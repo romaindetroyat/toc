@@ -32,8 +32,8 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Jouer un tour (PLAY)
 
-- [ ] **PLAY-01** : Le joueur voit sa main et, quand c'est son tour, les cartes jouables et les pions concernés sont mis en évidence.
-- [ ] **PLAY-02** : Le joueur choisit une carte puis un pion (ou une cible), voit un aperçu du trajet et des pions qui seraient mangés, puis confirme son coup.
+- [x] **PLAY-01** : Le joueur voit sa main et, quand c'est son tour, les cartes jouables et les pions concernés sont mis en évidence.
+- [x] **PLAY-02** : Le joueur choisit une carte puis un pion (ou une cible), voit un aperçu du trajet et des pions qui seraient mangés, puis confirme son coup.
 - [ ] **PLAY-03** : Avec le 7, le joueur répartit les pas entre ses pions à l'aide d'un assistant pas à pas qui affiche le reste à jouer, puis confirme en une fois.
 - [ ] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
 - [ ] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
@@ -135,8 +135,8 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | RULE-18 | Phase 1 | Complete |
 | RULE-19 | Phase 2 | Pending |
 | RULE-20 | Phase 1 | Complete |
-| PLAY-01 | Phase 1 | Pending |
-| PLAY-02 | Phase 1 | Pending |
+| PLAY-01 | Phase 1 | Complete |
+| PLAY-02 | Phase 1 | Complete |
 | PLAY-03 | Phase 1 | Pending |
 | PLAY-04 | Phase 1 | Pending |
 | PLAY-05 | Phase 1 | Pending |
