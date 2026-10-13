@@ -3,11 +3,13 @@
   import {
     type CardId,
     COLORS,
+    type Color,
     type PawnId,
     type Place,
     type Playability,
     pawnColor,
     playability,
+    teamOf,
   } from "@toc/engine";
   import { clear, hop, partsOf } from "../board/animator.ts";
   import Board from "../board/Board.svelte";
@@ -15,9 +17,17 @@
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
   import Pawn from "../board/Pawn.svelte";
-  import { createSession, loadDebugParams, type Session } from "../game/session.svelte.ts";
+  import type { DebugParams } from "../game/debugParams.ts";
+  import {
+    createSession,
+    loadDebugParams,
+    type Session,
+    type SessionEnv,
+  } from "../game/session.svelte.ts";
   import type { TurnUiEvent } from "../game/turnUi.ts";
   import ActionZone from "../ui/ActionZone.svelte";
+  import DealBanner from "../ui/DealBanner.svelte";
+  import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
 
@@ -53,55 +63,82 @@
 
   let session = $state.raw<Session>();
 
+  // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
+  const env: SessionEnv = {
+    animator: {
+      hop(pawn, points, timeline, leadMs, pawnFacings) {
+        // The moving pawn is re-ordered on top before its animation starts (moving a node
+        // while it animates would cut the animation).
+        movingPawn = pawn;
+        flushSync();
+        const parts = partsOf(els[pawn]);
+        if (!parts) throw new Error(`pawn ${pawn} is not mounted`);
+        return hop(parts, points, timeline, leadMs, pawnFacings);
+      },
+      finish(pawn) {
+        const parts = partsOf(els[pawn]);
+        if (!parts) return;
+        for (const group of [parts.mover, parts.arc, parts.facing]) {
+          for (const animation of group.getAnimations()) animation.finish();
+        }
+      },
+    },
+    facingOf: (pawn) => facings[pawn] ?? "right",
+    commit(pawn, _place, facing) {
+      // The render state already holds the landing place: keep the facing, move the static
+      // anchor, then drop the animation offset in the same task (no flicker).
+      facings = { ...facings, [pawn]: facing };
+      flushSync();
+      const parts = partsOf(els[pawn]);
+      if (parts) clear(parts);
+      movingPawn = undefined;
+    },
+  };
+
+  let alive = true;
+  /** Counts the games started, so a game that was replaced while it was being built is dropped. */
+  let epoch = 0;
+  /** The debug parameters the first game was opened with; a replay keeps only the speed. */
+  let opened: DebugParams = {};
+
+  /** Starts a game, replacing the one on screen: the board is unmounted first, so the pawns start afresh. */
+  async function begin(debug: DebugParams, colour?: Color) {
+    const mine = ++epoch;
+    session?.dispose();
+    session = undefined;
+    facings = Object.fromEntries(PAWNS.map(({ id }) => [id, "right" as Facing]));
+    movingPawn = undefined;
+    tapped = null;
+    missed = false;
+    await tick();
+    if (!alive || mine !== epoch) return;
+    const created = createSession(env, debug, colour);
+    session = created;
+    // The pawns must be mounted before the first bot can move.
+    await tick();
+    if (alive && mine === epoch) created.start();
+  }
+
   onMount(() => {
-    let alive = true;
-    let created: Session | undefined;
     (async () => {
-      const debug = await loadDebugParams(location.hash);
-      if (!alive) return;
-      created = createSession(
-        {
-          animator: {
-            hop(pawn, points, timeline, leadMs, pawnFacings) {
-              // The moving pawn is re-ordered on top before its animation starts (moving a node
-              // while it animates would cut the animation).
-              movingPawn = pawn;
-              flushSync();
-              const parts = partsOf(els[pawn]);
-              if (!parts) throw new Error(`pawn ${pawn} is not mounted`);
-              return hop(parts, points, timeline, leadMs, pawnFacings);
-            },
-            finish(pawn) {
-              const parts = partsOf(els[pawn]);
-              if (!parts) return;
-              for (const group of [parts.mover, parts.arc, parts.facing]) {
-                for (const animation of group.getAnimations()) animation.finish();
-              }
-            },
-          },
-          facingOf: (pawn) => facings[pawn] ?? "right",
-          commit(pawn, _place, facing) {
-            // The render state already holds the landing place: keep the facing, move the static
-            // anchor, then drop the animation offset in the same task (no flicker).
-            facings = { ...facings, [pawn]: facing };
-            flushSync();
-            const parts = partsOf(els[pawn]);
-            if (parts) clear(parts);
-            movingPawn = undefined;
-          },
-        },
-        debug,
-      );
-      session = created;
-      // The pawns must be mounted before the first bot can move.
-      await tick();
-      if (alive) created.start();
+      opened = await loadDebugParams(location.hash);
+      if (alive) await begin(opened);
     })();
     return () => {
       alive = false;
-      created?.dispose();
+      session?.dispose();
     };
   });
+
+  /** « Rejouer »: a new game with the same colour (and the same speed under test). */
+  function replay() {
+    void begin({ vitesse: opened.vitesse }, session?.human);
+  }
+
+  /** « Changer de couleur »: back to the launch screen. */
+  function changeColour() {
+    location.hash = "#/";
+  }
 
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
@@ -282,6 +319,7 @@
             />
           {/snippet}
         </Board>
+        <DealBanner {render} names={session.names} />
       </div>
 
       <div class="action">
@@ -313,6 +351,16 @@
         />
       </div>
     </div>
+
+    {#if render.phase === "won" && render.winner !== null}
+      <EndScreen
+        won={render.winner === teamOf(session.human)}
+        winner={render.winner}
+        stats={session.stats}
+        onreplay={replay}
+        onchange={changeColour}
+      />
+    {/if}
   {/if}
 </main>
 
@@ -365,6 +413,7 @@
 
   .stage {
     grid-area: stage;
+    position: relative;
     display: flex;
     justify-content: center;
   }

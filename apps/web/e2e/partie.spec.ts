@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { etatParam } from "./position.ts";
 
 // A seeded game (the `graine` debug parameter fixes the deck and the bots) at test speed (no think
 // delay, no motion), and positions made by hand for the dead hand and the end of the game.
@@ -109,4 +110,92 @@ test("un coup simple : carte, cheval, aperçu, rien ne bouge seul, « Jouer », 
   // The card lies on the felt in front of his place.
   await expect(page.locator('[data-felt-last="bleu"]')).toBeVisible();
   await expect(page.locator(`[data-felt-last="bleu"] [data-felt-card="${played}"]`)).toBeVisible();
+});
+
+// R-14.2 (packages/engine/scenarios/fin.ts) with a Jaune hand that can play: in the fixture itself the
+// other hands are empty, so the next deal starts the moment Bleu lays his cards down and the posed
+// hand would not stay on the felt long enough to be seen. Bleu holds a 2, a 4 and a Valet with every
+// knight in its stable: nothing can be played.
+const DEAD_HAND = {
+  turn: "bleu",
+  hands: { bleu: ["2S", "4S", "11S"], jaune: ["2H", "3H", "5H"] },
+  pawns: { jaune: [{ p: 5 }, "S", "S", "S"] },
+};
+
+test("main injouable : rien ne se pose seul, « Poser mes cartes » étale la main sur le tapis", async ({
+  page,
+}) => {
+  await openGame(page, `etat=${etatParam(DEAD_HAND)}`);
+
+  await expect(zone(page)).toHaveAttribute("data-state", "deadHand");
+  await expect(zone(page)).toContainText("Aucune carte ne peut être jouée.");
+  const pose = page.getByRole("button", { name: "Poser mes cartes" });
+  await expect(pose).toBeVisible();
+  await expect(page.locator('[data-hand] [data-state="unplayable"]')).toHaveCount(3);
+
+  // Two seconds later the hand is still in the hand zone: the game never poses it for the player (D-20).
+  await page.waitForTimeout(2000);
+  await expect(page.locator("[data-hand] [data-card]")).toHaveCount(3);
+  await expect(page.locator("[data-felt-posed]")).toHaveCount(0);
+
+  await pose.click();
+  await expect(page.locator('[data-felt-posed="bleu"] [data-felt-card]')).toHaveCount(3);
+  await expect(zone(page)).toContainText("Tu attends la prochaine donne.");
+  await expect(page.locator("[data-hand] [data-card]")).toHaveCount(0);
+  await expect(page.locator("[data-hand-empty]")).toContainText("Plus de cartes");
+  await expect(page.locator("[data-hand-empty]")).toContainText(
+    "Attends la prochaine donne : les autres joueurs finissent leur tour.",
+  );
+});
+
+test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » revient au départ", async ({
+  page,
+}) => {
+  // R-16.4: Bleu's four knights are home and the 5 brings Rouge's last knight home (RULE-17, RULE-18).
+  await openGame(page, "scenario=R-16.4&vitesse=test");
+  // The partner is a horse picked at random: « ceux de Marengo » or « ceux d’Ourasi ».
+  await expect(zone(page)).toContainText(
+    /Tes quatre chevaux sont rentrés\. Tu joues avec ceux d(e |’)\S+\./,
+  );
+  await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 7/8");
+
+  await page.getByRole("button", { name: "5 de pique, jouable" }).click();
+  // The partner's knights carry the halos.
+  await expect(page.locator('[data-halo="rouge3"]')).toBeVisible();
+  await page.locator('[data-hit="rouge3"]').click({ force: true });
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+
+  const end = page.locator("[data-end-screen]");
+  await expect(end).toBeVisible();
+  await expect(end.getByRole("heading", { name: "Victoire !" })).toBeVisible();
+  await expect(end).toContainText("Ton équipe a rentré ses 8 chevaux.");
+  await expect(end).toContainText(/Donnes jouées\s*: 0/);
+  await expect(end).toContainText(/Chevaux mangés\s*: nous 0, eux 0/);
+  await expect(page.getByRole("button", { name: "Rejouer" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Changer de couleur" }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+});
+
+test("fin de partie : « Rejouer » ouvre une nouvelle partie avec la même couleur", async ({
+  page,
+}) => {
+  // R-16.1: Rouge plays the 5 that brings his last knight home, which wins for Bleu and Rouge.
+  await openGame(page, "scenario=R-16.1&vitesse=test");
+  const turns = await page.locator("[data-board]").getAttribute("data-k");
+  expect(turns).not.toBe("0");
+
+  await page.getByRole("button", { name: "5 de pique, jouable" }).click();
+  await page.locator('[data-hit="rouge3"]').click({ force: true });
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+  await expect(page.locator("[data-end-screen]")).toBeVisible();
+
+  await page.getByRole("button", { name: "Rejouer" }).click();
+  await expect(page.locator("[data-end-screen]")).toHaveCount(0);
+  await expect(page.locator("[data-board]")).toHaveAttribute("data-k", turns as string);
+  await expect(zone(page)).toHaveAttribute("data-state", "exchange");
+  await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
+  await expect(page.locator("[data-info-bar]")).toContainText("Donne 1 sur 3");
+  await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 0/8");
 });

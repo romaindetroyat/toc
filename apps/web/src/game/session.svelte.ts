@@ -74,9 +74,17 @@ export async function loadDebugParams(hash: string): Promise<DebugParams> {
   return {};
 }
 
-export function createSession(env: SessionEnv, debug: DebugParams = {}): Session {
+/**
+ * `colour` is the seat the human plays; without it, the colour chosen on the launch screen. A debug
+ * scenario overrides it with the seat whose turn it is.
+ */
+export function createSession(
+  env: SessionEnv,
+  debug: DebugParams = {},
+  colour: Color = settings.lastColor,
+): Session {
   const scenario = debug.etat ?? debug.scenario?.before;
-  const human = humanSeat(settings.lastColor, scenario);
+  const human = humanSeat(colour, scenario);
   const k = quarterTurnsFor(human);
   const testSpeed = debug.vitesse === "test";
 
