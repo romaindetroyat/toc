@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import raw from "../../../../assets/audio/LICENSES.md?raw";
 import { SOUND_IDS } from "../audio/sounds.ts";
-import { LICENCES, parseLicences } from "./licences.ts";
+import { LICENCES, type LicenceRow, parseLicences, uncoveredAssets } from "./licences.ts";
 
 const SAMPLE = [
   "# Licences",
@@ -109,6 +109,97 @@ describe("assets/audio/LICENSES.md", () => {
   it("shows no raw markup in any cell", () => {
     for (const row of rows) {
       for (const cell of Object.values(row)) expect(cell).not.toMatch(/[<>]/);
+    }
+  });
+});
+
+const row = (id: string, fichier: string): LicenceRow => ({
+  id,
+  fichier,
+  type: "police",
+  source: "s",
+  auteur: "a",
+  licence: "l",
+  url: "—",
+});
+
+describe("uncoveredAssets", () => {
+  const rows = [
+    row("nunito", "nunito-latin.woff2, nunito-latin-ext.woff2"),
+    row("cartes", "apps/web/src/assets/cartes/"),
+    row("un-son", "apps/web/public/audio/pose.m4a"),
+  ];
+
+  it("accepts a file named in a row, by its name or by its path", () => {
+    expect(uncoveredAssets(["apps/web/src/assets/fonts/nunito-latin.woff2"], rows)).toEqual([]);
+    expect(uncoveredAssets(["apps/web/public/audio/pose.m4a"], rows)).toEqual([]);
+  });
+
+  it("accepts every file under a directory prefix of a row", () => {
+    expect(
+      uncoveredAssets(
+        ["apps/web/src/assets/cartes/11S.svg", "apps/web/src/assets/cartes/a/b.svg"],
+        rows,
+      ),
+    ).toEqual([]);
+  });
+
+  it("accepts a licence text, which is the licence itself", () => {
+    expect(
+      uncoveredAssets(
+        ["apps/web/src/assets/fonts/OFL-Nunito.txt", "x/LICENSE", "x/LGPL-2.1.txt"],
+        rows,
+      ),
+    ).toEqual([]);
+  });
+
+  it("lists a new asset file that has no row (temporary fixture list)", () => {
+    const fixture = [
+      "apps/web/src/assets/fonts/nunito-latin.woff2",
+      "apps/web/src/assets/cartes/11S.svg",
+      "apps/web/src/assets/fonts/nouvelle-police.woff2",
+      "apps/web/public/audio/galop.m4a",
+    ];
+    expect(uncoveredAssets(fixture, rows)).toEqual([
+      "apps/web/src/assets/fonts/nouvelle-police.woff2",
+      "apps/web/public/audio/galop.m4a",
+    ]);
+  });
+
+  it("does not let a directory prefix cover a sibling directory with a longer name", () => {
+    expect(uncoveredAssets(["apps/web/src/assets/cartes-autres/x.svg"], rows)).toEqual([
+      "apps/web/src/assets/cartes-autres/x.svg",
+    ]);
+  });
+});
+
+// Bundled asset files: the fonts and the card art under apps/web/src/assets, and the recorded sounds
+// under apps/web/public/audio when that directory exists. Only the file names are listed (no import).
+const bundled = [
+  ...Object.keys(import.meta.glob("../assets/**/*")).map((file) => `apps/web/src/${file.slice(3)}`),
+  ...Object.keys(import.meta.glob("../../public/audio/**/*")).map(
+    (file) => `apps/web/${file.slice(6)}`,
+  ),
+];
+
+describe("bundled asset files", () => {
+  it("finds the fonts and the court figures", () => {
+    expect(bundled.some((file) => file.endsWith("/fonts/nunito-latin.woff2"))).toBe(true);
+    expect(bundled.filter((file) => /\/cartes\/1[123][SHDC]\.(svg|webp)$/.test(file))).toHaveLength(
+      12,
+    );
+  });
+
+  it("have a row in assets/audio/LICENSES.md (FX-05)", () => {
+    expect(uncoveredAssets(bundled, parseLicences(raw))).toEqual([]);
+  });
+
+  it("have a « cartes » row for the court figures, with the author and the licence", () => {
+    const cartes = parseLicences(raw).filter((entry) => entry.type === "cartes");
+    expect(cartes.length).toBeGreaterThanOrEqual(1);
+    for (const entry of cartes) {
+      expect(entry.auteur, `auteur of ${entry.id}`).not.toBe("");
+      expect(entry.licence, `licence of ${entry.id}`).not.toBe("");
     }
   });
 });
