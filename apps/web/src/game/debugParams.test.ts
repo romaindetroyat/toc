@@ -5,9 +5,10 @@ import { parseDebugParams } from "./debugParams.ts";
 const ON = { debug: true };
 
 function encode(value: unknown): string {
-  return Buffer.from(typeof value === "string" ? value : JSON.stringify(value)).toString(
-    "base64url",
-  );
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  let binary = "";
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 const GOOD_ETAT = {

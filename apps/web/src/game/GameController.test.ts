@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { randomLegal } from "@toc/bots";
 import {
   type Action,
@@ -12,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOT_NAMES } from "./botNames.ts";
 import { createGame, type GameDirector, type Speed } from "./GameController.ts";
+import source from "./GameController.ts?raw";
 
 // The real bot, wrapped so the tests can see what it was called with.
 vi.mock("@toc/bots", async (importOriginal) => {
@@ -128,7 +128,6 @@ describe("createGame: set-up", () => {
   });
 
   it("keeps the random source out of the controller code", () => {
-    const source = readFileSync(new URL("./GameController.ts", import.meta.url), "utf8");
     expect(source).toContain("getRandomValues");
     expect(source).not.toMatch(/Math\.random/);
     expect(source).not.toMatch(/Date\.now|new Date/);
@@ -221,7 +220,7 @@ describe("bots: think delay and view-only play (D-18)", () => {
       expect(view).not.toHaveProperty("rng");
     }
     // The jaune bot saw its own card and the size of the others, nothing more.
-    const [jaune] = calls[0] as [PlayerView];
+    const jaune = calls[0]?.[0] as PlayerView;
     expect(jaune.hand).toEqual(["4S"]);
     expect(jaune.handSizes.bleu).toBe(1);
     game.dispose();

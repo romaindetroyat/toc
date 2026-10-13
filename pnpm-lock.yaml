@@ -32,6 +32,9 @@ importers:
       '@toc/board':
         specifier: workspace:*
         version: link:../../packages/board
+      '@toc/bots':
+        specifier: workspace:*
+        version: link:../../packages/bots
       '@toc/engine':
         specifier: workspace:*
         version: link:../../packages/engine
