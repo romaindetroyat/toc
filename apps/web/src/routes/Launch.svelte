@@ -51,12 +51,12 @@
 
 <main class="launch">
   <header>
-    <h1>{launch.title}</h1>
+    <h1 class="t-display">{launch.title}</h1>
     <p class="tagline">{launch.tagline}</p>
   </header>
 
   <section class="choice">
-    <h2 id="choose-color">{launch.chooseColor}</h2>
+    <h2 id="choose-color" class="t-heading">{launch.chooseColor}</h2>
     <div class="grid" role="radiogroup" aria-labelledby="choose-color">
       {#each COLORS as color (color)}
         <ColorTile
@@ -95,7 +95,7 @@
     <p class="note">{launch.note}</p>
   </section>
 
-  <button type="button" class="primary" onclick={play}>{launch.play}</button>
+  <button type="button" class="btn btn-primary play" onclick={play}>{launch.play}</button>
 </main>
 
 <style>
@@ -118,8 +118,6 @@
 
   h1 {
     margin: 0;
-    font-size: 64px;
-    line-height: 1.2;
     letter-spacing: 0.08em;
   }
 
@@ -129,9 +127,7 @@
   }
 
   h2 {
-    margin: 0 0 16px;
-    font-size: 20px;
-    line-height: 1.2;
+    margin: 0 0 var(--space-md);
     text-align: center;
   }
 
@@ -161,8 +157,9 @@
   }
 
   .label {
-    font-size: 14px;
+    font-size: var(--label-size);
     font-weight: 700;
+    line-height: var(--label-line);
   }
 
   .plus {
@@ -176,16 +173,7 @@
     text-align: center;
   }
 
-  .primary {
+  .play {
     width: 100%;
-    min-height: 48px;
-    padding: 0 24px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--ambre);
-    color: var(--noyer);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
   }
 </style>

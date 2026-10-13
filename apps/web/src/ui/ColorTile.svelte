@@ -2,6 +2,7 @@
   import type { Color } from "@toc/engine";
   import { launch } from "../i18n/fr/launch.ts";
   import { seats } from "../i18n/fr/seats.ts";
+  import Icon from "./Icon.svelte";
   import SeatChip from "./SeatChip.svelte";
 
   type Props = {
@@ -50,6 +51,9 @@
     <span class="disc"></span>
   </span>
   <SeatChip {color} />
+  {#if selected}
+    <span class="check" aria-hidden="true"><Icon name="check" size={16} /></span>
+  {/if}
   {#if partner}
     <span class="tag" id={tagId}>{launch.partner}</span>
   {/if}
@@ -65,7 +69,7 @@
     gap: 8px;
     min-width: 128px;
     min-height: 128px;
-    padding: 16px 8px;
+    padding: 28px 8px 16px;
     border: 3px solid transparent;
     border-radius: 12px;
     /* Light oak with a faint horizontal grain, drawn in CSS (the board art stays untouched). */
@@ -124,6 +128,19 @@
   }
   .tile[data-color="vert"] {
     --tile-pawn: var(--pawn-vert);
+  }
+
+  .check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #2b1d12;
+    color: var(--creme);
   }
 
   .tag {
