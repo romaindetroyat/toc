@@ -281,13 +281,14 @@ test.describe("crédits et licences", () => {
     await expect(dialog.getByText("Nunito", { exact: true })).toBeVisible();
     await expect(dialog.getByText("The Nunito Project Authors · OFL-1.1")).toBeVisible();
     await expect(dialog.getByText("Généré par le code").first()).toBeVisible();
-    for (const title of ["Sons", "Polices", "Icônes", "Plateau", "Cavaliers"]) {
+    for (const title of ["Sons", "Polices", "Icônes", "Plateau", "Cavaliers", "Cartes"]) {
       await expect(dialog.getByRole("heading", { name: title, level: 3 })).toHaveCount(1);
     }
-    // No card art row yet: no « Cartes » group.
-    await expect(dialog.getByRole("heading", { name: "Cartes", level: 3 })).toHaveCount(0);
+    // The court figures name their author and their licence.
+    await expect(dialog.getByText("Figures des cartes (Valet, Dame, Roi)")).toBeVisible();
+    await expect(dialog.getByText(/David Bellot.*LGPL-2\.1/)).toBeVisible();
     // One entry per row of the manifest, shown as text.
-    await expect(dialog.locator("li[data-credit]")).toHaveCount(16);
+    await expect(dialog.locator("li[data-credit]")).toHaveCount(17);
     await expect(dialog.locator("a")).toHaveCount(0);
   });
 

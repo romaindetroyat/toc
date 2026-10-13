@@ -40,5 +40,6 @@ export const credits = {
     lucide: "Lucide",
     plateau: "Plateau de jeu",
     cavaliers: "Cavaliers",
+    cartes: "Figures des cartes (Valet, Dame, Roi)",
   } as Record<string, string>,
 } as const;

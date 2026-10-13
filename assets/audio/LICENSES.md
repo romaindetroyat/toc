@@ -1,10 +1,11 @@
 # Licences : sons, polices, icônes, plateau et cavaliers
 
-Ce registre trace la provenance de tout ce que le jeu embarque : un son, une police, un jeu d’icônes ou une illustration par ligne. Le jeu le lit tel quel : la feuille « Crédits et licences » et la page `#/sons` affichent ces lignes. Un test échoue si un son du catalogue (`apps/web/src/audio/sounds.ts`) n’a pas sa ligne.
+Ce registre trace la provenance de tout ce que le jeu embarque : un son, une police, un jeu d’icônes ou une illustration par ligne. Le jeu le lit tel quel : la feuille « Crédits et licences » et la page `#/sons` affichent ces lignes. Un test échoue si un son du catalogue (`apps/web/src/audio/sounds.ts`) n’a pas sa ligne, et si un fichier de `apps/web/src/assets` (polices, figures des cartes) ou de `apps/web/public/audio` n’est couvert par aucune ligne.
 
 Règles pour ajouter une ligne :
 
 - Un fichier enregistré (CC0 ou équivalent) a sa propre ligne, avec l’adresse de la page d’origine (Freesound, OpenGameArt…) et le nom de l’auteur. Une licence à vérifier fichier par fichier ne se déduit jamais d’un lot.
+- La colonne `fichier` donne le nom du fichier, son chemin depuis la racine du dépôt, ou un dossier terminé par une barre oblique (tous les fichiers du dossier sont alors couverts). Les textes de licence (`OFL-*.txt`, `LGPL-*.txt`, `LICENSE*`) n’ont pas besoin de ligne.
 - Une ligne ne contient ni barre verticale ni balise : tout est affiché comme du texte.
 - Types utilisés : `son`, `police`, `icônes`, `plateau`, `cavaliers`, `cartes`.
 
@@ -26,3 +27,4 @@ Règles pour ajouter une ligne :
 | lucide | apps/web/src/ui/icons.ts | icônes | Lucide, paquet lucide-static 1.56.0 | Lucide Contributors | ISC (certaines icônes viennent de Feather : MIT) | https://lucide.dev |
 | plateau | assets/plateau/quart-bleu.webp, quart-jaune.webp, quart-rouge.webp, quart-vert.webp | plateau | Plateau dessiné par Romain | Romain | Utilisé avec l’accord de l’auteur | — |
 | cavaliers | assets/cavaliers/cavaliers-source.webp, apps/web/public/cavaliers/{bleu,jaune,rouge,vert}.webp | cavaliers | Cavaliers dessinés par Romain | Romain | Utilisés avec l’accord de l’auteur | — |
+| cartes | apps/web/src/assets/cartes/ | cartes | Figures du Valet, de la Dame et du Roi, paquet svg-cards 4.0.2, extraites en fichiers SVG séparés (fond, cadre et indices retirés, vue recadrée) par tools/import-card-art.mjs | David Bellot, Huub de Beer et contributeurs (desphilboy, Thomas Linard, rhorns) | LGPL-2.1 (GNU Lesser General Public License 2.1), texte dans LGPL-2.1.txt ; fichiers remplaçables | https://github.com/htdebeer/SVG-cards |

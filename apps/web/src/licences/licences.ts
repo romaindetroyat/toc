@@ -66,3 +66,25 @@ export const LICENCES: LicenceRow[] = parseLicences(manifest);
 export function licenceOf(id: string): LicenceRow | undefined {
   return LICENCES.find((row) => row.id === id);
 }
+
+/** A licence text is the licence itself: OFL-Nunito.txt, LGPL-2.1.txt, LICENSE, LICENCE.md... */
+const LICENCE_TEXT = /(^|\/)((OFL|LGPL|GPL)-[-._A-Za-z0-9]*\.txt|LICEN[CS]E(\.(txt|md))?)$/i;
+
+/** Whether one cell of the `fichier` column covers a file: its name, its path, or a directory prefix. */
+function covers(entry: string, file: string): boolean {
+  if (entry === "" || entry === "—") return false;
+  if (entry.endsWith("/")) return file.startsWith(entry);
+  return entry === file || entry === file.slice(file.lastIndexOf("/") + 1);
+}
+
+/**
+ * The bundled asset files (paths from the repository root, « / » separated) that no row of the
+ * manifest covers (FX-05): a row covers a file when its `fichier` cell lists the file name, the file
+ * path, or a directory ending in « / » that holds the file. Licence texts need no row.
+ */
+export function uncoveredAssets(files: string[], rows: LicenceRow[] = LICENCES): string[] {
+  const entries = rows.flatMap((row) => row.fichier.split(",").map((entry) => entry.trim()));
+  return files.filter(
+    (file) => !LICENCE_TEXT.test(file) && !entries.some((entry) => covers(entry, file)),
+  );
+}

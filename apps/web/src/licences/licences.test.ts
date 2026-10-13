@@ -153,6 +153,12 @@ describe("uncoveredAssets", () => {
     ).toEqual([]);
   });
 
+  it("does not take a font or a picture for a licence text because of its name", () => {
+    expect(
+      uncoveredAssets(["apps/web/src/assets/fonts/licensed-sans.woff2", "x/GPL.svg"], rows),
+    ).toEqual(["apps/web/src/assets/fonts/licensed-sans.woff2", "x/GPL.svg"]);
+  });
+
   it("lists a new asset file that has no row (temporary fixture list)", () => {
     const fixture = [
       "apps/web/src/assets/fonts/nunito-latin.woff2",
