@@ -23,7 +23,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
 - [ ] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
 - [ ] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
-- [ ] **RULE-15** : Un pion doit avoir fait le tour complet pour entrer dans sa maison par sa case d'entrée, au compte exact, sans sauter un pion déjà rentré.
+- [ ] **RULE-15** : Un pion doit avoir fait le tour complet pour entrer dans sa maison par sa case d'entrée, au compte exact jusqu'à une case vide, sans sauter un pion déjà rentré ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact.
 - [ ] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
 - [ ] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [ ] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
