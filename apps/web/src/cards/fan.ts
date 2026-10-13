@@ -33,3 +33,29 @@ export function fanLayout(n: number, width: number, cardW: number): FanSlot[] {
 export function visibleSlice(n: number, width: number, cardW: number): number {
   return n <= 1 ? cardW : Math.min(56, Math.floor((width - cardW) / (n - 1)));
 }
+
+/** The width of the screen margin on each side of the fan (the padding of the hand zone), px. */
+export const FAN_GUTTER = 16;
+
+/**
+ * How far past the box of the fan the top corners of its outer cards reach once they are turned about
+ * the point at 160 % of their height (the corner swings out by 1.6 h sin(a) and the half width
+ * shrinks by cos(a)), px. Zero for one card, and never negative.
+ */
+export function fanReach(n: number, cardW: number, cardH: number): number {
+  if (n <= 1) return 0;
+  const angle = (((n - 1) / 2) * 4 * Math.PI) / 180;
+  const pivotY = 1.6 * cardH;
+  // The outer top corner, relative to the pivot (the card's centre line, 160 % down), then turned.
+  const x = (cardW / 2) * Math.cos(angle) + pivotY * Math.sin(angle);
+  return Math.max(0, x - cardW / 2);
+}
+
+/**
+ * The width the fan may spread over so that its turned outer cards stay inside the screen: the
+ * container width less what the turned corners reach past the gutter, on both sides.
+ */
+export function fanSpread(n: number, width: number, cardW: number, cardH: number): number {
+  const beyond = Math.max(0, Math.ceil(fanReach(n, cardW, cardH)) - FAN_GUTTER);
+  return width - 2 * beyond;
+}

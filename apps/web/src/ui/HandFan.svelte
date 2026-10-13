@@ -10,7 +10,7 @@
   import { MOTION, type Mode, REDUCED, scaleFor } from "@toc/board";
   import { type CardId, type Playability, sortHand } from "@toc/engine";
   import { tick, untrack } from "svelte";
-  import { cardSize, fanLayout } from "../cards/fan.ts";
+  import { cardSize, fanLayout, fanSpread } from "../cards/fan.ts";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
   import Card, { type CardState } from "./Card.svelte";
@@ -48,7 +48,10 @@
 
   const cards = $derived(sortHand(hand));
   const size = $derived(cardSize(viewportWidth, viewportHeight));
-  const slots = $derived(fanLayout(cards.length, width, size.w));
+  // The turned outer cards stay inside the screen: on a 320 px phone the fan spreads a little less.
+  const slots = $derived(
+    fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
+  );
   const interactive = $derived(mode !== "waiting");
 
   function stateOf(card: CardId): CardState {
@@ -198,7 +201,7 @@
   .fan {
     position: relative;
     width: 100%;
-    height: calc(var(--card-h) + 32px);
+    height: calc(var(--card-h) + 36px);
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
@@ -237,7 +240,8 @@
   .slot {
     position: absolute;
     left: calc(50% - var(--card-w) / 2);
-    bottom: 16px;
+    /* Room under the card for the drop of the outer cards and the swing of their turned corners. */
+    bottom: 26px;
     width: var(--card-w);
     height: var(--card-h);
     transform-origin: 50% 160%;

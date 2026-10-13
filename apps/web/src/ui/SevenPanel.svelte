@@ -65,7 +65,7 @@
   let region = $state<HTMLElement | undefined>();
   $effect(() => {
     void rows.length;
-    if (region !== undefined) region.scrollTop = region.scrollHeight;
+    if (region) region.scrollTop = region.scrollHeight;
   });
 </script>
 
@@ -217,8 +217,10 @@
     font-weight: 700;
   }
 
+  /* Seven chips of 44 are 332 wide: on a 320 px phone they wrap to a second row. */
   .chips {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-xs);
     min-height: var(--touch);
   }

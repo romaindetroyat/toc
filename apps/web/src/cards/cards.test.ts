@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
 import { botLine, describeAction } from "../i18n/fr/game.ts";
 import { cardFace } from "./faces.ts";
-import { cardSize, fanLayout, visibleSlice } from "./fan.ts";
+import { cardSize, fanLayout, fanReach, fanSpread, visibleSlice } from "./fan.ts";
 
 describe("cardFace", () => {
   it("labels ranks and colours suits", () => {
@@ -94,6 +94,23 @@ describe("hand fan", () => {
       expect(visibleSlice(n, 320 - 32, 72)).toBeGreaterThanOrEqual(44);
     }
     expect(visibleSlice(5, 320 - 32, 72)).toBe(54);
+  });
+
+  it("spreads the fan so that the turned outer cards stay on a 320 px screen", () => {
+    const reach = fanReach(5, 72, 100);
+    // On a 320 px screen the gutter is 16 px: the corners would stick out by about 6 px without it.
+    expect(reach).toBeGreaterThan(21);
+    expect(reach).toBeLessThan(23);
+    const spread = fanSpread(5, 320 - 32, 72, 100);
+    expect(spread).toBeLessThan(288);
+    // The outer card's turned corner is back inside the 16 px gutter.
+    const offset = Math.min(56, Math.floor((spread - 72) / 4));
+    expect(offset).toBeGreaterThanOrEqual(44);
+    const reachFromEdge = 16 + (288 - (spread - 72 + 72)) / 2 - reach;
+    expect(reachFromEdge).toBeGreaterThanOrEqual(0);
+    // Nothing to give back when the screen is wide, or the hand is one card.
+    expect(fanSpread(5, 358, 72, 100)).toBeLessThanOrEqual(358);
+    expect(fanReach(1, 72, 100)).toBe(0);
   });
 
   it("uses the regular card size from 600 px", () => {

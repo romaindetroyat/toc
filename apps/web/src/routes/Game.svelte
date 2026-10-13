@@ -643,28 +643,41 @@
 
 <style>
   /*
-   * Board side (UI-SPEC "Game screen"): always a square, centred, never cropped. The chrome
-   * (info bar 56 + action zone 72 + hand zone 132 = 260) is reserved below the board in portrait,
-   * and the board keeps 4 % of its side free above it for the head of the top knights; in landscape
-   * the right panel takes 320 + 48. Safe-area insets are subtracted from both axes.
+   * Board side (UI-SPEC "Game screen"): always a square, centred, never cropped. The chrome below the
+   * board in portrait is the info bar (56), the action zone and the hand zone: the action zone has a
+   * fixed height (--action) so that a longer prompt, the preview or the tray never pushes the hand down,
+   * and the hand zone is the fan plus the room the lifted and turned cards need (--hand). The board keeps
+   * 4 % of its side free above it for the head of the top knights; in landscape the right panel takes
+   * 320 + 48. Safe-area insets are subtracted from both axes. The page never scrolls (FX-01).
    */
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
     --inset-y: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-    --chrome: 260px;
+    --action: 120px;
+    --hand: 136px;
+    --chrome: calc(56px + var(--action) + var(--hand));
     --board-size: max(
       0px,
       min(100vw - var(--inset-x), (100dvh - var(--chrome) - var(--inset-y)) / 1.04, 880px)
     );
+    /* Its own formatting context: the outer margin of the landscape layout stays inside the page. */
+    display: flow-root;
     min-height: 100%;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
       env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
 
+  /* Below 360 px the prompt wraps more and the tray stacks its button: the zone is a little taller. */
+  @media (max-width: 359.98px) {
+    .game {
+      --action: 128px;
+    }
+  }
+
   /* Regular cards (88 x 124): the hand zone is 24 px taller. */
   @media (min-width: 600px) and (min-height: 600px) {
     .game {
-      --chrome: 284px;
+      --hand: 160px;
     }
   }
 
@@ -680,7 +693,7 @@
       "stage"
       "action"
       "hand";
-    grid-template-rows: 56px auto auto auto;
+    grid-template-rows: 56px auto var(--action) auto;
     align-content: start;
   }
 
@@ -695,13 +708,15 @@
     justify-content: center;
   }
 
+  /* A fixed height; the prompt is centred in it, and a prompt that is longer than it scrolls here. */
   .action {
     grid-area: action;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 72px;
-    max-height: 160px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .hand {
@@ -725,8 +740,8 @@
     }
 
     .layout {
-      max-width: none;
-      width: max-content;
+      max-width: 100%;
+      width: fit-content;
       min-height: calc(100dvh - 32px - var(--inset-y));
       margin: 16px auto;
       column-gap: var(--space-md);
@@ -735,8 +750,13 @@
         "stage info"
         "stage action"
         "stage hand";
-      grid-template-rows: 56px auto 1fr;
+      grid-template-rows: 56px minmax(72px, auto) 1fr;
       align-content: stretch;
+    }
+
+    .action {
+      min-height: 72px;
+      max-height: 160px;
     }
 
     .stage {
@@ -745,6 +765,21 @@
 
     .hand {
       align-self: end;
+    }
+  }
+
+  /* A short landscape screen (480 x 320): no outer margin, so the right panel has the height it needs. */
+  @media (orientation: landscape) and (max-height: 400px) {
+    .game {
+      --board-size: max(
+        0px,
+        min(100dvh - var(--inset-y), 100vw - 368px - var(--inset-x)) / 1.04
+      );
+    }
+
+    .layout {
+      min-height: calc(100dvh - var(--inset-y));
+      margin: 0 auto;
     }
   }
 </style>

@@ -75,6 +75,7 @@
     display: grid;
     place-items: center;
     pointer-events: none;
+    container-type: size;
   }
 
   .plate {
@@ -100,5 +101,18 @@
   .sub {
     font-size: var(--label-size);
     line-height: var(--label-line);
+  }
+
+  /* A small board (a phone held sideways): a compact plate that stays inside it. */
+  @container (max-width: 240px) {
+    .plate {
+      max-width: 96%;
+      padding: var(--space-xs) var(--space-sm);
+    }
+
+    .display {
+      font-size: var(--body-size);
+      line-height: var(--body-line);
+    }
   }
 </style>
