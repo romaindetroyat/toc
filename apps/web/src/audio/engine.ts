@@ -447,12 +447,15 @@ function mirrorState(): void {
  * Returns the context, or undefined when the browser cannot create one (the game stays playable).
  */
 export function unlock(): AudioContext | undefined {
-  if (!engine && !createFailed) {
+  // A browser that could not create the context is asked again on each tap (« Réessayer » in the
+  // game): the failure is reported again if it persists.
+  if (!engine) {
     try {
       const created = new WebAudioBackend();
       const made = createAudioEngine({ backend: created, render: renderRecipe });
       backend = created;
       engine = made;
+      createFailed = false;
       made.onStatus(emit);
       created.onStateChange(mirrorState);
       // Any later tap retries the resume (iOS interrupts the context when the app goes to background).

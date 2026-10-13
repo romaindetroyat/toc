@@ -18,6 +18,8 @@
     /** A confirmation must not vanish on a stray tap outside: pass false for those. */
     closeOnBackdrop?: boolean;
     closeLabel?: string;
+    /** A confirmation makes its safe answer the primary button, focused on opening. */
+    closeIsPrimary?: boolean;
     /** Element that gets the focus back on close; defaults to the element focused on opening. */
     opener?: HTMLElement | null;
     children: Snippet;
@@ -28,6 +30,7 @@
     onclose,
     closeOnBackdrop = true,
     closeLabel = "Fermer",
+    closeIsPrimary = false,
     opener = null,
     children,
   }: Props = $props();
@@ -37,6 +40,7 @@
   const openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   let dialog = $state<HTMLElement>();
+  let closeButton = $state<HTMLButtonElement>();
 
   const me = Symbol("sheet");
   open.push(me);
@@ -74,9 +78,11 @@
     );
   }
 
-  // The focus moves into the sheet when it opens (on the dialog itself, so the title is read first).
+  // The focus moves into the sheet when it opens (on the dialog itself, so the title is read first; on
+  // the safe answer of a confirmation).
   $effect(() => {
-    dialog?.focus({ preventScroll: true });
+    if (closeIsPrimary) closeButton?.focus({ preventScroll: true });
+    else dialog?.focus({ preventScroll: true });
   });
 
   // The page behind does not scroll while the sheet is open.
@@ -157,7 +163,16 @@
     <div class="body" role="region" aria-labelledby={titleId} tabindex="0" data-sheet-body>
       {@render children()}
     </div>
-    <button type="button" class="btn btn-secondary close" onclick={onclose}>{closeLabel}</button>
+    <button
+      type="button"
+      class="btn close"
+      class:btn-primary={closeIsPrimary}
+      class:btn-secondary={!closeIsPrimary}
+      bind:this={closeButton}
+      onclick={onclose}
+    >
+      {closeLabel}
+    </button>
   </div>
 </div>
 

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { exchange, playSimpleMove, untilOwnTurn, zone } from "./jouer.ts";
 import { etatParam } from "./position.ts";
 
 // « Réglages » (plan 01-23): opened from the launch screen and from the gear of the game, switches
@@ -311,5 +312,140 @@ test.describe("en pleine partie", () => {
     );
     expect(moves.filter((a) => a.role === "mover").map((a) => a.duration)).toEqual([180]);
     expect(moves.filter((a) => a.role === "arc" || a.role === "squash")).toHaveLength(0);
+  });
+});
+
+test.describe("abandonner la partie", () => {
+  const confirm = (page: Page) => dialog(page, "Abandonner la partie ?");
+  const abandonLink = (page: Page) =>
+    dialog(page, "Réglages").getByRole("button", { name: "Abandonner la partie" });
+
+  test("réglages: « Abandonner la partie » n’existe qu’en partie, pas sur l’écran de lancement", async ({
+    page,
+  }) => {
+    await openFromLaunch(page);
+    await expect(dialog(page, "Réglages").getByRole("button", { name: "Abandonner" })).toHaveCount(
+      0,
+    );
+    await openGame(page);
+    await openFromGame(page);
+    await expect(abandonLink(page)).toBeVisible();
+  });
+
+  test("abandon: la confirmation garde « Continuer à jouer » au focus, Échap et le fond ne quittent pas", async ({
+    page,
+  }) => {
+    await openGame(page);
+    await openFromGame(page);
+    await abandonLink(page).click();
+
+    await expect(confirm(page)).toBeVisible();
+    await expect(confirm(page)).toContainText(
+      "La partie en cours sera perdue. Tu ne pourras pas la reprendre.",
+    );
+    const keep = confirm(page).getByRole("button", { name: "Continuer à jouer" });
+    await expect(keep).toBeFocused();
+    await expect(confirm(page).getByRole("button", { name: "Abandonner la partie" })).toBeVisible();
+
+    // A tap outside the dialog does not close it.
+    await page.mouse.click(4, 4);
+    await expect(confirm(page)).toBeVisible();
+
+    // Échap keeps the game: only the confirmation closes, the focus goes back to the text button.
+    await page.keyboard.press("Escape");
+    await expect(confirm(page)).toHaveCount(0);
+    await expect(dialog(page, "Réglages")).toBeVisible();
+    await expect(abandonLink(page)).toBeFocused();
+    await expect(page).toHaveURL(/#\/partie/);
+
+    // « Continuer à jouer » keeps it as well.
+    await abandonLink(page).click();
+    await confirm(page).getByRole("button", { name: "Continuer à jouer" }).click();
+    await expect(confirm(page)).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/partie/);
+    await expect(page.locator("[data-board]")).toBeVisible();
+  });
+
+  test("abandon: confirmer ramène à l’écran de lancement", async ({ page }) => {
+    await openGame(page);
+    await openFromGame(page);
+    await abandonLink(page).click();
+    await confirm(page).getByRole("button", { name: "Abandonner la partie" }).click();
+
+    await expect(page).toHaveURL(/#\/$/);
+    await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+    await expect(page.locator("[data-board]")).toHaveCount(0);
+    await expect(page.locator("[data-sheet-layer]")).toHaveCount(0);
+  });
+});
+
+test.describe("le son ne démarre pas", () => {
+  const toast = (page: Page) => page.locator("[data-toast]");
+
+  test("son: le message et « Réessayer » apparaissent, la partie se joue jusqu’au bout du tour sans son", async ({
+    page,
+  }) => {
+    // A browser that cannot create an AudioContext (or refuses to).
+    await page.addInitScript(() => {
+      const refuse = function refuse() {
+        throw new Error("AudioContext indisponible");
+      };
+      Object.assign(window, { AudioContext: refuse, webkitAudioContext: refuse });
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Jouer la partie" }).click();
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+
+    await expect(toast(page)).toContainText(
+      "Le son n’a pas pu démarrer. La partie reste jouable sans son.",
+    );
+    await expect(toast(page).getByRole("button", { name: "Réessayer" })).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-audio", "none");
+
+    // « Réessayer » asks again; the browser still refuses, so the message comes back.
+    await toast(page).getByRole("button", { name: "Réessayer" }).click();
+    await expect(toast(page)).toContainText("Le son n’a pas pu démarrer.");
+
+    // The game goes on without sound: an exchange, then a move, from a seeded game in test speed.
+    await page.evaluate((seed) => {
+      location.hash = "#/";
+      setTimeout(() => {
+        location.hash = `#/partie?graine=${seed}&vitesse=test`;
+      }, 0);
+    }, SEED);
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    await expect(zone(page)).toHaveAttribute("data-state", "exchange");
+    await exchange(page);
+    await untilOwnTurn(page);
+    await playSimpleMove(page);
+    await expect(page.locator("body")).toHaveAttribute("data-audio", "none");
+  });
+});
+
+test.describe("un problème inattendu", () => {
+  test("erreur: l’écran amical ne montre ni texte d’erreur ni trace, « Recharger la page » repart de zéro", async ({
+    page,
+  }) => {
+    const logged: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") logged.push(message.text());
+    });
+    await page.goto("/");
+    await page.goto("/#/panne");
+
+    const screen = page.locator("[data-error-screen]");
+    await expect(
+      screen.getByRole("heading", { name: "Oups, le jeu a rencontré un problème." }),
+    ).toBeVisible();
+    await expect(screen).toContainText(
+      "Recharge la page pour repartir. La partie en cours sera perdue.",
+    );
+    await expect(screen).not.toContainText("panne de test");
+    await expect(screen).not.toContainText("Error");
+
+    await screen.getByRole("button", { name: "Recharger la page" }).click();
+    await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+    await expect(page).toHaveURL(/#\/$/);
+    expect(logged.length).toBeGreaterThan(0);
   });
 });

@@ -11,9 +11,11 @@
     human: Color;
     /** « toi » for the human, a horse name for each bot. */
     names: Record<Color, string>;
+    /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
+    onabandon?: () => void;
   };
 
-  let { render, human, names }: Props = $props();
+  let { render, human, names, onabandon }: Props = $props();
 
   let settingsOpen = $state(false);
   let gear = $state<HTMLButtonElement | null>(null);
@@ -82,7 +84,7 @@
 </header>
 
 {#if settingsOpen}
-  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} />
+  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} {onabandon} />
 {/if}
 
 <style>

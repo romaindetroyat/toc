@@ -20,6 +20,7 @@
     startAmbience,
     status,
     stopAmbience,
+    unlock,
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
@@ -38,6 +39,7 @@
   import Pawn from "../board/Pawn.svelte";
   import { mixFromSettings, shouldPlayAmbience } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
+  import { game as copy } from "../i18n/fr/game.ts";
   import {
     createSession,
     loadDebugParams,
@@ -52,6 +54,7 @@
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import { showToast } from "../ui/toast.svelte.ts";
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -257,6 +260,14 @@
     location.hash = "#/";
   }
 
+  /** « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back. */
+  function abandon() {
+    epoch++;
+    session?.dispose();
+    session = undefined;
+    location.hash = "#/";
+  }
+
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
   const ui = $derived(session?.ui ?? { kind: "waiting" as const });
@@ -453,6 +464,22 @@
   let audioStatus = $state<EngineStatus>(status());
   $effect(() => onStatus((next) => (audioStatus = next)));
 
+  // When the sound cannot start the game goes on without it (FX-06): one toast says so and offers to try
+  // again. The retry is a tap, so it may create and resume the AudioContext.
+  function warnAudioFailed() {
+    showToast(copy.failures.audio, { label: copy.failures.audioRetry, run: retryAudio });
+  }
+
+  function retryAudio() {
+    unlock();
+    audioStatus = status();
+    if (audioStatus === "failed") warnAudioFailed();
+  }
+
+  $effect(() => {
+    if (audioStatus === "failed") warnAudioFailed();
+  });
+
   // The light ambience plays while the sound and the ambience are on, the audio is ready and the page
   // is visible (it fades in over 1.5 s once started); it stops for good when « Son » or « Ambiance »
   // goes off, and only pauses with the tab.
@@ -473,7 +500,7 @@
   {#if session !== undefined && render !== null && view !== undefined}
     <div class="layout" data-layout>
       <div class="info">
-        <InfoBar {render} human={session.human} names={session.names} />
+        <InfoBar {render} human={session.human} names={session.names} onabandon={abandon} />
       </div>
 
       <div class="stage">
