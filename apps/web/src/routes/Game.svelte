@@ -289,12 +289,15 @@
   /** « Sur le tapis »: the felt read in large form (D-08). */
   let tapisOpen = $state(false);
 
-  /** « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back. */
-  function abandon() {
+  /**
+   * « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back (or
+   * the sound test, when « Tester les sons » was asked for in the game).
+   */
+  function abandon(to = "#/") {
     epoch++;
     session?.dispose();
     session = undefined;
-    location.hash = "#/";
+    location.hash = to;
   }
 
   const k = $derived(session?.k ?? 0);

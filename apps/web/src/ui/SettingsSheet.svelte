@@ -17,8 +17,12 @@
     onclose: () => void;
     /** Element that gets the focus back on close; defaults to the element focused on opening. */
     opener?: HTMLElement | null;
-    /** In a game only: offers « Abandonner la partie » and calls this once the player has confirmed. */
-    onabandon?: () => void;
+    /**
+     * In a game only: offers « Abandonner la partie » and calls this once the player has confirmed,
+     * with the route to go to (the sound test when « Tester les sons » asked for it; the launch screen
+     * by default).
+     */
+    onabandon?: (to?: string) => void;
   };
 
   let { onclose, opener = null, onabandon }: Props = $props();
@@ -33,6 +37,24 @@
   let creditsButton = $state<HTMLButtonElement | null>(null);
   let abandonOpen = $state(false);
   let abandonButton = $state<HTMLButtonElement | null>(null);
+  let soundsLink = $state<HTMLAnchorElement | null>(null);
+  /** Where the confirmed abandon leads, and the control that asked for it (it gets the focus back). */
+  let abandonTo = $state<string | undefined>(undefined);
+  let abandonOpener = $state<HTMLElement | null>(null);
+
+  function askAbandon(to: string | undefined, from: HTMLElement | null) {
+    abandonTo = to;
+    abandonOpener = from;
+    abandonOpen = true;
+  }
+
+  // In a game, leaving for the sound test loses the game: it asks the same confirmation as
+  // « Abandonner la partie » (UI-SPEC « Destructive confirmation ») instead of one stray tap doing it.
+  function onSoundsClick(event: MouseEvent) {
+    if (!onabandon) return;
+    event.preventDefault();
+    askAbandon("#/sons", soundsLink);
+  }
 
   // « Son » off dims the other two switches; « Ambiance » off dims and disables the volume.
   const muted = $derived(!settings.sound);
@@ -76,7 +98,9 @@
     />
 
     <nav class="links">
-      <a class="btn btn-text" href="#/sons">{reglages.testSounds}</a>
+      <a class="btn btn-text" href="#/sons" bind:this={soundsLink} onclick={onSoundsClick}>
+        {reglages.testSounds}
+      </a>
       <button
         type="button"
         class="btn btn-text"
@@ -93,7 +117,7 @@
         class="btn btn-text abandon"
         data-abandon
         bind:this={abandonButton}
-        onclick={() => (abandonOpen = true)}
+        onclick={() => askAbandon(undefined, abandonButton)}
       >
         {game.abandon.confirm}
       </button>
@@ -108,8 +132,8 @@
 {#if abandonOpen && onabandon}
   <ConfirmDialog
     oncancel={() => (abandonOpen = false)}
-    onconfirm={onabandon}
-    opener={abandonButton}
+    onconfirm={() => onabandon(abandonTo)}
+    opener={abandonOpener}
   />
 {/if}
 

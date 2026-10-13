@@ -379,6 +379,31 @@ test.describe("abandonner la partie", () => {
     // The two stacked sheets (Réglages, then the confirmation) give the page its scroll back.
     expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
   });
+
+  test("réglages en partie: « Tester les sons » demande d’abord d’abandonner la partie", async ({
+    page,
+  }) => {
+    await openGame(page);
+    await openFromGame(page);
+    const sounds = dialog(page, "Réglages").getByRole("link", { name: "Tester les sons" });
+    await sounds.click();
+
+    // The same destructive confirmation as « Abandonner la partie »; keeping the game stays in it.
+    await expect(confirm(page)).toBeVisible();
+    await expect(confirm(page)).toContainText("La partie en cours sera perdue.");
+    await expect(page).toHaveURL(/#\/partie/);
+    await confirm(page).getByRole("button", { name: "Continuer à jouer" }).click();
+    await expect(confirm(page)).toHaveCount(0);
+    await expect(sounds).toBeFocused();
+    await expect(page).toHaveURL(/#\/partie/);
+
+    // Confirmed: the game is given up and the sound test opens.
+    await sounds.click();
+    await confirm(page).getByRole("button", { name: "Abandonner la partie" }).click();
+    await expect(page).toHaveURL(/#\/sons$/);
+    await expect(page.getByRole("heading", { name: "Test des sons", level: 1 })).toBeVisible();
+    await expect(page.locator("[data-board]")).toHaveCount(0);
+  });
 });
 
 test.describe("le son ne démarre pas", () => {

@@ -12,7 +12,7 @@
     /** « toi » for the human, a horse name for each bot. */
     names: Record<Color, string>;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
-    onabandon?: () => void;
+    onabandon?: (to?: string) => void;
   };
 
   let { render, human, names, onabandon }: Props = $props();
