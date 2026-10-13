@@ -1,13 +1,13 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 1
+current_phase: 01
 current_phase_name: Une vraie partie sur un appareil
 status: executing
 stopped_at: Phase 1 UI-SPEC approved
-last_updated: "2026-10-13T11:43:30.507Z"
+last_updated: "2026-10-13T14:00:34.826Z"
 last_activity: 2026-10-13
-last_activity_desc: Roadmap créé (5 phases, 57 exigences v1 couvertes)
-state_head: 048ca2ac647625585e1e37b4c6a71d86d2b5d9bc
+last_activity_desc: Phase 01 execution started
+state_head: 637f01d3f66fd642a6a98e6d16beefc306d8a37a
 progress:
   total_phases: 5
   completed_phases: 0
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre proches sur n'importe quel appareil, avec l'ambiance du plateau original (chevaux animés, bruitages).
-**Current focus:** Phase 1 — Une vraie partie sur un appareil
+**Current focus:** Phase 01 — Une vraie partie sur un appareil
 
 ## Current Position
 
-Phase: 1 (Une vraie partie sur un appareil) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
-Status: Ready to execute
-Last activity: 2026-10-13 — Roadmap créé (5 phases, 57 exigences v1 couvertes)
+Phase: 01 (Une vraie partie sur un appareil) — EXECUTING
+Plan: 1 of 24
+Status: Executing Phase 01
+Last activity: 2026-10-13 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
