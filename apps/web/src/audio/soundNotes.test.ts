@@ -9,7 +9,7 @@ import {
   saveNotes,
 } from "./soundNotes.ts";
 
-const NBSP = " ";
+const NBSP = "\u00a0";
 
 describe("parseNotes", () => {
   it("keeps known keys with known ratings", () => {
@@ -32,7 +32,7 @@ describe("parseNotes", () => {
       "carte-pose": 3,
       "carte-donne": null,
       "son-inconnu": "bon",
-      "ambiance": "bon",
+      ambiance: "bon",
       sabot: "bon", // the hoof sound is rated per distance, never as a whole
     });
     expect(notes).toEqual({ ambiance: "bon" });
