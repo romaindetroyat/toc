@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 17/24 plans executed
+**Plans:** 20/24 plans executed
 
 Plans:
 **Wave 1**
@@ -76,9 +76,9 @@ Plans:
 - [x] 01-17-PLAN.md — La table : bandeau, tapis, échange de carte, main posée, fin de partie
 
 **Wave 12** *(blocked on Wave 11 completion)*
-- [ ] 01-18-PLAN.md — As/Roi « Sortir ou avancer », Valet en deux touches, chevaux serrés
-- [ ] 01-19-PLAN.md — Les cavaliers s’animent et hennissent
-- [ ] 01-20-PLAN.md — Figures traditionnelles des cartes, licences vérifiées
+- [x] 01-18-PLAN.md — As/Roi « Sortir ou avancer », Valet en deux touches, chevaux serrés
+- [x] 01-19-PLAN.md — Les cavaliers s’animent et hennissent
+- [x] 01-20-PLAN.md — Figures traditionnelles des cartes, licences vérifiées
 
 **Wave 13** *(blocked on Wave 12 completion)*
 - [ ] 01-21-PLAN.md — Le 7 réparti pas à pas, partie complète au doigt, cibles de 44 px
@@ -162,7 +162,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 17/24 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 20/24 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |

@@ -35,7 +35,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **PLAY-01** : Le joueur voit sa main et, quand c'est son tour, les cartes jouables et les pions concernés sont mis en évidence.
 - [x] **PLAY-02** : Le joueur choisit une carte puis un pion (ou une cible), voit un aperçu du trajet et des pions qui seraient mangés, puis confirme son coup.
 - [ ] **PLAY-03** : Avec le 7, le joueur répartit les pas entre ses pions à l'aide d'un assistant pas à pas qui affiche le reste à jouer, puis confirme en une fois.
-- [ ] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
+- [x] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
 - [x] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
 - [ ] **PLAY-06** : Une aide en français rappelle les règles et l'effet de chaque carte à tout moment.
 - [ ] **PLAY-07** : À la fin de la partie, l'équipe gagnante est annoncée et les joueurs peuvent relancer une revanche à la même table.
@@ -75,10 +75,10 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 - [x] **FX-01** : Le plateau original (4 quarts) est affiché assemblé, net et lisible sur téléphone en portrait comme sur grand écran.
 - [ ] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
-- [ ] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
+- [x] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
 - [x] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
 - [x] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
-- [ ] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
+- [x] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
 
 ### Application (APP)
 
@@ -138,7 +138,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | PLAY-01 | Phase 1 | Complete |
 | PLAY-02 | Phase 1 | Complete |
 | PLAY-03 | Phase 1 | Pending |
-| PLAY-04 | Phase 1 | Pending |
+| PLAY-04 | Phase 1 | Complete |
 | PLAY-05 | Phase 1 | Complete |
 | PLAY-06 | Phase 5 | Pending |
 | PLAY-07 | Phase 2 | Pending |
@@ -163,10 +163,10 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | HIST-04 | Phase 5 | Pending |
 | FX-01 | Phase 1 | Complete |
 | FX-02 | Phase 1 | Pending |
-| FX-03 | Phase 1 | Pending |
+| FX-03 | Phase 1 | Complete |
 | FX-04 | Phase 1 | Complete |
 | FX-05 | Phase 1 | Complete |
-| FX-06 | Phase 1 | Pending |
+| FX-06 | Phase 1 | Complete |
 | APP-01 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
 | APP-03 | Phase 4 | Pending |
