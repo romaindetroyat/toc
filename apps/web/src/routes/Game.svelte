@@ -16,11 +16,11 @@
     type EngineStatus,
     onStatus,
     pauseAmbience,
+    retryUnlock,
     setMix,
     startAmbience,
     status,
     stopAmbience,
-    unlock,
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
@@ -498,10 +498,15 @@
     showToast(copy.failures.audio, { label: copy.failures.audioRetry, run: retryAudio });
   }
 
+  // The outcome is read once the resume has settled: right after the tap the old failure still stands.
+  // A failure that does not change the status (the browser refuses again) shows the toast from here;
+  // a recovery reaches audioStatus through onStatus.
   function retryAudio() {
-    unlock();
-    audioStatus = status();
-    if (audioStatus === "failed") warnAudioFailed();
+    void retryUnlock().then((outcome) => {
+      if (!alive) return;
+      audioStatus = outcome;
+      if (outcome === "failed") warnAudioFailed();
+    });
   }
 
   $effect(() => {

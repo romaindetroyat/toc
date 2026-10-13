@@ -337,6 +337,25 @@ describe("status and resume", () => {
     expect(seen).toEqual(["failed", "ready"]);
   });
 
+  it("unlock resolves once its resume has settled, so a retry reports its own outcome", async () => {
+    const backend = new FakeBackend();
+    backend.resumeError = new Error("NotAllowedError");
+    const engine = createAudioEngine({ backend, render: fakeRender, random: () => 0.5 });
+    await engine.unlock();
+    await engine.whenReady();
+    expect(engine.status()).toBe("failed");
+    // « Réessayer », and the browser accepts this time: once unlock has resolved the failure is gone.
+    backend.resumeError = undefined;
+    const retry = engine.unlock();
+    expect(engine.status()).toBe("failed"); // the stale value a synchronous read would report
+    await retry;
+    expect(engine.status()).toBe("ready");
+    // The browser refuses again: still failed once settled, and unlock never rejects.
+    backend.resumeError = new Error("NotAllowedError");
+    await expect(engine.unlock()).resolves.toBeUndefined();
+    expect(engine.status()).toBe("failed");
+  });
+
   it("retries the resume only while the context is not running", async () => {
     const { backend, engine } = await setup();
     expect(backend.resumeCalls).toBe(1);

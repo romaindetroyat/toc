@@ -89,7 +89,8 @@ export type EngineOptions = {
 };
 
 export interface AudioEngine {
-  unlock(): void;
+  /** Resolves once the resume it asked for has settled (never rejects): status() is then current. */
+  unlock(): Promise<void>;
   now(): number;
   cue(id: SoundId, at?: number, opts?: CueOptions): void;
   scheduleClops(offsetsMs: number[], t0: number): void;
@@ -160,16 +161,16 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     for (const listener of [...statusListeners]) listener(next);
   }
 
-  function resumeNow(): void {
+  function resumeNow(): Promise<void> {
     let pending: Promise<void>;
     try {
       pending = backend.resume();
     } catch {
       resumeFailed = true;
       updateStatus();
-      return;
+      return Promise.resolve();
     }
-    pending.then(
+    return pending.then(
       () => {
         resumeFailed = false;
         updateStatus();
@@ -345,7 +346,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
         applyMix(0);
         void renderAll();
       }
-      resumeNow();
+      return resumeNow();
     },
     now: () => backend.now(),
     cue,
@@ -365,7 +366,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
       file: fileBuffers.has(id),
     }),
     retryResume() {
-      if (unlocked && backend.state() !== "running") resumeNow();
+      if (unlocked && backend.state() !== "running") void resumeNow();
     },
     status: computeStatus,
     onStatus(listener) {
@@ -431,6 +432,8 @@ let backend: WebAudioBackend | undefined;
 let createFailed = false;
 let pendingMix: Mix | undefined;
 let pendingAmbience = false;
+/** The resume the last unlock() asked for; settled (never rejects). */
+let resuming: Promise<void> = Promise.resolve();
 const shellListeners = new Set<(status: EngineStatus) => void>();
 
 function emit(status: EngineStatus): void {
@@ -475,9 +478,21 @@ export function unlock(): AudioContext | undefined {
   // iOS: play through the media channel so the ringer switch does not mute the game (feature-detected).
   const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
   if (session) session.type = "playback";
-  engine?.unlock();
+  resuming = engine ? engine.unlock() : Promise.resolve();
   mirrorState();
   return backend?.context;
+}
+
+/**
+ * « Réessayer »: unlocks again (call it synchronously inside the tap, like unlock) and resolves with
+ * the status once the resume has settled. Reading status() right after unlock() would still report
+ * the failure the retry is about to clear.
+ */
+export async function retryUnlock(): Promise<EngineStatus> {
+  unlock();
+  await resuming;
+  mirrorState();
+  return status();
 }
 
 /** Current time on the AudioContext clock, in seconds (0 before unlock). */
