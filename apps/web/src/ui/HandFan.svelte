@@ -79,7 +79,7 @@
   let wasConcealed = untrack(() => concealed);
   $effect(() => {
     const hidden = concealed;
-    if (wasConcealed && !hidden && pace !== "test") {
+    if (wasConcealed && !hidden && pace !== "test" && !document.hidden) {
       const calm = pace === "reduced";
       const scale = scaleFor(pace);
       cards.forEach((card, i) => {
@@ -106,7 +106,7 @@
   let seenReceived = untrack(() => received);
   $effect(() => {
     const card = received;
-    const fresh = card !== null && card !== seenReceived && pace !== "test";
+    const fresh = card !== null && card !== seenReceived && pace !== "test" && !document.hidden;
     seenReceived = card;
     if (!fresh) return;
     const calm = pace === "reduced";

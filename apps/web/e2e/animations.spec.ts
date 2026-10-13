@@ -695,3 +695,237 @@ test("la victoire : les huit chevaux de l’équipe gagnante sautent une fois, 6
 
   await expect(page.locator("[data-end-screen]")).toBeVisible({ timeout: 10_000 });
 });
+
+// ---- Fast, reduced and hidden-tab proof (plan 01-22, task 2) ---------------------------------
+
+const DEAD_HAND = {
+  turn: "bleu",
+  hands: { bleu: ["2S", "4S", "11S"], jaune: ["2H", "3H", "5H"] },
+  pawns: { jaune: [{ p: 5 }, "S", "S", "S"] },
+};
+
+/** The scheduled hoof clops of every move so far: milliseconds after the start of each move. */
+const clopHistory = (page: Page) =>
+  page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.history ?? []);
+
+test.describe("Avance rapide : le bond de 4 cases, les cartes", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("toc.settings.v1", JSON.stringify({ fast: true }));
+    });
+  });
+
+  test("un bond de 4 cases dure 320 ms, les sabots restent à 50 ms au moins l’un de l’autre, la carte jouée vole 120 ms", async ({
+    page,
+  }) => {
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["4S"] },
+    });
+    await playCard(page, "4 de pique", "bleu0");
+
+    // The 4 goes backward: four bounds of 80 ms after a 48 ms volte-face.
+    await expect
+      .poll(async () => flightsOf(await records(page), "play").length, { timeout: 10_000 })
+      .toBe(1);
+    const card = flightsOf(await records(page), "play")[0] as Rec;
+    near(card.duration, 120, 2);
+
+    const mover = await waitFor(page, "bleu0", "mover", 320);
+    near(mover.duration, 320, 2);
+    const arc = await waitFor(page, "bleu0", "arc", 80);
+    expect(arc.iterations).toBe(4);
+    await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:6");
+
+    const history = await clopHistory(page);
+    expect(history.length).toBeGreaterThan(0);
+    for (const clops of history) {
+      for (let i = 1; i < clops.length; i++) {
+        expect((clops[i] as number) - (clops[i - 1] as number)).toBeGreaterThanOrEqual(49.9);
+      }
+    }
+  });
+
+  test("la donne : 20 cartes de 100 ms espacées de 16 ms, la main se retourne en 100 ms", async ({
+    page,
+  }) => {
+    await openSeeded(page);
+    await expect
+      .poll(async () => flightsOf(await records(page), "deal").length, { timeout: 10_000 })
+      .toBe(20);
+    const deal = flightsOf(await records(page), "deal");
+    for (const [i, flight] of deal.entries()) {
+      near(flight.duration, 100, 2);
+      near(flight.begins - (deal[0] as Rec).begins, i * 16, 6);
+    }
+    await expect.poll(async () => handCards(await records(page)).length).toBe(5);
+    for (const flip of handCards(await records(page))) near(flip.duration, 100, 2);
+    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(1);
+  });
+
+  test("une main posée : 140 ms par carte, 24 ms d’intervalle", async ({ page }) => {
+    await openAny(page, DEAD_HAND);
+    await page.getByRole("button", { name: "Poser mes cartes" }).click();
+    await expect.poll(async () => flightsOf(await records(page), "lay").length).toBe(3);
+    const laid = flightsOf(await records(page), "lay");
+    for (const [i, flight] of laid.entries()) {
+      near(flight.duration, 140, 2);
+      near(flight.begins - (laid[0] as Rec).begins, i * 24, 6);
+    }
+  });
+});
+
+test.describe("Réduire les animations : les cartes se fondent en 150 ms", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("une carte jouée se fond en 150 ms, le cheval glisse en 180 ms avec un seul sabot, sans particules", async ({
+    page,
+  }) => {
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    });
+    await playCard(page, "Dame de cœur", "bleu0");
+    await expect
+      .poll(async () => flightsOf(await records(page), "play").length, { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    const card = flightsOf(await records(page), "play")[0] as Rec;
+    near(card.duration, 150, 1);
+    // A fade or a short slide: its keyframes never fly across the board.
+    const mover = await waitFor(page, "bleu0", "mover", 180);
+    near(mover.begins - card.ends, LEAD, 12);
+    await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:22");
+    expect(await clopHistory(page)).toEqual([[180]]);
+    const all = await records(page);
+    expect(all.filter((r) => r.role === "particle")).toHaveLength(0);
+    expect(all.filter((r) => r.role === "rear" || r.role === "arc")).toHaveLength(0);
+    await expect(page.locator("[data-particles]")).toHaveCount(0);
+  });
+
+  test("la donne et l’échange : quatre cartes de 150 ms à la fois, la main se fond en 150 ms", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await openSeeded(page);
+    await expect
+      .poll(async () => flightsOf(await records(page), "deal").length, { timeout: 10_000 })
+      .toBe(4);
+    const deal = flightsOf(await records(page), "deal");
+    for (const flight of deal) {
+      near(flight.duration, 150, 1);
+      near(flight.begins, (deal[0] as Rec).begins, 6);
+    }
+    await expect.poll(async () => handCards(await records(page)).length).toBe(5);
+    for (const fade of handCards(await records(page))) {
+      near(fade.duration, 150, 1);
+      near(fade.delay, 0, 1);
+    }
+    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(1);
+
+    await expect(page.locator("[data-flight]")).toHaveCount(0);
+    await page.locator("[data-hand] [data-card]").first().click();
+    await page.getByRole("button", { name: "Passer cette carte" }).click();
+    await expect
+      .poll(async () => flightsOf(await records(page), "exchange").length, { timeout: 30_000 })
+      .toBe(4);
+    for (const flight of flightsOf(await records(page), "exchange")) near(flight.duration, 150, 1);
+    expect((await cues(page)).filter((c) => c.id === "carte-echange")).toHaveLength(1);
+    expect(
+      (await records(page)).filter((r) => r.role === "particle" || r.role === "arc"),
+    ).toHaveLength(0);
+  });
+
+  test("une main posée : toutes les cartes en même temps, 150 ms", async ({ page }) => {
+    await openAny(page, DEAD_HAND);
+    await page.getByRole("button", { name: "Poser mes cartes" }).click();
+    await expect.poll(async () => flightsOf(await records(page), "lay").length).toBe(3);
+    const laid = flightsOf(await records(page), "lay");
+    for (const flight of laid) {
+      near(flight.duration, 150, 1);
+      near(flight.begins, (laid[0] as Rec).begins, 6);
+    }
+    await expect(page.locator('[data-felt-posed="bleu"] [data-felt-card]')).toHaveCount(3);
+  });
+});
+
+/** Makes the page believe it is hidden (or visible again), as a switch of tab does. */
+async function setHidden(page: Page, hidden: boolean) {
+  await page.evaluate((value) => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => value });
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => (value ? "hidden" : "visible"),
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, hidden);
+}
+
+test("onglet caché : le coup en cours finit d’un coup, les suivants s’appliquent sans mouvement ni son, jusqu’au retour", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  // Bleu plays a long move; the three bots each play their only card, then the next deal opens.
+  await openPosition(page, {
+    turn: "bleu",
+    pawns: {
+      bleu: [{ p: 10 }, "S", "S", "S"],
+      jaune: [{ p: 20 }, "S", "S", "S"],
+      rouge: [{ p: 20 }, "S", "S", "S"],
+      vert: [{ p: 20 }, "S", "S", "S"],
+    },
+    hands: { bleu: ["12H"], jaune: ["3S"], rouge: ["2S"], vert: ["5S"] },
+  });
+  await playCard(page, "Dame de cœur", "bleu0");
+
+  // 12 cells: 400 + 133 × 11 = 1863 ms. The tab is hidden half a second into the move.
+  const mover = await waitFor(page, "bleu0", "mover", 1863);
+  await page.waitForTimeout(500);
+  const standing = {
+    jaune: await placeOf(page, "jaune0"),
+    rouge: await placeOf(page, "rouge0"),
+    vert: await placeOf(page, "vert0"),
+  };
+  const before = {
+    cues: (await cues(page)).length,
+    clops: (await clopHistory(page)).length,
+    animations: (await records(page)).length,
+  };
+  await setHidden(page, true);
+
+  // The running move ends at once, long before its natural end.
+  await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:22", {
+    timeout: 800,
+  });
+  expect(mover.duration).toBeGreaterThan(1800);
+
+  // The bots go on playing while the tab is hidden; the next deal opens: the exchange is asked of him.
+  await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "exchange", {
+    timeout: 30_000,
+  });
+  expect(await placeOf(page, "jaune0")).not.toBe(standing.jaune);
+  expect(await placeOf(page, "rouge0")).not.toBe(standing.rouge);
+  expect(await placeOf(page, "vert0")).not.toBe(standing.vert);
+  await expect(page.locator('[data-felt-last="bleu"] [data-felt-card="12H"]')).toBeVisible();
+  await expect(page.locator('[data-felt-last="vert"] [data-felt-card="5S"]')).toBeVisible();
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+
+  // Nothing moved and nothing sounded for the events that were skipped.
+  expect((await cues(page)).length).toBe(before.cues);
+  expect((await clopHistory(page)).length).toBe(before.clops);
+  expect((await records(page)).length).toBe(before.animations);
+
+  // Back on the page, the game moves and sounds again.
+  await setHidden(page, false);
+  await expect(page.locator("[data-hand]")).not.toHaveClass(/concealed/);
+  await page.locator("[data-hand] [data-card]").first().click();
+  await page.getByRole("button", { name: "Passer cette carte" }).click();
+  await expect
+    .poll(async () => (await cues(page)).some((c) => c.id === "carte-echange"), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  expect((await cues(page)).length).toBeGreaterThan(before.cues);
+  expect(flightsOf(await records(page), "exchange")).toHaveLength(4);
+});
