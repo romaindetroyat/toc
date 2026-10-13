@@ -927,5 +927,9 @@ test("onglet caché : le coup en cours finit d’un coup, les suivants s’appli
     })
     .toBe(true);
   expect((await cues(page)).length).toBeGreaterThan(before.cues);
-  expect(flightsOf(await records(page), "exchange")).toHaveLength(4);
+  // The cue is logged when the step is scheduled and the cards are recorded once they have taken off
+  // (the recorder reads the running animations frame by frame): wait for them, do not read them once.
+  await expect
+    .poll(async () => flightsOf(await records(page), "exchange").length, { timeout: 10_000 })
+    .toBe(4);
 });
