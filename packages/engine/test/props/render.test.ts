@@ -9,6 +9,7 @@ import {
   apply,
   COLORS,
   type Color,
+  eventsFor,
   type GameEvent,
   type GameState,
   legalActions,
@@ -203,3 +204,51 @@ describe("a view never carries another seat's cards", () => {
     );
   }, 180_000);
 });
+
+describe("the projected event stream (eventsFor) is safe to send to one seat", () => {
+  it("folds to the same render as the full stream and carries no card the seat may not know", () => {
+    let games = 0;
+    fc.assert(
+      fc.property(
+        fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
+        fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
+        (dealSeed, pickSeed) => {
+          const maxPlies = games++ < 3 ? 1500 : 150;
+          const first = newGame({ firstDealer: COLORS[dealSeed[0] % 4] as Color }, dealSeed);
+          const folded = perSeat(() => renderInit(viewFor(first, "bleu")));
+          let full = renderInit(viewFor(first, "bleu"));
+          let before: GameState = first;
+          playGame(dealSeed, pickSeed, maxPlies, ({ state, events }) => {
+            for (const event of events) full = renderReduce(full, event);
+            for (const seat of COLORS) {
+              const projected = eventsFor(events, seat);
+              for (const event of projected) folded[seat] = renderReduce(folded[seat], event);
+              // Public card facts of this step: what was played or laid on the felt.
+              const allowed = new Set<string>([
+                ...publicCards(before, seat),
+                ...publicCards(state, seat),
+                ...events.flatMap((e) =>
+                  e.t === "cardPlayed" ? [e.card] : e.t === "handDiscarded" ? e.cards : [],
+                ),
+              ]);
+              for (const match of JSON.stringify(projected).matchAll(CARD_IN_JSON)) {
+                if (!allowed.has(match[1] as string)) {
+                  throw new Error(`${seat} is sent ${match[1]}`);
+                }
+              }
+              if (JSON.stringify(folded[seat]) !== JSON.stringify(full)) {
+                expect(folded[seat]).toEqual(full);
+              }
+            }
+            before = state;
+          });
+        },
+      ),
+      { numRuns: 60, seed: 20261015, endOnFailure: true },
+    );
+  }, 180_000);
+});
+
+function perSeat<T>(make: (seat: Color) => T): Record<Color, T> {
+  return { bleu: make("bleu"), jaune: make("jaune"), rouge: make("rouge"), vert: make("vert") };
+}

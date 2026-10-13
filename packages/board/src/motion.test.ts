@@ -172,7 +172,7 @@ describe("the cards", () => {
   });
 
   it("card events take their time on screen, the hands of a deal flying with the dealt event", () => {
-    const hand = { t: "handDealt", seat: "bleu", cards: ["1S"] } as GameEvent;
+    const hand = { t: "handDealt", seat: "bleu", size: 1, cards: ["1S"] } as GameEvent;
     expect(eventDuration({ t: "dealt", dealer: "bleu", dealIndex: 0, size: 5 }, "normal")).toBe(
       250 + 19 * 40,
     );

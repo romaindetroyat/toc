@@ -110,8 +110,8 @@ export function renderReduce(rs: RenderState, event: GameEvent): RenderState {
     case "handDealt":
       return {
         ...rs,
-        talonSize: rs.talonSize - event.cards.length,
-        handSizes: { ...rs.handSizes, [event.seat]: event.cards.length },
+        talonSize: rs.talonSize - event.size,
+        handSizes: { ...rs.handSizes, [event.seat]: event.size },
       };
     case "cardsExchanged":
       // Each seat gives one card and receives one: the sizes do not change.

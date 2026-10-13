@@ -490,7 +490,7 @@ export function createDirector(deps: DirectorDeps): Director {
     fold(event);
     const m = cardStart(event, deps.animator.deal !== undefined && hands.length > 0);
     if (m !== null) {
-      const seats = hands.map((hand) => ({ seat: hand.seat, count: hand.cards.length }));
+      const seats = hands.map((hand) => ({ seat: hand.seat, count: hand.size }));
       await settled([deps.animator.deal?.(seats, LEAD_S * 1000, m)]);
     }
     if (generationAtStart !== generation) return;

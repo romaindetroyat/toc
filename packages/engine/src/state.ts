@@ -53,7 +53,7 @@ function dealHands(state: GameState): { state: GameState; events: GameEvent[] } 
     const cards = sortHand(talon.slice(0, size));
     talon = talon.slice(size);
     hands[seat] = cards;
-    events.push({ t: "handDealt", seat, cards: cards.slice() });
+    events.push({ t: "handDealt", seat, size: cards.length, cards: cards.slice() });
     seat = nextColor(seat);
   }
   return {

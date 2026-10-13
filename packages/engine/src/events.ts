@@ -5,13 +5,22 @@ import type { CardId } from "./types.ts";
  * Engine events are the only input of rendering, animation and audio, and later of the
  * network protocol (phase 2) and of replay. Each event is self-contained: folding the events
  * over the initial render state gives the same pawns and piles as the state itself.
+ *
+ * The list returned by apply/startGame carries every seat's hidden cards (handDealt, cardsExchanged).
+ * Anything sent to one seat must go through eventsFor(events, seat) (view.ts), as the state goes
+ * through viewFor.
  */
 export type GameEvent =
   /** A deal starts: `size` cards per seat (5, 4 or 4). */
   | { t: "dealt"; dealer: Color; dealIndex: 0 | 1 | 2; size: number }
-  /** Private to `seat`: the cards it was dealt. */
-  | { t: "handDealt"; seat: Color; cards: CardId[] }
-  /** The four exchange choices are applied together; `received` is private per seat. */
+  /**
+   * `size` is public; `cards` is private to `seat`: eventsFor sets it to null for every other seat.
+   */
+  | { t: "handDealt"; seat: Color; size: number; cards: CardId[] | null }
+  /**
+   * The four exchange choices are applied together; `received` is private per seat: eventsFor keeps
+   * only the projected seat's own card (the others become null).
+   */
   | { t: "cardsExchanged"; received: Record<Color, CardId | null> }
   | { t: "cardPlayed"; seat: Color; card: CardId }
   /** A pawn leaves its stable onto its exit square. */

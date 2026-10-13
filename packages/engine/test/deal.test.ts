@@ -8,6 +8,7 @@ import {
   type Color,
   DEFAULT_RULES,
   endDeal,
+  eventsFor,
   FULL_DECK,
   type GameEvent,
   type GameState,
@@ -444,5 +445,55 @@ describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
     view.hand.pop();
     view.discard.push("1S");
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+describe("eventsFor: the hidden-hand boundary of the event stream", () => {
+  it("keeps the seat's own dealt cards and the public hand sizes, hides the other hands", () => {
+    const { state, events } = startGame({ firstDealer: "rouge" }, SEED);
+    for (const seat of COLORS) {
+      const projected = eventsFor(events, seat);
+      expect(projected.map((e) => e.t)).toEqual(events.map((e) => e.t));
+      for (const event of projected) {
+        if (event.t !== "handDealt") continue;
+        expect(event.size).toBe(state.hands[event.seat].length);
+        if (event.seat === seat) expect(event.cards).toEqual(state.hands[seat]);
+        else expect(event.cards).toBeNull();
+      }
+      const json = JSON.stringify(projected);
+      for (const other of COLORS) {
+        if (other === seat) continue;
+        for (const card of state.hands[other]) {
+          if (!state.hands[seat].includes(card)) expect(json).not.toContain(`"${card}"`);
+        }
+      }
+    }
+  });
+
+  it("shows each seat only the card it received at the exchange", () => {
+    const { state } = startGame({ firstDealer: "vert" }, SEED);
+    const { state: played, events } = exchangeAll(state);
+    for (const seat of COLORS) {
+      const exchanged = eventsFor(events, seat).find((e) => e.t === "cardsExchanged");
+      expect(exchanged).toBeDefined();
+      if (exchanged?.t !== "cardsExchanged") continue;
+      for (const color of COLORS) {
+        expect(exchanged.received[color]).toBe(color === seat ? played.received[seat] : null);
+      }
+    }
+  });
+
+  it("passes the public events through and never touches its input", () => {
+    const { events } = startGame({ firstDealer: "bleu" }, SEED);
+    const frozen = deepFreeze(events.map((e) => ({ ...e })));
+    const before = JSON.stringify(frozen);
+    const projected = eventsFor(frozen, "jaune");
+    expect(JSON.stringify(frozen)).toBe(before);
+    expect(projected[0]).toEqual(frozen[0]);
+    const own = projected.find((e) => e.t === "handDealt" && e.seat === "jaune");
+    const source = frozen.find((e) => e.t === "handDealt" && e.seat === "jaune");
+    if (own?.t === "handDealt" && source?.t === "handDealt") {
+      expect(own.cards).not.toBe(source.cards);
+    }
   });
 });

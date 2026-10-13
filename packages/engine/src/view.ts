@@ -3,8 +3,9 @@
 // the public piles and the public board. Never the rng, the talon order or another seat's cards.
 // kind 'view' makes it a type error to hand a GameState to code that must stay blind (bots).
 
+import type { GameEvent } from "./events.ts";
 import type { Color, PawnId } from "./topology.ts";
-import type { GameState, Pawn, PlayerView } from "./types.ts";
+import type { CardId, GameState, Pawn, PlayerView } from "./types.ts";
 
 function perColor<T>(make: (color: Color) => T): Record<Color, T> {
   return { bleu: make("bleu"), jaune: make("jaune"), rouge: make("rouge"), vert: make("vert") };
@@ -40,4 +41,30 @@ export function viewFor(state: GameState, seat: Color): PlayerView {
     winner: state.winner,
     rules: { ...state.rules },
   };
+}
+
+/**
+ * The events `seat` may receive: the same list with every other seat's hidden cards removed (the
+ * hands of a deal, the cards received at the exchange). Public facts stay (the size of each hand).
+ * Pure: the events are copied, never mutated.
+ */
+export function eventsFor(events: readonly GameEvent[], seat: Color): GameEvent[] {
+  return events.map((event): GameEvent => {
+    switch (event.t) {
+      case "handDealt":
+        return {
+          ...event,
+          cards: event.seat === seat && event.cards !== null ? event.cards.slice() : null,
+        };
+      case "cardsExchanged":
+        return {
+          ...event,
+          received: perColor((color): CardId | null =>
+            color === seat ? event.received[color] : null,
+          ),
+        };
+      default:
+        return event;
+    }
+  });
 }

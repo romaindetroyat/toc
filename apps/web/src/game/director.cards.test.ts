@@ -108,10 +108,20 @@ function rig(mode: () => DirectorMode = () => "normal", doc?: VisibilitySource) 
 
 const dealt = (dealIndex: 0 | 1 | 2, size: number, dealer: Color = "bleu"): GameEvent[] => [
   { t: "dealt", dealer, dealIndex, size },
-  { t: "handDealt", seat: "jaune", cards: Array.from({ length: size }, () => "2S" as CardId) },
-  { t: "handDealt", seat: "rouge", cards: Array.from({ length: size }, () => "3S" as CardId) },
-  { t: "handDealt", seat: "vert", cards: Array.from({ length: size }, () => "4S" as CardId) },
-  { t: "handDealt", seat: "bleu", cards: Array.from({ length: size }, () => "5S" as CardId) },
+  {
+    t: "handDealt",
+    seat: "jaune",
+    size,
+    cards: Array.from({ length: size }, () => "2S" as CardId),
+  },
+  {
+    t: "handDealt",
+    seat: "rouge",
+    size,
+    cards: Array.from({ length: size }, () => "3S" as CardId),
+  },
+  { t: "handDealt", seat: "vert", size, cards: Array.from({ length: size }, () => "4S" as CardId) },
+  { t: "handDealt", seat: "bleu", size, cards: Array.from({ length: size }, () => "5S" as CardId) },
 ];
 
 const named = (calls: Call[], name: string) => calls.filter((c) => c.name === name);
