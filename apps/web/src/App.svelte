@@ -2,6 +2,7 @@
   import KnightDefs from "./board/KnightDefs.svelte";
   import Game from "./routes/Game.svelte";
   import Launch from "./routes/Launch.svelte";
+  import SoundTest from "./routes/SoundTest.svelte";
 
   let hash = $state(location.hash);
   // The hash may carry a query (#/partie?debug=geometry): the route is what precedes the "?".
@@ -21,6 +22,8 @@
 
 {#if route === "#/partie"}
   <Game />
+{:else if route === "#/sons"}
+  <SoundTest />
 {:else}
   <Launch />
 {/if}

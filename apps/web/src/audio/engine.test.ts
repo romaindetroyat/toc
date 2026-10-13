@@ -393,6 +393,18 @@ describe("ambience", () => {
     expect(backend.plays).toHaveLength(0);
   });
 
+  it("stopAmbience fades out and stays stopped: a later resume does not bring it back", async () => {
+    const { backend, engine } = await setup();
+    engine.startAmbience();
+    expect(backend.plays).toHaveLength(2);
+    engine.stopAmbience();
+    expect(backend.notStopped()).toHaveLength(0);
+    engine.resumeAmbience(); // the tab becomes visible again
+    expect(backend.plays).toHaveLength(2);
+    engine.startAmbience(); // a new explicit start does play again
+    expect(backend.notStopped()).toHaveLength(2);
+  });
+
   it("is not counted in the sound-effect voice pool", async () => {
     const { backend, engine } = await setup();
     engine.startAmbience();
@@ -400,6 +412,37 @@ describe("ambience", () => {
     expect(
       backend.plays.filter((p) => p.bus === "ambience" && p.stoppedAt !== undefined),
     ).toHaveLength(0);
+  });
+});
+
+describe("availability", () => {
+  it("tells which buffers exist: none before unlock, the synthesis once rendered, a failed recipe stays absent", async () => {
+    const backend = new FakeBackend();
+    const engine = createAudioEngine({
+      backend,
+      render: async (recipe, variant) => {
+        if (recipe === "neigh-ruade") throw new Error("render failed");
+        return fakeRender(recipe, variant);
+      },
+      random: () => 0.5,
+    });
+    expect(engine.availability("sabot")).toEqual({ synth: false, file: false });
+    engine.unlock();
+    await engine.whenReady();
+    expect(engine.availability("sabot")).toEqual({ synth: true, file: false });
+    expect(engine.availability("hennissement-ruade")).toEqual({ synth: false, file: false });
+  });
+
+  it("reports a decoded recording as a file buffer next to the synthesis", async () => {
+    const { engine } = await setup({
+      catalogue: {
+        ...SOUNDS,
+        "carte-pose": { ...SOUNDS["carte-pose"], files: ["/audio/pose.m4a"] },
+      },
+    });
+    await engine.loadRecordings(async () => ({ duration: 0.2 }));
+    expect(engine.availability("carte-pose")).toEqual({ synth: true, file: true });
+    expect(engine.availability("carte-donne")).toEqual({ synth: true, file: false });
   });
 });
 

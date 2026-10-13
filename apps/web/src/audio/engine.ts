@@ -56,6 +56,9 @@ export type CueOptions = {
 
 export type RecordingInfo = { source: "synth" | "file"; recordingUnavailable: boolean };
 
+/** Which buffers exist for a sound right now: the sound test page lists « Fichier » and « Généré » from this. */
+export type Availability = { synth: boolean; file: boolean };
+
 export type RenderSound = (
   recipe: SynthRecipe,
   variant: number,
@@ -82,8 +85,11 @@ export interface AudioEngine {
   startAmbience(): void;
   pauseAmbience(): void;
   resumeAmbience(): void;
+  /** Stops the ambience for good: a later tab switch does not bring it back (startAmbience does). */
+  stopAmbience(): void;
   loadRecordings(decode?: Decoder): Promise<void>;
   recordings(): Record<SoundId, RecordingInfo>;
+  availability(id: SoundId): Availability;
   retryResume(): void;
   status(): EngineStatus;
   onStatus(listener: (status: EngineStatus) => void): () => void;
@@ -263,6 +269,11 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     ambienceVoices = [];
   }
 
+  function stopAmbience(): void {
+    ambienceWanted = false;
+    pauseAmbience();
+  }
+
   function resumeAmbience(): void {
     if (!ambienceWanted) return;
     ambiencePaused = false;
@@ -336,8 +347,13 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     startAmbience,
     pauseAmbience,
     resumeAmbience,
+    stopAmbience,
     loadRecordings,
     recordings: () => ({ ...info }),
+    availability: (id) => ({
+      synth: (synthBuffers.get(id)?.length ?? 0) > 0,
+      file: fileBuffers.has(id),
+    }),
     retryResume() {
       if (unlocked && backend.state() !== "running") resumeNow();
     },
@@ -493,6 +509,12 @@ export function resumeAmbience(): void {
   engine?.resumeAmbience();
 }
 
+/** Stops the ambience and forgets that it was wanted (the sound test page's « stop »). */
+export function stopAmbience(): void {
+  pendingAmbience = false;
+  engine?.stopAmbience();
+}
+
 /** Try the recorded files of every sound ([.m4a, .mp3]); a sound whose decode fails stays synthesized. */
 export function loadRecordings(decode?: Decoder): Promise<void> {
   return engine ? engine.loadRecordings(decode) : Promise.resolve();
@@ -500,6 +522,11 @@ export function loadRecordings(decode?: Decoder): Promise<void> {
 
 export function recordings(): Record<SoundId, RecordingInfo> | undefined {
   return engine?.recordings();
+}
+
+/** Which buffers (synthesized, recorded) exist for a sound; both false until it is rendered, or if rendering failed. */
+export function availability(id: SoundId): Availability {
+  return engine ? engine.availability(id) : { synth: false, file: false };
 }
 
 export function status(): EngineStatus {
