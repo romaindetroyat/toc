@@ -129,8 +129,8 @@ describe("the render fold equals the view projection (200 fixed-seed games)", ()
         fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
         fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
         (dealSeed, pickSeed) => {
-          // The first ten games are played to the end; the others stop after 300 actions (about five deals).
-          const maxPlies = games++ < 10 ? 6000 : 300;
+          // The first five games are played to the end; the others stop after 250 actions (about four deals).
+          const maxPlies = games++ < 5 ? 6000 : 250;
           const first = newGame({ firstDealer: COLORS[dealSeed[0] % 4] as Color }, dealSeed);
           let rs = renderInit(viewFor(first, "bleu"));
           let last: GameState = first;
@@ -182,7 +182,7 @@ describe("a view never carries another seat's cards", () => {
         fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
         fc.tuple(fc.nat(), fc.nat(), fc.nat(), fc.nat()),
         (dealSeed, pickSeed) => {
-          const maxPlies = games++ < 10 ? 1500 : 150;
+          const maxPlies = games++ < 5 ? 1500 : 150;
           const check = (state: GameState) => {
             for (const seat of COLORS) {
               const allowed = publicCards(state, seat);

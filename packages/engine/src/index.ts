@@ -4,6 +4,7 @@ export * from "./events.ts";
 export * from "./legal.ts";
 export * from "./moves.ts";
 export * from "./path.ts";
+export * from "./render.ts";
 export * from "./rng.ts";
 export * from "./rules.ts";
 export * from "./scenario.ts";
