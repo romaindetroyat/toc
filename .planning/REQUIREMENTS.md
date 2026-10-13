@@ -18,14 +18,14 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **RULE-07** : La Dame avance de 12 ; 10, 9, 8, 6, 5, 3 et 2 avancent du nombre indiqué ; le 5 ne fait avancer que ses propres pions.
 - [x] **RULE-08** : Le 4 fait reculer un pion de 4 cases, y compris un pion qui vient de sortir et se trouve sur sa case de sortie ; on n'entre jamais dans sa maison en reculant.
 - [x] **RULE-09** : Le Valet échange un de ses pions du parcours avec le pion d'un autre joueur (adversaire ou partenaire) sur le parcours ; on ne peut pas échanger deux de ses propres pions, ni un pion de l'écurie ou de la maison, ni un pion protégé sur sa sortie.
-- [ ] **RULE-10** : Le 7 se répartit entre ses pions en sous-déplacements dont la somme fait exactement 7 ; s'il est impossible de jouer les 7 pas en entier, le 7 est injouable.
-- [ ] **RULE-11** : Le 7 mange tout pion adverse ou partenaire qu'il dépasse ou sur lequel il s'arrête ; il peut dépasser ses propres pions sans les manger.
+- [x] **RULE-10** : Le 7 se répartit entre ses pions en sous-déplacements dont la somme fait exactement 7 ; s'il est impossible de jouer les 7 pas en entier, le 7 est injouable.
+- [x] **RULE-11** : Le 7 mange tout pion adverse ou partenaire qu'il dépasse ou sur lequel il s'arrête ; il peut dépasser ses propres pions sans les manger.
 - [x] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
 - [x] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
 - [x] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
 - [x] **RULE-15** : Un pion doit avoir fait le tour complet pour entrer dans sa maison par sa case d'entrée, au compte exact jusqu'à une case vide, sans sauter un pion déjà rentré ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact.
 - [x] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
-- [ ] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
+- [x] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [x] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
 - [ ] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
 - [x] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
@@ -124,14 +124,14 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | RULE-07 | Phase 1 | Complete |
 | RULE-08 | Phase 1 | Complete |
 | RULE-09 | Phase 1 | Complete |
-| RULE-10 | Phase 1 | Pending |
-| RULE-11 | Phase 1 | Pending |
+| RULE-10 | Phase 1 | Complete |
+| RULE-11 | Phase 1 | Complete |
 | RULE-12 | Phase 1 | Complete |
 | RULE-13 | Phase 1 | Complete |
 | RULE-14 | Phase 1 | Complete |
 | RULE-15 | Phase 1 | Complete |
 | RULE-16 | Phase 1 | Complete |
-| RULE-17 | Phase 1 | Pending |
+| RULE-17 | Phase 1 | Complete |
 | RULE-18 | Phase 1 | Complete |
 | RULE-19 | Phase 2 | Pending |
 | RULE-20 | Phase 1 | Complete |
