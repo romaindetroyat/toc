@@ -28,7 +28,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [ ] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
 - [ ] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
-- [ ] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
+- [x] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
 
 ### Jouer un tour (PLAY)
 
@@ -77,7 +77,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
 - [ ] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
 - [x] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
-- [ ] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
+- [x] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
 - [ ] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
 
 ### Application (APP)
@@ -134,7 +134,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | RULE-17 | Phase 1 | Pending |
 | RULE-18 | Phase 1 | Pending |
 | RULE-19 | Phase 2 | Pending |
-| RULE-20 | Phase 1 | Pending |
+| RULE-20 | Phase 1 | Complete |
 | PLAY-01 | Phase 1 | Pending |
 | PLAY-02 | Phase 1 | Pending |
 | PLAY-03 | Phase 1 | Pending |
@@ -165,7 +165,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | FX-02 | Phase 1 | Pending |
 | FX-03 | Phase 1 | Pending |
 | FX-04 | Phase 1 | Complete |
-| FX-05 | Phase 1 | Pending |
+| FX-05 | Phase 1 | Complete |
 | FX-06 | Phase 1 | Pending |
 | APP-01 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
