@@ -13,6 +13,7 @@
   import type { CardId, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { board as t } from "../i18n/fr/board.ts";
+  import { game } from "../i18n/fr/game.ts";
   import CardFlights, { type Flight } from "./CardFlights.svelte";
   import FeltTable from "./FeltTable.svelte";
   import Particles from "./Particles.svelte";
@@ -29,6 +30,7 @@
     discardTop = null,
     burst = null,
     flights = [],
+    ontapis,
     children,
     under,
     over,
@@ -41,6 +43,8 @@
     burst?: Burst | null;
     /** The cards in flight: dealt, played, exchanged or laid down. */
     flights?: Flight[];
+    /** A tap (or Entrée) on the felt: the game opens « Sur le tapis ». */
+    ontapis?: () => void;
     children?: Snippet;
     under?: Snippet<[number]>;
     over?: Snippet<[number]>;
@@ -119,6 +123,17 @@
     {@render over?.(px)}
     {@render hits?.(px)}
   </svg>
+  {#if render && ontapis}
+    <!-- The whole felt square is one target (D-08): no knight stands in it, so it never hides a tap. -->
+    <button
+      type="button"
+      class="tapis"
+      aria-label={game.tapis.title}
+      aria-haspopup="dialog"
+      data-felt-button
+      onclick={ontapis}
+    ></button>
+  {/if}
   {#if status === "error"}
     <div class="failed" role="alert">
       <p>{t.loadFailed}</p>
@@ -150,6 +165,24 @@
     width: 33.36%;
     height: 33.36%;
     background: #005400;
+  }
+
+  /* Invisible button over the felt square (x and y 853..1707 of 2560 board units). */
+  .tapis {
+    position: absolute;
+    left: 33.32%;
+    top: 33.32%;
+    width: 33.36%;
+    height: 33.36%;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   img,

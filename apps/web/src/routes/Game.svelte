@@ -54,6 +54,7 @@
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import TapisSheet from "../ui/TapisSheet.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
@@ -259,6 +260,9 @@
   function changeColour() {
     location.hash = "#/";
   }
+
+  /** « Sur le tapis »: the felt read in large form (D-08). */
+  let tapisOpen = $state(false);
 
   /** « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back. */
   function abandon() {
@@ -504,7 +508,7 @@
       </div>
 
       <div class="stage">
-        <Board {k} {render} {discardTop} {burst} {flights}>
+        <Board {k} {render} {discardTop} {burst} {flights} ontapis={() => (tapisOpen = true)}>
           {#snippet under(px)}
             <Overlay
               layer="under"
@@ -620,6 +624,10 @@
         </div>
       {/if}
     </div>
+
+    {#if tapisOpen}
+      <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
+    {/if}
 
     {#if render.phase === "won" && render.winner !== null}
       <EndScreen
