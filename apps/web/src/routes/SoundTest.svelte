@@ -26,12 +26,14 @@
     type Notes,
     RATINGS,
     type Rating,
+    notesAsText,
     saveNotes,
   } from "../audio/soundNotes.ts";
   import { sons } from "../i18n/fr/sons.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "../ui/Icon.svelte";
   import Segmented from "../ui/Segmented.svelte";
+  import { showToast } from "../ui/toast.svelte.ts";
 
   // The listening page for Romain (D-22): every Phase 1 sound, its source, a rating kept on this
   // device. Nothing here is awaited by the game; the page only calls the audio engine.
@@ -184,6 +186,23 @@
   function rate(key: NoteKey, rating: Rating) {
     notes[key] = rating;
     saveNotes(storage, $state.snapshot(notes));
+  }
+
+  // --- Copying the notes ---
+  /** Set when the clipboard refused: the notes are shown as selectable text instead. */
+  let fallbackText = $state<string | undefined>();
+
+  async function copyNotes() {
+    const text = notesAsText(notes, sons.noteNames, sons.ratings);
+    try {
+      // Plain text only: nothing in the notes is ever turned into markup.
+      await navigator.clipboard.writeText(text);
+      fallbackText = undefined;
+      showToast(sons.copied);
+    } catch {
+      fallbackText = text;
+      showToast(sons.copyFailed);
+    }
   }
 
   function tagOf(sound: SoundId): string {
@@ -376,6 +395,23 @@
       </li>
     </ul>
   </section>
+
+  <footer>
+    <button type="button" class="btn btn-primary copy" onclick={copyNotes}>
+      <Icon name="copy" />
+      {sons.copy}
+    </button>
+    {#if fallbackText !== undefined}
+      <textarea
+        class="notes-text"
+        readonly
+        rows={NOTE_KEYS.length + 1}
+        aria-label={sons.notesText}
+        value={fallbackText}
+        onfocus={(event) => event.currentTarget.select()}
+      ></textarea>
+    {/if}
+  </footer>
 </main>
 
 <style>
@@ -504,6 +540,29 @@
     border-radius: var(--radius-button);
     font-size: var(--label-size);
     font-weight: 700;
+  }
+
+  footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .copy {
+    align-self: stretch;
+  }
+
+  .notes-text {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 2px solid var(--creme-attenuee);
+    border-radius: var(--radius-button);
+    background: var(--bois-sombre);
+    color: var(--creme);
+    font-family: inherit;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    resize: vertical;
   }
 
   input[type="range"] {

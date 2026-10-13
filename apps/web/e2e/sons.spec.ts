@@ -173,3 +173,83 @@ test.describe("page de test des sons", () => {
     await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
   });
 });
+
+test.describe("copier mes notes", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  test("sons: Copier mes notes met le texte français dans le presse-papiers et le dit", async ({
+    page,
+  }) => {
+    await page.goto("/#/sons");
+    await page
+      .getByRole("radiogroup", { name: /Sortie de l’écurie/ })
+      .getByRole("radio", { name: "Bon" })
+      .click();
+    await page
+      .getByRole("radiogroup", { name: /13 cases/ })
+      .getByRole("radio", { name: "À changer" })
+      .click();
+
+    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    const toast = page.locator("[data-toast]");
+    await expect(toast).toHaveText("Notes copiées.");
+    await expect(page.getByRole("textbox", { name: "Tes notes" })).toHaveCount(0);
+
+    const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+    const lines = clipboard.split("\n");
+    expect(lines).toHaveLength(14);
+    expect(lines).toContain(`Sortie de l’écurie${NBSP}: Bon`);
+    expect(lines).toContain(`Sabots, 13 cases${NBSP}: À changer`);
+    expect(lines).toContain(`Donne${NBSP}: À écouter`);
+  });
+
+  test("sons: un seul message à la fois, le nouveau remplace l’ancien, il disparaît après 4 s", async ({
+    page,
+  }) => {
+    await page.goto("/#/sons");
+    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    await expect(page.locator("[data-toast]")).toHaveText("Notes copiées.");
+
+    // The clipboard now refuses: the second message replaces the first, never stacks.
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error("refusé")) },
+      });
+    });
+    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    const toast = page.locator("[data-toast]");
+    await expect(toast).toHaveCount(1);
+    await expect(toast).toHaveText("Impossible de copier. Sélectionne le texte ci-dessous.");
+
+    // Lifetime: gone after 4 s (and not before 3 s).
+    const shown = Date.now();
+    await expect(toast).toBeHidden({ timeout: 6000 });
+    expect(Date.now() - shown).toBeGreaterThan(2000);
+  });
+
+  test("sons: si la copie échoue, le texte est affiché, sélectionnable, sans balisage", async ({
+    page,
+  }) => {
+    await page.goto("/#/sons");
+    await page
+      .getByRole("radiogroup", { name: /Poser une carte/ })
+      .getByRole("radio", { name: "Bon" })
+      .click();
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: undefined,
+      });
+    });
+    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    await expect(page.locator("[data-toast]")).toHaveText(
+      "Impossible de copier. Sélectionne le texte ci-dessous.",
+    );
+    const box = page.getByRole("textbox", { name: "Tes notes" });
+    await expect(box).toBeVisible();
+    await expect(box).toHaveAttribute("readonly", "");
+    await expect(box).toHaveValue(new RegExp(`Poser une carte${NBSP}: Bon`));
+    await expect(box).toHaveValue(/\n/);
+  });
+});

@@ -3,6 +3,7 @@
   import Game from "./routes/Game.svelte";
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
+  import Toast from "./ui/Toast.svelte";
 
   let hash = $state(location.hash);
   // The hash may carry a query (#/partie?debug=geometry): the route is what precedes the "?".
@@ -27,3 +28,6 @@
 {:else}
   <Launch />
 {/if}
+
+<!-- The one transient message of the app (UI-SPEC « Toast »). -->
+<Toast />
