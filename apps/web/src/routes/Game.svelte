@@ -21,6 +21,7 @@
     startAmbience,
     status,
     stopAmbience,
+    unlockOnFirstGesture,
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
@@ -524,6 +525,10 @@
 
   // The ambience belongs to the game screen: it stops when the player leaves it.
   onMount(() => stopAmbience);
+
+  // Opened without the launch screen's tap (a reload, a PWA relaunch, a bookmark): the first tap or key
+  // on the game screen starts the sound.
+  onMount(() => unlockOnFirstGesture());
 </script>
 
 <svelte:window {onkeydown} />

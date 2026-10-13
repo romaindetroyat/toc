@@ -30,3 +30,13 @@ test("audio: tous les sons synthétisés sont rendus, audibles et de la bonne du
   expect(seconds("card-donne#0")).toBeGreaterThan(seconds("card-pose#0"));
   expect(seconds("ambience#0")).toBeCloseTo(8, 2);
 });
+
+// A reload or a PWA relaunch lands on #/partie without the launch screen's « Jouer la partie » tap:
+// the first gesture on the game screen creates and resumes the audio.
+test("audio: une partie ouverte directement démarre le son au premier geste", async ({ page }) => {
+  await page.goto("/#/partie?vitesse=test");
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+  await expect(page.locator("body")).not.toHaveAttribute("data-audio", /.*/);
+  await page.locator("[data-board]").click({ position: { x: 4, y: 4 } });
+  await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
+});

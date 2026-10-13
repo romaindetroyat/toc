@@ -428,6 +428,13 @@ async function renderRecipe(
 }
 
 let engine: AudioEngine | undefined;
+/**
+ * Input events that grant user activation, so a resume() called from them is allowed: the HTML list
+ * (pointerup and touchend for touch, keydown) plus click, which WebKit uses to unlock audio. A touch
+ * pointerdown does not grant it.
+ */
+const ACTIVATION_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const;
+
 let backend: WebAudioBackend | undefined;
 let createFailed = false;
 let pendingMix: Mix | undefined;
@@ -481,6 +488,28 @@ export function unlock(): AudioContext | undefined {
   resuming = engine ? engine.unlock() : Promise.resolve();
   mirrorState();
   return backend?.context;
+}
+
+/**
+ * A screen reached without the launch screen's tap (a reload or a PWA relaunch on #/partie, a
+ * bookmark) has no AudioContext yet: its first gesture becomes the unlock. The listeners live here,
+ * outside unlock(), since nothing has called unlock() on that path. They listen on the capture phase,
+ * so the unlock runs inside the gesture before the screen handles it, and are removed after the first
+ * one. Returns the function that removes them (the screen's cleanup); a no-op once the engine exists.
+ */
+export function unlockOnFirstGesture(): () => void {
+  if (engine) return () => {};
+  const disarm = () => {
+    for (const type of ACTIVATION_EVENTS) document.removeEventListener(type, arm, true);
+  };
+  const arm = () => {
+    disarm();
+    unlock();
+  };
+  for (const type of ACTIVATION_EVENTS) {
+    document.addEventListener(type, arm, { capture: true, passive: true });
+  }
+  return disarm;
 }
 
 /**
