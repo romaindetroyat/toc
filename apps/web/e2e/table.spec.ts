@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { etatParam } from "./position.ts";
 
 // Same order and numbers as packages/engine/src/topology.ts, written as literals so the spec does
 // not import workspace TypeScript.
@@ -15,6 +16,28 @@ async function sit(page: Page, color: Color) {
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
   await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+}
+
+/**
+ * Plays one move through the real flow (card, knight, preview, « Jouer ») from a hand-made position:
+ * `color` to play, one knight three cells from its exit and only the Dame de cœur in hand, which
+ * moves it 12 cells. The `etat` debug parameter is base64url JSON (debug builds only).
+ */
+async function playScenarioMove(page: Page, color: Color) {
+  const etat = etatParam({
+    turn: color,
+    pawns: { [color]: [{ p: 3 }, "S", "S", "S"] },
+    hands: { [color]: ["12H"] },
+  });
+  await page.goto("/");
+  await page.goto(`/#/partie?etat=${etat}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+  const knight = page.locator(`[data-pawn="${color}0"]`);
+  await expect(knight).toHaveAttribute("data-place", `ring:${EXIT[color] + 3}`);
+  await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+  await page.locator(`[data-hit="${color}0"]`).click();
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+  return knight;
 }
 
 async function centre(page: Page, selector: string): Promise<{ x: number; y: number }> {
@@ -47,15 +70,12 @@ for (const color of COLORS) {
     );
   });
 
-  test(`table ${color}: le premier cheval part de son losange et bondit de 4 cases`, async ({
+  test(`table ${color}: la Dame fait bondir le cheval de 12 cases (carte, cheval, « Jouer »)`, async ({
     page,
   }) => {
-    await sit(page, color);
-    const knight = page.locator(`[data-pawn="${color}0"]`);
-    await expect(knight).toHaveAttribute("data-place", `ring:${EXIT[color]}`);
-    await knight.click();
-    await expect(knight).toHaveAttribute("data-place", `ring:${EXIT[color] + 4}`);
-    await expect(knight).toHaveAttribute("data-ring", String(EXIT[color] + 4));
+    const knight = await playScenarioMove(page, color);
+    await expect(knight).toHaveAttribute("data-place", `ring:${EXIT[color] + 15}`);
+    await expect(knight).toHaveAttribute("data-ring", String(EXIT[color] + 15));
   });
 }
 
@@ -94,11 +114,8 @@ test("table: les cavaliers regardent dans le sens de la marche, tête gardée su
   page,
 }) => {
   // The facing is whatever the screen delta of the hops says; it is recorded on the pawn.
-  await sit(page, "bleu");
-  const knight = page.locator('[data-pawn="bleu0"]');
-  await expect(knight).toHaveAttribute("data-facing", "right");
-  await knight.click();
-  await expect(knight).toHaveAttribute("data-place", "ring:4");
+  const knight = await playScenarioMove(page, "bleu");
+  await expect(knight).toHaveAttribute("data-place", "ring:15");
   const facing = await knight.getAttribute("data-facing");
   expect(["left", "right"]).toContain(facing);
   // The mirror is applied to the facing group only, never to the anchor.

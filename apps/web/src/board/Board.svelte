@@ -4,7 +4,21 @@
 
   // k = clockwise quarter turns of the art (D-05). Only the art turns: the overlay svg stays upright
   // and its children are placed at anchorOf(place, k).
-  let { k = 0, children }: { k?: number; children?: Snippet } = $props();
+  // `under` and `over` are drawn behind and in front of the knights (`children`), `hits` on top of
+  // all; each receives the number of board units per screen pixel.
+  let {
+    k = 0,
+    children,
+    under,
+    over,
+    hits,
+  }: {
+    k?: number;
+    children?: Snippet;
+    under?: Snippet<[number]>;
+    over?: Snippet<[number]>;
+    hits?: Snippet<[number]>;
+  } = $props();
   const turn = $derived(`rotate(${k * 90}deg)`);
 
   // The three composites produced by tools/build-board.mjs; the browser picks one from `sizes`.
@@ -14,6 +28,7 @@
   let status = $state<"loading" | "loaded" | "error">("loading");
   let attempt = $state(0);
   let width = $state(0);
+  const px = $derived(width > 0 ? 2560 / width : 1);
   let img = $state<HTMLImageElement>();
 
   // « Réessayer » reassigns every source with a cache-busting query.
@@ -37,7 +52,7 @@
   data-board
   data-k={k}
   bind:clientWidth={width}
-  style:--px={width > 0 ? 2560 / width : 1}
+  style:--px={px}
 >
   <!-- Backdrop while the image loads: oak with the felt square, no spinner. -->
   <div class="felt" aria-hidden="true" style:transform={turn}></div>
@@ -57,7 +72,10 @@
     }}
   />
   <svg viewBox="0 0 2560 2560" xmlns="http://www.w3.org/2000/svg">
+    {@render under?.(px)}
     {@render children?.()}
+    {@render over?.(px)}
+    {@render hits?.(px)}
   </svg>
   {#if status === "error"}
     <div class="failed" role="alert">

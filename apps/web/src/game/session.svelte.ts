@@ -7,7 +7,7 @@
 // animation has finished (UI-SPEC, Turn flow step 4).
 
 import { quarterTurnsFor } from "@toc/board";
-import type { Color, PlayerView, Reason, RenderState } from "@toc/engine";
+import type { Color, GameEvent, PlayerView, Reason, RenderState } from "@toc/engine";
 import * as audio from "../audio/engine.ts";
 import { settings } from "../settings/store.svelte.ts";
 import type { DebugParams } from "./debugParams.ts";
@@ -34,6 +34,9 @@ export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit"> 
   audio?: DirectorDeps["audio"];
 };
 
+/** What a bot just played: its seat and the events of its play (the action zone words them). */
+export type BotPlay = { seat: Color; events: GameEvent[] };
+
 export type Session = {
   readonly human: Color;
   /** Clockwise quarter turns of the board toward the human (D-05). */
@@ -49,6 +52,8 @@ export type Session = {
   readonly hint: Reason | "illegal" | null;
   /** The bot that is thinking about its move. */
   readonly thinking: Color | null;
+  /** The last play of a bot, kept until the human acts again. */
+  readonly lastPlay: BotPlay | null;
   stats(): GameStats;
   /** Starts the game: the bots begin to act. */
   start(): void;
@@ -84,13 +89,25 @@ export function createSession(env: SessionEnv, debug: DebugParams = {}): Session
     getMode: (): DirectorMode =>
       testSpeed ? "test" : settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
   });
+  // The controller hands every play to the Director; the session listens in to word the bots' plays.
+  let lastPlay = $state.raw<BotPlay | null>(null);
+  const watched = {
+    enqueue(events: GameEvent[]): void {
+      const played = events.find(
+        (event) => event.t === "cardPlayed" || event.t === "handDiscarded",
+      );
+      if (played !== undefined && played.seat !== human) lastPlay = { seat: played.seat, events };
+      director.enqueue(events);
+    },
+    idle: () => director.idle(),
+  };
   const controller = createGame({
     human,
     seed: debug.graine,
     botSeed: debug.graine === undefined ? undefined : botSeedFrom(debug.graine),
     speed: (): Speed => (testSpeed ? "test" : settings.fast ? "fast" : "normal"),
     scenario,
-    director,
+    director: watched,
   });
 
   let view = $state.raw<PlayerView>(controller.view());
@@ -110,11 +127,16 @@ export function createSession(env: SessionEnv, debug: DebugParams = {}): Session
   director.onRender((next) => {
     render = next;
   });
-  director.reset(view);
+  director.reset(controller.view());
 
+  // Only the latest request counts: an earlier one may have found the Director idle just before the
+  // play it belongs to was enqueued (the controller notifies before and after a bot's play), and
+  // would unlock the board while the move is still animating.
+  let syncTicket = 0;
   async function syncWhenIdle(): Promise<void> {
+    const ticket = ++syncTicket;
     await director.idle();
-    if (disposed) return;
+    if (disposed || ticket !== syncTicket) return;
     ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
   }
 
@@ -143,6 +165,9 @@ export function createSession(env: SessionEnv, debug: DebugParams = {}): Session
     get thinking() {
       return thinking;
     },
+    get lastPlay() {
+      return lastPlay;
+    },
     stats: () => controller.stats(),
     start() {
       ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
@@ -154,6 +179,7 @@ export function createSession(env: SessionEnv, debug: DebugParams = {}): Session
       ui = result.state;
       hint = result.hint ?? null;
       if (result.submit === undefined) return;
+      lastPlay = null;
       const outcome = controller.submit(result.submit);
       if (!outcome.ok) {
         // The engine refused: nothing changed, the interaction starts again from the view.

@@ -16,9 +16,21 @@
     el?: SVGGElement;
     /** Present only on a pawn the player can act on. */
     onselect?: () => void;
+    /** Board units the knight is lifted off its shadow (12 for the selected one). */
+    lift?: number;
   };
 
-  let { pawn, color, x, y, place, facing = "right", el = $bindable(), onselect }: Props = $props();
+  let {
+    pawn,
+    color,
+    x,
+    y,
+    place,
+    facing = "right",
+    el = $bindable(),
+    onselect,
+    lift = 0,
+  }: Props = $props();
 
   const ring = $derived(place.z === "ring" ? place.cell : -1);
   // Pawns that are home are drawn 10 % smaller in the house (UI-SPEC).
@@ -37,9 +49,11 @@
     <g data-role="arc">
       <g transform={`scale(${size})`}>
         <use href="#knight-shadow" />
-        <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
-          <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
-          <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+        <g transform={lift > 0 ? `translate(0 ${-lift})` : undefined}>
+          <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
+            <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
+            <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+          </g>
         </g>
       </g>
       {#if onselect}
