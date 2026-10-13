@@ -468,8 +468,12 @@ export function unlock(): AudioContext | undefined {
       createFailed = false;
       made.onStatus(emit);
       created.onStateChange(mirrorState);
-      // Any later tap retries the resume (iOS interrupts the context when the app goes to background).
-      document.addEventListener("pointerdown", () => made.retryResume(), { passive: true });
+      // Any later tap or key retries the resume (iOS interrupts the context when the app goes to the
+      // background). Only events that grant user activation may resume it: a touch pointerdown does not.
+      const retry = () => made.retryResume();
+      for (const type of ACTIVATION_EVENTS) {
+        document.addEventListener(type, retry, { passive: true });
+      }
       // The ambience stops with the page and comes back with it.
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) made.pauseAmbience();
