@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Une vraie partie sur un appareil
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-10-13T09:23:36.172Z"
+stopped_at: Phase 1 UI-SPEC approved
+last_updated: "2026-10-13T09:39:08.122Z"
 last_activity: 2026-10-13
 last_activity_desc: Roadmap créé (5 phases, 57 exigences v1 couvertes)
-state_head: 2b86e022eeae28b8b8b2470bf56a020b7c3aff28
+state_head: 7cc65556545e2c5c2f1a3311d7d9956be72e1771
 progress:
   total_phases: 5
   completed_phases: 0
@@ -88,6 +88,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T09:23:36.141Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-une-vraie-partie-sur-un-appareil/01-CONTEXT.md
+Last session: 2026-10-13T09:39:08.095Z
+Stopped at: Phase 1 UI-SPEC approved
+Resume file: .planning/phases/01-une-vraie-partie-sur-un-appareil/01-UI-SPEC.md
