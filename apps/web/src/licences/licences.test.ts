@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import raw from "../../../../assets/audio/LICENSES.md?raw";
 import { SOUND_IDS } from "../audio/sounds.ts";
 import { LICENCES, parseLicences } from "./licences.ts";
 
@@ -67,13 +67,10 @@ describe("parseLicences", () => {
 });
 
 describe("assets/audio/LICENSES.md", () => {
-  const raw = readFileSync(
-    new URL("../../../../assets/audio/LICENSES.md", import.meta.url),
-    "utf8",
-  );
   const rows = parseLicences(raw);
 
-  it("is what the application imports", () => {
+  it("is what the application imports, and is not empty", () => {
+    expect(LICENCES.length).toBeGreaterThan(0);
     expect(LICENCES).toEqual(rows);
   });
 

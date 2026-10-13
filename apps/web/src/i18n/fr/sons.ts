@@ -70,6 +70,9 @@ export const sons = {
   generatedButton: "Généré",
   sourceGenerated: "Généré par le code",
   sourceFile: "Fichier libre (CC0)",
+  /** Under the source tag: author and licence of the sound, from assets/audio/LICENSES.md. */
+  licenceLine: (author: string, licence: string) => `${author} · ${licence}`,
+  licenceMissing: "Licence non renseignée",
   decoding: "Préparation du son…",
   unavailable: "Son indisponible",
 

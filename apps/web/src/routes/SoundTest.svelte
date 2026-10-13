@@ -30,6 +30,7 @@
     saveNotes,
   } from "../audio/soundNotes.ts";
   import { sons } from "../i18n/fr/sons.ts";
+  import { licenceOf } from "../licences/licences.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "../ui/Icon.svelte";
   import Segmented from "../ui/Segmented.svelte";
@@ -208,6 +209,12 @@
   function tagOf(sound: SoundId): string {
     return sources[sound]?.source === "file" ? sons.sourceFile : sons.sourceGenerated;
   }
+
+  /** « auteur · licence » of a sound, from the licence manifest (FX-05). */
+  function licenceLine(sound: SoundId): string {
+    const row = licenceOf(sound);
+    return row ? sons.licenceLine(row.auteur, row.licence) : sons.licenceMissing;
+  }
 </script>
 
 <!-- Any tap on the page unlocks the audio (the first tap is the user gesture browsers require). -->
@@ -278,6 +285,7 @@
             {tagOf(sound)}
           {/if}
         </span>
+        <span class="tag licence">{licenceLine(sound)}</span>
       </div>
     </div>
     {@render rating(key)}
@@ -376,6 +384,7 @@
                 {tagOf("ambiance")}
               {/if}
             </span>
+            <span class="tag licence">{licenceLine("ambiance")}</span>
           </div>
         </div>
         <div class="volume">

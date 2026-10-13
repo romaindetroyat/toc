@@ -163,6 +163,15 @@ test.describe("page de test des sons", () => {
     await expect(page.getByText("Son indisponible")).toHaveCount(0);
   });
 
+  test("sons: chaque ligne montre l’auteur et la licence du registre", async ({ page }) => {
+    await page.goto("/#/sons");
+    await expect(page.locator("li.row[data-sound] .licence")).toHaveCount(14);
+    await expect(page.getByText("Jeu TOC (synthèse Web Audio) · Aucune œuvre tierce")).toHaveCount(
+      14,
+    );
+    await expect(page.getByText("Licence non renseignée")).toHaveCount(0);
+  });
+
   test("sons: la page défile et le lien Retour ramène au lancement", async ({ page }) => {
     await page.goto("/#/sons");
     const scrollable = await page.evaluate(
