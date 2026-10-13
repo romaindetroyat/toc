@@ -178,15 +178,15 @@ describe("the finished player (RULE-17)", () => {
       "bleu",
     );
     expect(legalActions(s, "bleu")).toEqual([
-      { t: "exit", card: "1S", pawn: "rouge1" },
       { t: "move", card: "1S", pawn: "rouge0" },
+      { t: "exit", card: "1S", pawn: "rouge1" },
     ]);
   });
 
   it("emits playerFinished once, when the fourth pawn arrives", () => {
     const s = playState(
       { bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }] },
-      { bleu: ["5S", "2S"], jaune: ["3H"] },
+      { bleu: ["5S", "1S"], jaune: ["3H"] },
       "bleu",
     );
     const out = apply(s, "bleu", { t: "move", card: "5S", pawn: "bleu3" });
@@ -201,7 +201,7 @@ describe("the finished player (RULE-17)", () => {
     // The next card of the finished player is played with the partner's pawns; no second event.
     const later = apply({ ...out.state, turn: "bleu" }, "bleu", {
       t: "exit",
-      card: "2S",
+      card: "1S",
       pawn: "rouge0",
     });
     expect(later.events.some((e) => e.t === "playerFinished")).toBe(false);

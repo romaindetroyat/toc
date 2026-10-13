@@ -1,5 +1,7 @@
+export * from "./apply.ts";
 export * from "./deck.ts";
 export * from "./events.ts";
+export * from "./legal.ts";
 export * from "./moves.ts";
 export * from "./path.ts";
 export * from "./rng.ts";

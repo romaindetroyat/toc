@@ -18,6 +18,7 @@ import {
   IllegalActionError,
   isDealOver,
   legalActions,
+  nextColor,
   type Pawn,
   type PawnId,
   type PawnSpec,
@@ -34,6 +35,8 @@ const FIXED_SEED: Seed = [101, 202, 303, 404];
 
 /** The fixture R-13.15 plays a 4 and expects a forward move into the home; the 4 goes back (R-08). */
 const CONTRADICTIONS: Record<string, string> = {
+  "R-13.13":
+    "the fixture plays 4S (backward 4, R-08) from progress 66 and expects progress 70, which a forward 4 would give: RULES.md contradicts itself, see the SUMMARY of plan 01-12",
   "R-13.15":
     "the fixture plays 4S (backward 4, R-08) from progress 140 and expects home slot 1, which a forward 4 would give: RULES.md contradicts itself, see the SUMMARY of plan 01-12",
 };
@@ -113,6 +116,18 @@ function run(sc: Scenario): void {
     }
     playState = state;
   } else if (sc.action !== undefined) {
+    // A fixture that gives a hand to the acting seat only means « the other seats still hold cards »
+    // (R-14.2, R-16.2): when this move empties the last hand, give the next seat a card from the talon
+    // so the deal does not end inside the move.
+    const lastCard = state.hands[seat].length === 1 || sc.action.t === "discard";
+    if (lastCard && COLORS.every((c) => c === seat || state.hands[c].length === 0)) {
+      const bystander = nextColor(seat);
+      state = {
+        ...state,
+        hands: { ...state.hands, [bystander]: [state.talon[0] as CardId] },
+        talon: state.talon.slice(1),
+      };
+    }
     const isLegal = has(legalBefore, sc.action);
     if (want.legal !== undefined) expect(isLegal).toBe(want.legal);
     if (isLegal) {
@@ -196,11 +211,18 @@ for (const rule of RULE_IDS) {
   });
 }
 
-describe("R-13.15 fixture contradiction", () => {
-  it("what the engine does with the fixture: the 4 goes back, the pawn does not enter the home", () => {
-    const sc = scenarios.find((s) => s.id === "R-13.15") as Scenario;
-    const state = scenarioState(sc.before, FIXED_SEED);
-    const out = apply(state, "bleu", sc.action as Action);
-    expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: 136 });
-  });
+describe("fixtures that contradict R-08 (the 4 goes back)", () => {
+  const cases: [string, number, number][] = [
+    ["R-13.13", 66, 62],
+    ["R-13.15", 140, 136],
+  ];
+  for (const [id, start, end] of cases) {
+    it(`${id}: the engine plays the 4 backward from ${start} to ${end}, it does not enter the home`, () => {
+      const sc = scenarios.find((s) => s.id === id) as Scenario;
+      const state = scenarioState(sc.before, FIXED_SEED);
+      expect(state.pawns.bleu0).toEqual({ zone: "ring", progress: start });
+      const out = apply(state, "bleu", sc.action as Action);
+      expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: end });
+    });
+  }
 });
