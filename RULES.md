@@ -1,12 +1,12 @@
 # Règles du TOC — version maison
 
-**Statut :** brouillon complet à valider par Romain (voir « Points à valider » à la fin)
+**Statut :** Validé par Romain le 2026-10-13 (voir « Décisions de Romain » à la fin)
 **Date :** 2026-10-13
-**Contenu de cette version :** les seize règles R-01 à R-16 (équipes, plateau, donnes, échange, tour, As et Roi, cartes à avancer, le 4, le Valet, le 7, prise, sortie protégée, maison, main injouable, joueur qui a fini, fin de partie), suivies de « Points à valider » (ce que Romain doit trancher) et de « Décidé » (ce qui l’est déjà, avec sa source). Chaque scénario est dessiné sur le plateau : à gauche avant le coup, à droite après.
+**Contenu de cette version :** les seize règles R-01 à R-16 (équipes, plateau, donnes, échange, tour, As et Roi, cartes à avancer, le 4, le Valet, le 7, prise, sortie protégée, maison, main injouable, joueur qui a fini, fin de partie), suivies de « Décisions de Romain » (les points qu’il a validés, avec la valeur retenue) et de « Décidé » (ce qui l’est déjà, avec sa source). Chaque scénario est dessiné sur le plateau : à gauche avant le coup, à droite après.
 
 Chaque règle est numérotée. Chaque règle cite des scénarios (`R-NN.k`) : ce sont de petits cas écrits comme des données, que le moteur de jeu devra reproduire à l’identique. Rien n’est décidé en silence dans le code : ce qui est écrit ici est ce que le jeu fera.
 
-Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le reste est une hypothèse de travail et porte la mention « à valider » : Romain les relit une par une avant que le moteur ne soit figé.
+Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Ce que dit ce document est ce que le moteur fait.
 
 ## Vocabulaire
 
@@ -41,7 +41,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - Un cheval qui recule de 4 depuis sa sortie se retrouve à la progression −4, sur la case située quatre cases avant son losange. Cette décision est actée (D-04).
 - Un cheval à la progression −2 se tient sur son propre carré 16, mais il n’a pas fait le tour : il n’entre pas dans la maison. Un cheval ne peut entrer qu’après avoir fait le tour complet (acté).
 - Un cheval peut s’arrêter sur le losange d’une autre couleur ; il y est un cheval ordinaire (R-12).
-- Après un échange au Valet, la progression du cheval qui change de place est à préciser en R-09 (G1, à valider).
+- Après un échange au Valet, la progression du cheval qui change de place est précisée en R-09 (G1, validé).
 
 **Scénarios**
 - R-02.1 — La progression compte les cases parcourues depuis la sortie
@@ -58,7 +58,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 **Règle** — On joue avec un jeu de 52 cartes sans joker, mélangé. Les cartes sont distribuées en trois donnes successives : 5 cartes à chacun, puis 4, puis 4. Quand les 52 cartes sont distribuées, on rebat et le donneur change : il passe au joueur suivant dans le sens horaire.
 
 **Cas limites**
-- Le joueur qui commence chaque donne est celui qui suit le donneur dans le sens horaire (G9, à valider). Le donneur reste le même pendant les trois donnes d’un paquet et ne change qu’au moment de rebattre (G9, à valider).
+- Le joueur qui commence chaque donne est celui qui suit le donneur dans le sens horaire (G9, validé). Le donneur reste le même pendant les trois donnes d’un paquet et ne change qu’au moment de rebattre (G9, validé).
 - Le premier donneur est choisi au début de la partie ; il n’a aucune influence sur les équipes.
 - La suite complète d’un paquet (les trois donnes jouées jusqu’au bout) est vérifiée par des tests automatiques sur des parties tirées au hasard ; les scénarios ci-dessous en vérifient chaque étape.
 
@@ -82,8 +82,8 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - L’échange a lieu à chaque donne (5, 4 et 4), pas seulement à la première (acté, D-04).
 - Un joueur voit sa main avant de choisir (Q8, acté par RULE-03).
 - L’échange a lieu même si la main du joueur semble injouable : la carte reçue peut la sauver, et une main vraiment injouable est posée après l’échange (Q6, acté par RULE-03).
-- La carte échangée ne compte pas dans la taille de la donne : chacun garde 5 cartes (ou 4) après l’échange (Q7, à valider).
-- Rien ne bouge tant que les quatre n’ont pas choisi : le jeu indique seulement qui doit encore choisir (G8, à valider).
+- La carte échangée ne compte pas dans la taille de la donne : chacun garde 5 cartes (ou 4) après l’échange (Q7, validé).
+- Rien ne bouge tant que les quatre n’ont pas choisi : le jeu indique seulement qui doit encore choisir (G8, validé).
 - On ne peut donner qu’une carte qu’on a en main.
 - La carte reçue est marquée dans la main du joueur jusqu’à ce qu’il la joue (D-21).
 
@@ -106,7 +106,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 **Cas limites**
 - Le sens horaire est acté (D-04).
 - Jouer une carte jouable est obligatoire : il n’y a pas de défausse volontaire (Q20, acté par RULE-04).
-- Un joueur dont la main est vide est sauté jusqu’à la donne suivante (G13, à valider).
+- Un joueur dont la main est vide est sauté jusqu’à la donne suivante (G13, validé).
 - Le jeu ne joue jamais à la place d’un joueur humain, même s’il n’a qu’un seul coup possible : il le met seulement en évidence (D-19).
 
 **Scénarios**
@@ -144,9 +144,9 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 **Règle** — La Dame avance un cheval de 12. Le 10, le 9, le 8, le 6, le 5, le 3 et le 2 avancent un cheval du nombre indiqué. Le 5 ne fait avancer que les propres chevaux du joueur. On ne peut jamais s’arrêter sur un de ses propres chevaux.
 
 **Cas limites**
-- Le 5 est une règle maison : il ne fait pas avancer les chevaux des autres joueurs, partenaire compris (acté). Aucune autre carte ne déplace un cheval qui n’est pas à soi, sauf l’échange du Valet (G10, à valider pour la formulation générale).
+- Le 5 est une règle maison : il ne fait pas avancer les chevaux des autres joueurs, partenaire compris (acté). Aucune autre carte ne déplace un cheval qui n’est pas à soi, sauf l’échange du Valet (G10, validé).
 - S’arrêter sur un cheval adverse ou du partenaire le mange (R-11) ; passer par-dessus ne mange rien, sauf pour le 7 (R-10).
-- Un cheval peut passer par-dessus d’autres chevaux, les siens compris, avec les cartes ordinaires : seul un cheval protégé sur son losange est infranchissable (R-12). Cette hypothèse n’est pas listée dans la recherche (G11, à valider).
+- Un cheval peut passer par-dessus d’autres chevaux, les siens compris, avec les cartes ordinaires : seul un cheval protégé sur son losange est infranchissable (R-12). Cette précision n’était pas dans la recherche ; Romain l’a validée (G11).
 - Les chevaux entrent dans la maison au compte exact ; le détail est en R-13.
 
 **Scénarios**
@@ -169,7 +169,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - Reculer depuis la sortie est acté (D-04) : le cheval passe à la progression −4.
 - Ne jamais entrer dans la maison en reculant, et devoir faire le tour complet, est acté (D-04).
 - Un cheval qui recule et s’arrête sur un cheval adverse ou du partenaire le mange, comme avec toute autre carte (R-11).
-- Un cheval protégé sur son losange est infranchissable, y compris pour un autre cheval de sa propre couleur qui voudrait reculer à travers lui (G4, à valider).
+- Un cheval protégé sur son losange est infranchissable, y compris pour un autre cheval de sa propre couleur qui voudrait reculer à travers lui (G4, validé).
 - Un cheval à l’écurie ne peut pas reculer. Si aucun cheval ne peut reculer, le 4 est injouable.
 
 **Scénarios**
@@ -193,10 +193,10 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 **Cas limites**
 - Le Valet n’échange jamais deux chevaux du même joueur : c’est acté (D-04, RULE-09), à la place de l’hypothèse de départ de la recherche (Q10).
 - Un cheval à l’écurie ou dans la maison n’est ni échangé ni visé (Q11, acté par RULE-09).
-- Un cheval protégé sur sa sortie (R-12) ne peut pas être visé (Q12, acté par RULE-13). Mon propre cheval protégé sur ma sortie ne peut pas non plus servir de cheval à échanger (G6, à valider).
+- Un cheval protégé sur sa sortie (R-12) ne peut pas être visé (Q12, acté par RULE-13). Mon propre cheval protégé sur ma sortie ne peut pas non plus servir de cheval à échanger (G6, validé).
 - Sans cible possible, le Valet est injouable : le jeu l’indique et le reste de la main se joue (R-14).
-- Après l’échange, chaque cheval est sur la case de l’autre. Sa progression (voir le vocabulaire) est recalculée d’après sa nouvelle case : un cheval qui avait déjà fait un tour de plus perd ce tour, un cheval qui arrive sur son carré 16 peut entrer dans sa maison (G1, à valider). L’autre choix possible, garder ses tours déjà faits, est dessiné en R-09.9.
-- Le Valet est la seule carte qui déplace un cheval qui n’est pas à soi (G10, à valider).
+- Après l’échange, chaque cheval est sur la case de l’autre. Sa progression (voir le vocabulaire) est recalculée d’après sa nouvelle case : un cheval qui avait déjà fait un tour de plus perd ce tour, un cheval qui arrive sur son carré 16 peut entrer dans sa maison (G1, validé). L’autre choix possible, garder ses tours déjà faits, est dessiné en R-09.9.
+- Le Valet est la seule carte qui déplace un cheval qui n’est pas à soi (G10, validé).
 
 **Scénarios**
 - R-09.1 — Le Valet échange un de mes pions avec celui d’un adversaire
@@ -227,7 +227,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - Le 7 mange aussi le cheval du partenaire (Q23, acté par RULE-11).
 - Les captures se font pas à pas : un cheval mangé retourne tout de suite à son écurie et sa case est libre pour la suite du plan. L’ordre des pas compte (R-10.11).
 - Un plan est accepté ou refusé en entier : s’il est invalide, rien ne bouge (R-10.12).
-- Le même cheval peut revenir plus d’une fois dans un plan, à des moments différents ; deux pas de suite du même cheval n’en font qu’un (G5, à valider).
+- Le même cheval peut revenir plus d’une fois dans un plan, à des moments différents ; deux pas de suite du même cheval n’en font qu’un (G5, validé).
 - Un pas du 7 qui arrive au compte exact dans la maison y entre, comme en R-13. Quand le 7 rentre le dernier cheval d’un joueur au milieu du plan, voir G12 en R-15.
 - Pendant la construction du 7, l’écran propose seulement les pas qui permettent encore de finir à 7.
 
@@ -289,8 +289,8 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - La protection ne vaut que pour la couleur du losange : c’est acté (D-04, RULE-13).
 - Mon cheval sur ma sortie bloque ma deuxième sortie : il faut le faire avancer d’abord (Q15, acté par RULE-14).
 - Un cheval protégé reste libre de bouger : dès qu’il quitte son losange, il n’est plus protégé.
-- Un cheval qui s’arrête sur sa sortie après un tour de plus y est protégé comme au premier passage (G3, à valider).
-- Le cheval protégé bloque aussi les autres chevaux de sa propre couleur, pour le 4, le 7 et les cartes à avancer (G4, à valider).
+- Un cheval qui s’arrête sur sa sortie après un tour de plus y est protégé comme au premier passage (G3, validé).
+- Le cheval protégé bloque aussi les autres chevaux de sa propre couleur, pour le 4, le 7 et les cartes à avancer (G4, validé).
 - Le cheval qui entre dans sa maison passe par le carré 16, avant le losange : l’entrée ne croise jamais son losange.
 
 **Scénarios**
@@ -323,7 +323,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - Compte exact jusqu’à une case vide, entrée obligatoire, avancer dans la maison : c’est acté (D-01, D-02, D-03, RULE-15).
 - Le tour complet est obligatoire et on n’entre jamais en reculant : c’est acté (D-04). Un cheval qui a reculé depuis sa sortie est à la progression −4 et n’a pas fait le tour ; il passe devant le carré 16 sans entrer (R-13.12).
 - La case 0 de la maison est la plus proche du carré 16, la case 3 la plus éloignée.
-- Si la case visée est libre mais qu’un cheval déjà rentré se trouve sur le chemin, le cheval ne le saute pas et repart pour un tour, comme si la case était occupée (G2, à valider).
+- Si la case visée est libre mais qu’un cheval déjà rentré se trouve sur le chemin, le cheval ne le saute pas et repart pour un tour, comme si la case était occupée (G2, validé).
 - Un cheval qui rate sa maison continue sur le parcours, il peut manger ou être mangé comme n’importe quel cheval, et il retrouve le carré 16 un tour plus tard (R-13.15).
 - Dans un 7, un pas qui arrive au compte exact entre dans la maison, avec les mêmes règles (R-13.3).
 
@@ -366,7 +366,7 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 **Cas limites**
 - Poser sa main est un geste du joueur, pas une décision automatique du jeu : c’est acté (D-20), à la place de l’hypothèse de départ de la recherche (Q21). Les ordinateurs, eux, posent sans bouton.
 - La main posée reste visible sur le tapis jusqu’à la donne suivante, et ses cartes ne reviennent pas dans le jeu.
-- Un joueur qui a posé (ou qui n’a plus de carte) est sauté jusqu’à la donne suivante (G13, à valider).
+- Un joueur qui a posé (ou qui n’a plus de carte) est sauté jusqu’à la donne suivante (G13, validé).
 - Quand les quatre mains sont posées ou vides, la donne se termine et la suivante commence (R-03). La partie ne peut donc pas rester bloquée.
 - La raison pour laquelle une carte n’est pas jouable est donnée au joueur : aucun cheval ne peut jouer cette carte, aucun cheval à sortir, le Valet n’a pas de cible, le 7 ne peut pas être joué en entier, ou un cheval protégé bloque le passage.
 
@@ -386,9 +386,9 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Cas limites**
 - Les chevaux du partenaire comptent comme les siens pour toutes les cartes : c’est acté (RULE-17). Cela règle aussi le 5 (Q16) et ce qui compte comme « à soi » pour le Valet et les prises (Q17).
-- Pour le Valet, le cheval du partenaire est « à soi » : la cible est donc un cheval adverse (G7, à valider).
+- Pour le Valet, le cheval du partenaire est « à soi » : la cible est donc un cheval adverse (G7, validé).
 - Un joueur qui a fini garde sa place : il reçoit sa main, échange une carte avec son partenaire (Q6), et pose sa main si elle est injouable (R-14).
-- Quand le 7 rentre le dernier cheval d’un joueur au milieu du plan, les pas qui restent peuvent se jouer avec les chevaux de son partenaire (G12, à valider). L’autre choix possible, jouer tout le 7 avec les seuls chevaux contrôlés au début du tour, est dessiné en R-15.9.
+- Quand le 7 rentre le dernier cheval d’un joueur au milieu du plan, les pas qui restent peuvent se jouer avec les chevaux de son partenaire (G12, validé). L’autre choix possible, jouer tout le 7 avec les seuls chevaux contrôlés au début du tour, est dessiné en R-15.9.
 - Si tous les chevaux du partenaire sont aussi rentrés, l’équipe a gagné (R-16).
 
 **Scénarios**
@@ -430,25 +430,25 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 - R-16.4 — Le huitième pion peut être rentré par le partenaire qui a déjà fini
   ![R-16.4](docs/regles/R-16.4.webp)
 
-## Points à valider
+## Décisions de Romain
 
-Voici les points que Romain doit trancher avant que le moteur de jeu soit figé. Chacun donne le choix proposé par défaut, l’autre choix possible, et les règles et scénarios touchés. Tant que Romain n’a pas répondu, le jeu applique le choix par défaut. Les scénarios de l’autre choix sont marqués « alternative » : ils ne servent que si Romain le préfère.
+Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R-13.7 et R-10.13, puis l’a validé tel quel le 2026-10-13 : chaque point prend la valeur retenue indiquée. Aucune correction. Les scénarios R-09.9 et R-15.9 dessinent l’autre choix de G1 et de G12 : ils sont conservés comme repères et ne sont pas implémentés. Chaque valeur est une constante nommée dans `packages/engine/src/rules.ts`.
 
-- **G1 — Progression d’un cheval après un échange au Valet.** Le cheval qui change de case a-t-il la progression de sa nouvelle case, ou garde-t-il ses tours déjà faits ? Par défaut : la progression de sa nouvelle case (de 0 à 71 ; un cheval qui avait fait un tour de plus perd ce tour). Autre choix : il garde ses tours. Touche R-02, R-09, R-13 ; scénarios R-09.1, R-09.2, R-09.8 (défaut), R-09.9 (autre choix), R-15.4.
-- **G2 — Entrée bloquée par un cheval déjà rentré.** Le compte tombe sur une case libre de la maison, mais un cheval déjà rentré se trouve sur le chemin. Par défaut : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. Autre choix : le coup est interdit. Touche R-13 ; scénario R-13.7.
-- **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Est-il protégé comme au premier passage ? Par défaut : oui, la protection tient à la case et à la couleur, pas au tour. Autre choix : la protection ne vaut qu’au premier passage. Touche R-12 ; scénario R-12.9.
-- **G4 — Un cheval protégé bloque-t-il aussi ses propres chevaux ?** Par défaut : oui, personne ne le dépasse, y compris son propre camp. Autre choix : ses propres chevaux peuvent le dépasser. Touche R-08, R-12 ; scénarios R-08.4, R-08.5, R-12.10.
-- **G5 — Le même cheval deux fois dans un 7.** Un plan peut-il reprendre un cheval déjà déplacé plus tôt dans le même 7 ? Par défaut : oui, deux pas de suite du même cheval n’en font qu’un. Autre choix : chaque cheval n’apparaît qu’une fois par 7. Touche R-10 ; scénario R-10.13.
-- **G6 — Le Valet avec mon propre cheval protégé sur ma sortie.** Par défaut : impossible, un cheval protégé ne s’échange pas, ni comme cible ni comme cheval joué. Autre choix : possible, seule la cible adverse est protégée. Touche R-09 ; scénario R-09.6.
-- **G7 — Joueur qui a fini : ce qui compte comme « à soi » pour le Valet et les prises.** Par défaut : les chevaux du partenaire sont à lui, le Valet échange un cheval du partenaire avec un cheval adverse et un cheval joué mange comme un cheval à soi. Autre choix : un joueur qui a fini ne peut pas jouer le Valet. Touche R-09, R-15 ; scénarios R-15.4, R-15.6.
-- **G8 — Échange de cartes simultané.** Par défaut : les quatre joueurs choisissent, puis les quatre cartes changent de main ensemble. Autre choix : chaque couple de partenaires échange dès que les deux ont choisi. Touche R-04 ; scénarios R-04.1, R-04.2.
-- **G9 — Qui commence chaque donne et quand le donneur change.** Par défaut : le joueur après le donneur commence chaque donne, le donneur reste le même pendant les trois donnes d’un paquet et change à chaque paquet (dans le sens horaire). Autre choix : le donneur change à chaque donne. Touche R-03 ; scénarios R-03.1 à R-03.4.
-- **G10 — Quelle carte déplace un cheval qui n’est pas à soi.** Par défaut : seul le Valet. Les autres cartes, le 5 compris (acté), ne déplacent que les chevaux du joueur. Autre choix : une autre carte pourrait déplacer des chevaux d’autrui. Touche R-07, R-09 ; scénario R-07.3.
-- **G11 — Passer par-dessus des chevaux avec les cartes ordinaires.** Par défaut : on passe par-dessus tous les chevaux sans les manger ; seul un cheval protégé est infranchissable. Seul le 7 mange ce qu’il dépasse. Autre choix : un cheval ne peut pas en dépasser un autre. Touche R-07, R-10 ; scénario R-07.5.
-- **G12 — Le 7 qui rentre mon dernier cheval au milieu du plan.** Les pas qui restent peuvent-ils se jouer avec les chevaux du partenaire ? Par défaut : oui. Autre choix : non, le 7 se joue entièrement avec les chevaux contrôlés au début du tour, sinon il est injouable. Touche R-10, R-15 ; scénarios R-15.8 (défaut), R-15.9 (autre choix).
-- **G13 — Un joueur qui n’a plus de carte est sauté jusqu’à la donne suivante.** Par défaut : oui, le tour passe au suivant. Autre choix : il garde la parole mais passe automatiquement (même résultat, avec un temps d’affichage de plus). Touche R-05, R-14 ; scénarios R-05.3, R-14.4.
-- **Q7 — La carte échangée compte-t-elle dans les 5 cartes de la donne ?** Par défaut : on compte avant l’échange ; comme chacun donne une carte et en reçoit une, la taille des mains ne change pas. Touche R-04 ; scénario R-04.4.
-- **Q22 — La pause en cas de déconnexion vaut-elle pendant l’échange, la pose de main et les tours des ordinateurs ?** Par défaut : oui, dans toutes les phases du jeu. Cela ne concerne que le jeu en réseau (phase 2) : aucun scénario de la phase 1.
+- **G1 — Progression d’un cheval après un échange au Valet.** Retenu : le cheval qui change de case prend la progression de sa nouvelle case (de 0 à 71 ; un cheval qui avait fait un tour de plus perd ce tour). Touche R-02, R-09, R-13 ; scénarios R-09.1, R-09.2, R-09.8, R-15.4. Le scénario R-09.9 (garder ses tours) n’est pas retenu.
+- **G2 — Entrée bloquée par un cheval déjà rentré.** Retenu : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. Touche R-13 ; scénario R-13.7.
+- **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Retenu : il est protégé comme au premier passage, la protection tient à la case et à la couleur, pas au tour. Touche R-12 ; scénario R-12.9.
+- **G4 — Un cheval protégé bloque-t-il aussi ses propres chevaux ?** Retenu : oui, personne ne le dépasse, y compris son propre camp. Touche R-08, R-12 ; scénarios R-08.4, R-08.5, R-12.10.
+- **G5 — Le même cheval deux fois dans un 7.** Retenu : un plan peut reprendre un cheval déjà déplacé plus tôt dans le même 7 ; deux pas de suite du même cheval n’en font qu’un. Touche R-10 ; scénario R-10.13.
+- **G6 — Le Valet avec mon propre cheval protégé sur ma sortie.** Retenu : impossible, un cheval protégé ne s’échange pas, ni comme cible ni comme cheval joué. Touche R-09 ; scénario R-09.6.
+- **G7 — Joueur qui a fini : ce qui compte comme « à soi » pour le Valet et les prises.** Retenu : les chevaux du partenaire sont à lui, le Valet échange un cheval du partenaire avec un cheval adverse et un cheval joué mange comme un cheval à soi. Touche R-09, R-15 ; scénarios R-15.4, R-15.6.
+- **G8 — Échange de cartes simultané.** Retenu : les quatre joueurs choisissent, puis les quatre cartes changent de main ensemble. Touche R-04 ; scénarios R-04.1, R-04.2.
+- **G9 — Qui commence chaque donne et quand le donneur change.** Retenu : le joueur après le donneur commence chaque donne ; le donneur reste le même pendant les trois donnes d’un paquet et change à chaque paquet (dans le sens horaire). Touche R-03 ; scénarios R-03.1 à R-03.4.
+- **G10 — Quelle carte déplace un cheval qui n’est pas à soi.** Retenu : seul le Valet. Les autres cartes, le 5 compris, ne déplacent que les chevaux du joueur. Touche R-07, R-09 ; scénario R-07.3.
+- **G11 — Passer par-dessus des chevaux avec les cartes ordinaires.** Retenu : on passe par-dessus tous les chevaux sans les manger ; seul un cheval protégé est infranchissable. Seul le 7 mange ce qu’il dépasse. Touche R-07, R-10 ; scénario R-07.5.
+- **G12 — Le 7 qui rentre mon dernier cheval au milieu du plan.** Retenu : les pas qui restent peuvent se jouer avec les chevaux du partenaire. Touche R-10, R-15 ; scénario R-15.8. Le scénario R-15.9 (7 joué avec les seuls chevaux d’avant le tour) n’est pas retenu.
+- **G13 — Un joueur qui n’a plus de carte est sauté jusqu’à la donne suivante.** Retenu : oui, le tour passe au suivant. Touche R-05, R-14 ; scénarios R-05.3, R-14.4.
+- **Q7 — La carte échangée compte-t-elle dans les 5 cartes de la donne ?** Retenu : on compte avant l’échange ; comme chacun donne une carte et en reçoit une, la taille des mains ne change pas. Touche R-04 ; scénario R-04.4.
+- **Q22 — La pause en cas de déconnexion vaut-elle pendant l’échange, la pose de main et les tours des ordinateurs ?** Retenu : oui, dans toutes les phases du jeu. Cela ne concerne que le jeu en réseau (phase 2) : aucun scénario de la phase 1.
 
 ## Décidé
 
@@ -468,7 +468,7 @@ Ces points ne sont plus à discuter : ils sont écrits plus haut sans réserve.
 **Déjà tranché par une exigence ou une décision**
 - Q6, l’échange a lieu même si la main sera injouable, et aussi pour un joueur qui a fini (RULE-03).
 - Q8, on voit sa main avant de choisir la carte à passer (RULE-03).
-- Q9, la suite 5, 4, 4 puis on rebat, et le donneur change à chaque paquet (RULE-02). Qui commence chaque donne reste à valider (G9).
+- Q9, la suite 5, 4, 4 puis on rebat, et le donneur change à chaque paquet (RULE-02). Qui commence chaque donne est validé (G9).
 - Q11, un cheval à l’écurie ou dans la maison ne s’échange pas au Valet (RULE-09).
 - Q12, un cheval protégé ne s’échange pas : sans autre cible, le Valet est injouable (RULE-09, RULE-13).
 - Q13, sortir sur un cheval d’une autre couleur garé sur sa sortie le mange (RULE-14).

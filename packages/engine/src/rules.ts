@@ -1,0 +1,109 @@
+// House-rule choices validated by Romain on 2026-10-13 (plan 01-07, RULE-20).
+//
+// One named constant per open point of RULES.md, section « Décisions de Romain ». Each value is the
+// choice Romain validated (the proposed default for every point); the type is the literal union of
+// the retained value and its alternative so that switching is a one-line change here. The engine
+// (plans 01-10 to 01-14) reads these constants and never hard-codes a rule choice.
+//
+// Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
+// Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
+
+/**
+ * G1 — Progression of a pawn after a Jack swap (RULES.md R-09, « Décisions de Romain »; validated 2026-10-13).
+ * 'position': the pawn takes the progression of its new square (0-71; a pawn that had done an extra lap loses it).
+ * 'keep': the pawn keeps the laps already done (picture R-09.9, not implemented).
+ */
+export const SWAP_PROGRESS: "position" | "keep" = "position";
+
+/**
+ * G2 — Home entry blocked by a pawn already home (RULES.md R-13; validated 2026-10-13).
+ * 'continue': the pawn does not jump it and goes on for another lap, as if the square were occupied (scenario R-13.7).
+ * 'illegal': the move is forbidden.
+ */
+export const HOME_JUMP_BLOCKED: "continue" | "illegal" = "continue";
+
+/**
+ * G3 — A pawn stopping on its own exit square after an extra lap is protected like on its first pass
+ * (RULES.md R-12; validated 2026-10-13). true: protection depends on square and colour, not on the lap.
+ */
+export const PROTECTED_AFTER_EXTRA_LAP: boolean = true;
+
+/**
+ * G4 — A protected pawn also blocks the pawns of its own colour, for the 4, the 7 and the advancing cards
+ * (RULES.md R-08, R-12; validated 2026-10-13). true: nobody passes it, own side included.
+ */
+export const PROTECTED_BLOCKS_OWNER: boolean = true;
+
+/**
+ * G5 — The same pawn may come back several times in one 7 plan; two consecutive steps of the same pawn
+ * count as one (RULES.md R-10, scenario R-10.13; validated 2026-10-13). true: allowed.
+ */
+export const SEVEN_SAME_PAWN_TWICE: boolean = true;
+
+/**
+ * G6 — Jack with my own pawn protected on my exit square (RULES.md R-09, scenario R-09.6; validated 2026-10-13).
+ * false: impossible, a protected pawn cannot be swapped, neither as target nor as the pawn played.
+ */
+export const SWAP_OWN_PROTECTED: boolean = false;
+
+/**
+ * G7 — Player who has finished: the partner's pawns count as « his own » for the Jack and for captures
+ * (RULES.md R-09, R-15, scenarios R-15.4 and R-15.6; validated 2026-10-13). true: they do.
+ */
+export const FINISHED_PARTNER_PAWNS_ARE_OWN: boolean = true;
+
+/**
+ * G8 — Card exchange is simultaneous: the four players choose, then the four cards change hands together
+ * (RULES.md R-04; validated 2026-10-13). The only value the UI supports.
+ */
+export const EXCHANGE_SIMULTANEOUS: true = true;
+
+/**
+ * G9 — Dealer rotation (RULES.md R-03, scenarios R-03.1 to R-03.4; validated 2026-10-13).
+ * 'perCycle': the dealer stays the same for the three deals of a pack and changes (clockwise) at each reshuffle.
+ * 'perDeal': the dealer changes at every deal.
+ */
+export const DEALER_ROTATION: "perCycle" | "perDeal" = "perCycle";
+
+/**
+ * G9 — Who starts each deal (RULES.md R-03; validated 2026-10-13).
+ * 'afterDealer': the player following the dealer, clockwise, starts every deal.
+ */
+export const FIRST_PLAYER: "afterDealer" = "afterDealer";
+
+/**
+ * G10 — Only the Jack moves a pawn that is not the player's own; every other card, the 5 included,
+ * moves the player's own pawns only (RULES.md R-07, R-09, scenario R-07.3; validated 2026-10-13). true: only own pawns.
+ */
+export const ONLY_OWN_PAWNS_MOVE: boolean = true;
+
+/**
+ * G11 — Ordinary cards pass over pawns without capturing them; only a protected pawn is impassable and
+ * only the 7 captures what it passes (RULES.md R-07, R-10, scenario R-07.5; validated 2026-10-13). true: pass over.
+ */
+export const ORDINARY_CARDS_PASS_OVER_PAWNS: boolean = true;
+
+/**
+ * G12 — When a 7 brings the player's last pawn home mid-plan, the remaining steps may be played with the
+ * partner's pawns (RULES.md R-10, R-15, scenario R-15.8; validated 2026-10-13). true: they may
+ * (R-15.9, playing the whole 7 with the pawns held at the start of the turn, is not implemented).
+ */
+export const SEVEN_CONTINUES_WITH_PARTNER: boolean = true;
+
+/**
+ * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
+ * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
+ */
+export const EMPTY_HAND_SKIPPED: boolean = true;
+
+/**
+ * Q7 — The exchanged card counts before the exchange: each player gives one card and receives one, so hand
+ * sizes do not change (RULES.md R-04, scenario R-04.4; validated 2026-10-13). true: sizes unchanged.
+ */
+export const EXCHANGE_KEEPS_HAND_SIZE: boolean = true;
+
+/**
+ * Q22 — The pause on disconnection applies in every phase of the game: exchange, hand laying down and
+ * computer turns (RULES.md, « Décisions de Romain »; validated 2026-10-13). Network play only (phase 2).
+ */
+export const PAUSE_IN_ALL_PHASES: boolean = true;
