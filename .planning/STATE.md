@@ -1,6 +1,13 @@
 ---
-gsd_state_version: '1.0'
+gsd_state_version: "1.0"
+current_phase: 1
+current_phase_name: Une vraie partie sur un appareil
 status: planning
+stopped_at: Phase 1 context gathered
+last_updated: "2026-10-13T09:23:36.172Z"
+last_activity: 2026-10-13
+last_activity_desc: Roadmap créé (5 phases, 57 exigences v1 couvertes)
+state_head: 2b86e022eeae28b8b8b2470bf56a020b7c3aff28
 progress:
   total_phases: 5
   completed_phases: 0
@@ -81,6 +88,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13
-Stopped at: Roadmap et STATE.md créés ; traçabilité de REQUIREMENTS.md mise à jour
-Resume file: None
+Last session: 2026-10-13T09:23:36.141Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/phases/01-une-vraie-partie-sur-un-appareil/01-CONTEXT.md
