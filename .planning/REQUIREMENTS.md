@@ -10,8 +10,8 @@
 Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Chaque couleur a une écurie (4 places), une case de sortie (losange 18), une case d'entrée (carré 16, deux cases avant sa sortie) et une maison de 4 cases. Équipes : jaune + vert contre rouge + bleu.
 
 - [x] **RULE-01** : Une partie se joue à 4 places en 2 équipes ; les partenaires sont face à face (jaune + vert, rouge + bleu).
-- [ ] **RULE-02** : Un jeu de 52 cartes sans joker est mélangé côté serveur (aléa cryptographique) puis distribué en donnes de 5, 4 et 4 cartes ; on rebat ensuite et le donneur change à chaque paquet.
-- [ ] **RULE-03** : À chaque donne, chaque joueur voit sa main puis passe une carte face cachée à son partenaire ; l'échange a lieu même si la main deviendra injouable.
+- [x] **RULE-02** : Un jeu de 52 cartes sans joker est mélangé côté serveur (aléa cryptographique) puis distribué en donnes de 5, 4 et 4 cartes ; on rebat ensuite et le donneur change à chaque paquet.
+- [x] **RULE-03** : À chaque donne, chaque joueur voit sa main puis passe une carte face cachée à son partenaire ; l'échange a lieu même si la main deviendra injouable.
 - [ ] **RULE-04** : Les joueurs jouent à tour de rôle dans le sens horaire ; jouer une carte jouable est obligatoire.
 - [ ] **RULE-05** : L'As sort un pion de l'écurie sur sa case de sortie, ou avance un pion de 1.
 - [ ] **RULE-06** : Le Roi sort un pion, ou avance un pion de 13.
@@ -116,8 +116,8 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | RULE-01 | Phase 1 | Complete |
-| RULE-02 | Phase 1 | Pending |
-| RULE-03 | Phase 1 | Pending |
+| RULE-02 | Phase 1 | Complete |
+| RULE-03 | Phase 1 | Complete |
 | RULE-04 | Phase 1 | Pending |
 | RULE-05 | Phase 1 | Pending |
 | RULE-06 | Phase 1 | Pending |
