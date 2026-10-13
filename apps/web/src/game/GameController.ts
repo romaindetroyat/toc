@@ -71,6 +71,12 @@ export type GameController = {
   submit(action: Action): SubmitResult;
   /** Called after every applied action, the human's and the bots'. Returns the unsubscribe function. */
   onChange(listener: () => void): () => void;
+  /**
+   * Called once if a bot step throws: the bot loop has stopped and the game cannot go on, so the screen
+   * must say so (the error screen) instead of leaving a frozen board. A listener added after the failure
+   * is called at once. Returns the unsubscribe function.
+   */
+  onError(listener: (error: unknown) => void): () => void;
   stats(): GameStats;
   /** The bot that is thinking about its move, if any. */
   thinking(): Color | null;
@@ -152,6 +158,8 @@ export function createGame(options: CreateGameOptions): GameController {
   for (const color of COLORS) names[color] = color === human ? "toi" : (horses[horse++] as string);
 
   const listeners = new Set<() => void>();
+  const errorListeners = new Set<(error: unknown) => void>();
+  let failure: { error: unknown } | null = null;
   let disposed = false;
   let started = false;
   let running = false;
@@ -196,7 +204,7 @@ export function createGame(options: CreateGameOptions): GameController {
   }
 
   async function run(): Promise<void> {
-    if (running || disposed) return;
+    if (running || disposed || failure !== null) return;
     running = true;
     try {
       while (!disposed) {
@@ -219,7 +227,13 @@ export function createGame(options: CreateGameOptions): GameController {
         play(bot, action);
       }
     } catch (error) {
+      // The loop cannot go on: a silent console line would leave the board locked on a bot's turn
+      // forever. The failure is kept (no bot plays again) and handed to the screen.
       console.error(error);
+      if (!disposed && failure === null) {
+        failure = { error };
+        for (const listener of [...errorListeners]) listener(error);
+      }
     } finally {
       running = false;
       setThinking(null);
@@ -246,6 +260,14 @@ export function createGame(options: CreateGameOptions): GameController {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    onError(listener) {
+      if (failure !== null) {
+        listener(failure.error);
+        return () => {};
+      }
+      errorListeners.add(listener);
+      return () => errorListeners.delete(listener);
+    },
     stats() {
       const us = teamOf(human);
       const them = teamOf(nextColor(human));
@@ -264,6 +286,7 @@ export function createGame(options: CreateGameOptions): GameController {
       clearTimeout(timer);
       wake?.();
       listeners.clear();
+      errorListeners.clear();
     },
   };
 }

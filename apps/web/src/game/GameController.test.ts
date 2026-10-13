@@ -283,6 +283,45 @@ describe("bots: think delay and view-only play (D-18)", () => {
   });
 });
 
+describe("bots: a failing bot step is reported, never swallowed", () => {
+  it("stops the loop and calls the error listeners once with the error", async () => {
+    const boom = new Error("bot step failed");
+    vi.mocked(randomLegal).mockImplementationOnce(() => {
+      throw boom;
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { game, director } = newGameFor("test");
+    const seen: unknown[] = [];
+    game.onError((error) => seen.push(error));
+    game.start();
+    await vi.runAllTimersAsync();
+
+    expect(seen).toEqual([boom]);
+    expect(director.calls).toBe(0);
+    expect(game.thinking()).toBeNull();
+    // A listener that arrives late still hears about it; no bot plays again.
+    const late: unknown[] = [];
+    game.onError((error) => late.push(error));
+    expect(late).toEqual([boom]);
+    game.start();
+    await vi.runAllTimersAsync();
+    expect(seen).toEqual([boom]);
+    expect(director.calls).toBe(0);
+    game.dispose();
+  });
+
+  it("reports nothing after dispose, and nothing while the bots play normally", async () => {
+    const { game } = newGameFor("test");
+    const seen: unknown[] = [];
+    game.onError((error) => seen.push(error));
+    game.start();
+    await vi.runAllTimersAsync();
+    expect(COLORS.filter((c) => game.view().hasGiven[c]).length).toBe(3);
+    game.dispose();
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("human: nothing is played for him (D-19, D-20)", () => {
   it("waits for his move when only one is legal", async () => {
     // One card, one knight on the ring: a single legal action.

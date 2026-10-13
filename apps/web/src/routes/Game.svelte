@@ -95,6 +95,14 @@
 
   let session = $state.raw<Session>();
 
+  /**
+   * Raises a failure the game cannot recover from inside the component tree, where the app's
+   * `<svelte:boundary>` turns it into the « Oups » error screen (T-01-33) instead of a frozen board.
+   */
+  function fail(failure: { error: unknown }): never {
+    throw failure.error instanceof Error ? failure.error : new Error("game failure");
+  }
+
   const parts = (pawn: PawnId): fx.PawnParts => {
     const found = fx.partsOf(els[pawn]);
     if (!found) throw new Error(`pawn ${pawn} is not mounted`);
@@ -501,6 +509,9 @@
 <svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
 <main class="game">
+  {#if session?.failure}
+    {fail(session.failure)}
+  {/if}
   {#if session !== undefined && render !== null && view !== undefined}
     <div class="layout" data-layout>
       <div class="info">

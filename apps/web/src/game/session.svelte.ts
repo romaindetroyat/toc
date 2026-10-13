@@ -56,6 +56,8 @@ export type Session = {
   readonly thinking: Color | null;
   /** The last play of a bot, kept until the human acts again. */
   readonly lastPlay: BotPlay | null;
+  /** Set when the bot loop failed: the game cannot go on and the screen shows the error screen. */
+  readonly failure: { error: unknown } | null;
   stats(): GameStats;
   /** Starts the game: the bots begin to act. */
   start(): void;
@@ -126,6 +128,7 @@ export function createSession(
   let ui = $state.raw<TurnUiState>(initialTurnUi);
   let hint = $state.raw<Reason | "illegal" | null>(null);
   let thinking = $state.raw<Color | null>(null);
+  let failure = $state.raw<{ error: unknown } | null>(null);
   let disposed = false;
 
   // The reducer's context is worth computing once per view.
@@ -150,6 +153,10 @@ export function createSession(
     if (disposed || ticket !== syncTicket) return;
     ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
   }
+
+  controller.onError((error) => {
+    if (!disposed) failure = { error };
+  });
 
   controller.onChange(() => {
     view = controller.view();
@@ -181,6 +188,9 @@ export function createSession(
     },
     get lastPlay() {
       return lastPlay;
+    },
+    get failure() {
+      return failure;
     },
     stats: () => controller.stats(),
     start() {
