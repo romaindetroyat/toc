@@ -115,12 +115,69 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| RULE-01 | Phase 1 | Pending |
+| RULE-02 | Phase 1 | Pending |
+| RULE-03 | Phase 1 | Pending |
+| RULE-04 | Phase 1 | Pending |
+| RULE-05 | Phase 1 | Pending |
+| RULE-06 | Phase 1 | Pending |
+| RULE-07 | Phase 1 | Pending |
+| RULE-08 | Phase 1 | Pending |
+| RULE-09 | Phase 1 | Pending |
+| RULE-10 | Phase 1 | Pending |
+| RULE-11 | Phase 1 | Pending |
+| RULE-12 | Phase 1 | Pending |
+| RULE-13 | Phase 1 | Pending |
+| RULE-14 | Phase 1 | Pending |
+| RULE-15 | Phase 1 | Pending |
+| RULE-16 | Phase 1 | Pending |
+| RULE-17 | Phase 1 | Pending |
+| RULE-18 | Phase 1 | Pending |
+| RULE-19 | Phase 2 | Pending |
+| RULE-20 | Phase 1 | Pending |
+| PLAY-01 | Phase 1 | Pending |
+| PLAY-02 | Phase 1 | Pending |
+| PLAY-03 | Phase 1 | Pending |
+| PLAY-04 | Phase 1 | Pending |
+| PLAY-05 | Phase 1 | Pending |
+| PLAY-06 | Phase 5 | Pending |
+| PLAY-07 | Phase 2 | Pending |
+| NET-01 | Phase 2 | Pending |
+| NET-02 | Phase 2 | Pending |
+| NET-03 | Phase 2 | Pending |
+| NET-04 | Phase 2 | Pending |
+| NET-05 | Phase 2 | Pending |
+| ACCT-01 | Phase 4 | Pending |
+| ACCT-02 | Phase 4 | Pending |
+| ACCT-03 | Phase 4 | Pending |
+| ACCT-04 | Phase 4 | Pending |
+| ACCT-05 | Phase 4 | Pending |
+| BOT-01 | Phase 3 | Pending |
+| BOT-02 | Phase 3 | Pending |
+| BOT-03 | Phase 3 | Pending |
+| BOT-04 | Phase 3 | Pending |
+| BOT-05 | Phase 3 | Pending |
+| HIST-01 | Phase 2 | Pending |
+| HIST-02 | Phase 5 | Pending |
+| HIST-03 | Phase 5 | Pending |
+| HIST-04 | Phase 5 | Pending |
+| FX-01 | Phase 1 | Pending |
+| FX-02 | Phase 1 | Pending |
+| FX-03 | Phase 1 | Pending |
+| FX-04 | Phase 1 | Pending |
+| FX-05 | Phase 1 | Pending |
+| FX-06 | Phase 1 | Pending |
+| APP-01 | Phase 4 | Pending |
+| APP-02 | Phase 4 | Pending |
+| APP-03 | Phase 4 | Pending |
+| APP-04 | Phase 5 | Pending |
+| APP-05 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 57 total
-- Mapped to phases: 0
-- Unmapped: 57 ⚠️
+- Mapped to phases: 57
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-13 after initial definition*
+*Last updated: 2026-10-13 after roadmap creation*
