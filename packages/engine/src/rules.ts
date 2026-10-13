@@ -1,9 +1,19 @@
 // House-rule choices validated by Romain on 2026-10-13 (plan 01-07, RULE-20).
 //
 // One named constant per open point of RULES.md, section « Décisions de Romain ». Each value is the
-// choice Romain validated (the proposed default for every point); the type is the literal union of
-// the retained value and its alternative so that switching is a one-line change here. The engine
-// (plans 01-10 to 01-14) reads these constants and never hard-codes a rule choice.
+// choice Romain validated (the proposed default for every point). Two kinds of switch live here:
+//
+// - Switches the engine honours. Their type is the literal union of the retained value and its
+//   alternative, the engine reads them from `state.rules` (never the constants), and a game started
+//   with another value through `startGame(cfg, seed, rules)` really plays the alternative.
+// - Descriptive switches: EXCHANGE_SIMULTANEOUS (G8), EMPTY_HAND_SKIPPED (G13),
+//   EXCHANGE_KEEPS_HAND_SIZE (Q7) and PAUSE_IN_ALL_PHASES (Q22). Only the validated value is
+//   implemented and no engine code reads them, so their type is that single literal: they record the
+//   choice (and show it in PlayerView.rules) but there is no alternative to switch to. (FIRST_PLAYER,
+//   G9, also has a single value, but state.ts does read it.) G8, G13 and Q7 are built into
+//   the engine's structure (the exchange in state.ts, nextHolder in apply.ts); Q22 concerns network
+//   play (phase 2) and nothing reads it yet. Offering one of them as a table setting means
+//   implementing the alternative first and widening its type.
 //
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
@@ -54,7 +64,8 @@ export const FINISHED_PARTNER_PAWNS_ARE_OWN: boolean = true;
 
 /**
  * G8 — Card exchange is simultaneous: the four players choose, then the four cards change hands together
- * (RULES.md R-04; validated 2026-10-13). The only value the UI supports.
+ * (RULES.md R-04; validated 2026-10-13). Descriptive: the only value implemented (state.ts giveCard),
+ * nothing reads the switch.
  */
 export const EXCHANGE_SIMULTANEOUS: true = true;
 
@@ -93,22 +104,30 @@ export const SEVEN_CONTINUES_WITH_PARTNER: boolean = true;
 /**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
+ * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
  */
-export const EMPTY_HAND_SKIPPED: boolean = true;
+export const EMPTY_HAND_SKIPPED: true = true;
 
 /**
  * Q7 — The exchanged card counts before the exchange: each player gives one card and receives one, so hand
  * sizes do not change (RULES.md R-04, scenario R-04.4; validated 2026-10-13). true: sizes unchanged.
+ * Descriptive: the only value implemented (the exchange swaps one card for one), nothing reads it.
  */
-export const EXCHANGE_KEEPS_HAND_SIZE: boolean = true;
+export const EXCHANGE_KEEPS_HAND_SIZE: true = true;
 
 /**
  * Q22 — The pause on disconnection applies in every phase of the game: exchange, hand laying down and
  * computer turns (RULES.md, « Décisions de Romain »; validated 2026-10-13). Network play only (phase 2).
+ * Descriptive: there is no pause in phase 1, nothing reads it yet.
  */
-export const PAUSE_IN_ALL_PHASES: boolean = true;
+export const PAUSE_IN_ALL_PHASES: true = true;
 
-/** Every validated choice in one JSON-safe object (value types written out: `typeof` would narrow them to the retained literal): the engine reads `state.rules`, never the constants. */
+/**
+ * Every validated choice in one JSON-safe object (value types written out: `typeof` would narrow them to
+ * the retained literal): the engine reads `state.rules`, never the constants. The descriptive switches
+ * (see the header) are typed as their single implemented value, so an override cannot ask for an
+ * alternative the engine does not play.
+ */
 export type RuleSet = {
   SWAP_PROGRESS: "position" | "keep";
   HOME_JUMP_BLOCKED: "continue" | "illegal";
@@ -123,9 +142,9 @@ export type RuleSet = {
   ONLY_OWN_PAWNS_MOVE: boolean;
   ORDINARY_CARDS_PASS_OVER_PAWNS: boolean;
   SEVEN_CONTINUES_WITH_PARTNER: boolean;
-  EMPTY_HAND_SKIPPED: boolean;
-  EXCHANGE_KEEPS_HAND_SIZE: boolean;
-  PAUSE_IN_ALL_PHASES: boolean;
+  EMPTY_HAND_SKIPPED: true;
+  EXCHANGE_KEEPS_HAND_SIZE: true;
+  PAUSE_IN_ALL_PHASES: true;
 };
 
 /** The rules as Romain validated them (2026-10-13). A game copies this into `state.rules`. */

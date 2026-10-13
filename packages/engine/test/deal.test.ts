@@ -134,6 +134,22 @@ describe("startGame / newGame", () => {
     expect(state.rules.FIRST_PLAYER).toBe("afterDealer");
   });
 
+  it("offers no override for the descriptive switches, which have a single implemented value", () => {
+    // Type-level guard: asking for an alternative the engine does not play does not compile.
+    // @ts-expect-error EMPTY_HAND_SKIPPED has no alternative (G13)
+    startGame({ firstDealer: "vert" }, SEED, { EMPTY_HAND_SKIPPED: false });
+    // @ts-expect-error EXCHANGE_KEEPS_HAND_SIZE has no alternative (Q7)
+    startGame({ firstDealer: "vert" }, SEED, { EXCHANGE_KEEPS_HAND_SIZE: false });
+    // @ts-expect-error PAUSE_IN_ALL_PHASES has no alternative (Q22)
+    startGame({ firstDealer: "vert" }, SEED, { PAUSE_IN_ALL_PHASES: false });
+    // @ts-expect-error EXCHANGE_SIMULTANEOUS has no alternative (G8)
+    startGame({ firstDealer: "vert" }, SEED, { EXCHANGE_SIMULTANEOUS: false });
+    expect(DEFAULT_RULES.EMPTY_HAND_SKIPPED).toBe(true);
+    expect(DEFAULT_RULES.EXCHANGE_KEEPS_HAND_SIZE).toBe(true);
+    expect(DEFAULT_RULES.PAUSE_IN_ALL_PHASES).toBe(true);
+    expect(DEFAULT_RULES.EXCHANGE_SIMULTANEOUS).toBe(true);
+  });
+
   it("puts every pawn in its stable at the start", () => {
     const { state } = startGame({ firstDealer: "bleu" }, SEED);
     expect(Object.keys(state.pawns)).toHaveLength(16);
