@@ -6,8 +6,9 @@
 // The option recorded in CHOIX.md decides what happens:
 //   svg-cards      `npm pack svg-cards@<version>` into a scratch directory OUTSIDE the repository
 //                  (never installed as a dependency, install scripts disabled), the tarball is
-//                  checked against the pinned digest below, the archive is extracted there, and
-//                  only the licence text and the 12 figures are copied.
+//                  checked against the digest pinned for that version below (a version with no
+//                  pinned digest is refused), the archive is extracted there, and only the
+//                  licence text and the 12 figures are copied.
 //   jeu-de-romain, autre-source
 //                  the 12 files of assets/cartes/source/ ({rank}{suit}.png|jpg|webp|svg, rank
 //                  11 12 13, suit S H D C) are converted with sharp to webp (quality 85, card
@@ -43,9 +44,15 @@ const choixPath = path.join(root, "assets/cartes/CHOIX.md");
 const sourceDir = path.join(root, "assets/cartes/source");
 const outDir = path.join(root, "apps/web/src/assets/cartes");
 
-/** dist.integrity of svg-cards@4.0.2 on the npm registry, checked against the downloaded tarball. */
-const SVG_CARDS_INTEGRITY =
-  "sha512-YQVC0+bVQtvGbKoQZAHPgVSrKUymPK+aG9NQjJul9jp/a+lFcm8aWKh7YmKVinSjpaBTbogTLKAPi5YQEFRYLg==";
+/**
+ * dist.integrity of each svg-cards version on the npm registry, checked against the downloaded
+ * tarball. A version missing here is refused: moving CHOIX.md to another version means pinning its
+ * digest first (`npm view svg-cards@<version> dist.integrity`).
+ */
+const SVG_CARDS_INTEGRITY = {
+  "4.0.2":
+    "sha512-YQVC0+bVQtvGbKoQZAHPgVSrKUymPK+aG9NQjJul9jp/a+lFcm8aWKh7YmKVinSjpaBTbogTLKAPi5YQEFRYLg==",
+};
 
 const RANKS = [
   { rank: 11, name: "jack" },
@@ -215,6 +222,12 @@ function integrityOfFile(file) {
 
 function importSvgCards(version) {
   if (!version) throw new Error("CHOIX.md does not state the svg-cards version");
+  const expected = Object.hasOwn(SVG_CARDS_INTEGRITY, version)
+    ? SVG_CARDS_INTEGRITY[version]
+    : undefined;
+  if (!expected) {
+    throw new Error(`no pinned digest for svg-cards@${version}; add one to SVG_CARDS_INTEGRITY`);
+  }
   const scratch = mkdtempSync(path.join(tmpdir(), "toc-svg-cards-"));
   try {
     // Fetch only: no install, no lifecycle script, nothing written inside the repository.
@@ -223,11 +236,9 @@ function importSvgCards(version) {
       stdio: ["ignore", "ignore", "inherit"],
     });
     const tarball = path.join(scratch, `svg-cards-${version}.tgz`);
-    if (version === "4.0.2") {
-      const digest = integrityOfFile(tarball);
-      if (digest !== SVG_CARDS_INTEGRITY) {
-        throw new Error(`svg-cards-${version}.tgz has an unexpected digest: ${digest}`);
-      }
+    const digest = integrityOfFile(tarball);
+    if (digest !== expected) {
+      throw new Error(`svg-cards-${version}.tgz has an unexpected digest: ${digest}`);
     }
     const extracted = path.join(scratch, "x");
     mkdirSync(extracted);
