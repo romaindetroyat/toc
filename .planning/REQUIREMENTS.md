@@ -73,10 +73,10 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Rendu et ambiance (FX)
 
-- [ ] **FX-01** : Le plateau original (4 quarts) est affiché assemblé, net et lisible sur téléphone en portrait comme sur grand écran.
+- [x] **FX-01** : Le plateau original (4 quarts) est affiché assemblé, net et lisible sur téléphone en portrait comme sur grand écran.
 - [ ] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
 - [ ] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
-- [ ] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
+- [x] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
 - [ ] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
 - [ ] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
 
@@ -161,10 +161,10 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | HIST-02 | Phase 5 | Pending |
 | HIST-03 | Phase 5 | Pending |
 | HIST-04 | Phase 5 | Pending |
-| FX-01 | Phase 1 | Pending |
+| FX-01 | Phase 1 | Complete |
 | FX-02 | Phase 1 | Pending |
 | FX-03 | Phase 1 | Pending |
-| FX-04 | Phase 1 | Pending |
+| FX-04 | Phase 1 | Complete |
 | FX-05 | Phase 1 | Pending |
 | FX-06 | Phase 1 | Pending |
 | APP-01 | Phase 4 | Pending |
