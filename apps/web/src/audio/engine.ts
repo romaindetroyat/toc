@@ -517,21 +517,37 @@ export function setMix(mix: Mix): void {
   engine?.setMix(mix);
 }
 
+/**
+ * Debug builds: whether the ambience is wanted (`on`), wanted but paused with the tab (`paused`) or
+ * not wanted (`off`), for the e2e specs. A pause or a resume changes nothing for an ambience that is off.
+ */
+function noteAmbience(state: "on" | "paused" | "off"): void {
+  if (!DEBUG || !window.__tocDebug) return;
+  const audio = window.__tocDebug.audio;
+  if (state === "paused" && audio.ambience !== "on") return;
+  if (state === "on" && audio.ambience === "off") return;
+  audio.ambience = state;
+}
+
 export function startAmbience(): void {
+  if (DEBUG && window.__tocDebug) window.__tocDebug.audio.ambience = "on";
   pendingAmbience = true;
   engine?.startAmbience();
 }
 
 export function pauseAmbience(): void {
+  noteAmbience("paused");
   engine?.pauseAmbience();
 }
 
 export function resumeAmbience(): void {
+  noteAmbience("on");
   engine?.resumeAmbience();
 }
 
 /** Stops the ambience and forgets that it was wanted (the sound test page's « stop »). */
 export function stopAmbience(): void {
+  noteAmbience("off");
   pendingAmbience = false;
   engine?.stopAmbience();
 }

@@ -1,7 +1,10 @@
 <script lang="ts">
   import { type Color, PARTNER, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
+  import { reglages } from "../i18n/fr/reglages.ts";
+  import Icon from "./Icon.svelte";
   import SeatChip from "./SeatChip.svelte";
+  import SettingsSheet from "./SettingsSheet.svelte";
 
   type Props = {
     render: RenderState;
@@ -11,6 +14,9 @@
   };
 
   let { render, human, names }: Props = $props();
+
+  let settingsOpen = $state(false);
+  let gear = $state<HTMLButtonElement | null>(null);
 
   const partner = $derived(PARTNER[human]);
   const playing = $derived(render.phase === "play");
@@ -61,9 +67,23 @@
     </span>
   </div>
 
-  <!-- The settings button of plan 01-23 goes here (44 x 44). -->
-  <div class="gear" data-settings-slot></div>
+  <div class="gear" data-settings-slot>
+    <button
+      type="button"
+      class="gear-button"
+      aria-label={reglages.openLabel}
+      aria-haspopup="dialog"
+      bind:this={gear}
+      onclick={() => (settingsOpen = true)}
+    >
+      <Icon name="settings" />
+    </button>
+  </div>
 </header>
+
+{#if settingsOpen}
+  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} />
+{/if}
 
 <style>
   .bar {
@@ -154,6 +174,22 @@
     flex: none;
     width: var(--touch);
     height: var(--touch);
+  }
+
+  .gear-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch);
+    height: var(--touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: transparent;
+    color: var(--creme);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Compact rule: « Tour de » is hidden visually and the middle zone narrows to 96. */

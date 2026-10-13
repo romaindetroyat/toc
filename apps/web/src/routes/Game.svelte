@@ -12,6 +12,15 @@
     teamOf,
   } from "@toc/engine";
   import { MOTION, scaleFor } from "@toc/board";
+  import {
+    type EngineStatus,
+    onStatus,
+    pauseAmbience,
+    setMix,
+    startAmbience,
+    status,
+    stopAmbience,
+  } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
   import type { Flight } from "../board/CardFlights.svelte";
@@ -27,6 +36,7 @@
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
   import Pawn from "../board/Pawn.svelte";
+  import { mixFromSettings, shouldPlayAmbience } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
   import {
     createSession,
@@ -35,6 +45,7 @@
     type SessionEnv,
   } from "../game/session.svelte.ts";
   import type { TurnUiEvent } from "../game/turnUi.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
@@ -427,11 +438,36 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
+    // Échap belongs to the sheet that is open (« Réglages »), not to the card selection behind it.
+    if (document.querySelector("[data-sheet-layer]")) return;
     if (event.key === "Escape") send({ t: "escape" });
   }
+
+  // --- Sound settings (FX-06, D-25) ---
+  // Every change of « Son », « Bruitages », « Ambiance » and its volume reaches the audio buses at once.
+  $effect(() => {
+    setMix(mixFromSettings(settings));
+  });
+
+  let pageVisible = $state(!document.hidden);
+  let audioStatus = $state<EngineStatus>(status());
+  $effect(() => onStatus((next) => (audioStatus = next)));
+
+  // The light ambience plays while the sound and the ambience are on, the audio is ready and the page
+  // is visible (it fades in over 1.5 s once started); it stops for good when « Son » or « Ambiance »
+  // goes off, and only pauses with the tab.
+  $effect(() => {
+    if (!settings.sound || !settings.ambience) stopAmbience();
+    else if (shouldPlayAmbience(settings, pageVisible, audioStatus === "ready")) startAmbience();
+    else if (!pageVisible) pauseAmbience();
+  });
+
+  // The ambience belongs to the game screen: it stops when the player leaves it.
+  onMount(() => stopAmbience);
 </script>
 
 <svelte:window {onkeydown} />
+<svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
 <main class="game">
   {#if session !== undefined && render !== null && view !== undefined}

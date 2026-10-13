@@ -18,6 +18,8 @@ declare global {
         sounds?: Record<string, { duration: number; peak: number }>;
         /** The bus gains the last mix asked for: 0 or 1 for master and effects, 0..1 for the ambience. */
         gains?: { master: number; sfx: number; ambience: number };
+        /** What the game last asked of the ambience: started, paused with the tab, or stopped. */
+        ambience?: "on" | "paused" | "off";
       };
     };
   }

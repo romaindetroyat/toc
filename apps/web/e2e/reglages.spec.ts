@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { etatParam } from "./position.ts";
 
 // « Réglages » (plan 01-23): opened from the launch screen and from the gear of the game, switches
 // for « Son », « Bruitages », « Ambiance » (with its volume) and « Réduire les animations », all applied
@@ -7,21 +8,36 @@ import { expect, type Page, test } from "@playwright/test";
 
 type Gains = { master: number; sfx: number; ambience: number };
 type TocWindow = Window & {
-  __tocDebug?: { audio: { gains?: Gains } };
+  __tocDebug?: { audio: { gains?: Gains; ambience?: "on" | "paused" | "off" } };
+  __anims: { pawn: string | null; role: string; duration: number }[];
 };
 
 const KEY = "toc.settings.v1";
 const NBSP = " ";
+const SEED = "1234567890abcdef1234567890abcdef";
 
 const dialog = (page: Page, name: string) => page.getByRole("dialog", { name });
 const sw = (page: Page, name: string) => page.getByRole("switch", { name, exact: true });
 const gains = (page: Page) =>
   page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.gains);
+const ambience = (page: Page) =>
+  page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.ambience);
 const stored = async (page: Page) =>
   JSON.parse((await page.evaluate((key) => localStorage.getItem(key), KEY)) ?? "{}");
 
 async function openFromLaunch(page: Page) {
   await page.goto("/");
+  await page.getByRole("button", { name: "Réglages", exact: true }).click();
+  await expect(dialog(page, "Réglages")).toBeVisible();
+}
+
+async function openGame(page: Page, query = `graine=${SEED}&vitesse=test`) {
+  await page.goto("/");
+  await page.goto(`/#/partie?${query}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+}
+
+async function openFromGame(page: Page) {
   await page.getByRole("button", { name: "Réglages", exact: true }).click();
   await expect(dialog(page, "Réglages")).toBeVisible();
 }
@@ -172,5 +188,128 @@ test.describe("« Réduire les animations » suit la préférence du système, p
     await page.reload();
     await page.getByRole("button", { name: "Réglages", exact: true }).click();
     await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "false");
+  });
+});
+
+test.describe("en pleine partie", () => {
+  test("réglages: la roue dentée de la barre d’info (44 x 44) ouvre la même feuille", async ({
+    page,
+  }) => {
+    await openGame(page);
+    const gear = page.locator("[data-info-bar]").getByRole("button", { name: "Réglages" });
+    const box = await gear.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await gear.click();
+    await expect(dialog(page, "Réglages")).toBeVisible();
+    await expect(sw(page, "Son")).toHaveAttribute("aria-checked", "true");
+
+    // Échap closes the sheet, and the focus comes back to the gear.
+    await page.keyboard.press("Escape");
+    await expect(dialog(page, "Réglages")).toHaveCount(0);
+    await expect(gear).toBeFocused();
+  });
+
+  test("réglages: « Son » coupé en partie met aussitôt le bus principal à zéro", async ({
+    page,
+  }) => {
+    await openGame(page);
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1, ambience: 0.3 });
+    await openFromGame(page);
+    await sw(page, "Son").click();
+    await expect.poll(() => gains(page)).toMatchObject({ master: 0 });
+    await sw(page, "Bruitages").click();
+    await expect.poll(() => gains(page)).toMatchObject({ master: 0, sfx: 0 });
+    await sw(page, "Son").click();
+    await expect.poll(() => gains(page)).toMatchObject({ master: 1, sfx: 0 });
+  });
+
+  test("réglages: l’ambiance démarre dans la partie, se met en pause avec la page et s’arrête quand on la coupe", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Jouer la partie" }).click();
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
+    await expect.poll(() => ambience(page)).toBe("on");
+
+    // The page goes to the background: the ambience pauses; it comes back with the page.
+    const hide = (hidden: boolean) =>
+      page.evaluate((value) => {
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => value });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, hidden);
+    await hide(true);
+    await expect.poll(() => ambience(page)).toBe("paused");
+    await hide(false);
+    await expect.poll(() => ambience(page)).toBe("on");
+
+    // « Ambiance » off stops it for good, « Ambiance » on starts it again.
+    await openFromGame(page);
+    await sw(page, "Ambiance").click();
+    await expect.poll(() => ambience(page)).toBe("off");
+    await hide(true);
+    await hide(false);
+    await expect.poll(() => ambience(page)).toBe("off");
+    await sw(page, "Ambiance").click();
+    await expect.poll(() => ambience(page)).toBe("on");
+
+    // « Son » off stops it as well.
+    await sw(page, "Son").click();
+    await expect.poll(() => ambience(page)).toBe("off");
+  });
+
+  test("réglages: « Réduire les animations » fait du coup suivant un seul glissement de 180 ms", async ({
+    page,
+  }) => {
+    // Records every Web Animation on a knight (inner group role and duration) from page load.
+    await page.addInitScript(() => {
+      const w = window as unknown as TocWindow;
+      w.__anims = [];
+      const known = new Set<Animation>();
+      const tick = () => {
+        for (const animation of document.getAnimations()) {
+          if (known.has(animation) || animation.startTime === null) continue;
+          const target = animation.effect && (animation.effect as KeyframeEffect).target;
+          if (!(target instanceof Element)) continue;
+          const owner = target.closest("[data-pawn]");
+          if (owner === null) continue;
+          known.add(animation);
+          w.__anims.push({
+            pawn: owner.getAttribute("data-pawn"),
+            role: target.getAttribute("data-role") ?? "",
+            duration: Number(animation.effect?.getTiming().duration),
+          });
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    const etat = {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    };
+    await openGame(page, `etat=${etatParam(etat)}`);
+    await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "idle");
+
+    await openFromGame(page);
+    await sw(page, "Réduire les animations").click();
+    await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "true");
+    await dialog(page, "Réglages").getByRole("button", { name: "Fermer" }).click();
+    await expect(dialog(page, "Réglages")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+    await page.locator('[data-hit="bleu0"]').click({ force: true });
+    await page.getByRole("button", { name: "Jouer", exact: true }).click();
+
+    await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:22", {
+      timeout: 15_000,
+    });
+    const moves = await page.evaluate(() =>
+      (window as unknown as TocWindow).__anims.filter((a) => a.pawn === "bleu0"),
+    );
+    expect(moves.filter((a) => a.role === "mover").map((a) => a.duration)).toEqual([180]);
+    expect(moves.filter((a) => a.role === "arc" || a.role === "squash")).toHaveLength(0);
   });
 });
