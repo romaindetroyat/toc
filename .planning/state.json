@@ -1,0 +1,38 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Une vraie partie sur un appareil",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "Jouer en ligne entre proches",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "L'ordinateur à la force choisie",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "Comptes, amis et application installable",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "Suivi, apprentissage et finition",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 01 of 5 · 0% · executing"
+  },
+  "updated_at": "2026-10-13T14:00:34.847Z"
+}

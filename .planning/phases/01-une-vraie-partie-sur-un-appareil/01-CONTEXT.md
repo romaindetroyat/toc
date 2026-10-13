@@ -1,0 +1,182 @@
+# Phase 1: Une vraie partie sur un appareil - Context
+
+**Gathered:** 2026-10-13
+**Status:** Ready for planning
+
+<domain>
+## Phase Boundary
+
+Un joueur fait une partie complète de TOC sur un seul appareil (téléphone ou ordinateur), contre trois joueurs gérés par l'ordinateur qui jouent un coup légal au hasard (niveau 1). La partie se joue sur le plateau original assemblé, avec des cavaliers animés et sonorisés. Cette phase comprend :
+
+- RULES.md, validé par Romain ;
+- le moteur de règles pur et testé ;
+- le repérage précis des cases sur l'illustration ;
+- l'interface de jeu ;
+- les animations et l'audio.
+
+Hors de cette phase :
+
+- le réseau et le serveur (phase 2) ;
+- les niveaux 2 à 5 de l'ordinateur (phase 3) ;
+- les comptes et la PWA installable (phase 4) ;
+- l'aide sur les règles et le tutoriel (phase 5).
+
+Requirements : RULE-01 à RULE-18, RULE-20, PLAY-01 à PLAY-05, FX-01 à FX-06.
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+### Règles : précision apportée pendant la discussion (remplace la formulation de RULE-15)
+- **D-01 :** Pour entrer dans sa maison, il faut le **compte exact jusqu'à une case vide** de la maison. Atteindre le carré 16 ne suffit pas.
+  - Si le compte ne tombe pas juste, ou si la case visée est occupée, le cheval n'entre pas.
+  - Le cheval dépasse alors sa case d'entrée, continue sur le parcours et repart pour un tour supplémentaire. Ce mouvement est légal.
+  - **Reversibility:** costly — modèle de progression des pions et générateur de coups.
+- **D-02 :** Quand le compte permet d'entrer pile sur une case vide, l'entrée est **obligatoire**. Le cheval ne peut pas choisir de refaire un tour.
+- **D-03 :** Un cheval déjà rentré **peut encore avancer dans sa maison**, au compte exact et sans sauter un autre cheval. Une carte peut donc servir à avancer un pion à l'intérieur de la maison.
+- **D-04 :** Rappel des décisions déjà validées (PROJECT.md, « Rule Decisions ») :
+  - sens horaire ;
+  - entrée par le carré 16 ;
+  - losange 18 infranchissable seulement pour le pion de sa couleur ;
+  - le 4 peut reculer depuis la sortie, mais jamais pour entrer dans la maison ;
+  - tour complet obligatoire ;
+  - le 7 dépasse ses propres pions et se joue en entier ou pas du tout ;
+  - échange de carte à chaque donne ;
+  - le Valet n'échange pas deux pions du même joueur.
+
+  Les autres cas limites (SUMMARY.md, questions 5 à 34) prennent la valeur par défaut de la recherche, à faire valider par Romain dans RULES.md.
+
+### Écran et plateau
+- **D-05 :** Le plateau **tourne pour que la couleur du joueur humain soit en bas**, face à lui. On tourne l'ensemble par quarts de tour, l'illustration n'est pas modifiée.
+  - Dans l'illustration d'origine, chaque aide-mémoire est écrit pour un joueur assis de son côté : bleu en bas, jaune à gauche, rouge en haut, vert à droite.
+  - Les partenaires sont donc face à face : bleu et rouge, jaune et vert.
+  - **Reversibility:** reversible.
+- **D-06 :** En solo, le joueur **choisit sa couleur avant la partie**, ce qui fixe aussi son partenaire. Il faut donc un petit écran de lancement : choix de la couleur, puis « Jouer ».
+- **D-07 :** Sur téléphone en portrait :
+  - le plateau carré occupe toute la largeur en haut de l'écran ;
+  - la main du joueur est affichée en éventail dessous ;
+  - un bandeau fin indique à qui c'est le tour, le donneur et les équipes.
+
+  Sur grand écran, même logique avec plus d'espace.
+- **D-08 :** Le carré vert central sert de **tapis de jeu**.
+  - La dernière carte jouée par chacun y est posée devant sa place, comme à une vraie table.
+  - Le talon et la défausse y sont aussi.
+  - Une main injouable y est posée face visible.
+
+### Cavaliers et animations
+- **D-09 :** Les pions sont des **cavaliers d'échecs de style Staunton en bois peint**.
+  - Ils sont teintés à la couleur du joueur, avec un aspect mat et un léger veinage, pour s'accorder au plateau en bois.
+  - Ils restent en « fausse 3D » : ombre portée, dégradés, reflet discret.
+- **D-10 :** La tête du cheval **regarde dans le sens de la marche** et suit la direction locale du parcours. Elle fait volte-face quand le pion recule de 4.
+- **D-11 :** Le cavalier avance par **petits bonds case par case**, avec un « clop » de sabot par bond.
+  - Plus la distance est longue, plus le rythme accélère, jusqu'au galop.
+  - Repère : 1 case ≈ 0,4 s et 13 cases (le Roi) ≈ 2 s au maximum. La courbe d'accélération est laissée au planner.
+- **D-12 :** Pour une prise, l'attaquant **se cabre (ruade)**, puis le cheval mangé est **éjecté en arc jusqu'à son écurie**, avec un hennissement.
+  - Avec le 7, chaque prise a lieu au moment où l'attaquant passe sur la case.
+- **D-13 :** Pour l'échange au Valet, les deux cavaliers font **deux bonds en arc croisés** et atterrissent chacun à la place de l'autre.
+- **D-14 :** Pour l'entrée dans la maison, l'animation reste sobre pour les 3 premiers chevaux d'un joueur. Pour le **4e, petite fête** : le cheval se cabre, un hennissement joyeux retentit, avec un effet visuel léger.
+- **D-15 :** La sortie de l'écurie est un bond de l'écurie vers le losange 18, accompagné d'un hennissement.
+
+### Jouer un coup et rythme
+- **D-16 :** Pour jouer, le joueur **touche une carte**, ce qui allume les chevaux jouables, puis **touche un cheval**.
+  - L'aperçu du trajet et des chevaux qui seraient mangés s'affiche, puis un bouton **« Jouer »** confirme.
+  - On ne joue pas en glissant la carte.
+  - Avec l'As et le Roi, un choix « Sortir » ou « Avancer » est proposé quand les deux sont possibles.
+- **D-17 :** Pour répartir le 7, le joueur procède **cheval par cheval** :
+  - il touche un cheval et choisit un nombre de pas, entre 1 et le reste à jouer ;
+  - l'aperçu se met à jour, avec les prises en chemin ;
+  - il recommence jusqu'à ce que le reste soit 0, puis confirme une seule fois.
+
+  Il faut pouvoir annuler une étape avant la confirmation.
+- **D-18 :** Les ordinateurs jouent à un **rythme naturel**, avec environ 1 s de réflexion puis l'animation. Un bouton **« avance rapide »** raccourcit les temps de réflexion et les animations.
+- **D-19 :** Le jeu ne joue **jamais un coup à la place du joueur**, même quand un seul coup est possible : ce coup est seulement mis en évidence.
+- **D-20 :** Quand aucune carte n'est jouable :
+  - un message explique qu'aucune carte n'est jouable ;
+  - un bouton **« Poser mes cartes »** pose la main face visible sur le tapis ;
+  - le joueur attend ensuite la donne suivante.
+- **D-21 :** Pendant l'échange de carte avec le partenaire :
+  - le joueur choisit la carte à passer et voit qui doit encore choisir ;
+  - la **carte reçue est marquée** (entourée) dans sa main jusqu'à ce qu'il la joue.
+
+### Sons et cartes
+- **D-22 :** Les bruitages viennent d'**enregistrements libres de droits (CC0)** quand on en trouve de bons, par exemple sur Freesound. Sinon, ils sont **générés par le code** (Web Audio).
+  - La licence de chaque fichier est tracée dans un fichier dédié.
+  - Romain valide l'ensemble à l'oreille : prévoir une page ou un écran de test des sons.
+- **D-23 :** Le hennissement accompagne 4 moments : la **sortie d'écurie**, la **prise** (ruade de l'attaquant, plainte du mangé), l'**entrée dans la maison** (joyeux, fête au 4e) et l'**échange au Valet** (petit hennissement surpris).
+  - Les sabots accompagnent chaque bond, au même rythme que l'animation.
+  - Des sons de cartes accompagnent la donne, le jeu d'une carte et l'échange.
+- **D-24 :** Les cartes reprennent un **jeu classique français** : figures traditionnelles comme sur l'aide-mémoire du plateau.
+  - Il faut un visuel libre de droits, du domaine public ou sous licence CC0/CC-BY compatible, à faire valider.
+  - Le dos des cartes est assorti au plateau.
+- **D-25 :** Une **ambiance sonore légère** est jouée en fond (campagne ou écurie, discrète), avec son propre réglage de volume.
+  - Elle se coupe séparément des bruitages. Le réglage global « couper le son » et le réglage « réduire les animations » (FX-06) restent disponibles.
+
+### Claude's Discretion
+- La courbe exacte d'accélération des bonds et la durée des prises et des fêtes, dans les repères D-11.
+- Les détails graphiques du bandeau d'infos, de l'écran de lancement solo et de l'écran de fin de partie.
+- La technique de dessin des cavaliers (SVG fait main, ou rendu à partir d'un modèle) et du veinage du bois.
+- La manière d'annuler une étape du 7.
+
+</decisions>
+
+<canonical_refs>
+## Canonical References
+
+**Downstream agents MUST read these before planning or implementing.**
+
+### Projet et règles
+- `.planning/PROJECT.md` — vision, décisions de règles validées (section « Rule Decisions »), contraintes
+- `.planning/REQUIREMENTS.md` — exigences RULE/PLAY/FX de la phase 1 (RULE-15 est précisé par D-01 à D-03 ci-dessus)
+- `.planning/ROADMAP.md` — objectif et critères de succès de la phase 1
+
+### Recherche
+- `.planning/research/SUMMARY.md` — synthèse, questions de règles 5 à 34 avec leurs hypothèses par défaut
+- `.planning/research/ARCHITECTURE.md` — API du moteur, événements comme contrat d'animation, modèle de géométrie du plateau
+- `.planning/research/PITFALLS.md` — pièges 1 à 10 (modèle par progression, 7, sortie protégée, audio iOS, perf SVG)
+- `.planning/research/STACK.md` — stack recommandée (Svelte 5, Vite 8, WAAPI, Web Audio, Vitest 4.1 + fast-check)
+
+### Illustrations
+- `assets/plateau/quart-bleu.webp` — quart bas-gauche (1280×1280)
+- `assets/plateau/quart-jaune.webp` — quart haut-gauche
+- `assets/plateau/quart-rouge.webp` — quart haut-droite
+- `assets/plateau/quart-vert.webp` — quart bas-droite
+
+</canonical_refs>
+
+<code_context>
+## Existing Code Insights
+
+### Reusable Assets
+- Le dépôt ne contient pas encore de code applicatif : c'est un projet greenfield.
+- Les 4 quarts du plateau en webp sont prêts à l'emploi.
+- Un prototype jetable de pion SVG en « fausse 3D » a été fait en début de projet, hors dépôt. Il a validé les ingrédients : dégradés linéaire et radial calculés depuis la couleur du joueur, ombre portée floue, reflet blanc. Il devra être réécrit en cavalier, avec l'ombre pré-calculée pour les performances.
+
+### Established Patterns
+- Aucun pour l'instant. La stack recommandée est dans STACK.md.
+
+### Integration Points
+- Le moteur doit rester pur (sans I/O) pour être réutilisé tel quel par le Durable Object en phase 2 et par les ordinateurs en phase 3.
+- Les événements émis par le moteur (pion déplacé avec son trajet, pion mangé, pion renvoyé à l'écurie, échange, entrée dans la maison, main posée) forment le contrat de l'animation et de l'audio, et plus tard du réseau.
+
+</code_context>
+
+<specifics>
+## Specific Ideas
+
+- On doit retrouver la sensation d'être assis à la vraie table : sa couleur devant soi, les cartes posées sur le tapis vert devant chaque place.
+- Le côté ludique est voulu : ruade et éjection en arc lors d'une prise, sauts croisés au Valet, fête au 4e cheval rentré.
+- La cadence des sabots, liée à la vitesse et donc à la distance de la carte, est un élément d'ambiance central.
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+None — discussion stayed within phase scope.
+
+</deferred>
+
+---
+
+*Phase: 01-une-vraie-partie-sur-un-appareil*
