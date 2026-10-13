@@ -60,6 +60,9 @@ export function cuesFor(event: GameEvent, context: CueContext): Cue[] {
       return [{ id: "carte-pose", atMs: 0 }];
     case "cardsExchanged":
       return [{ id: "carte-echange", atMs: 0 }];
+    case "handDiscarded":
+      // A dead hand is laid down card by card: one card-down sound as the first one lands.
+      return [{ id: "carte-pose", atMs: 0 }];
     default:
       return [];
   }

@@ -137,6 +137,12 @@ describe("cuesFor (D-23)", () => {
     ).toEqual([{ id: "carte-echange", atMs: 0 }]);
   });
 
+  it("a dead hand laid on the felt gives one card-down sound", () => {
+    expect(
+      cuesFor({ t: "handDiscarded", seat: "bleu", cards: ["2S", "4S"] }, { mode: "normal" }),
+    ).toEqual([{ id: "carte-pose", atMs: 0 }]);
+  });
+
   it("events with no sound give no cue", () => {
     expect(cuesFor({ t: "turn", seat: "bleu" }, { mode: "normal" })).toEqual([]);
     expect(

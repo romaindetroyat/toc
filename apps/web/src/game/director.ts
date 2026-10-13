@@ -10,7 +10,9 @@ import {
   volteFaceDuration,
 } from "@toc/board";
 import {
+  type CardId,
   COLORS,
+  type Color,
   type GameEvent,
   type PawnId,
   type Place,
@@ -91,8 +93,26 @@ export type PawnAnimator = {
   winHop?(pawns: PawnId[], leadMs: number, mode: Mode): Promise<void>;
 };
 
+/**
+ * What draws the cards: the deal, a played card, the exchange and a dead hand laid on the felt. Like the
+ * knights' motions each takes `leadMs` (the delay shared with the audio clock) and the pace of the moment;
+ * a motion the animator does not have is skipped and the event is still applied.
+ */
+export type CardAnimator = {
+  /** The deal: `seats` in dealing order with the number of cards each gets; the player's flip face up after. */
+  deal?(seats: { seat: Color; count: number }[], leadMs: number, mode: Mode): Promise<void>;
+  /** A card played flies to the felt slot of its seat. */
+  playCard?(seat: Color, card: CardId, leadMs: number, mode: Mode): Promise<void>;
+  /** The four cards of the exchange cross the felt, each seat to its partner. */
+  exchange?(leadMs: number, mode: Mode): Promise<void>;
+  /** A dead hand is laid face up in front of its seat, card by card. */
+  lay?(seat: Color, cards: CardId[], leadMs: number, mode: Mode): Promise<void>;
+  /** Jumps the cards in flight to their end, so the promises settle at once. */
+  finishCards?(): void;
+};
+
 export type DirectorDeps = {
-  animator: PawnAnimator;
+  animator: PawnAnimator & CardAnimator;
   audio: {
     now(): number;
     scheduleClops(offsetsMs: number[], t0: number): void;
@@ -117,6 +137,11 @@ export type DirectorDeps = {
 
 export type Director = {
   enqueue(events: GameEvent[]): void;
+  /**
+   * The first deal of a game: the render state goes back to before it (all the cards in the talon, no
+   * hand) and the deal events are played, so the cards fly from the talon to the seats.
+   */
+  openDeal(events: GameEvent[]): void;
   /** Resolves once everything queued so far has been played. */
   idle(): Promise<void>;
   /**
@@ -442,11 +467,85 @@ export function createDirector(deps: DirectorDeps): Director {
     fold(event);
   }
 
+  /** The pace and the start of a card motion, with its sounds on the audio clock; null when it is skipped. */
+  function cardStart(event: GameEvent, wanted: boolean): Mode | null {
+    if (!wanted || instant()) return null;
+    const pace = mode();
+    const m: Mode = pace === "test" ? "normal" : pace;
+    sound(cuesFor(event, { mode: m }), deps.audio.now() + LEAD_S);
+    return m;
+  }
+
+  /**
+   * A deal: the `dealt` event opens the exchange (the banner shows), then the cards of the hands that
+   * follow it fly from the talon to the seats, and the hands are counted once they have landed.
+   */
+  async function playDeal(event: Extract<GameEvent, { t: "dealt" }>): Promise<void> {
+    const hands: Extract<GameEvent, { t: "handDealt" }>[] = [];
+    for (let next = queue[0]; next !== undefined && next.t === "handDealt"; next = queue[0]) {
+      queue.shift();
+      hands.push(next);
+    }
+    const generationAtStart = generation;
+    fold(event);
+    const m = cardStart(event, deps.animator.deal !== undefined && hands.length > 0);
+    if (m !== null) {
+      const seats = hands.map((hand) => ({ seat: hand.seat, count: hand.cards.length }));
+      await settled([deps.animator.deal?.(seats, LEAD_S * 1000, m)]);
+    }
+    if (generationAtStart !== generation) return;
+    for (const hand of hands) fold(hand);
+  }
+
+  /** A card played lands on the felt before the knight it moves; the felt shows it once it has landed. */
+  async function playCardPlayed(event: Extract<GameEvent, { t: "cardPlayed" }>): Promise<void> {
+    const generationAtStart = generation;
+    const m = cardStart(event, deps.animator.playCard !== undefined && render !== null);
+    if (m !== null)
+      await settled([deps.animator.playCard?.(event.seat, event.card, LEAD_S * 1000, m)]);
+    if (generationAtStart !== generation) return;
+    fold(event);
+  }
+
+  /** The four cards of the exchange cross the felt; the hands change once they have crossed. */
+  async function playExchange(event: Extract<GameEvent, { t: "cardsExchanged" }>): Promise<void> {
+    const generationAtStart = generation;
+    const m = cardStart(event, deps.animator.exchange !== undefined && render !== null);
+    if (m !== null) await settled([deps.animator.exchange?.(LEAD_S * 1000, m)]);
+    if (generationAtStart !== generation) return;
+    fold(event);
+  }
+
+  /** A dead hand is laid face up in front of its seat, 350 ms per card, 60 ms apart. */
+  async function playDiscard(event: Extract<GameEvent, { t: "handDiscarded" }>): Promise<void> {
+    const generationAtStart = generation;
+    const m = cardStart(
+      event,
+      deps.animator.lay !== undefined && render !== null && event.cards.length > 0,
+    );
+    if (m !== null) await settled([deps.animator.lay?.(event.seat, event.cards, LEAD_S * 1000, m)]);
+    if (generationAtStart !== generation) return;
+    fold(event);
+  }
+
   async function play(event: GameEvent): Promise<void> {
     if (isMovement(event)) return playMovement(event);
-    if (event.t === "pawnsSwapped") return playSwap(event);
-    if (event.t === "gameWon") return playWin(event);
-    fold(event);
+    switch (event.t) {
+      case "pawnsSwapped":
+        return playSwap(event);
+      case "gameWon":
+        return playWin(event);
+      case "dealt":
+        return playDeal(event);
+      case "cardPlayed":
+        return playCardPlayed(event);
+      case "cardsExchanged":
+        return playExchange(event);
+      case "handDiscarded":
+        return playDiscard(event);
+      default:
+        fold(event);
+    }
   }
 
   async function drain(): Promise<void> {
@@ -473,8 +572,14 @@ export function createDirector(deps: DirectorDeps): Director {
     if (draining !== null) {
       snapping = true;
       for (const pawn of current) deps.animator.finish?.(pawn);
+      deps.animator.finishCards?.();
     }
     return idle();
+  }
+
+  function enqueue(events: GameEvent[]): void {
+    queue.push(...events);
+    if (draining === null && queue.length > 0) draining = drain();
   }
 
   function onVisibility(): void {
@@ -491,9 +596,19 @@ export function createDirector(deps: DirectorDeps): Director {
   doc?.addEventListener("visibilitychange", onVisibility);
 
   return {
-    enqueue(events) {
-      queue.push(...events);
-      if (draining === null && queue.length > 0) draining = drain();
+    enqueue,
+    openDeal(events) {
+      if (render !== null) {
+        // Before the deal every card is in the talon: the hands fill as the cards land.
+        const held = COLORS.reduce((sum, color) => sum + (render?.handSizes[color] ?? 0), 0);
+        render = {
+          ...render,
+          talonSize: render.talonSize + held,
+          handSizes: { bleu: 0, jaune: 0, rouge: 0, vert: 0 },
+        };
+        for (const listener of [...listeners]) listener(render);
+      }
+      enqueue(events);
     },
     idle,
     snapToEnd,

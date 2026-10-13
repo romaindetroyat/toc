@@ -78,6 +78,31 @@ export function partyDuration(mode: Mode): number {
   return Math.max(MOTION.partyRear, MOTION.partyBurst) * scaleFor(mode);
 }
 
+/** A deal flies at most this many cards (5 to each of the four seats): the animation stays bounded. */
+export const MAX_DEAL_CARDS = 20;
+
+/**
+ * Time of cards that leave one after the other: the last one starts `(count - 1)` staggers after the
+ * first. The deal and the dead hand have their own pace; reduced motion has every card fade at once.
+ */
+export function cardsDuration(count: number, kind: "deal" | "dead", mode: Mode): number {
+  if (count <= 0) return 0;
+  if (mode === "reduced") return REDUCED.cards;
+  const flight = kind === "deal" ? MOTION.dealCard : MOTION.deadCard;
+  const stagger = kind === "deal" ? MOTION.dealStagger : MOTION.deadStagger;
+  return (flight + (Math.min(count, MAX_DEAL_CARDS) - 1) * stagger) * scaleFor(mode);
+}
+
+/** Time of a played card flying to its felt slot; a fade or slide when motion is reduced. */
+export function cardPlayDuration(mode: Mode): number {
+  return mode === "reduced" ? REDUCED.cards : MOTION.cardPlay * scaleFor(mode);
+}
+
+/** Time of the four cards of the exchange crossing the felt; a fade or slide when motion is reduced. */
+export function exchangeDuration(mode: Mode): number {
+  return mode === "reduced" ? REDUCED.cards : MOTION.exchangeCross * scaleFor(mode);
+}
+
 /** Time of the volte-face before a backward 4; none when motion is reduced. */
 export function volteFaceDuration(mode: Mode): number {
   return mode === "reduced" ? 0 : MOTION.volteFace * scaleFor(mode);
@@ -127,6 +152,15 @@ export function eventDuration(
       return reduced ? REDUCED.swapFade : MOTION.swap * scale;
     case "gameWon":
       return reduced ? 0 : MOTION.winHop * scale;
+    // The cards: a deal is its `dealt` event (the hands that follow it fly with it).
+    case "dealt":
+      return cardsDuration(event.size * 4, "deal", mode);
+    case "cardPlayed":
+      return cardPlayDuration(mode);
+    case "cardsExchanged":
+      return exchangeDuration(mode);
+    case "handDiscarded":
+      return cardsDuration(event.cards.length, "dead", mode);
     default:
       return 0;
   }

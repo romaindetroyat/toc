@@ -1,7 +1,18 @@
 import type { GameEvent, Place } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import { hopTimeline } from "./hopTimeline.ts";
-import { captureBeat, eventDuration, eventsDuration, MOTION, REDUCED, scaleFor } from "./motion.ts";
+import {
+  captureBeat,
+  cardPlayDuration,
+  cardsDuration,
+  eventDuration,
+  eventsDuration,
+  exchangeDuration,
+  MAX_DEAL_CARDS,
+  MOTION,
+  REDUCED,
+  scaleFor,
+} from "./motion.ts";
 
 const ring = (cell: number): Place => ({ z: "ring", cell });
 const stable = (slot: 0 | 1 | 2 | 3): Place => ({ z: "stable", color: "bleu", slot });
@@ -41,6 +52,10 @@ describe("MOTION table (UI-SPEC Motion Contract)", () => {
     expect([MOTION.partyRear, MOTION.partyBurst, MOTION.partyParticles]).toEqual([500, 700, 8]);
     expect(MOTION.winHop).toBe(600);
     expect([MOTION.landingSquash, MOTION.lastHopSettle]).toEqual([0.08, 80]);
+    expect([MOTION.dealCard, MOTION.dealStagger]).toEqual([250, 40]);
+    expect([MOTION.deadCard, MOTION.deadStagger]).toEqual([350, 60]);
+    expect([MOTION.cardPlay, MOTION.exchangeCross, MOTION.banner]).toEqual([300, 300, 1200]);
+    expect(REDUCED.cards).toBe(150);
     expect(REDUCED.move).toBe(180);
     expect([REDUCED.captureFadeOut, REDUCED.captureFadeIn, REDUCED.swapFade]).toEqual([
       150, 150, 150,
@@ -121,6 +136,56 @@ describe("eventDuration", () => {
     const events = [moved(4), captured(3), { t: "pawnSentHome", pawn: "rouge1", to: stable(1) }];
     expect(eventsDuration(events as GameEvent[], "normal")).toBe(799 + 1350);
     expect(eventsDuration([], "normal")).toBe(0);
+  });
+});
+
+describe("the cards", () => {
+  it("a deal of 20 cards lasts 250 ms for the first and a 40 ms stagger for each next one", () => {
+    expect(cardsDuration(20, "deal", "normal")).toBe(250 + 19 * 40);
+    expect(cardsDuration(16, "deal", "normal")).toBe(250 + 15 * 40);
+    expect(cardsDuration(1, "deal", "normal")).toBe(250);
+    expect(cardsDuration(0, "deal", "normal")).toBe(0);
+  });
+
+  it("a dead hand lays 350 ms per card with a 60 ms stagger", () => {
+    expect(cardsDuration(3, "dead", "normal")).toBe(350 + 2 * 60);
+  });
+
+  it("never counts more than the 20 cards of a deal", () => {
+    expect(MAX_DEAL_CARDS).toBe(20);
+    expect(cardsDuration(500, "deal", "normal")).toBe(cardsDuration(20, "deal", "normal"));
+  });
+
+  it("fast mode multiplies every card motion by 0.4", () => {
+    expect(cardsDuration(20, "deal", "fast")).toBeCloseTo((250 + 19 * 40) * 0.4, 9);
+    expect(cardPlayDuration("normal")).toBe(300);
+    expect(cardPlayDuration("fast")).toBeCloseTo(120, 9);
+    expect(exchangeDuration("normal")).toBe(300);
+    expect(exchangeDuration("fast")).toBeCloseTo(120, 9);
+  });
+
+  it("reduced motion makes every card motion one 150 ms fade or slide, all at once", () => {
+    expect(cardsDuration(20, "deal", "reduced")).toBe(150);
+    expect(cardsDuration(3, "dead", "reduced")).toBe(150);
+    expect(cardPlayDuration("reduced")).toBe(150);
+    expect(exchangeDuration("reduced")).toBe(150);
+  });
+
+  it("card events take their time on screen, the hands of a deal flying with the dealt event", () => {
+    const hand = { t: "handDealt", seat: "bleu", cards: ["1S"] } as GameEvent;
+    expect(eventDuration({ t: "dealt", dealer: "bleu", dealIndex: 0, size: 5 }, "normal")).toBe(
+      250 + 19 * 40,
+    );
+    expect(eventDuration({ t: "dealt", dealer: "bleu", dealIndex: 1, size: 4 }, "normal")).toBe(
+      250 + 15 * 40,
+    );
+    expect(eventDuration(hand, "normal")).toBe(0);
+    expect(eventDuration({ t: "cardPlayed", seat: "bleu", card: "5H" }, "normal")).toBe(300);
+    expect(
+      eventDuration({ t: "handDiscarded", seat: "bleu", cards: ["2S", "4S", "11S"] }, "normal"),
+    ).toBe(470);
+    const none = { bleu: null, jaune: null, rouge: null, vert: null };
+    expect(eventDuration({ t: "cardsExchanged", received: none }, "fast")).toBeCloseTo(120, 9);
   });
 });
 
