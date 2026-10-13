@@ -69,8 +69,13 @@
 
 <style>
   .board {
+    /* A knight is 190 units tall and the stables closest to the top edge sit about 94 units below
+       it, so a head can rise up to 4 % of the board above the art: reserve that room above the
+       board and let the overlay draw outside its box. */
+    --side: var(--board-size, min(100vw, 100dvh, 880px));
     position: relative;
-    width: var(--board-size, min(100vw, 100dvh, 880px));
+    width: var(--side);
+    margin-top: calc(var(--side) * 0.04);
     aspect-ratio: 1;
     background: #d8c6b0;
     container-type: inline-size;
@@ -94,6 +99,10 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+
+  svg {
+    overflow: visible;
   }
 
   img {
