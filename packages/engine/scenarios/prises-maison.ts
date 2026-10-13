@@ -470,11 +470,11 @@ export const r13: Scenario[] = [
     rule: "R-13",
     title: "Arriver pile sur le carré 16 ne fait pas entrer dans la maison",
     before: {
-      pawns: { bleu: [{ p: 66 }, "S", "S", "S"] },
-      hands: { bleu: ["4S"] },
+      pawns: { bleu: [{ p: 67 }, "S", "S", "S"] },
+      hands: { bleu: ["3S"] },
       turn: "bleu",
     },
-    action: { t: "move", card: "4S", pawn: "bleu0" },
+    action: { t: "move", card: "3S", pawn: "bleu0" },
     expect: {
       legal: true,
       after: { pawns: { bleu: [{ p: 70 }, "S", "S", "S"] } },
@@ -502,11 +502,11 @@ export const r13: Scenario[] = [
     rule: "R-13",
     title: "Après un tour de plus, le pion entre au passage suivant",
     before: {
-      pawns: { bleu: [{ p: 140 }, "S", "S", "S"] },
-      hands: { bleu: ["4S"] },
+      pawns: { bleu: [{ p: 141 }, "S", "S", "S"] },
+      hands: { bleu: ["3S"] },
       turn: "bleu",
     },
-    action: { t: "move", card: "4S", pawn: "bleu0" },
+    action: { t: "move", card: "3S", pawn: "bleu0" },
     expect: {
       legal: true,
       after: { pawns: { bleu: [{ h: 1 }, "S", "S", "S"] } },

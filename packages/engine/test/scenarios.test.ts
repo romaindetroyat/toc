@@ -1,7 +1,7 @@
 // The RULES.md scenarios as executable acceptance tests (success criterion 1).
 // Every fixture of packages/engine/scenarios is built with scenarioState() and checked against the engine.
 // Scenarios that need the 7 are `todo` until plan 01-13; the « alt » scenarios (R-09.9, R-15.9) describe
-// the alternative of an open point and are skipped; R-13.15 is a known fixture contradiction (below).
+// the alternative of an open point and are skipped.
 
 import { describe, expect, it } from "vitest";
 import { scenarios } from "../scenarios/index.ts";
@@ -32,14 +32,6 @@ import {
 
 type Seed = [number, number, number, number];
 const FIXED_SEED: Seed = [101, 202, 303, 404];
-
-/** The fixture R-13.15 plays a 4 and expects a forward move into the home; the 4 goes back (R-08). */
-const CONTRADICTIONS: Record<string, string> = {
-  "R-13.13":
-    "the fixture plays 4S (backward 4, R-08) from progress 66 and expects progress 70, which a forward 4 would give: RULES.md contradicts itself, see the SUMMARY of plan 01-12",
-  "R-13.15":
-    "the fixture plays 4S (backward 4, R-08) from progress 140 and expects home slot 1, which a forward 4 would give: RULES.md contradicts itself, see the SUMMARY of plan 01-12",
-};
 
 function mentionsSeven(value: unknown): boolean {
   return /"t":"seven"|"seven-incomplete"/.test(JSON.stringify(value));
@@ -199,8 +191,6 @@ for (const rule of RULE_IDS) {
       const name = `${sc.id} ${sc.title}`;
       if (sc.flags?.includes("alt")) {
         it.skip(`${name} (alternative of an open point, not implemented)`, () => {});
-      } else if (CONTRADICTIONS[sc.id] !== undefined) {
-        it.skip(`${name} (${CONTRADICTIONS[sc.id]})`, () => {});
       } else if (sevenDependent(sc)) {
         // The 7 is added by plan 01-13 (RULE-10, RULE-11).
         it.todo(name);
@@ -210,19 +200,3 @@ for (const rule of RULE_IDS) {
     }
   });
 }
-
-describe("fixtures that contradict R-08 (the 4 goes back)", () => {
-  const cases: [string, number, number][] = [
-    ["R-13.13", 66, 62],
-    ["R-13.15", 140, 136],
-  ];
-  for (const [id, start, end] of cases) {
-    it(`${id}: the engine plays the 4 backward from ${start} to ${end}, it does not enter the home`, () => {
-      const sc = scenarios.find((s) => s.id === id) as Scenario;
-      const state = scenarioState(sc.before, FIXED_SEED);
-      expect(state.pawns.bleu0).toEqual({ zone: "ring", progress: start });
-      const out = apply(state, "bleu", sc.action as Action);
-      expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: end });
-    });
-  }
-});

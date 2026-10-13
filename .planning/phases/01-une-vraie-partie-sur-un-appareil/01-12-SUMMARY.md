@@ -135,3 +135,7 @@ None. T-01-09 (tampering with `apply`) is mitigated and tested in `turn.test.ts`
 ## Self-Check: PASSED
 
 All created files exist; commits 171ddff, 43e5fcf, 4624933, bc363b9 are in the branch history; `git rev-list --count` from the ledger base gives 4.
+
+## Post-plan fix (orchestrator)
+
+The R-13.13 / R-13.15 « contradiction » was a fixture authoring slip, not a rule question: both fixtures meant to test an exact forward count onto the entry square (R-13.13) and into the home after an extra lap (R-13.15), but picked the 4, which goes back (R-08). The fixtures now play a 3 from progress 67 and 141, with the same expected outcome; their two pictures were re-rendered. The skips and the temporary « fixtures that contradict R-08 » tests were removed. Scenario results: 82 pass, 19 todo (the 7), 2 alt skips.
