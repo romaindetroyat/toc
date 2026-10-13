@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Une vraie partie sur un appareil
+
 **Goal**: Un joueur fait une partie complète de TOC, fidèle aux règles maison validées par Romain, contre trois joueurs gérés par l'ordinateur, sur le plateau original, avec des cavaliers animés et sonorisés.
 **Mode:** mvp
 **Depends on**: Rien (première phase)
@@ -31,36 +32,68 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Quand c'est son tour, le joueur voit ses cartes jouables et les pions concernés mis en évidence, et seuls les coups permis par RULES.md lui sont proposés. Il passe une carte à son partenaire en début de donne et voit qui doit encore choisir. Avec l'As ou le Roi, il choisit entre sortir et avancer. Il répartit le 7 avec l'assistant pas à pas. Avant de confirmer un coup, il voit l'aperçu du trajet et des pions qui seraient mangés.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
+
 **Plans:** 24 plans
 
 Plans:
+**Wave 1**
 - [ ] 01-01-PLAN.md — Squelette jouable : validation des paquets, traceur « Jouer la partie » → plateau → cavalier qui bondit au son des sabots
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Plateau net et juste sur tous les écrans : srcset, chargement, erreur, overlay de géométrie, garde-fous en tests
 - [ ] 01-03-PLAN.md — Contrat du moteur (types, événements) et règles R-01 à R-08 avec leurs scénarios
 - [ ] 01-04-PLAN.md — Moteur audio complet : sabots sur l’horloge audio, hennissements, cartes, ambiance
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-05-PLAN.md — Règles R-09 à R-16, points à valider et images des scénarios
 - [ ] 01-06-PLAN.md — Choix de la couleur mémorisé, polices, icônes et jetons de style
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-07-PLAN.md — Romain valide RULES.md et choisit la source des figures des cartes ; constantes de règles nommées
 - [ ] 01-08-PLAN.md — Plateau tourné vers le joueur et seize cavaliers Staunton
 - [ ] 01-09-PLAN.md — Page « Test des sons » pour Romain
+
+**Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 01-10-PLAN.md — Moteur : paquet, donnes 5/4/4, échange, vue par place
 - [ ] 01-11-PLAN.md — Licences tracées et feuille « Crédits et licences »
+
+**Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 01-12-PLAN.md — Moteur : un seul chemin pour les déplacements, tour de jeu, scénarios en tests
+
+**Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 01-13-PLAN.md — Moteur : le 7 réparti et l’état de rendu
+
+**Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 01-14-PLAN.md — Ordinateur de niveau 1, propriétés du moteur, parties en auto-jeu
+
+**Wave 9** *(blocked on Wave 8 completion)*
 - [ ] 01-15-PLAN.md — Contrôleur de partie, metteur en scène et interaction du tour
+
+**Wave 10** *(blocked on Wave 9 completion)*
 - [ ] 01-16-PLAN.md — Écran de jeu : main en éventail, carte → cheval → aperçu → « Jouer »
+
+**Wave 11** *(blocked on Wave 10 completion)*
 - [ ] 01-17-PLAN.md — La table : bandeau, tapis, échange de carte, main posée, fin de partie
+
+**Wave 12** *(blocked on Wave 11 completion)*
 - [ ] 01-18-PLAN.md — As/Roi « Sortir ou avancer », Valet en deux touches, chevaux serrés
 - [ ] 01-19-PLAN.md — Les cavaliers s’animent et hennissent
 - [ ] 01-20-PLAN.md — Figures traditionnelles des cartes, licences vérifiées
+
+**Wave 13** *(blocked on Wave 12 completion)*
 - [ ] 01-21-PLAN.md — Le 7 réparti pas à pas, partie complète au doigt, cibles de 44 px
 - [ ] 01-22-PLAN.md — Les cartes bougent aussi ; avance rapide, animations réduites, onglet caché
+
+**Wave 14** *(blocked on Wave 13 completion)*
 - [ ] 01-23-PLAN.md — « Réglages » : couper le son, régler l’ambiance, réduire les animations
+
+**Wave 15** *(blocked on Wave 14 completion)*
 - [ ] 01-24-PLAN.md — Abandonner, pannes de son, tapis en grand, finition et vérifications
+
 **UI hint**: yes
 
 ### Phase 2: Jouer en ligne entre proches
+
 **Goal**: Quatre proches, chacun sur son appareil, jouent la même partie en temps réel sur une table dont le serveur fait autorité. La partie résiste aux coupures et peut être reprise plus tard.
 **Mode:** mvp
 **Depends on**: Phase 1
@@ -71,10 +104,12 @@ Plans:
   3. Un joueur qui recharge la page ou perd le réseau retrouve la partie dans son état exact. Pendant son absence, la partie est en pause, et tous les joueurs le voient. Passé le délai, le créateur de la table choisit entre trois options : attendre encore, confier la place à l'ordinateur (le joueur la récupère à son retour) ou sauvegarder la partie.
   4. Le créateur de la table peut arrêter une partie à tout moment. Les joueurs la reprennent plus tard, même plusieurs jours après, dans l'état exact où elle était : mains, donne en cours, position des pions, joueur dont c'est le tour.
   5. Les joueurs d'une table discutent par chat texte pendant la partie. À la fin, l'équipe gagnante est annoncée à tous, et la table peut enchaîner une revanche avec les mêmes joueurs.
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 3: L'ordinateur à la force choisie
+
 **Goal**: Chaque place tenue par l'ordinateur joue à la force choisie, du niveau 1 (un coup légal au hasard) au niveau 5 (un vrai jeu d'équipe). L'ordinateur ne triche jamais et joue à un rythme naturel.
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -85,9 +120,11 @@ Plans:
   3. Face au niveau 5, on observe un vrai jeu d'équipe : il protège ses pions, aide son partenaire à avancer et choisit avec soin la carte qu'il lui passe.
   4. Les décisions de l'ordinateur ne dépendent que de ce qu'un humain saurait à sa place : sa main, les cartes jouées et la position des pions. Changer les mains cachées des autres joueurs ne change pas son coup.
   5. Avant chaque coup, l'ordinateur marque un temps de réflexion naturel, et il ne dépasse jamais quelques secondes, quel que soit son niveau.
+
 **Plans**: TBD
 
 ### Phase 4: Comptes, amis et application installable
+
 **Goal**: Chaque proche a son compte et retrouve ses amis. Il monte une table ou une partie solo depuis l'application installée, et il est prévenu quand c'est son tour.
 **Mode:** mvp
 **Depends on**: Phase 3
@@ -98,10 +135,12 @@ Plans:
   3. Un joueur crée une table, invite des amis, répartit les places et les équipes, et règle la force de l'ordinateur pour chaque place libre. Il peut aussi lancer directement une partie solo contre trois joueurs gérés par l'ordinateur.
   4. Le jeu s'installe comme application sur téléphone et sur ordinateur, avec une icône et un écran de démarrage. Une nouvelle version ne recharge jamais une partie en cours : le joueur est invité à mettre à jour.
   5. Le joueur reçoit une notification quand c'est son tour ou qu'on l'invite à une table, y compris sur iPhone quand l'application est installée.
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 5: Suivi, apprentissage et finition
+
 **Goal**: Les joueurs suivent leurs parties et se mesurent entre amis. Les nouveaux venus apprennent les règles en jouant. Le jeu est accessible à toute la famille.
 **Mode:** mvp
 **Depends on**: Phase 4
@@ -112,6 +151,7 @@ Plans:
   3. À tout moment de la partie, une aide en français rappelle les règles et l'effet de chaque carte.
   4. Un nouveau joueur apprend les règles en faisant une partie guidée par un tutoriel interactif.
   5. Toute l'interface est en français. Chaque place se reconnaît autrement que par sa couleur, et les zones tactiles sont assez grandes pour jouer au doigt sur téléphone.
+
 **Plans**: TBD
 **UI hint**: yes
 
