@@ -3,6 +3,28 @@
   // focus leaving: a sheet opened from another sheet (« Crédits et licences » in « Réglages ») would
   // otherwise fight it for the focus.
   const open: symbol[] = [];
+
+  // The page scroll lock is shared by every open sheet and counted, not saved and restored by each
+  // one: sheets opened from one another (Réglages, then the abandon confirmation) can be torn down in
+  // any order (a hash change drops the whole game at once, first sheet first), and a per-sheet restore
+  // would then leave the second sheet's saved « hidden » on the body for good.
+  let scrollLocks = 0;
+  let overflowBeforeLock = "";
+
+  function lockScroll(): () => void {
+    if (scrollLocks === 0) {
+      overflowBeforeLock = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    scrollLocks += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      scrollLocks -= 1;
+      if (scrollLocks === 0) document.body.style.overflow = overflowBeforeLock;
+    };
+  }
 </script>
 
 <script lang="ts">
@@ -86,13 +108,7 @@
   });
 
   // The page behind does not scroll while the sheet is open.
-  $effect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  });
+  $effect(() => lockScroll());
 
   onDestroy(() => {
     open.splice(open.indexOf(me), 1);

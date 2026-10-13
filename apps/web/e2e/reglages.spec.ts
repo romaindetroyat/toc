@@ -376,6 +376,8 @@ test.describe("abandonner la partie", () => {
     await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
     await expect(page.locator("[data-board]")).toHaveCount(0);
     await expect(page.locator("[data-sheet-layer]")).toHaveCount(0);
+    // The two stacked sheets (Réglages, then the confirmation) give the page its scroll back.
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
   });
 });
 
