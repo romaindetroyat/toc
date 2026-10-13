@@ -1,4 +1,4 @@
-import { type CardId, rankOf, suitOf } from "@toc/engine";
+import { type CardId, FULL_DECK, rankOf, suitOf } from "@toc/engine";
 
 /** What a card face draws: the corner label, the suit pip and its colour (UI-SPEC « Card faces »). */
 export type CardFace = {
@@ -29,7 +29,30 @@ export function cardFace(card: CardId): CardFace {
 }
 
 /**
- * Image of each court card, filled in by plan 01-20 from Romain's choice (assets/cartes/CHOIX.md).
- * A court card without an entry is drawn as a large rank letter between its suit pips.
+ * The figure files of apps/web/src/assets/cartes, written by tools/import-card-art.mjs from the card
+ * art Romain chose (assets/cartes/CHOIX.md, D-24). Each is a separate file named {rank}{suit}, loaded
+ * as an image and never inlined into the code, so that it can be replaced by another figure.
  */
-export const COURT_FIGURES: Partial<Record<CardId, string>> = {};
+const FIGURE_FILES = import.meta.glob<string>("../assets/cartes/*.{svg,webp}", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+
+const figureByName = new Map(
+  Object.entries(FIGURE_FILES).map(([file, url]) => [
+    file.slice(file.lastIndexOf("/") + 1).replace(/\.(svg|webp)$/, ""),
+    url,
+  ]),
+);
+
+/**
+ * Image of each court card (Valet, Dame, Roi). A court card without an entry is drawn as a large
+ * rank letter between its suit pips.
+ */
+export const COURT_FIGURES: Partial<Record<CardId, string>> = Object.fromEntries(
+  FULL_DECK.filter((card) => rankOf(card) >= 11).flatMap((card) => {
+    const url = figureByName.get(card);
+    return url ? [[card, url]] : [];
+  }),
+);
