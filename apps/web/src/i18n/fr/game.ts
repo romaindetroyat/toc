@@ -177,7 +177,18 @@ export const game = {
     playable: (card: string) => `${card}, jouable`,
     unplayable: (card: string) => `${card}, pas jouable`,
     neutral: (card: string) => card,
-    pawn: (color: Color) => `Cheval ${colourWord(color)}, jouable`,
+    /**
+     * A lit knight, for the keyboard and screen readers: its colour, its letter (A to D, as on the 7
+     * panel) and where it stands, so two knights of one colour never read the same.
+     */
+    pawn: (color: Color, letter: string, where: string) =>
+      `Cheval ${colourWord(color)} ${letter}, ${where}, jouable`,
+    place: {
+      stable: "à l’écurie",
+      home: "à la maison",
+      exit: "sur sa case de sortie",
+      ring: (n: number) => `à ${cases(n)} de sa sortie`,
+    },
   },
 } as const;
 

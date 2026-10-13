@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { PawnId, RenderState } from "@toc/engine";
-  import { pawnColor } from "@toc/engine";
+  import type { PawnId, Place, RenderState } from "@toc/engine";
+  import { EXIT, pawnColor, RING } from "@toc/engine";
+  import { knightLetter } from "../game/turnUi.ts";
   import { game } from "../i18n/fr/game.ts";
   import { anchorOf } from "./geometry.ts";
 
@@ -30,10 +31,20 @@
   // Knights this close to the tap may be the one meant: with two or more, the tray tells them apart.
   const near = $derived(Math.max(44 * px, radius));
 
+  /** Where a knight stands, in words: the stable, the home, or how far it has come from its exit. */
+  function whereOf(pawn: PawnId, place: Place): string {
+    if (place.z === "stable") return game.hand.place.stable;
+    if (place.z === "home") return game.hand.place.home;
+    const done = (((place.cell - EXIT[pawnColor(pawn)]) % RING) + RING) % RING;
+    return done === 0 ? game.hand.place.exit : game.hand.place.ring(done);
+  }
+
   const targets = $derived(
     candidates.map((pawn) => {
-      const [x, y] = anchorOf(render.pawns[pawn], k);
-      return { pawn, x, y: y - BODY };
+      const place = render.pawns[pawn];
+      const [x, y] = anchorOf(place, k);
+      const label = game.hand.pawn(pawnColor(pawn), knightLetter(pawn), whereOf(pawn, place));
+      return { pawn, x, y: y - BODY, label };
     }),
   );
 
@@ -75,7 +86,7 @@
         data-hit={target.pawn}
         role="button"
         tabindex="0"
-        aria-label={game.hand.pawn(pawnColor(target.pawn))}
+        aria-label={target.label}
         onkeydown={(event) => onkeydown(event, target.pawn)}
       >
         <circle cx={target.x} cy={target.y} r={radius} fill="transparent" />

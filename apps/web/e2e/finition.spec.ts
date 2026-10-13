@@ -366,8 +366,9 @@ test.describe("au clavier", () => {
         typeof pattern === "string" ? name === pattern : pattern.test(name),
       );
     expect(at("Réglages"), "Réglages").toBeGreaterThanOrEqual(0);
-    expect(at("Cheval bleu, jouable"), "Cheval bleu").toBeGreaterThan(at("Réglages"));
-    expect(at("Sur le tapis"), "tapis").toBeGreaterThan(at("Cheval bleu, jouable"));
+    const knight = "Cheval bleu A, à 10 cases de sa sortie, jouable";
+    expect(at(knight), "Cheval bleu A").toBeGreaterThan(at("Réglages"));
+    expect(at("Sur le tapis"), "tapis").toBeGreaterThan(at(knight));
     expect(at("Changer de carte"), "Changer de carte").toBeGreaterThan(at("Sur le tapis"));
     expect(at(/^(?!Cheval).+, (jouable|pas jouable)$/), "main").toBeGreaterThan(
       at("Changer de carte"),
@@ -398,6 +399,25 @@ test.describe("au clavier", () => {
     await expect(zone(page)).toHaveAttribute("data-state", "idle");
   });
 
+  test("deux chevaux éclairés d’une couleur se distinguent : lettre et place", async ({ page }) => {
+    await page.goto("/");
+    await page.goto(
+      `/#/partie?etat=${etatParam({
+        turn: "bleu",
+        pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+        hands: { bleu: ["3S", "13H"] },
+      })}&vitesse=test`,
+    );
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    await page.getByRole("button", { name: "3 de pique, jouable" }).click();
+    await expect(
+      page.getByRole("button", { name: "Cheval bleu A, à 5 cases de sa sortie, jouable" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Cheval bleu B, à 20 cases de sa sortie, jouable" }),
+    ).toBeVisible();
+  });
+
   test("Échap ferme le plateau de choix des chevaux serrés", async ({ page }) => {
     await page.goto("/");
     await page.goto(
@@ -425,7 +445,9 @@ test.describe("au clavier", () => {
     // A card that cannot be played says so as well.
     await expect(page.getByRole("button", { name: "Valet de pique, pas jouable" })).toBeVisible();
     await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
-    await expect(page.getByRole("button", { name: "Cheval bleu, jouable" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Cheval bleu A, à 10 cases de sa sortie, jouable" }),
+    ).toBeVisible();
 
     const controls = await namesOfControls(page);
     expect(controls.length).toBeGreaterThan(5);
