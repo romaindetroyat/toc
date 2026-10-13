@@ -50,6 +50,32 @@ describe("apply rejects what legalActions does not list (T-01-09)", () => {
     expect(JSON.stringify(s)).toBe(snapshot);
   });
 
+  it("refuses malformed frames with IllegalActionError, never a raw TypeError (T-01-18)", () => {
+    const s = deepFreeze(state());
+    const snapshot = JSON.stringify(s);
+    const malformed: unknown[] = [
+      null,
+      undefined,
+      "move",
+      42,
+      [],
+      {},
+      { t: 7 },
+      { t: "seven" },
+      { t: "seven", card: 7, plan: [{ pawn: "bleu0", steps: 7 }] },
+      { t: "seven", card: "7S", plan: null },
+      { t: "seven", card: "7S", plan: [null] },
+      { t: "move", card: null, pawn: "bleu0" },
+      { t: "move", card: 3, pawn: "bleu0" },
+      { t: "give" },
+      { t: "swap", card: "3S" },
+    ];
+    for (const action of malformed) {
+      expect(() => apply(s, "bleu", action as Action)).toThrow(IllegalActionError);
+    }
+    expect(JSON.stringify(s)).toBe(snapshot);
+  });
+
   it("only the seat whose turn it is may play", () => {
     const s = state();
     expect(legalActions(s, "jaune")).toEqual([]);

@@ -152,6 +152,15 @@ export function apply(
   seat: Color,
   action: Action,
 ): { state: GameState; events: GameEvent[] } {
+  // Untrusted input (T-01-18): a frame that is not even an action object is refused the same way as
+  // an illegal one, never with a raw TypeError.
+  if (
+    typeof action !== "object" ||
+    action === null ||
+    typeof (action as { t?: unknown }).t !== "string"
+  ) {
+    throw new IllegalActionError("bad-action", "malformed action");
+  }
   const hands = { ...state.hands };
   const events: GameEvent[] = [];
   let next: GameState;
@@ -160,6 +169,7 @@ export function apply(
     const mayPlay =
       state.phase === "play" &&
       state.turn === seat &&
+      typeof action.card === "string" &&
       rankOf(action.card) === 7 &&
       state.hands[seat].includes(action.card);
     const played = mayPlay ? applyPlan(state, seat, action.card, action.plan) : null;
