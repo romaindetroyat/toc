@@ -9,7 +9,12 @@ declare global {
 
   interface Window {
     __tocDebug?: {
-      audio: { scheduled: number[]; history: number[][] };
+      audio: {
+        scheduled: number[];
+        history: number[][];
+        /** Rendered synthesized sounds, keyed `recipe#variant`: duration in seconds and peak amplitude. */
+        sounds?: Record<string, { duration: number; peak: number }>;
+      };
     };
   }
 }

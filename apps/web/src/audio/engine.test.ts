@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type AudioBufferLike, FakeBackend } from "./backend.ts";
 import { createAudioEngine, MAX_VOICES } from "./engine.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId } from "./sounds.ts";
+import { makeLoopable, normalize } from "./synth.ts";
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -399,5 +400,37 @@ describe("ambience", () => {
     expect(
       backend.plays.filter((p) => p.bus === "ambience" && p.stoppedAt !== undefined),
     ).toHaveLength(0);
+  });
+});
+
+describe("synthesis helpers", () => {
+  it("normalize scales to the requested peak and leaves silence alone", () => {
+    const data = new Float32Array([0.1, -0.25, 0.05]);
+    normalize(data, 0.5);
+    expect(Math.max(...data.map(Math.abs))).toBeCloseTo(0.5, 6);
+    expect(data[0]).toBeCloseTo(0.2, 6);
+    const silence = new Float32Array(4);
+    normalize(silence, 0.5);
+    expect([...silence]).toEqual([0, 0, 0, 0]);
+  });
+
+  it("makeLoopable continues the last sample into the first like the original signal does", () => {
+    const loop = 1000;
+    const fade = 200;
+    // A steady tone that is not periodic in the loop length: a naive loop would click.
+    const tone = Float32Array.from({ length: loop + fade }, (_, i) => Math.sin(i * 0.37));
+    const out = makeLoopable(tone, loop, fade);
+    expect(out).toHaveLength(loop);
+    // The sample after the loop end in the original is tone[loop]; the loop restarts on it.
+    expect(out[0]).toBeCloseTo(tone[loop] as number, 6);
+    // Past the fade the loop is the untouched source.
+    expect(out[fade]).toBeCloseTo(tone[fade] as number, 6);
+    expect(out[loop - 1]).toBeCloseTo(tone[loop - 1] as number, 6);
+    // No jump across the seam bigger than the tone's own sample-to-sample step.
+    expect(Math.abs((out[0] as number) - (out[loop - 1] as number))).toBeLessThan(0.37 + 1e-6);
+  });
+
+  it("makeLoopable rejects a source that is too short", () => {
+    expect(() => makeLoopable(new Float32Array(10), 10, 5)).toThrow(RangeError);
   });
 });

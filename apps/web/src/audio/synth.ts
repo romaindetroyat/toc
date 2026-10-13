@@ -49,3 +49,366 @@ export async function renderHoof(variant: number, sampleRate = 44100): Promise<A
 
   return ctx.startRendering();
 }
+
+// --- Normalisation and seamless loops (pure, tested in Node) ---
+
+/** Scale `data` in place so its largest absolute sample equals `peak` (silence stays silence). */
+export function normalize(data: Float32Array, peak: number): void {
+  let max = 0;
+  for (const sample of data) max = Math.max(max, Math.abs(sample));
+  if (max === 0) return;
+  const factor = peak / max;
+  for (let i = 0; i < data.length; i++) data[i] = (data[i] as number) * factor;
+}
+
+/**
+ * Turn `source` (at least loopLength + fade samples of a steady sound) into a loop of exactly
+ * `loopLength` samples whose last sample is followed by its natural continuation: the first
+ * `fade` samples are an equal-power crossfade from the material after the loop end into the
+ * start. There is no seam, whatever the filters were doing when the render began.
+ */
+export function makeLoopable(source: Float32Array, loopLength: number, fade: number): Float32Array {
+  if (source.length < loopLength + fade) throw new RangeError("source is shorter than loop + fade");
+  const out = source.slice(0, loopLength);
+  for (let i = 0; i < fade; i++) {
+    const theta = (i / fade) * (Math.PI / 2);
+    out[i] =
+      (source[i] as number) * Math.sin(theta) +
+      (source[loopLength + i] as number) * Math.cos(theta);
+  }
+  return out;
+}
+
+async function renderToBuffer(
+  length: number,
+  sampleRate: number,
+  build: (ctx: OfflineAudioContext) => void,
+): Promise<AudioBuffer> {
+  const ctx = new OfflineAudioContext(1, length, sampleRate);
+  build(ctx);
+  return ctx.startRendering();
+}
+
+function noiseBuffer(ctx: OfflineAudioContext, seconds: number): AudioBuffer {
+  const buffer = ctx.createBuffer(1, Math.ceil(seconds * ctx.sampleRate), ctx.sampleRate);
+  fillNoise(buffer.getChannelData(0));
+  return buffer;
+}
+
+// --- Neighs (RESEARCH Appendix D) ---
+
+export type NeighKind = "sortie" | "ruade" | "plainte" | "joyeux" | "fete" | "surpris";
+
+type NeighSpec = {
+  duration: number;
+  /** Fundamental contour: [seconds, Hz] points joined by exponential ramps. */
+  contour: [number, number][];
+  vibratoHz: number;
+  vibratoDepthHz: number;
+  /** Three parallel band-pass formants, swept to `target` by 30 % of the duration, then back to 0.8 of the start. */
+  formants: { freq: number; q: number; gain: number; target: number }[];
+  /** Breath noise level (band-passed at 3 kHz) relative to the voiced part. */
+  breath: number;
+  attack: number;
+  /** Fraction of the duration held at full level before the exponential release. */
+  hold: number;
+};
+
+const formants = (targets: [number, number, number]): NeighSpec["formants"] => [
+  { freq: 650, q: 5, gain: 1.0, target: targets[0] },
+  { freq: 1300, q: 6, gain: 0.7, target: targets[1] },
+  { freq: 2700, q: 8, gain: 0.4, target: targets[2] },
+];
+
+const NEIGHS: Record<NeighKind, NeighSpec> = {
+  // Stable exit: the full neigh, rising then falling, with vibrato.
+  sortie: {
+    duration: 1.1,
+    contour: [
+      [0, 420],
+      [0.25, 900],
+      [0.5, 700],
+      [1.1, 330],
+    ],
+    vibratoHz: 22,
+    vibratoDepthHz: 18,
+    formants: formants([1100, 2000, 3200]),
+    breath: 0.12,
+    attack: 0.06,
+    hold: 0.65,
+  },
+  // Rear-up: a short, noise-heavy snort.
+  ruade: {
+    duration: 0.25,
+    contour: [
+      [0, 260],
+      [0.06, 520],
+      [0.25, 230],
+    ],
+    vibratoHz: 0,
+    vibratoDepthHz: 0,
+    formants: formants([1000, 1900, 3000]),
+    breath: 1.6,
+    attack: 0.01,
+    hold: 0.5,
+  },
+  // Captured pawn: lower, falling, trembling.
+  plainte: {
+    duration: 1.0,
+    contour: [
+      [0, 560],
+      [0.15, 640],
+      [0.45, 430],
+      [1.0, 220],
+    ],
+    vibratoHz: 26,
+    vibratoDepthHz: 22,
+    formants: formants([800, 1500, 2500]),
+    breath: 0.1,
+    attack: 0.08,
+    hold: 0.5,
+  },
+  // Pawn home: shorter, 1.4 times higher.
+  joyeux: {
+    duration: 0.75,
+    contour: [
+      [0, 590],
+      [0.14, 1260],
+      [0.3, 980],
+      [0.75, 460],
+    ],
+    vibratoHz: 22,
+    vibratoDepthHz: 22,
+    formants: formants([1300, 2300, 3400]),
+    breath: 0.1,
+    attack: 0.04,
+    hold: 0.6,
+  },
+  // Fourth pawn home: the joyful neigh, longer, with a second rise.
+  fete: {
+    duration: 1.7,
+    contour: [
+      [0, 600],
+      [0.2, 1300],
+      [0.45, 1000],
+      [0.7, 1350],
+      [1.0, 1050],
+      [1.7, 480],
+    ],
+    vibratoHz: 22,
+    vibratoDepthHz: 24,
+    formants: formants([1300, 2300, 3400]),
+    breath: 0.1,
+    attack: 0.05,
+    hold: 0.7,
+  },
+  // Valet swap: a short surprised squeak, rising only.
+  surpris: {
+    duration: 0.35,
+    contour: [
+      [0, 430],
+      [0.12, 800],
+      [0.35, 1150],
+    ],
+    vibratoHz: 24,
+    vibratoDepthHz: 14,
+    formants: formants([1200, 2200, 3300]),
+    breath: 0.1,
+    attack: 0.02,
+    hold: 0.75,
+  },
+};
+
+const NEIGH_PEAK = 0.7;
+
+/**
+ * A synthesized neigh: a sawtooth with the spec's pitch contour and vibrato through three swept
+ * formants, plus band-passed breath noise, shaped by an attack/hold/release envelope.
+ */
+export async function renderNeigh(kind: NeighKind, sampleRate = 44100): Promise<AudioBuffer> {
+  const spec = NEIGHS[kind];
+  const length = Math.ceil((spec.duration + 0.05) * sampleRate);
+  const buffer = await renderToBuffer(length, sampleRate, (ctx) => {
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0, 0);
+    envelope.gain.linearRampToValueAtTime(1, spec.attack);
+    envelope.gain.setValueAtTime(1, spec.hold * spec.duration);
+    envelope.gain.exponentialRampToValueAtTime(0.001, spec.duration);
+    envelope.connect(ctx.destination);
+
+    const voice = ctx.createOscillator();
+    voice.type = "sawtooth";
+    const [first, ...rest] = spec.contour;
+    if (first) voice.frequency.setValueAtTime(first[1], first[0]);
+    for (const [t, hz] of rest) voice.frequency.exponentialRampToValueAtTime(hz, t);
+    if (spec.vibratoDepthHz > 0) {
+      const vibrato = ctx.createOscillator();
+      vibrato.frequency.value = spec.vibratoHz;
+      const depth = ctx.createGain();
+      depth.gain.value = spec.vibratoDepthHz;
+      vibrato.connect(depth).connect(voice.frequency);
+      vibrato.start(0);
+      vibrato.stop(spec.duration);
+    }
+    for (const formant of spec.formants) {
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.Q.value = formant.q;
+      band.frequency.setValueAtTime(formant.freq, 0);
+      band.frequency.linearRampToValueAtTime(formant.target, 0.3 * spec.duration);
+      band.frequency.linearRampToValueAtTime(formant.freq * 0.8, spec.duration);
+      const level = ctx.createGain();
+      level.gain.value = formant.gain;
+      voice.connect(band).connect(level).connect(envelope);
+    }
+    voice.start(0);
+    voice.stop(spec.duration);
+
+    const breath = ctx.createBufferSource();
+    breath.buffer = noiseBuffer(ctx, spec.duration + 0.05);
+    const breathBand = ctx.createBiquadFilter();
+    breathBand.type = "bandpass";
+    breathBand.frequency.value = 3000;
+    breathBand.Q.value = 0.8;
+    const breathLevel = ctx.createGain();
+    breathLevel.gain.value = spec.breath;
+    breath.connect(breathBand).connect(breathLevel).connect(envelope);
+    breath.start(0);
+  });
+  normalize(buffer.getChannelData(0), NEIGH_PEAK);
+  return buffer;
+}
+
+// --- Cards ---
+
+export type CardKind = "donne" | "pose" | "echange";
+
+const CARD_PEAK = 0.5;
+
+/**
+ * Card sounds from short filtered noise: `donne` is a riffle (fourteen quick ticks), `pose` a
+ * soft thump (card on felt), `echange` a band-passed sweep (card slid across the table).
+ */
+export async function renderCard(kind: CardKind, sampleRate = 44100): Promise<AudioBuffer> {
+  const seconds = kind === "donne" ? 0.62 : kind === "pose" ? 0.18 : 0.36;
+  const buffer = await renderToBuffer(Math.ceil(seconds * sampleRate), sampleRate, (ctx) => {
+    if (kind === "donne") {
+      const ticks = ctx.createBuffer(1, Math.ceil(seconds * sampleRate), sampleRate);
+      const data = ticks.getChannelData(0);
+      const noise = new Float32Array(data.length);
+      fillNoise(noise);
+      let t = 0.02;
+      for (let k = 0; k < 14; k++) {
+        const start = Math.floor(t * sampleRate);
+        const decay = 0.0035 * sampleRate;
+        const amplitude = 0.55 + (0.45 * ((k * 7) % 5)) / 4;
+        for (let i = 0; i < 0.014 * sampleRate && start + i < data.length; i++) {
+          data[start + i] = (noise[start + i] as number) * amplitude * Math.exp(-i / decay);
+        }
+        t += 0.036 - 0.0008 * k; // the riffle speeds up
+      }
+      const source = ctx.createBufferSource();
+      source.buffer = ticks;
+      const high = ctx.createBiquadFilter();
+      high.type = "highpass";
+      high.frequency.value = 1500;
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 3800;
+      band.Q.value = 0.7;
+      source.connect(high).connect(band).connect(ctx.destination);
+      source.start(0);
+    } else if (kind === "pose") {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx, 0.05);
+      const low = ctx.createBiquadFilter();
+      low.type = "lowpass";
+      low.frequency.value = 1300;
+      const burst = ctx.createGain();
+      burst.gain.setValueAtTime(0, 0);
+      burst.gain.linearRampToValueAtTime(0.7, 0.002);
+      burst.gain.exponentialRampToValueAtTime(0.001, 0.05);
+      source.connect(low).connect(burst).connect(ctx.destination);
+      source.start(0);
+      const thump = ctx.createOscillator();
+      thump.frequency.setValueAtTime(150, 0);
+      thump.frequency.exponentialRampToValueAtTime(70, 0.1);
+      const thumpGain = ctx.createGain();
+      thumpGain.gain.setValueAtTime(0, 0);
+      thumpGain.gain.linearRampToValueAtTime(0.9, 0.003);
+      thumpGain.gain.exponentialRampToValueAtTime(0.001, 0.14);
+      thump.connect(thumpGain).connect(ctx.destination);
+      thump.start(0);
+      thump.stop(seconds);
+    } else {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx, seconds);
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.Q.value = 1.5;
+      band.frequency.setValueAtTime(1200, 0);
+      band.frequency.exponentialRampToValueAtTime(4200, seconds);
+      const swell = ctx.createGain();
+      swell.gain.setValueAtTime(0, 0);
+      swell.gain.linearRampToValueAtTime(1, 0.09);
+      swell.gain.setValueAtTime(1, 0.16);
+      swell.gain.exponentialRampToValueAtTime(0.001, seconds - 0.01);
+      source.connect(band).connect(swell).connect(ctx.destination);
+      source.start(0);
+    }
+  });
+  normalize(buffer.getChannelData(0), CARD_PEAK);
+  return buffer;
+}
+
+// --- Ambience ---
+
+/** Loop length in seconds: a multiple of both LFO periods (8 s and 4 s), so the swell repeats exactly. */
+export const AMBIENCE_SECONDS = 8;
+const AMBIENCE_FADE_SECONDS = 1;
+const AMBIENCE_PEAK = 0.35;
+
+/**
+ * A light countryside/stable bed: low wind-like noise swelling slowly (0.125 Hz) under a faint
+ * airy rustle (0.25 Hz). Rendered a second longer and folded back (makeLoopable) so it loops
+ * without a seam.
+ */
+export async function renderAmbience(sampleRate = 44100): Promise<AudioBuffer> {
+  const loop = Math.round(AMBIENCE_SECONDS * sampleRate);
+  const fade = Math.round(AMBIENCE_FADE_SECONDS * sampleRate);
+  const raw = await renderToBuffer(loop + fade, sampleRate, (ctx) => {
+    const total = AMBIENCE_SECONDS + AMBIENCE_FADE_SECONDS;
+    const layer = (
+      type: BiquadFilterType,
+      freq: number,
+      q: number,
+      base: number,
+      lfoHz: number,
+      lfoDepth: number,
+    ) => {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx, total);
+      const filter = ctx.createBiquadFilter();
+      filter.type = type;
+      filter.frequency.value = freq;
+      filter.Q.value = q;
+      const level = ctx.createGain();
+      level.gain.value = base;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = lfoHz;
+      const depth = ctx.createGain();
+      depth.gain.value = lfoDepth;
+      lfo.connect(depth).connect(level.gain);
+      source.connect(filter).connect(level).connect(ctx.destination);
+      source.start(0);
+      lfo.start(0);
+    };
+    layer("lowpass", 480, 0.5, 0.7, 1 / AMBIENCE_SECONDS, 0.25);
+    layer("bandpass", 2300, 1.8, 0.05, 2 / AMBIENCE_SECONDS, 0.04);
+  });
+  const looped = makeLoopable(raw.getChannelData(0), loop, fade);
+  normalize(looped, AMBIENCE_PEAK);
+  const buffer = new AudioBuffer({ length: loop, sampleRate, numberOfChannels: 1 });
+  buffer.getChannelData(0).set(looped);
+  return buffer;
+}

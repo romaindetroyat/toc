@@ -7,7 +7,7 @@ import {
   WebAudioBackend,
 } from "./backend.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId, type SynthRecipe } from "./sounds.ts";
-import { renderHoof } from "./synth.ts";
+import { renderAmbience, renderCard, renderHoof, renderNeigh } from "./synth.ts";
 
 // The audio engine. Everything is fire-and-forget: no function here returns a promise the game
 // loop has to await, and every start time is on the AudioContext clock (no setTimeout, no
@@ -352,17 +352,52 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
 
 // --- Web shell: one engine for the whole app, created inside the first user gesture. ---
 
+function renderSynth(
+  recipe: SynthRecipe,
+  variant: number,
+  sampleRate: number,
+): Promise<AudioBuffer> {
+  switch (recipe) {
+    case "hoof":
+      return renderHoof(variant, sampleRate);
+    case "neigh-sortie":
+      return renderNeigh("sortie", sampleRate);
+    case "neigh-ruade":
+      return renderNeigh("ruade", sampleRate);
+    case "neigh-plainte":
+      return renderNeigh("plainte", sampleRate);
+    case "neigh-joyeux":
+      return renderNeigh("joyeux", sampleRate);
+    case "neigh-fete":
+      return renderNeigh("fete", sampleRate);
+    case "neigh-surpris":
+      return renderNeigh("surpris", sampleRate);
+    case "card-donne":
+      return renderCard("donne", sampleRate);
+    case "card-pose":
+      return renderCard("pose", sampleRate);
+    case "card-echange":
+      return renderCard("echange", sampleRate);
+    case "ambience":
+      return renderAmbience(sampleRate);
+  }
+}
+
+/** Renders one synthesized sound; debug builds also report its duration and peak to the e2e specs. */
 async function renderRecipe(
   recipe: SynthRecipe,
   variant: number,
   sampleRate: number,
 ): Promise<AudioBufferLike | undefined> {
-  switch (recipe) {
-    case "hoof":
-      return renderHoof(variant, sampleRate);
-    default:
-      return undefined;
+  const buffer = await renderSynth(recipe, variant, sampleRate);
+  if (DEBUG && window.__tocDebug) {
+    let peak = 0;
+    for (const sample of buffer.getChannelData(0)) peak = Math.max(peak, Math.abs(sample));
+    const sounds = window.__tocDebug.audio.sounds ?? {};
+    sounds[`${recipe}#${variant}`] = { duration: buffer.duration, peak };
+    window.__tocDebug.audio.sounds = sounds;
   }
+  return buffer;
 }
 
 let engine: AudioEngine | undefined;
