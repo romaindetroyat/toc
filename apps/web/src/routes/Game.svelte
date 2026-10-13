@@ -103,6 +103,20 @@
     throw failure.error instanceof Error ? failure.error : new Error("game failure");
   }
 
+  /**
+   * A game that could not be built or started (the session, the first deal, the bot loop's start).
+   * That path is asynchronous, out of the boundary's reach: it is kept here and raised in the template.
+   */
+  let startFailure = $state.raw<{ error: unknown } | null>(null);
+
+  /** Runs a start-up step; a failure reaches the error screen instead of leaving a blank game. */
+  function guarded(step: Promise<void>): void {
+    step.catch((error: unknown) => {
+      console.error(error);
+      if (alive) startFailure = { error };
+    });
+  }
+
   const parts = (pawn: PawnId): fx.PawnParts => {
     const found = fx.partsOf(els[pawn]);
     if (!found) throw new Error(`pawn ${pawn} is not mounted`);
@@ -249,10 +263,12 @@
   }
 
   onMount(() => {
-    (async () => {
-      opened = await loadDebugParams(location.hash);
-      if (alive) await begin(opened);
-    })();
+    guarded(
+      (async () => {
+        opened = await loadDebugParams(location.hash);
+        if (alive) await begin(opened);
+      })(),
+    );
     return () => {
       alive = false;
       session?.dispose();
@@ -261,7 +277,7 @@
 
   /** « Rejouer »: a new game with the same colour (and the same speed under test). */
   function replay() {
-    void begin({ vitesse: opened.vitesse }, session?.human);
+    guarded(begin({ vitesse: opened.vitesse }, session?.human));
   }
 
   /** « Changer de couleur »: back to the launch screen. */
@@ -509,7 +525,9 @@
 <svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
 <main class="game">
-  {#if session?.failure}
+  {#if startFailure}
+    {fail(startFailure)}
+  {:else if session?.failure}
     {fail(session.failure)}
   {/if}
   {#if session !== undefined && render !== null && view !== undefined}
