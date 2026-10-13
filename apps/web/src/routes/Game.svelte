@@ -302,6 +302,8 @@
 
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
+  /** The end screen is up: the rest of the game screen is inert behind it. */
+  const ended = $derived(render !== null && render.phase === "won" && render.winner !== null);
   const ui = $derived(session?.ui ?? { kind: "waiting" as const });
   const view = $derived(session?.view);
 
@@ -544,7 +546,8 @@
     {fail(session.failure)}
   {/if}
   {#if session !== undefined && render !== null && view !== undefined}
-    <div class="layout" data-layout>
+    <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
+    <div class="layout" data-layout inert={ended}>
       <div class="info">
         <InfoBar {render} human={session.human} names={session.names} onabandon={abandon} />
       </div>
@@ -671,7 +674,7 @@
       <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
     {/if}
 
-    {#if render.phase === "won" && render.winner !== null}
+    {#if ended && render.winner !== null}
       <EndScreen
         won={render.winner === teamOf(session.human)}
         winner={render.winner}

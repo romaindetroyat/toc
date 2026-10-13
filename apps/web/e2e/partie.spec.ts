@@ -173,6 +173,24 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
   await expect(end).toContainText(/Chevaux mangés\s*: nous 0, eux 0/);
   await expect(page.getByRole("button", { name: "Rejouer" })).toBeFocused();
 
+  // The game behind the panel is inert: none of its controls can take the focus, and after a tap on
+  // the dimmed board Tab stays in the panel.
+  await expect(page.locator("[data-layout]")).toHaveAttribute("inert", "");
+  const behind = await page.evaluate(() => {
+    const gear = document.querySelector<HTMLElement>("[data-layout] button");
+    gear?.focus();
+    return gear !== null && document.activeElement === gear;
+  });
+  expect(behind, "a button of the game behind takes the focus").toBe(false);
+  await page.mouse.click(4, 4);
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Tab");
+    const inPanel = await page.evaluate(
+      () => document.activeElement?.closest("[data-end-screen]") !== null,
+    );
+    expect(inPanel, `Tab ${i + 1} stays in the end screen`).toBe(true);
+  }
+
   await page.getByRole("button", { name: "Changer de couleur" }).click();
   await expect(page).toHaveURL(/#\/$/);
   await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();

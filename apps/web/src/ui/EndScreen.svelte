@@ -25,9 +25,16 @@
 
   let replay = $state<HTMLButtonElement>();
   let change = $state<HTMLButtonElement>();
+  let panel = $state<HTMLElement>();
 
-  // Focus lands on « Rejouer » (UI-SPEC).
+  // Focus lands on « Rejouer » (UI-SPEC), inside the panel.
   onMount(() => replay?.focus());
+
+  // The game screen behind is inert while the panel is up (Game.svelte); anything else that could still
+  // take the focus (the toast) gives it back to the panel, as Sheet does.
+  function onWindowFocusin(event: FocusEvent) {
+    if (panel && event.target instanceof Node && !panel.contains(event.target)) replay?.focus();
+  }
 
   /** Tab stays on the panel: the board behind it is dimmed and not playable. */
   function onkeydown(event: KeyboardEvent) {
@@ -37,6 +44,8 @@
   }
 </script>
 
+<svelte:window onfocusin={onWindowFocusin} />
+
 <!-- End of game (UI-SPEC): the board stays visible behind walnut at 70 %, with a centred panel. -->
 <div class="scrim" data-end-screen data-result={won ? "win" : "loss"}>
   <div
@@ -45,6 +54,7 @@
     aria-modal="true"
     aria-labelledby="end-title"
     tabindex="-1"
+    bind:this={panel}
     {onkeydown}
   >
     <h2 id="end-title" class="title">{won ? game.end.win : game.end.loss}</h2>
