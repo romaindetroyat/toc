@@ -197,6 +197,22 @@ export function applyPlan(board: Board, seat: Color, card: CardId, plan: SevenPl
   if (rankOf(card) !== SEVEN || !wellFormed(plan)) return { ok: false, reason: "bad-plan" };
   const merged = normalizePlan(plan);
   if (total(merged) !== SEVEN) return { ok: false, reason: "bad-plan" };
+  return playMerged(board, seat, merged);
+}
+
+/**
+ * Plays the first steps of a 7 for a preview (the splitter of the interface): the same micro-moves as
+ * applyPlan, with the same checks, but the steps may sum to less than 7 and the plan may be empty.
+ * The events are the ones the whole plan would begin with, so what is shown is what will happen.
+ */
+export function previewPlan(board: Board, seat: Color, card: CardId, plan: SevenPlan): PlanResult {
+  if (rankOf(card) !== SEVEN) return { ok: false, reason: "bad-plan" };
+  const merged = plan.length === 0 ? [] : wellFormedPrefix(plan);
+  if (merged === null) return { ok: false, reason: "bad-plan" };
+  return playMerged(board, seat, merged);
+}
+
+function playMerged(board: Board, seat: Color, merged: SevenPlan): PlanResult {
   if (!board.rules.SEVEN_SAME_PAWN_TWICE && repeatsPawn(merged)) {
     return { ok: false, reason: "same-pawn-twice" };
   }

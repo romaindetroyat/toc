@@ -16,6 +16,7 @@ import {
   type PawnId,
   type PawnSpec,
   playability,
+  previewPlan,
   type SevenPlan,
   sevenPlans,
   viewFor,
@@ -512,5 +513,67 @@ describe("nextSteps stays under 5 ms (T-01-13)", () => {
     expect(Object.values(none).every((steps) => (steps ?? []).length === 0)).toBe(true);
     const open = nextSteps(viewFor(boards[2]?.[1] as GameState, "bleu"), "bleu", CARD, []);
     expect(Object.values(open).some((steps) => (steps ?? []).length > 0)).toBe(true);
+  });
+});
+
+describe("previewPlan: the first steps of a 7, for the splitter", () => {
+  const state = playState(
+    {
+      bleu: [{ p: 10 }, { p: 30 }, "S", "S"],
+      jaune: [{ p: 67 }, "S", "S", "S"],
+    },
+    { bleu: [CARD] },
+    "bleu",
+  );
+
+  it("plays an empty plan as nothing at all", () => {
+    const result = previewPlan(state, "bleu", CARD, []);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events).toEqual([]);
+    expect(result.captured).toEqual([]);
+    expect(result.pawns.bleu0).toEqual(state.pawns.bleu0);
+  });
+
+  it("plays a partial plan with the events and the captures of the micro-moves so far", () => {
+    const result = previewPlan(state, "bleu", CARD, plan(["bleu0", 4], ["bleu1", 1]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(kinds(result.events)).toEqual([
+      "pawnMoved",
+      "pawnCaptured",
+      "pawnSentHome",
+      "pawnMoved",
+    ]);
+    expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 14 });
+    expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 31 });
+    // The input is untouched.
+    expect(state.pawns.bleu0).toEqual({ zone: "ring", progress: 10 });
+  });
+
+  it("shows the capture in transit of a micro-move that is not the whole 7", () => {
+    const result = previewPlan(state, "bleu", CARD, plan(["bleu0", 4]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.captured).toEqual(["jaune0"]);
+    expect(result.events.find((e) => e.t === "pawnCaptured")).toMatchObject({ atStep: 2 });
+  });
+
+  it("agrees with applyPlan on a whole plan, and merges consecutive entries of one pawn", () => {
+    const whole = plan(["bleu0", 2], ["bleu0", 3], ["bleu1", 2]);
+    const preview = previewPlan(state, "bleu", CARD, whole);
+    const played = applyPlan(state, "bleu", CARD, whole);
+    expect(preview).toEqual(played);
+    if (preview.ok) expect(preview.plan).toEqual(plan(["bleu0", 5], ["bleu1", 2]));
+  });
+
+  it("refuses what applyPlan refuses, except a total below 7", () => {
+    expect(previewPlan(state, "bleu", "8S", plan(["bleu0", 3])).ok).toBe(false);
+    expect(previewPlan(state, "bleu", CARD, plan(["bleu0", 8])).ok).toBe(false);
+    expect(previewPlan(state, "bleu", CARD, plan(["rouge0", 3]))).toEqual({
+      ok: false,
+      reason: "not-controlled",
+    });
+    expect(applyPlan(state, "bleu", CARD, plan(["bleu0", 3])).ok).toBe(false);
   });
 });
