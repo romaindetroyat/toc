@@ -262,3 +262,83 @@ test.describe("copier mes notes", () => {
     await expect(box).toHaveValue(/\n/);
   });
 });
+
+test.describe("crédits et licences", () => {
+  const open = async (page: import("@playwright/test").Page) => {
+    await page.goto("/#/sons");
+    const button = page.getByRole("button", { name: "Crédits et licences" });
+    await button.click();
+    const dialog = page.getByRole("dialog", { name: "Crédits et licences" });
+    await expect(dialog).toBeVisible();
+    return { button, dialog };
+  };
+
+  test("crédits: la feuille liste les polices, les sons, les icônes et le plateau, groupés", async ({
+    page,
+  }) => {
+    const { dialog } = await open(page);
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    await expect(dialog.getByText("Nunito", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("The Nunito Project Authors · OFL-1.1")).toBeVisible();
+    await expect(dialog.getByText("Généré par le code").first()).toBeVisible();
+    for (const title of ["Sons", "Polices", "Icônes", "Plateau", "Cavaliers"]) {
+      await expect(dialog.getByRole("heading", { name: title, level: 3 })).toHaveCount(1);
+    }
+    // No card art row yet: no « Cartes » group.
+    await expect(dialog.getByRole("heading", { name: "Cartes", level: 3 })).toHaveCount(0);
+    // One entry per row of the manifest, shown as text.
+    await expect(dialog.locator("li[data-credit]")).toHaveCount(16);
+    await expect(dialog.locator("a")).toHaveCount(0);
+  });
+
+  test("crédits: la liste défile verticalement", async ({ page }) => {
+    const { dialog } = await open(page);
+    const body = dialog.locator("[data-sheet-body]");
+    const metrics = await body.evaluate((element) => ({
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    expect(metrics.overflowY).toBe("auto");
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+    await body.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+    expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    // The last row is reachable and the « Fermer » button stays in view.
+    await expect(dialog.locator("li[data-credit]").last()).toBeInViewport();
+    await expect(dialog.getByRole("button", { name: "Fermer" })).toBeInViewport();
+  });
+
+  test("crédits: Échap ferme la feuille et rend le focus au bouton", async ({ page }) => {
+    const { button, dialog } = await open(page);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(button).toBeFocused();
+  });
+
+  test("crédits: Fermer ferme, le fond aussi, et le focus reste dans la feuille avec Tab", async ({
+    page,
+  }) => {
+    const { button, dialog } = await open(page);
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("Tab");
+      const inside = await page.evaluate(
+        () => document.activeElement?.closest("[role=dialog]") !== null,
+      );
+      expect(inside, `Tab ${i + 1}`).toBe(true);
+    }
+    await page.keyboard.press("Shift+Tab");
+    expect(
+      await page.evaluate(() => document.activeElement?.closest("[role=dialog]") !== null),
+    ).toBe(true);
+
+    await dialog.getByRole("button", { name: "Fermer" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(button).toBeFocused();
+
+    await button.click();
+    await expect(dialog).toBeVisible();
+    // A tap on the backdrop (outside the sheet) closes it.
+    await page.locator("[data-sheet-layer]").click({ position: { x: 4, y: 4 } });
+    await expect(dialog).toBeHidden();
+  });
+});

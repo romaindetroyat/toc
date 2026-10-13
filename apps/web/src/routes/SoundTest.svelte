@@ -29,9 +29,11 @@
     notesAsText,
     saveNotes,
   } from "../audio/soundNotes.ts";
+  import { credits } from "../i18n/fr/credits.ts";
   import { sons } from "../i18n/fr/sons.ts";
   import { licenceOf } from "../licences/licences.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
+  import CreditsSheet from "../ui/CreditsSheet.svelte";
   import Icon from "../ui/Icon.svelte";
   import Segmented from "../ui/Segmented.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
@@ -205,6 +207,10 @@
       showToast(sons.copyFailed);
     }
   }
+
+  // --- Credits ---
+  let creditsOpen = $state(false);
+  let creditsButton = $state<HTMLButtonElement | null>(null);
 
   function tagOf(sound: SoundId): string {
     return sources[sound]?.source === "file" ? sons.sourceFile : sons.sourceGenerated;
@@ -410,6 +416,14 @@
       <Icon name="copy" />
       {sons.copy}
     </button>
+    <button
+      type="button"
+      class="btn btn-text credits-link"
+      bind:this={creditsButton}
+      onclick={() => (creditsOpen = true)}
+    >
+      {credits.open}
+    </button>
     {#if fallbackText !== undefined}
       <textarea
         class="notes-text"
@@ -422,6 +436,10 @@
     {/if}
   </footer>
 </main>
+
+{#if creditsOpen}
+  <CreditsSheet onclose={() => (creditsOpen = false)} opener={creditsButton} />
+{/if}
 
 <style>
   .sons {
@@ -559,6 +577,11 @@
 
   .copy {
     align-self: stretch;
+  }
+
+  .credits-link {
+    align-self: center;
+    min-height: var(--touch);
   }
 
   .notes-text {
