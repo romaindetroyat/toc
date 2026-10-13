@@ -96,12 +96,16 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 | Hébergement Cloudflare | Adapté aux salons temps réel (Durable Objects) | — Pending |
 | IA : curseur de force 1 à 5 | Réglage fin demandé | — Pending |
 
-## Open Questions
+## Rule Decisions (validées par Romain le 2026-10-13)
 
-- Avec le 7, peut-on **dépasser** ses propres pions (sans les manger) ? Hypothèse : oui.
-- Peut-on utiliser le 4 (recul) pour entrer dans la maison en reculant depuis la case de sortie ? Hypothèse : non, on entre uniquement en avançant ; reculer depuis la sortie rapproche simplement de l'entrée.
-- Un pion doit-il avoir quitté sa case de sortie pour entrer dans sa maison (tour complet obligatoire) ? Hypothèse : oui.
-- Délai maximum de pause en cas de déconnexion, et que se passe-t-il ensuite (l'ordinateur prend le relais ?).
+- Sens de rotation horaire (bleu → jaune → rouge → vert) ; entrée dans la maison par son carré 16.
+- Losange 18 infranchissable seulement quand le pion est de la couleur de cette sortie.
+- Le 4 peut reculer un pion qui vient de sortir ; on n'entre jamais dans la maison en reculant ; tour complet obligatoire.
+- Le 7 peut dépasser ses propres pions sans les manger ; il doit être joué en entier, sinon il est injouable.
+- Échange d'une carte avec le partenaire à chaque donne (5, 4 et 4).
+- Le Valet ne peut pas échanger deux de ses propres pions.
+- Déconnexion : pause ; après un délai, le créateur de la table choisit entre attendre, confier la place à l'ordinateur, ou sauvegarder.
+- Les autres cas limites (listés dans `research/SUMMARY.md`, questions 5 à 34) suivent les hypothèses par défaut de la recherche ; ils seront formalisés dans RULES.md et relus par Romain avant le codage du moteur.
 
 ## Evolution
 
