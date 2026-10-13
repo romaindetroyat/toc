@@ -11,10 +11,20 @@ const cases = (n: number): string => `${n} ${plural(n, "case", "cases")}`;
 /** « bleu », « jaune », « rouge », « vert »: the colour as an adjective. */
 const colourWord = (color: Color): string => seats[color].name.toLowerCase();
 
+/** « de Marengo », « d’Ourasi »: the preposition elides before a vowel. */
+const de = (name: string): string =>
+  /^[aeiouyhàâäéèêëîïôöùûüœ]/i.test(name) ? `d’${name}` : `de ${name}`;
+
 export const game = {
   info: {
     ownTurn: "À toi de jouer",
-    botTurn: (name: string) => `Tour de ${name}`,
+    botTurn: (name: string) => `Tour ${de(name)}`,
+    /** The words before the bot's name; hidden visually below 360 px wide, kept for screen readers. */
+    turnPrefix: (name: string) => (de(name).startsWith("d’") ? "Tour d’" : "Tour de "),
+    /** Row 1 while the cards are being exchanged and once the game is over. */
+    exchanging: "Échange des cartes",
+    over: "Partie terminée",
+    teamAriaThem: (n: number) => `Équipe adverse : ${n} chevaux rentrés sur 8`,
     dealer: (name: string) => `Donneur : ${name}`,
     deal: (k: number) => `Donne ${k} sur 3`,
     teamUs: (n: number) => `Nous ${n}/8`,
@@ -31,7 +41,7 @@ export const game = {
     choose: (partner: string) => `Choisis la carte à passer à ${partner}.`,
     pass: "Passer cette carte",
     waiting: (names: readonly string[]) => `En attente de ${names.join(", ")}…`,
-    done: (card: string, partner: string) => `Échange fait. Tu as reçu ${card} de ${partner}.`,
+    done: (card: string, partner: string) => `Échange fait. Tu as reçu ${card} ${de(partner)}.`,
     receivedTag: "Reçue",
   },
 
@@ -77,7 +87,7 @@ export const game = {
   },
 
   finished: (partner: string) =>
-    `Tes quatre chevaux sont rentrés. Tu joues avec ceux de ${partner}.`,
+    `Tes quatre chevaux sont rentrés. Tu joues avec ceux ${de(partner)}.`,
 
   fast: "Avance rapide",
   illegal: "Ce coup n’est pas permis. Choisis-en un autre.",

@@ -1,19 +1,27 @@
 <script lang="ts">
+  import type { CardId, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { board as t } from "../i18n/fr/board.ts";
+  import FeltTable from "./FeltTable.svelte";
 
   // k = clockwise quarter turns of the art (D-05). Only the art turns: the overlay svg stays upright
   // and its children are placed at anchorOf(place, k).
   // `under` and `over` are drawn behind and in front of the knights (`children`), `hits` on top of
   // all; each receives the number of board units per screen pixel.
+  // With a render state the felt is drawn as a card table under all of them (D-08).
   let {
     k = 0,
+    render,
+    discardTop = null,
     children,
     under,
     over,
     hits,
   }: {
     k?: number;
+    render?: RenderState | null;
+    /** The card on top of the défausse, or null when it is empty. */
+    discardTop?: CardId | null;
     children?: Snippet;
     under?: Snippet<[number]>;
     over?: Snippet<[number]>;
@@ -72,6 +80,9 @@
     }}
   />
   <svg viewBox="0 0 2560 2560" xmlns="http://www.w3.org/2000/svg">
+    {#if render}
+      <FeltTable {render} {discardTop} {k} {px} />
+    {/if}
     {@render under?.(px)}
     {@render children?.()}
     {@render over?.(px)}

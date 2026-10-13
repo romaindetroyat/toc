@@ -6,16 +6,18 @@
     color: Color;
     /** Name next to the glyph; hidden chips keep the glyph and expose the name to screen readers. */
     showName?: boolean;
+    /** A 20 px chip for the info bar, where two rows share 56 px. */
+    small?: boolean;
   };
 
-  let { color, showName = true }: Props = $props();
+  let { color, showName = true, small = false }: Props = $props();
 
   const seat = $derived(seats[color]);
 </script>
 
 <!-- Seat chip (UI-SPEC): cream pill, 16 px glyph filled with the seat colour and a 2 px walnut
      stroke, name in walnut. Colour is never the only identifier: the glyph and the name carry it. -->
-<span class="chip" data-seat={color}>
+<span class="chip" class:small data-seat={color}>
   <svg class="glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
     {#if color === "bleu"}
       <circle cx="8" cy="8" r="6" />
@@ -45,6 +47,11 @@
     background: #fff8e1;
     color: #2b1d12;
     white-space: nowrap;
+  }
+
+  .chip.small {
+    height: 20px;
+    padding: 0 4px;
   }
 
   .glyph {

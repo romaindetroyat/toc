@@ -19,6 +19,7 @@
   import type { TurnUiEvent } from "../game/turnUi.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
+  import InfoBar from "../ui/InfoBar.svelte";
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -163,6 +164,25 @@
     }
   });
 
+  /**
+   * The top of the défausse as the render state has it. A played card is also the last card of its
+   * seat on the felt (and a posed hand lies there too), so the défausse shows the latest card that is
+   * not already drawn elsewhere; only public cards are read (discarded cards were played face up).
+   */
+  const discardTop = $derived.by((): CardId | null => {
+    if (render === null || view === undefined || render.discardSize === 0) return null;
+    const shown = new Set<CardId>(
+      [...Object.values(render.lastPlayed), ...Object.values(render.posed).flat()].filter(
+        (card): card is CardId => card !== null,
+      ),
+    );
+    for (let i = Math.min(render.discardSize, view.discard.length) - 1; i >= 0; i--) {
+      const card = view.discard[i] as CardId;
+      if (!shown.has(card)) return card;
+    }
+    return null;
+  });
+
   const verdicts = $derived.by((): Partial<Record<CardId, Playability>> => {
     if (session === undefined || view === undefined || view.phase !== "play") return {};
     return playability(view, session.human);
@@ -205,11 +225,12 @@
 <main class="game">
   {#if session !== undefined && render !== null && view !== undefined}
     <div class="layout" data-layout>
-      <!-- 56 px reserved for the info bar of plan 01-17. -->
-      <div class="info" data-info-slot></div>
+      <div class="info">
+        <InfoBar {render} human={session.human} names={session.names} />
+      </div>
 
       <div class="stage">
-        <Board {k}>
+        <Board {k} {render} {discardTop}>
           {#snippet under(px)}
             <Overlay
               layer="under"

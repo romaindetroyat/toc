@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { type Color, PARTNER, type PawnId, type PlayerView, pawnColor, type Reason } from "@toc/engine";
+  import { COLORS, type Color, PARTNER, type PawnId, type PlayerView, pawnColor, type Reason } from "@toc/engine";
   import { fade } from "svelte/transition";
   import type { BotPlay } from "../game/session.svelte.ts";
   import type { TurnUiState } from "../game/turnUi.ts";
-  import { cardName } from "../i18n/fr/cards.ts";
+  import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
   import { botLine, game } from "../i18n/fr/game.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
@@ -44,22 +44,49 @@
 
   const partner = $derived(PARTNER[human]);
 
+  // « Échange fait » follows the exchange until the player picks a card of his own (D-21).
+  let exchanged = $state(false);
+  $effect(() => {
+    if (ui.kind === "exchangeWaiting") exchanged = true;
+    else if (ui.kind === "cardSelected" || ui.kind === "preview" || ui.kind === "exchange") {
+      exchanged = false;
+    }
+  });
+  const doneLine = $derived(
+    exchanged && view.phase === "play" && view.received !== null && view.hand.includes(view.received)
+      ? game.exchange.done(cardWithArticle(view.received), names[partner])
+      : null,
+  );
+
+  /** The other three players with their exchange state: a check once chosen, an hourglass until then. */
+  const givers = $derived(
+    COLORS.filter((color) => color !== human).map((color) => ({
+      color,
+      name: names[color],
+      done: view.hasGiven[color],
+    })),
+  );
+
   /** The sentence(s) of the zone: a list of lines, the first one is the prompt. */
   const lines = $derived.by((): string[] => {
     if (hint === "illegal") return [game.illegal];
     if (hint !== null) return [game.reasons[hint]];
+    const done = doneLine === null ? [] : [doneLine];
     switch (ui.kind) {
-      case "waiting": {
+      case "waiting":
+      case "empty":
+      case "posed": {
+        const after = ui.kind === "posed" ? [game.dead.after] : [];
         if (view.phase === "won") return [];
-        if (thinking !== null) return [game.bot.thinking(names[thinking])];
+        if (thinking !== null) return [...done, ...after, game.bot.thinking(names[thinking])];
         if (lastPlay !== null) {
           const line = botLine(names[lastPlay.seat], lastPlay.events);
-          return line === "" ? [] : [line];
+          return line === "" ? [...done, ...after] : [...done, ...after, line];
         }
-        return [];
+        return [...done, ...after];
       }
       case "idle":
-        return [game.turn.ownTurn];
+        return [...done, game.turn.ownTurn];
       case "finishedPrompt":
         return [game.finished(names[partner]), game.turn.ownTurn];
       case "cardSelected": {
@@ -78,10 +105,6 @@
         return [game.exchange.waiting(ui.pending.map((color) => names[color]))];
       case "deadHand":
         return [game.dead.message, game.dead.body];
-      case "posed":
-        return [game.dead.after];
-      case "empty":
-        return [game.empty.heading, game.empty.body];
     }
   });
 
@@ -101,7 +124,9 @@
   // One key per displayed state, so the zone cross-fades (150 ms, none under reduced motion).
   const key = $derived(`${ui.kind}|${hint ?? ""}|${missed}|${thinking ?? ""}|${lines.join("/")}`);
   const fadeMs = $derived(settings.reduceMotion ? 0 : 150);
-  const showFast = $derived(ui.kind === "waiting" && view.phase !== "won");
+  const showFast = $derived(
+    (ui.kind === "waiting" || ui.kind === "empty" || ui.kind === "posed") && view.phase !== "won",
+  );
 </script>
 
 <!-- Action zone (UI-SPEC): one state at a time, an aria-live region, prompt lines never truncated. -->
@@ -114,7 +139,16 @@
         {/each}
       </div>
 
-      {#if ui.kind === "cardSelected"}
+      {#if ui.kind === "exchangeWaiting"}
+        <ul class="givers" data-givers>
+          {#each givers as giver (giver.color)}
+            <li data-giver={giver.color} data-done={giver.done}>
+              <Icon name={giver.done ? "check" : "hourglass"} size={16} />
+              <span>{giver.name}</span>
+            </li>
+          {/each}
+        </ul>
+      {:else if ui.kind === "cardSelected"}
         <div class="buttons">
           <button type="button" class="btn btn-secondary" onclick={onchangeCard}>
             {game.buttons.changeCard}
@@ -204,6 +238,31 @@
 
   .text p:not(.prompt) {
     color: var(--creme-attenuee);
+  }
+
+  /* One row per player: a check once he has chosen, an hourglass until then. */
+  .givers {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .givers li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--creme-attenuee);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: var(--label-line);
+  }
+
+  .givers li[data-done="true"] {
+    color: var(--creme);
   }
 
   .buttons {

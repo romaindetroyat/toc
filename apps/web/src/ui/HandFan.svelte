@@ -89,6 +89,13 @@
   data-hand
   data-mode={mode}
 >
+  {#if cards.length === 0}
+    <!-- Between deals the hand is empty (UI-SPEC « Plus de cartes »). -->
+    <div class="empty" data-hand-empty>
+      <p class="heading">{game.empty.heading}</p>
+      <p class="body">{game.empty.body}</p>
+    </div>
+  {/if}
   {#each cards as card, i (card)}
     {@const slot = slots[i]}
     {#if slot}
@@ -122,6 +129,35 @@
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  .empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--space-md);
+    text-align: center;
+  }
+
+  .empty p {
+    margin: 0;
+  }
+
+  .empty .heading {
+    color: var(--creme);
+    font-size: var(--heading-size);
+    font-weight: 700;
+    line-height: var(--heading-line);
+  }
+
+  .empty .body {
+    margin-top: var(--space-xs);
+    color: var(--creme-attenuee);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
   }
 
   /* The card is centred, then shifted and turned about the point 160 % down its height. */
