@@ -67,6 +67,12 @@ importers:
         specifier: workspace:*
         version: link:../engine
 
+  packages/bots:
+    dependencies:
+      '@toc/engine':
+        specifier: workspace:*
+        version: link:../engine
+
   packages/engine: {}
 
 packages:

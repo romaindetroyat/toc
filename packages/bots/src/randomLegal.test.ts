@@ -9,6 +9,7 @@ import {
   isComplete,
   legalActions,
   newGame,
+  next as nextRandom,
   type Rng,
   rankOf,
   viewFor,
@@ -98,8 +99,11 @@ describe("randomLegal", () => {
   it("draws different cards for different rngs", () => {
     const view = viewFor(newGame({ firstDealer: "jaune" }, [8, 8, 8, 8]), "jaune");
     const cards = new Set<string>();
-    for (let i = 1; i <= 40; i++) {
-      const [action] = randomLegal(view, "jaune", [i, i * 3, i * 5, i * 7]);
+    let rng: Rng = [1, 2, 3, 4];
+    for (let i = 0; i < 40; i++) {
+      // Small seeds give correlated first draws in sfc32: walk the generator, as a game does.
+      [, rng] = nextRandom(rng);
+      const [action] = randomLegal(view, "jaune", rng);
       if (action.t === "give") cards.add(action.card);
     }
     expect(cards.size).toBeGreaterThan(1);
