@@ -107,3 +107,43 @@ export const EXCHANGE_KEEPS_HAND_SIZE: boolean = true;
  * computer turns (RULES.md, « Décisions de Romain »; validated 2026-10-13). Network play only (phase 2).
  */
 export const PAUSE_IN_ALL_PHASES: boolean = true;
+
+/** Every validated choice in one JSON-safe object (value types written out: `typeof` would narrow them to the retained literal): the engine reads `state.rules`, never the constants. */
+export type RuleSet = {
+  SWAP_PROGRESS: "position" | "keep";
+  HOME_JUMP_BLOCKED: "continue" | "illegal";
+  PROTECTED_AFTER_EXTRA_LAP: boolean;
+  PROTECTED_BLOCKS_OWNER: boolean;
+  SEVEN_SAME_PAWN_TWICE: boolean;
+  SWAP_OWN_PROTECTED: boolean;
+  FINISHED_PARTNER_PAWNS_ARE_OWN: boolean;
+  EXCHANGE_SIMULTANEOUS: true;
+  DEALER_ROTATION: "perCycle" | "perDeal";
+  FIRST_PLAYER: "afterDealer";
+  ONLY_OWN_PAWNS_MOVE: boolean;
+  ORDINARY_CARDS_PASS_OVER_PAWNS: boolean;
+  SEVEN_CONTINUES_WITH_PARTNER: boolean;
+  EMPTY_HAND_SKIPPED: boolean;
+  EXCHANGE_KEEPS_HAND_SIZE: boolean;
+  PAUSE_IN_ALL_PHASES: boolean;
+};
+
+/** The rules as Romain validated them (2026-10-13). A game copies this into `state.rules`. */
+export const DEFAULT_RULES: Readonly<RuleSet> = {
+  SWAP_PROGRESS,
+  HOME_JUMP_BLOCKED,
+  PROTECTED_AFTER_EXTRA_LAP,
+  PROTECTED_BLOCKS_OWNER,
+  SEVEN_SAME_PAWN_TWICE,
+  SWAP_OWN_PROTECTED,
+  FINISHED_PARTNER_PAWNS_ARE_OWN,
+  EXCHANGE_SIMULTANEOUS,
+  DEALER_ROTATION,
+  FIRST_PLAYER,
+  ONLY_OWN_PAWNS_MOVE,
+  ORDINARY_CARDS_PASS_OVER_PAWNS,
+  SEVEN_CONTINUES_WITH_PARTNER,
+  EMPTY_HAND_SKIPPED,
+  EXCHANGE_KEEPS_HAND_SIZE,
+  PAUSE_IN_ALL_PHASES,
+};

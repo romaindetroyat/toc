@@ -22,6 +22,7 @@
 // viewFor sets kind 'view'.
 
 import type { GameEvent } from "./events.ts";
+import type { RuleSet } from "./rules.ts";
 import type { Color, PawnId, Team } from "./topology.ts";
 
 /** 1 = As, 11 = Valet, 12 = Dame, 13 = Roi. */
@@ -98,6 +99,7 @@ export type GameState = {
   dealer: Color;
   /** Position in the 5/4/4 cycle: 0 = the 5-card deal, 1 and 2 = the two 4-card deals. */
   dealIndex: 0 | 1 | 2;
+  /** Deals completely played so far (0 during the first deal). */
   dealsPlayed: number;
   turn: Color;
   phase: Phase;
@@ -110,6 +112,8 @@ export type GameState = {
   winner: Team | null;
   /** sfc32 state, serialisable so deals are reproducible. */
   rng: [number, number, number, number];
+  /** The house rules in force (a copy of DEFAULT_RULES); every rule decision reads this, never the constants. */
+  rules: RuleSet;
 };
 
 /** What one seat is allowed to know. Never carries another seat's cards. Discriminant: kind: 'view'. */
@@ -137,6 +141,8 @@ export type PlayerView = {
   hasGiven: Record<Color, boolean>;
   captures: Record<Team, number>;
   winner: Team | null;
+  /** The house rules in force, public to all seats. */
+  rules: RuleSet;
 };
 
 /** Pawn placement in a fixture: in the stable, on the ring at this progress, or in this home slot. */

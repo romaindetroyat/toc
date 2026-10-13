@@ -193,7 +193,7 @@ describe("deal cycle 5/4/4 with reshuffle (R-03)", () => {
     expect(eventTypes[0]).toEqual(deal);
     expect(eventTypes[1]).toEqual(deal);
     expect(eventTypes[2]).toEqual(["reshuffled", ...deal]);
-    expect(state.dealer).toBe("rouge");
+    expect(state.dealer).toBe("jaune");
     expect(state.dealsPlayed).toBe(4);
   });
 
