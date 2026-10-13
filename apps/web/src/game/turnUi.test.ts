@@ -18,6 +18,7 @@ import {
   type TurnCtx,
   type TurnUiEvent,
   type TurnUiState,
+  trayLetters,
   turnCtx,
 } from "./turnUi.ts";
 
@@ -371,17 +372,23 @@ describe("the preview is the engine's own resolveMove (PLAY-02)", () => {
     expect(back.state.description).toMatchObject({ verb: "back", pawn: "bleu0", steps: 4 });
     expect(back.state.path).toHaveLength(4);
 
-    // The As: a stable knight means « sortir », a ring knight means « avancer » (D-16).
-    for (const tapped of ["bleu1", "bleu2", "bleu3"] as const) {
-      const exit = previewOf(before, "1S", tapped).result;
-      if (exit?.state.kind !== "preview") throw new Error("no preview");
-      expect(exit.state.action).toEqual({ t: "exit", card: "1S", pawn: "bleu1" });
-      expect(exit.state.description.verb).toBe("exit");
-      expect(exit.state.path).toHaveLength(1);
-    }
-    const ahead = previewOf(before, "1S", "bleu0").result;
-    if (ahead?.state.kind !== "preview") throw new Error("no preview");
-    expect(ahead.state.action).toEqual({ t: "move", card: "1S", pawn: "bleu0" });
+    // The As with both an exit and an advance asks first (D-16); « Sortir » previews the exit with
+    // no knight tap, whichever stable knight is tapped afterwards.
+    const ctx = ctxOf(build(before));
+    const [asked, exitPreview, tappedStable] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "1S" },
+      { t: "chooseExit" },
+      { t: "tapPawn", pawn: "bleu3" },
+    );
+    expect(asked?.state.kind).toBe("modeChoice");
+    if (exitPreview?.state.kind !== "preview") throw new Error("no preview");
+    expect(exitPreview.state.action).toEqual({ t: "exit", card: "1S", pawn: "bleu1" });
+    expect(exitPreview.state.description.verb).toBe("exit");
+    expect(exitPreview.state.path).toHaveLength(1);
+    expect(exitPreview.submit).toBeUndefined();
+    expect(tappedStable?.state).toEqual(exitPreview.state);
   });
 
   it("marks a move that enters the home", () => {
@@ -433,7 +440,7 @@ describe("the preview is the engine's own resolveMove (PLAY-02)", () => {
 });
 
 describe("cards the later plans complete", () => {
-  it("lets a 7 and a Valet be selected without producing a candidate", () => {
+  it("lets a 7 be selected without producing a candidate (plan 01-21)", () => {
     const state = build({
       pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 30 }, "S", "S", "S"] },
       hands: { bleu: ["7H", "11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
@@ -442,7 +449,7 @@ describe("cards the later plans complete", () => {
     const ctx = ctxOf(state);
     expect(ctx.playability["7H"]).toEqual({ playable: true });
     expect(ctx.playability["11H"]).toEqual({ playable: true });
-    for (const card of ["7H", "11H"] as const) {
+    for (const card of ["7H"] as const) {
       const [selected, pawn] = run(
         synced(ctx),
         ctx,
@@ -557,5 +564,374 @@ describe("waiting locks the board", () => {
       expect(result.state).toEqual({ kind: "waiting" });
       expect(result.submit).toBeUndefined();
     }
+  });
+});
+
+describe("As and Roi: « Sortir ou avancer » (D-16, PLAY-04)", () => {
+  const both: Scenario["before"] = {
+    pawns: { bleu: [{ p: 5 }, "S", "S", "S"] },
+    hands: { bleu: ["1S", "13H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+    turn: "bleu",
+  };
+  const ctx = ctxOf(build(both));
+
+  it("asks when both are possible, for the As and for the Roi", () => {
+    for (const card of ["1S", "13H"] as const) {
+      const result = reduceTurnUi(synced(ctx), { t: "tapCard", card }, ctx);
+      expect(result.state).toMatchObject({ kind: "modeChoice", card });
+      expect(result.submit).toBeUndefined();
+    }
+  });
+
+  it("previews the exit with no knight tap, then plays it only on confirm", () => {
+    const [asked, exit, confirm] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "13H" },
+      { t: "chooseExit" },
+      { t: "confirm" },
+    );
+    expect(asked?.state.kind).toBe("modeChoice");
+    expect(exit?.state).toMatchObject({
+      kind: "preview",
+      card: "13H",
+      action: { t: "exit", card: "13H", pawn: "bleu1" },
+    });
+    expect(exit?.submit).toBeUndefined();
+    expect(confirm?.submit).toEqual({ t: "exit", card: "13H", pawn: "bleu1" });
+  });
+
+  it("advancing lights the ring knights and waits for the tap", () => {
+    const [, advance, pawn, confirm] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "13H" },
+      { t: "chooseAdvance" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "confirm" },
+    );
+    expect(advance?.state).toMatchObject({
+      kind: "cardSelected",
+      card: "13H",
+      candidates: [{ t: "move", card: "13H", pawn: "bleu0" }],
+    });
+    expect(advance?.submit).toBeUndefined();
+    expect(pawn?.state).toMatchObject({ kind: "preview", action: { t: "move", pawn: "bleu0" } });
+    expect(confirm?.submit).toEqual({ t: "move", card: "13H", pawn: "bleu0" });
+  });
+
+  it("ignores a knight tap while the question is open, and the buttons outside it", () => {
+    const asked = reduceTurnUi(synced(ctx), { t: "tapCard", card: "1S" }, ctx).state;
+    expect(reduceTurnUi(asked, { t: "tapPawn", pawn: "bleu0" }, ctx).state).toBe(asked);
+    const idle = synced(ctx);
+    for (const event of [{ t: "chooseExit" }, { t: "chooseAdvance" }] as TurnUiEvent[]) {
+      expect(reduceTurnUi(idle, event, ctx).state).toBe(idle);
+    }
+  });
+
+  it("skips the question when only one mode is possible", () => {
+    // Every knight in the stable: only the exit.
+    const stable = ctxOf(
+      build({
+        pawns: { bleu: ["S", "S", "S", "S"] },
+        hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    const exitOnly = reduceTurnUi(synced(stable), { t: "tapCard", card: "1S" }, stable).state;
+    expect(exitOnly).toMatchObject({ kind: "cardSelected", card: "1S" });
+    // No knight in the stable: only advancing.
+    const ring = ctxOf(
+      build({
+        pawns: { bleu: [{ p: 5 }, { p: 9 }, { p: 20 }, { p: 30 }] },
+        hands: { bleu: ["13H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    const advanceOnly = reduceTurnUi(synced(ring), { t: "tapCard", card: "13H" }, ring).state;
+    expect(advanceOnly).toMatchObject({ kind: "cardSelected", card: "13H" });
+  });
+
+  it("goes back to idle from the question, on its card, cancel and escape", () => {
+    const asked = reduceTurnUi(synced(ctx), { t: "tapCard", card: "1S" }, ctx).state;
+    for (const event of [
+      { t: "tapCard", card: "1S" },
+      { t: "changeCard" },
+      { t: "cancel" },
+      { t: "escape" },
+    ] as TurnUiEvent[]) {
+      expect(reduceTurnUi(asked, event, ctx).state, event.t).toEqual({ kind: "idle" });
+    }
+    const other = reduceTurnUi(asked, { t: "tapCard", card: "13H" }, ctx).state;
+    expect(other).toMatchObject({ kind: "modeChoice", card: "13H" });
+  });
+});
+
+describe("the Valet in two taps (PLAY-02, RULE-09)", () => {
+  const before: Scenario["before"] = {
+    pawns: {
+      bleu: [{ p: 5 }, { p: 40 }, "S", "S"],
+      vert: [{ p: 30 }, "S", "S", "S"],
+      jaune: [{ p: 62 }, "S", "S", "S"],
+    },
+    hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+    turn: "bleu",
+  };
+  const ctx = ctxOf(build(before));
+  const swaps = ctx.legal.filter((a) => a.t === "swap");
+
+  it("takes the knights and the targets only from the legal swaps", () => {
+    expect(swaps.length).toBeGreaterThan(1);
+    const picked = reduceTurnUi(synced(ctx), { t: "tapCard", card: "11H" }, ctx);
+    expect(picked.state).toMatchObject({ kind: "jackPick", card: "11H" });
+    expect(picked.submit).toBeUndefined();
+    const [, target] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "11H" },
+      { t: "tapPawn", pawn: "bleu0" },
+    );
+    if (target?.state.kind !== "jackTarget") throw new Error("no jackTarget");
+    expect(target.state.pawn).toBe("bleu0");
+    const expected = swaps.filter((a) => a.pawn === "bleu0").map((a) => a.target);
+    expect(target.state.targets).toEqual(expected);
+    expect(target.state.targets).toContain("vert0");
+    expect(target.state.targets).toContain("jaune0");
+  });
+
+  it("previews the swap with both destinations, then plays it only on confirm", () => {
+    const [, , preview, confirm] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "11H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "vert0" },
+      { t: "confirm" },
+    );
+    if (preview?.state.kind !== "preview") throw new Error("no preview");
+    const action: Action = { t: "swap", card: "11H", pawn: "bleu0", target: "vert0" };
+    expect(preview.state.action).toEqual(action);
+    expect(preview.state.description).toMatchObject({
+      verb: "swap",
+      pawn: "bleu0",
+      target: "vert0",
+    });
+    expect(preview.state.captured).toEqual([]);
+    expect(preview.state.partnerCapture).toBe(false);
+    const resolved = resolveMove(viewFor(build(before), "bleu"), "bleu", action);
+    const event = resolved.events[0];
+    if (event?.t !== "pawnsSwapped") throw new Error("no swap event");
+    expect(preview.state.swap).toEqual({ a: "bleu0", b: "vert0", aTo: event.aTo, bTo: event.bTo });
+    expect(preview.submit).toBeUndefined();
+    expect(confirm?.submit).toEqual(action);
+    expect(confirm?.state).toEqual({ kind: "waiting" });
+  });
+
+  it("never submits a single legal swap on its own (D-19)", () => {
+    const one = ctxOf(
+      build({
+        pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 30 }, "S", "S", "S"] },
+        hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    expect(one.legal.filter((a) => a.t === "swap")).toHaveLength(1);
+    const steps = run(
+      synced(one),
+      one,
+      { t: "sync" },
+      { t: "tapCard", card: "11H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "vert0" },
+    );
+    for (const step of steps) expect(step.submit).toBeUndefined();
+    expect(steps[steps.length - 1]?.state.kind).toBe("preview");
+  });
+
+  it("switches the target, and goes back to the knight choice on the chosen knight", () => {
+    const [, , first, second, back, again] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "11H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "vert0" },
+      { t: "tapPawn", pawn: "jaune0" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "bleu0" },
+    );
+    expect(first?.state).toMatchObject({ kind: "preview", action: { target: "vert0" } });
+    expect(second?.state).toMatchObject({ kind: "preview", action: { target: "jaune0" } });
+    expect(back?.state).toMatchObject({ kind: "jackTarget", pawn: "bleu0" });
+    expect(again?.state).toMatchObject({ kind: "jackPick" });
+  });
+
+  it("ignores a knight that is not lit, in both taps", () => {
+    const picked = reduceTurnUi(synced(ctx), { t: "tapCard", card: "11H" }, ctx).state;
+    // Not one of his knights with a swap: neither a stable knight nor a target.
+    expect(reduceTurnUi(picked, { t: "tapPawn", pawn: "vert0" }, ctx).state).toBe(picked);
+    expect(reduceTurnUi(picked, { t: "tapPawn", pawn: "bleu3" }, ctx).state).toBe(picked);
+    const target = reduceTurnUi(picked, { t: "tapPawn", pawn: "bleu0" }, ctx).state;
+    expect(reduceTurnUi(target, { t: "tapPawn", pawn: "bleu1" }, ctx).state).toBe(target);
+    expect(reduceTurnUi(target, { t: "tapPawn", pawn: "jaune3" }, ctx).state).toBe(target);
+  });
+
+  it("goes back to idle on the card, changeCard, cancel and escape", () => {
+    const picked = reduceTurnUi(synced(ctx), { t: "tapCard", card: "11H" }, ctx).state;
+    const target = reduceTurnUi(picked, { t: "tapPawn", pawn: "bleu0" }, ctx).state;
+    const preview = reduceTurnUi(target, { t: "tapPawn", pawn: "vert0" }, ctx).state;
+    for (const from of [picked, target, preview]) {
+      for (const event of [
+        { t: "tapCard", card: "11H" },
+        { t: "changeCard" },
+        { t: "cancel" },
+        { t: "escape" },
+      ] as TurnUiEvent[]) {
+        expect(reduceTurnUi(from, event, ctx).state, `${from.kind} ${event.t}`).toEqual({
+          kind: "idle",
+        });
+      }
+    }
+  });
+
+  it("leaves a protected knight out (RULES R-09 as validated)", () => {
+    // A knight on its exit square is protected: it is neither played nor a target.
+    const protectedCtx = ctxOf(
+      build({
+        pawns: {
+          bleu: [{ p: 0 }, { p: 20 }, "S", "S"],
+          vert: [{ p: 0 }, { p: 30 }, "S", "S"],
+        },
+        hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    const picked = reduceTurnUi(synced(protectedCtx), { t: "tapCard", card: "11H" }, protectedCtx);
+    if (picked.state.kind !== "jackPick") throw new Error("no jackPick");
+    expect(picked.state.pawns).toEqual(["bleu1"]);
+    const target = reduceTurnUi(picked.state, { t: "tapPawn", pawn: "bleu1" }, protectedCtx).state;
+    if (target.kind !== "jackTarget") throw new Error("no jackTarget");
+    expect(target.targets).toEqual(["vert1"]);
+  });
+});
+
+describe("the tray: knights too close to tell apart", () => {
+  // Two of his knights on neighbouring cells and a 3: both can play it.
+  const close = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, { p: 6 }, "S", "S"] },
+      hands: { bleu: ["3S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const selected = () => reduceTurnUi(synced(close), { t: "tapCard", card: "3S" }, close).state;
+
+  it("opens with the knights near the tap, and a single one is simply tapped", () => {
+    const from = selected();
+    const result = reduceTurnUi(from, { t: "tapAt", near: ["bleu1", "bleu0"] }, close);
+    expect(result.state).toEqual({
+      kind: "tray",
+      card: "3S",
+      options: ["bleu1", "bleu0"],
+      next: from,
+    });
+    expect(result.submit).toBeUndefined();
+    const single = reduceTurnUi(from, { t: "tapAt", near: ["bleu0"] }, close);
+    expect(single.state).toMatchObject({ kind: "preview", action: { pawn: "bleu0" } });
+  });
+
+  it("continues as if the chosen knight had been tapped, and submits nothing", () => {
+    const [, tray, chosen, confirm] = run(
+      synced(close),
+      close,
+      { t: "tapCard", card: "3S" },
+      { t: "tapAt", near: ["bleu0", "bleu1"] },
+      { t: "chooseTrayOption", pawn: "bleu1" },
+      { t: "confirm" },
+    );
+    expect(tray?.state.kind).toBe("tray");
+    expect(chosen?.state).toMatchObject({ kind: "preview", action: { pawn: "bleu1" } });
+    expect(chosen?.submit).toBeUndefined();
+    expect(confirm?.submit).toEqual({ t: "move", card: "3S", pawn: "bleu1" });
+  });
+
+  it("« Choisir un autre cheval » returns to the selection with the card still selected", () => {
+    const from = selected();
+    const [tray, closed] = run(
+      from,
+      close,
+      { t: "tapAt", near: ["bleu0", "bleu1"] },
+      { t: "closeTray" },
+    );
+    expect(tray?.state.kind).toBe("tray");
+    expect(closed?.state).toBe(from);
+    expect(closed?.state).toMatchObject({ kind: "cardSelected", card: "3S" });
+  });
+
+  it("ignores a chosen knight that is not an option, and the tray events elsewhere", () => {
+    const from = selected();
+    const tray = reduceTurnUi(from, { t: "tapAt", near: ["bleu0", "bleu1"] }, close).state;
+    expect(reduceTurnUi(tray, { t: "chooseTrayOption", pawn: "bleu3" }, close).state).toBe(tray);
+    expect(reduceTurnUi(from, { t: "chooseTrayOption", pawn: "bleu0" }, close).state).toBe(from);
+    expect(reduceTurnUi(from, { t: "closeTray" }, close).state).toBe(from);
+    expect(reduceTurnUi(tray, { t: "tapPawn", pawn: "bleu0" }, close).state).toBe(tray);
+  });
+
+  it("escape, cancel and a second tap of the card leave the tray for idle", () => {
+    const tray = reduceTurnUi(selected(), { t: "tapAt", near: ["bleu0", "bleu1"] }, close).state;
+    for (const event of [
+      { t: "tapCard", card: "3S" },
+      { t: "escape" },
+      { t: "cancel" },
+    ] as TurnUiEvent[]) {
+      expect(reduceTurnUi(tray, event, close).state, event.t).toEqual({ kind: "idle" });
+    }
+  });
+
+  it("does not offer stable knights of one colour as a choice: they are the same exit", () => {
+    const stable = ctxOf(
+      build({
+        pawns: { bleu: ["S", "S", "S", "S"] },
+        hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    const result = run(
+      synced(stable),
+      stable,
+      { t: "tapCard", card: "1S" },
+      { t: "tapAt", near: ["bleu2", "bleu3", "bleu1"] },
+    )[1];
+    expect(result?.state).toMatchObject({ kind: "preview", action: { t: "exit" } });
+  });
+
+  it("keeps the knights that are not targets out of the options, and caps them at four", () => {
+    const valet = ctxOf(
+      build({
+        pawns: {
+          bleu: [{ p: 5 }, "S", "S", "S"],
+          jaune: [{ p: 62 }, { p: 63 }, { p: 64 }, { p: 65 }],
+          vert: [{ p: 30 }, "S", "S", "S"],
+        },
+        hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
+    const [, , tray] = run(
+      synced(valet),
+      valet,
+      { t: "tapCard", card: "11H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapAt", near: ["jaune0", "jaune1", "bleu3", "jaune2", "jaune3", "vert0"] },
+    );
+    if (tray?.state.kind !== "tray") throw new Error("no tray");
+    expect(tray.state.options).toEqual(["jaune0", "jaune1", "jaune2", "jaune3"]);
+    const second = reduceTurnUi(tray.state, { t: "chooseTrayOption", pawn: "jaune2" }, valet).state;
+    expect(second).toMatchObject({ kind: "preview", action: { t: "swap", target: "jaune2" } });
+  });
+
+  it("labels the knights A to D by their index, and by their place when the index repeats", () => {
+    expect(trayLetters(["bleu1", "bleu2"])).toEqual(["B", "C"]);
+    expect(trayLetters(["jaune0", "bleu3", "vert1"])).toEqual(["A", "D", "B"]);
+    expect(trayLetters(["jaune0", "bleu0", "vert1"])).toEqual(["A", "B", "C"]);
   });
 });

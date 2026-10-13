@@ -93,6 +93,14 @@
         if (missed) return [game.turn.chooseLit];
         return [ui.candidates.length === 1 ? game.turn.singleHorse : game.turn.chooseHorse];
       }
+      case "modeChoice":
+        return [game.turn.modeQuestion];
+      case "jackPick":
+        return [missed ? game.turn.chooseLit : game.turn.jackFirst];
+      case "jackTarget":
+        return [missed ? game.turn.chooseLit : game.turn.jackSecond];
+      case "tray":
+        return [];
       case "preview": {
         const out = [describe(ui)];
         if (ui.captured.length > 0) out.push(captureLine(ui));
@@ -111,6 +119,7 @@
   function describe(state: Extract<TurnUiState, { kind: "preview" }>): string {
     const d = state.description;
     if (d.verb === "exit") return game.preview.exit;
+    if (d.verb === "swap") return game.preview.swap(pawnColor(d.target ?? d.pawn));
     const main = d.verb === "back" ? game.preview.back : game.preview.advance(cardName(state.card), d.steps);
     return d.entersHome ? `${main} ${game.preview.home}` : main;
   }

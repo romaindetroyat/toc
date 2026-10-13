@@ -1,6 +1,10 @@
 // The turn interaction as a pure reducer (RESEARCH Pattern 6): card, then knight, then preview, then
 // confirm; the exchange; the dead hand. Svelte only renders the state it returns.
 //
+// The As and the Roi ask « Sortir ou avancer » when both are possible (D-16), the Valet takes two taps
+// (his knight, then the one to swap with) and a tap near several candidate knights opens a tray of
+// chips to tell them apart.
+//
 // Nothing here ever plays for the human (D-19, D-20): the reducer returns a `submit` only for
 // `confirm` in a preview, `give` with a chosen card and `pose` on a dead hand. A preview is
 // resolveMove(view, seat, action), the engine's own code, so what is shown is what will happen.
@@ -26,8 +30,10 @@ import {
 
 /** What the French sentence under the board says about the previewed move; the words live in i18n. */
 export type PreviewDescription = {
-  verb: "exit" | "advance" | "back";
+  verb: "exit" | "advance" | "back" | "swap";
   pawn: PawnId;
+  /** Valet: the knight swapped with. */
+  target?: PawnId;
   /** Cells moved (the card's value); 0 for an exit. */
   steps: number;
   entersHome: boolean;
@@ -41,6 +47,14 @@ export type TurnUiState =
   /** His turn, with the « Tes quatre chevaux sont rentrés » prompt to show once. */
   | { kind: "finishedPrompt" }
   | { kind: "cardSelected"; card: CardId; candidates: Action[] }
+  /** As or Roi with both an exit and an advance legal: « Que veux-tu faire ? ». */
+  | { kind: "modeChoice"; card: CardId; exit: Action; advance: Action[] }
+  /** Valet, first tap: one of his knights that has at least one swap. */
+  | { kind: "jackPick"; card: CardId; candidates: Action[]; pawns: PawnId[] }
+  /** Valet, second tap: the knights `pawn` can be swapped with. */
+  | { kind: "jackTarget"; card: CardId; candidates: Action[]; pawn: PawnId; targets: PawnId[] }
+  /** Candidate knights too close to tell apart: chips to choose from; `next` is where the flow resumes. */
+  | { kind: "tray"; card: CardId; options: PawnId[]; next: TurnUiState }
   | {
       kind: "preview";
       card: CardId;
@@ -48,6 +62,8 @@ export type TurnUiState =
       candidates: Action[];
       action: Action;
       path: Place[];
+      /** Valet: the two knights and the place each one will stand on. */
+      swap?: { a: PawnId; b: PawnId; aTo: Place; bTo: Place };
       captured: PawnId[];
       /** A knight of his own side would be eaten (D-16): the UI warns. */
       partnerCapture: boolean;
@@ -66,6 +82,12 @@ export type TurnUiEvent =
   | { t: "sync" }
   | { t: "tapCard"; card: CardId }
   | { t: "tapPawn"; pawn: PawnId }
+  /** A tap on the board: the candidate knights within 44 screen px of it, nearest first. */
+  | { t: "tapAt"; near: PawnId[] }
+  | { t: "chooseExit" }
+  | { t: "chooseAdvance" }
+  | { t: "chooseTrayOption"; pawn: PawnId }
+  | { t: "closeTray" }
   | { t: "confirm" }
   | { t: "cancel" }
   | { t: "changeCard" }
@@ -79,7 +101,7 @@ export type TurnCtx = {
   view: PlayerView;
   seat: Color;
   playability: Record<CardId, Playability>;
-  /** legalActions(view, seat, { sevenPlans: 'none' }): the 7 is added by plan 01-18. */
+  /** legalActions(view, seat, { sevenPlans: 'none' }): the 7 is added by plan 01-21. */
   legal: Action[];
 };
 
@@ -114,8 +136,24 @@ function isOwnTurn(state: TurnUiState): boolean {
   return (
     state.kind === "idle" ||
     state.kind === "cardSelected" ||
+    state.kind === "modeChoice" ||
+    state.kind === "jackPick" ||
+    state.kind === "jackTarget" ||
+    state.kind === "tray" ||
     state.kind === "preview" ||
     state.kind === "deadHand"
+  );
+}
+
+/** Whether a card is selected (the reducer is somewhere between the card and « Jouer »). */
+function hasCard(state: TurnUiState): state is Extract<TurnUiState, { card: CardId }> {
+  return (
+    state.kind === "cardSelected" ||
+    state.kind === "modeChoice" ||
+    state.kind === "jackPick" ||
+    state.kind === "jackTarget" ||
+    state.kind === "tray" ||
+    state.kind === "preview"
   );
 }
 
@@ -148,6 +186,11 @@ function candidatesOf(ctx: TurnCtx, card: CardId): Action[] {
   return ctx.legal.filter((a) => (a.t === "exit" || a.t === "move") && a.card === card);
 }
 
+/** The Valet's swaps for a card, in the engine's order. */
+function swapsOf(ctx: TurnCtx, card: CardId): Action[] {
+  return ctx.legal.filter((a) => a.t === "swap" && a.card === card);
+}
+
 /** The action a tap on `pawn` means among `candidates`: a stable knight of the right colour is the exit. */
 function actionFor(candidates: Action[], pawn: PawnId, ctx: TurnCtx): Action | undefined {
   if (ctx.view.pawns[pawn].zone === "stable") {
@@ -163,9 +206,29 @@ function previewState(
   action: Action,
   ctx: TurnCtx,
 ): TurnUiState | null {
-  if (action.t !== "exit" && action.t !== "move") return null;
+  if (action.t !== "exit" && action.t !== "move" && action.t !== "swap") return null;
   const resolved = resolveMove(ctx.view, ctx.seat, action);
   const first = resolved.events[0];
+  if (action.t === "swap") {
+    if (first?.t !== "pawnsSwapped") return null;
+    return {
+      kind: "preview",
+      card,
+      candidates,
+      action,
+      path: [],
+      swap: { a: first.a, b: first.b, aTo: first.aTo, bTo: first.bTo },
+      captured: [],
+      partnerCapture: false,
+      description: {
+        verb: "swap",
+        pawn: action.pawn,
+        target: action.target,
+        steps: 0,
+        entersHome: false,
+      },
+    };
+  }
   let path: Place[] = [];
   if (first?.t === "pawnMoved" || first?.t === "pawnEnteredHome") path = first.path;
   else if (first?.t === "pawnExited") path = [first.to];
@@ -191,28 +254,149 @@ function previewState(
   };
 }
 
+/** The state a tap on a card leads to: the question, the Valet's first tap, or the candidate knights. */
+function selectCard(card: CardId, ctx: TurnCtx): TurnUiState {
+  if (rankOf(card) === 11) {
+    const candidates = swapsOf(ctx, card);
+    const pawns = [...new Set(candidates.flatMap((a) => (a.t === "swap" ? [a.pawn] : [])))];
+    return { kind: "jackPick", card, candidates, pawns };
+  }
+  const candidates = candidatesOf(ctx, card);
+  const exit = candidates.find((a) => a.t === "exit");
+  const advance = candidates.filter((a) => a.t === "move");
+  if (exit !== undefined && advance.length > 0) return { kind: "modeChoice", card, exit, advance };
+  return { kind: "cardSelected", card, candidates };
+}
+
 function tapCard(state: TurnUiState, card: CardId, ctx: TurnCtx): TurnUiResult {
   const choosing = isOwnTurn(state) || state.kind === "finishedPrompt";
   if (!choosing || !ctx.view.hand.includes(card)) return { state };
-  if ((state.kind === "cardSelected" || state.kind === "preview") && state.card === card) {
-    return { state: IDLE };
-  }
+  if (hasCard(state) && state.card === card) return { state: IDLE };
   const verdict = ctx.playability[card];
   if (verdict === undefined) return { state };
   if (!verdict.playable) return { state, hint: verdict.reason };
-  return { state: { kind: "cardSelected", card, candidates: candidatesOf(ctx, card) } };
+  return { state: selectCard(card, ctx) };
+}
+
+/** What a tap on `pawn` leads to from `state`, or null when the knight is not one to tap there. */
+function stepFor(state: TurnUiState, pawn: PawnId, ctx: TurnCtx): TurnUiState | null {
+  switch (state.kind) {
+    case "cardSelected": {
+      const action = actionFor(state.candidates, pawn, ctx);
+      return action === undefined ? null : previewState(state.card, state.candidates, action, ctx);
+    }
+    case "jackPick": {
+      if (!state.pawns.includes(pawn)) return null;
+      const targets = state.candidates.flatMap((a) =>
+        a.t === "swap" && a.pawn === pawn ? [a.target] : [],
+      );
+      return { kind: "jackTarget", card: state.card, candidates: state.candidates, pawn, targets };
+    }
+    case "jackTarget":
+      return stepFromSwap(state, state.pawn, state.targets, pawn, ctx);
+    case "preview": {
+      if (state.action.t === "swap") {
+        const own = state.action.pawn;
+        const targets = state.candidates.flatMap((a) =>
+          a.t === "swap" && a.pawn === own ? [a.target] : [],
+        );
+        return stepFromSwap(state, own, targets, pawn, ctx);
+      }
+      const action = actionFor(state.candidates, pawn, ctx);
+      return action === undefined ? null : previewState(state.card, state.candidates, action, ctx);
+    }
+    default:
+      return null;
+  }
+}
+
+/** Valet, own knight chosen: a target previews the swap, the knight itself goes back to the first tap. */
+function stepFromSwap(
+  state: Extract<TurnUiState, { kind: "jackTarget" | "preview" }>,
+  own: PawnId,
+  targets: PawnId[],
+  pawn: PawnId,
+  ctx: TurnCtx,
+): TurnUiState | null {
+  if (targets.includes(pawn)) {
+    const action = state.candidates.find(
+      (a) => a.t === "swap" && a.pawn === own && a.target === pawn,
+    );
+    return action === undefined ? null : previewState(state.card, state.candidates, action, ctx);
+  }
+  if (pawn !== own) return null;
+  // The chosen knight again: from the preview back to its targets, from its targets back to the choice.
+  if (state.kind === "preview") {
+    return {
+      kind: "jackTarget",
+      card: state.card,
+      candidates: state.candidates,
+      pawn: own,
+      targets,
+    };
+  }
+  const pawns = [...new Set(state.candidates.flatMap((a) => (a.t === "swap" ? [a.pawn] : [])))];
+  return { kind: "jackPick", card: state.card, candidates: state.candidates, pawns };
 }
 
 function tapPawn(state: TurnUiState, pawn: PawnId, ctx: TurnCtx): TurnUiResult {
-  if (state.kind !== "cardSelected" && state.kind !== "preview") return { state };
-  const action = actionFor(state.candidates, pawn, ctx);
-  if (action === undefined) return { state };
-  const next = previewState(state.card, state.candidates, action, ctx);
+  const next = stepFor(state, pawn, ctx);
+  return { state: next ?? state };
+}
+
+/** Two stable knights of one colour are the same exit (A-11): one option for them all. */
+function optionKey(pawn: PawnId, ctx: TurnCtx): string {
+  return ctx.view.pawns[pawn].zone === "stable" ? `stable:${pawnColor(pawn)}` : pawn;
+}
+
+const TRAY_MAX = 4;
+
+/** A tap near knights: one tapped as such, several open the tray (2 to 4 chips). */
+function tapAt(state: TurnUiState, near: PawnId[], ctx: TurnCtx): TurnUiResult {
+  const seen = new Set<string>();
+  const options: PawnId[] = [];
+  for (const pawn of near) {
+    if (stepFor(state, pawn, ctx) === null) continue;
+    const key = optionKey(pawn, ctx);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push(pawn);
+  }
+  const first = options[0];
+  if (first === undefined) return { state };
+  if (options.length === 1 || !hasCard(state)) return tapPawn(state, first, ctx);
+  return {
+    state: { kind: "tray", card: state.card, options: options.slice(0, TRAY_MAX), next: state },
+  };
+}
+
+function chooseTrayOption(state: TurnUiState, pawn: PawnId, ctx: TurnCtx): TurnUiResult {
+  if (state.kind !== "tray" || !state.options.includes(pawn)) return { state };
+  return tapPawn(state.next, pawn, ctx);
+}
+
+/**
+ * The letters A to D written on the chips and over the knights of the tray: the knight's index in
+ * its colour, or its place in the tray when two options would carry the same letter.
+ */
+export function trayLetters(options: readonly PawnId[]): string[] {
+  const byIndex = options.map((pawn) => "ABCD".charAt(Number(pawn.slice(-1))));
+  return new Set(byIndex).size === options.length
+    ? byIndex
+    : options.map((_, i) => "ABCD".charAt(i));
+}
+
+function chooseMode(state: TurnUiState, mode: "exit" | "advance", ctx: TurnCtx): TurnUiResult {
+  if (state.kind !== "modeChoice") return { state };
+  if (mode === "advance") {
+    return { state: { kind: "cardSelected", card: state.card, candidates: state.advance } };
+  }
+  const next = previewState(state.card, [state.exit], state.exit, ctx);
   return { state: next ?? state };
 }
 
 function deselect(state: TurnUiState): TurnUiResult {
-  if (state.kind === "cardSelected" || state.kind === "preview") return { state: IDLE };
+  if (hasCard(state)) return { state: IDLE };
   if (state.kind === "exchange" && state.selected !== undefined) {
     return { state: { kind: "exchange" } };
   }
@@ -246,6 +430,16 @@ export function reduceTurnUi(state: TurnUiState, event: TurnUiEvent, ctx: TurnCt
       return tapCard(state, event.card, ctx);
     case "tapPawn":
       return tapPawn(state, event.pawn, ctx);
+    case "tapAt":
+      return tapAt(state, event.near, ctx);
+    case "chooseExit":
+      return chooseMode(state, "exit", ctx);
+    case "chooseAdvance":
+      return chooseMode(state, "advance", ctx);
+    case "chooseTrayOption":
+      return chooseTrayOption(state, event.pawn, ctx);
+    case "closeTray":
+      return state.kind === "tray" ? { state: state.next } : { state };
     case "confirm":
       return state.kind === "preview"
         ? { state: { kind: "waiting" }, submit: state.action }
