@@ -31,7 +31,20 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Quand c'est son tour, le joueur voit ses cartes jouables et les pions concernés mis en évidence, et seuls les coups permis par RULES.md lui sont proposés. Il passe une carte à son partenaire en début de donne et voit qui doit encore choisir. Avec l'As ou le Roi, il choisit entre sortir et avancer. Il répartit le 7 avec l'assistant pas à pas. Avant de confirmer un coup, il voit l'aperçu du trajet et des pions qui seraient mangés.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
-**Plans**: TBD
+**Plans:** 11 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Squelette jouable : validation des paquets, traceur « Jouer la partie » → plateau → cavalier qui bondit au son des sabots, plateau net sur tous les écrans
+- [ ] 01-02-PLAN.md — RULES.md rédigé (R-01 à R-16), scénarios en données, images sur le plateau, contrat du moteur et des événements
+- [ ] 01-03-PLAN.md — Romain valide RULES.md et choisit la source des figures des cartes ; constantes de règles nommées
+- [ ] 01-04-PLAN.md — Choix de la couleur mémorisé, plateau tourné vers le joueur, seize cavaliers Staunton
+- [ ] 01-05-PLAN.md — Moteur audio complet, page « Test des sons » pour Romain, licences et crédits
+- [ ] 01-06-PLAN.md — Moteur : donnes, échange, déplacements, maison, prises, scénarios en tests
+- [ ] 01-07-PLAN.md — Moteur : le 7, propriétés, ordinateur de niveau 1, parties en auto-jeu
+- [ ] 01-08-PLAN.md — Partie jouable : échange, coup avec aperçu, main posée, tapis, fin de partie
+- [ ] 01-09-PLAN.md — As/Roi, 7 réparti, Valet, plateau qui départage, partie complète au doigt
+- [ ] 01-10-PLAN.md — Animations des cavaliers et des cartes, synchronisées avec les sons
+- [ ] 01-11-PLAN.md — Réglages, tapis en grand, figures des cartes, finition et vérifications
 **UI hint**: yes
 
 ### Phase 2: Jouer en ligne entre proches
