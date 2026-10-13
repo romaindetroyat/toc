@@ -159,16 +159,31 @@
         }),
   );
 
+  /** Where the flow stands: under the tray it is the state the tray resumes. */
+  const flow = $derived(ui.kind === "tray" ? ui.next : ui);
+
   /** Knights lit for the selected card: the ring knight itself, or every stable knight for an exit. */
   const candidates = $derived.by((): PawnId[] => {
-    if (render === null || (ui.kind !== "cardSelected" && ui.kind !== "preview")) return [];
+    if (render === null) return [];
     const out = new Set<PawnId>();
-    for (const action of ui.candidates) {
-      if (action.t === "move") out.add(action.pawn);
-      else if (action.t === "exit") {
-        for (const pawn of PAWNS) {
-          if (pawn.color === pawnColor(action.pawn) && render.pawns[pawn.id]?.z === "stable") {
-            out.add(pawn.id);
+    if (flow.kind === "jackPick") for (const pawn of flow.pawns) out.add(pawn);
+    else if (flow.kind === "jackTarget") {
+      out.add(flow.pawn);
+      for (const pawn of flow.targets) out.add(pawn);
+    } else if (flow.kind === "preview" && flow.action.t === "swap") {
+      const own = flow.action.pawn;
+      out.add(own);
+      for (const action of flow.candidates) {
+        if (action.t === "swap" && action.pawn === own) out.add(action.target);
+      }
+    } else if (flow.kind === "cardSelected" || flow.kind === "preview") {
+      for (const action of flow.candidates) {
+        if (action.t === "move") out.add(action.pawn);
+        else if (action.t === "exit") {
+          for (const pawn of PAWNS) {
+            if (pawn.color === pawnColor(action.pawn) && render.pawns[pawn.id]?.z === "stable") {
+              out.add(pawn.id);
+            }
           }
         }
       }
@@ -177,19 +192,28 @@
   });
 
   const selectedPawn = $derived.by((): PawnId | null => {
-    if (render === null || ui.kind !== "preview") return null;
-    const action = ui.action;
-    if (action.t === "move") return action.pawn;
+    if (render === null) return null;
+    if (flow.kind === "jackTarget") return flow.pawn;
+    if (flow.kind !== "preview") return null;
+    const action = flow.action;
+    if (action.t === "move" || action.t === "swap") return action.pawn;
     if (action.t !== "exit") return null;
     const same = tapped !== null && pawnColor(tapped) === pawnColor(action.pawn);
     return same && render.pawns[tapped as PawnId]?.z === "stable" ? (tapped as PawnId) : action.pawn;
   });
+
+  /** Valet: the knight to swap with, once chosen. */
+  const targetPawn = $derived(flow.kind === "preview" && flow.action.t === "swap" ? flow.action.target : null);
 
   const handMode = $derived.by((): HandMode => {
     switch (ui.kind) {
       case "idle":
       case "finishedPrompt":
       case "cardSelected":
+      case "modeChoice":
+      case "jackPick":
+      case "jackTarget":
+      case "tray":
       case "preview":
         return "turn";
       case "exchange":
@@ -226,7 +250,12 @@
   });
 
   const selectedCard = $derived(
-    ui.kind === "cardSelected" || ui.kind === "preview"
+    ui.kind === "cardSelected" ||
+      ui.kind === "modeChoice" ||
+      ui.kind === "jackPick" ||
+      ui.kind === "jackTarget" ||
+      ui.kind === "tray" ||
+      ui.kind === "preview"
       ? ui.card
       : ui.kind === "exchange"
         ? (ui.selected ?? null)
@@ -250,6 +279,23 @@
   function pickPawn(pawn: PawnId) {
     tapped = pawn;
     send({ t: "tapPawn", pawn });
+  }
+
+  /** A tap on the board: the lit knights near it, nearest first (the reducer taps one or opens the tray). */
+  function pickNear(near: PawnId[]) {
+    tapped = near[0] ?? null;
+    send({ t: "tapAt", near });
+  }
+
+  function chooseExit() {
+    // « Sortir » needs no knight tap: any stable knight stands for the exit.
+    tapped = null;
+    send({ t: "chooseExit" });
+  }
+
+  function pickTrayOption(pawn: PawnId) {
+    tapped = pawn;
+    send({ t: "chooseTrayOption", pawn });
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -277,6 +323,7 @@
               {ui}
               {candidates}
               selected={selectedPawn}
+              target={targetPawn}
             />
           {/snippet}
           {#each drawn as pawn (pawn.id)}
@@ -303,6 +350,7 @@
               {ui}
               {candidates}
               selected={selectedPawn}
+              target={targetPawn}
             />
           {/snippet}
           {#snippet hits(px)}
@@ -311,8 +359,14 @@
               {k}
               {render}
               {candidates}
-              active={ui.kind === "cardSelected" || ui.kind === "preview"}
+              active={
+                ui.kind === "cardSelected" ||
+                ui.kind === "jackPick" ||
+                ui.kind === "jackTarget" ||
+                ui.kind === "preview"
+              }
               onpick={pickPawn}
+              onnear={pickNear}
               onmiss={() => {
                 missed = true;
               }}
@@ -337,6 +391,10 @@
           onchangeCard={() => send({ t: "changeCard" })}
           ongive={() => send({ t: "give" })}
           onpose={() => send({ t: "pose" })}
+          onexit={chooseExit}
+          onadvance={() => send({ t: "chooseAdvance" })}
+          ontrayPick={pickTrayOption}
+          ontrayClose={() => send({ t: "closeTray" })}
         />
       </div>
 

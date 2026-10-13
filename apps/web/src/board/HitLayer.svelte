@@ -13,17 +13,22 @@
     candidates: readonly PawnId[];
     /** A card is selected: a tap on the board that misses every lit knight says so. */
     active: boolean;
+    /** A knight chosen with the keyboard. */
     onpick: (pawn: PawnId) => void;
+    /** A tap that hit at least one lit knight: those within 44 screen px of it, nearest first. */
+    onnear: (near: PawnId[]) => void;
     onmiss: () => void;
   };
 
-  let { px, k, render, candidates, active, onpick, onmiss }: Props = $props();
+  let { px, k, render, candidates, active, onpick, onnear, onmiss }: Props = $props();
 
   /** Body centre of a knight above its feet, in board units. */
   const BODY = 92;
   const FOOTPRINT = 110;
   // Hit radius = max(22 screen px, footprint / 2).
   const radius = $derived(Math.max(22 * px, FOOTPRINT / 2));
+  // Knights this close to the tap may be the one meant: with two or more, the tray tells them apart.
+  const near = $derived(Math.max(44 * px, radius));
 
   const targets = $derived(
     candidates.map((pawn) => {
@@ -32,23 +37,24 @@
     }),
   );
 
-  /** A tap lands on the nearest lit knight within reach; anywhere else is a miss. */
+  /**
+   * A tap that lands on a lit knight reports every lit knight within 44 screen px of it, nearest first
+   * (the reducer chooses: one knight is tapped, several open the tray); anywhere else is a miss.
+   */
   function onclick(event: MouseEvent) {
     const layer = event.currentTarget as SVGGraphicsElement;
     const matrix = layer.getScreenCTM();
     if (!matrix) return;
     const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    let best: PawnId | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
+    let hit = false;
+    const around: { pawn: PawnId; distance: number }[] = [];
     for (const target of targets) {
       const distance = Math.hypot(point.x - target.x, point.y - target.y);
-      if (distance <= radius && distance < bestDistance) {
-        best = target.pawn;
-        bestDistance = distance;
-      }
+      if (distance <= radius) hit = true;
+      if (distance <= near) around.push({ pawn: target.pawn, distance });
     }
-    if (best === null) onmiss();
-    else onpick(best);
+    if (!hit) onmiss();
+    else onnear(around.sort((a, b) => a.distance - b.distance).map((entry) => entry.pawn));
   }
 
   function onkeydown(event: KeyboardEvent, pawn: PawnId) {

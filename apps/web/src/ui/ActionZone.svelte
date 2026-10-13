@@ -1,5 +1,14 @@
 <script lang="ts">
-  import { COLORS, type Color, PARTNER, type PawnId, type PlayerView, pawnColor, type Reason } from "@toc/engine";
+  import {
+    COLORS,
+    type Color,
+    PARTNER,
+    type PawnId,
+    type PlayerView,
+    pawnColor,
+    rankOf,
+    type Reason,
+  } from "@toc/engine";
   import { fade } from "svelte/transition";
   import type { BotPlay } from "../game/session.svelte.ts";
   import type { TurnUiState } from "../game/turnUi.ts";
@@ -7,6 +16,7 @@
   import { botLine, game } from "../i18n/fr/game.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
+  import PawnTray from "./PawnTray.svelte";
 
   type Props = {
     ui: TurnUiState;
@@ -24,6 +34,10 @@
     onchangeCard: () => void;
     ongive: () => void;
     onpose: () => void;
+    onexit: () => void;
+    onadvance: () => void;
+    ontrayPick: (pawn: PawnId) => void;
+    ontrayClose: () => void;
   };
 
   let {
@@ -40,6 +54,10 @@
     onchangeCard,
     ongive,
     onpose,
+    onexit,
+    onadvance,
+    ontrayPick,
+    ontrayClose,
   }: Props = $props();
 
   const partner = $derived(PARTNER[human]);
@@ -48,7 +66,14 @@
   let exchanged = $state(false);
   $effect(() => {
     if (ui.kind === "exchangeWaiting") exchanged = true;
-    else if (ui.kind === "cardSelected" || ui.kind === "preview" || ui.kind === "exchange") {
+    else if (
+      ui.kind === "cardSelected" ||
+      ui.kind === "modeChoice" ||
+      ui.kind === "jackPick" ||
+      ui.kind === "jackTarget" ||
+      ui.kind === "preview" ||
+      ui.kind === "exchange"
+    ) {
       exchanged = false;
     }
   });
@@ -142,11 +167,13 @@
 <section class="zone" aria-live="polite" data-action-zone data-state={ui.kind}>
   {#key key}
     <div class="content" in:fade={{ duration: fadeMs }}>
-      <div class="text">
-        {#each lines as line, i (i)}
-          <p class:prompt={i === 0}>{line}</p>
-        {/each}
-      </div>
+      {#if lines.length > 0}
+        <div class="text">
+          {#each lines as line, i (i)}
+            <p class:prompt={i === 0}>{line}</p>
+          {/each}
+        </div>
+      {/if}
 
       {#if ui.kind === "exchangeWaiting"}
         <ul class="givers" data-givers>
@@ -157,7 +184,18 @@
             </li>
           {/each}
         </ul>
-      {:else if ui.kind === "cardSelected"}
+      {:else if ui.kind === "modeChoice"}
+        <div class="buttons modes">
+          <button type="button" class="btn btn-primary" data-mode="exit" onclick={onexit}>
+            {game.turn.exitButton}
+          </button>
+          <button type="button" class="btn btn-primary" data-mode="advance" onclick={onadvance}>
+            {game.turn.advanceButton(rankOf(ui.card))}
+          </button>
+        </div>
+      {:else if ui.kind === "tray"}
+        <PawnTray options={ui.options} onpick={ontrayPick} onclose={ontrayClose} />
+      {:else if ui.kind === "cardSelected" || ui.kind === "jackPick" || ui.kind === "jackTarget"}
         <div class="buttons">
           <button type="button" class="btn btn-secondary" onclick={onchangeCard}>
             {game.buttons.changeCard}
@@ -285,6 +323,19 @@
 
   .play {
     min-width: 120px;
+  }
+
+  /* « Sortir un cheval » and « Avancer de n » side by side, each 48 px high. */
+  .modes {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    margin-left: 0;
+  }
+
+  .modes .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 var(--space-sm);
   }
 
   /* « Avance rapide »: a 44 x 44 toggle, with its label from 600 px up. */

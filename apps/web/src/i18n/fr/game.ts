@@ -79,6 +79,11 @@ export const game = {
     otherHorse: "Choisir un autre cheval",
   },
 
+  /** The chips that tell apart knights too close to tap (letters A to D, as over the knights). */
+  tray: {
+    chip: (letter: string, color: Color) => `Cheval ${letter}, ${colourWord(color)}`,
+  },
+
   bot: {
     thinking: (name: string) => `${name} réfléchit…`,
     played: (name: string, card: CardId, description: string) =>
