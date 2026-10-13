@@ -3,6 +3,8 @@
   import Launch from "./routes/Launch.svelte";
 
   let hash = $state(location.hash);
+  // The hash may carry a query (#/partie?debug=geometry): the route is what precedes the "?".
+  const route = $derived(hash.split("?")[0]);
 
   $effect(() => {
     const onHashChange = () => {
@@ -13,7 +15,7 @@
   });
 </script>
 
-{#if hash === "#/partie"}
+{#if route === "#/partie"}
   <Game />
 {:else}
   <Launch />
