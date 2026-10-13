@@ -36,6 +36,18 @@ export type Mix = {
   ambienceVolume: number;
 };
 
+/** The three bus gains a mix asks for: master and effects are on or off, the ambience follows its volume. */
+export function busGainsFor(mix: Mix): { master: number; sfx: number; ambience: number } {
+  const volume = Number.isFinite(mix.ambienceVolume)
+    ? Math.min(100, Math.max(0, mix.ambienceVolume))
+    : DEFAULT_AMBIENCE_VOLUME;
+  return {
+    master: mix.sound ? 1 : 0,
+    sfx: mix.sfx ? 1 : 0,
+    ambience: mix.ambience ? volume / 100 : 0,
+  };
+}
+
 export const DEFAULT_MIX: Mix = {
   sound: true,
   sfx: true,
@@ -170,12 +182,10 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   }
 
   function applyMix(rampSeconds: number): void {
-    const volume = Number.isFinite(mix.ambienceVolume)
-      ? Math.min(100, Math.max(0, mix.ambienceVolume))
-      : DEFAULT_AMBIENCE_VOLUME;
-    backend.setBusGain("master", mix.sound ? 1 : 0, undefined, rampSeconds);
-    backend.setBusGain("sfx", mix.sfx ? 1 : 0, undefined, rampSeconds);
-    backend.setBusGain("ambience", mix.ambience ? volume / 100 : 0, undefined, rampSeconds);
+    const gains = busGainsFor(mix);
+    backend.setBusGain("master", gains.master, undefined, rampSeconds);
+    backend.setBusGain("sfx", gains.sfx, undefined, rampSeconds);
+    backend.setBusGain("ambience", gains.ambience, undefined, rampSeconds);
   }
 
   function bufferFor(id: SoundId, prefer?: "file" | "synth"): AudioBufferLike | undefined {
@@ -498,6 +508,11 @@ export function cue(id: SoundId, at?: number, opts?: CueOptions): void {
 
 /** Apply the sound settings. Safe before unlock: the mix is applied when the engine starts. */
 export function setMix(mix: Mix): void {
+  if (DEBUG && window.__tocDebug) {
+    // Debug builds: the e2e specs read the bus gains the settings ask for (the buses ramp to them in
+    // 30 ms once the audio is unlocked, and before that the same gains wait in `pendingMix`).
+    window.__tocDebug.audio.gains = busGainsFor(mix);
+  }
   pendingMix = { ...mix };
   engine?.setMix(mix);
 }

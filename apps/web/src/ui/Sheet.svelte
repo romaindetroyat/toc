@@ -1,3 +1,10 @@
+<script module lang="ts">
+  // The sheets open at this moment, the last one on top. Only the top one answers to Échap and to the
+  // focus leaving: a sheet opened from another sheet (« Crédits et licences » in « Réglages ») would
+  // otherwise fight it for the focus.
+  const open: symbol[] = [];
+</script>
+
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import { fade, fly } from "svelte/transition";
@@ -30,6 +37,10 @@
   const openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   let dialog = $state<HTMLElement>();
+
+  const me = Symbol("sheet");
+  open.push(me);
+  const onTop = () => open[open.length - 1] === me;
 
   function compact(): boolean {
     try {
@@ -78,12 +89,13 @@
   });
 
   onDestroy(() => {
+    open.splice(open.indexOf(me), 1);
     const target = opener ?? openedFrom;
     if (target?.isConnected) target.focus({ preventScroll: true });
   });
 
   function onWindowKeydown(event: KeyboardEvent) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && onTop()) {
       event.preventDefault();
       onclose();
     }
@@ -112,6 +124,7 @@
 
   // If the focus ever leaves the sheet (a click on the page behind), it comes back.
   function onWindowFocusin(event: FocusEvent) {
+    if (!onTop()) return;
     if (dialog && event.target instanceof Node && !dialog.contains(event.target)) dialog.focus();
   }
 

@@ -2,10 +2,12 @@
   import { COLORS, type Color, PARTNER } from "@toc/engine";
   import { unlock } from "../audio/engine.ts";
   import { launch } from "../i18n/fr/launch.ts";
+  import { reglages } from "../i18n/fr/reglages.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ColorTile from "../ui/ColorTile.svelte";
   import SeatChip from "../ui/SeatChip.svelte";
+  import SettingsSheet from "../ui/SettingsSheet.svelte";
 
   // Default selection: the colour used last time, Bleu on a first visit, so « Jouer la partie »
   // is never disabled (settings.lastColor is already validated and falls back to Bleu).
@@ -40,6 +42,9 @@
     select(next);
     tiles[next]?.focus();
   }
+
+  let settingsOpen = $state(false);
+  let settingsButton = $state<HTMLButtonElement | null>(null);
 
   function play() {
     // The AudioContext must be created and resumed synchronously inside this tap.
@@ -96,7 +101,19 @@
   </section>
 
   <button type="button" class="btn btn-primary play" onclick={play}>{launch.play}</button>
+  <button
+    type="button"
+    class="btn btn-text settings"
+    bind:this={settingsButton}
+    onclick={() => (settingsOpen = true)}
+  >
+    {reglages.open}
+  </button>
 </main>
+
+{#if settingsOpen}
+  <SettingsSheet onclose={() => (settingsOpen = false)} opener={settingsButton} />
+{/if}
 
 <style>
   .launch {
@@ -175,5 +192,11 @@
 
   .play {
     width: 100%;
+  }
+
+  /* « Réglages » is a quiet text button under the primary action. */
+  .settings {
+    align-self: center;
+    margin-top: calc(-1 * var(--space-sm));
   }
 </style>
