@@ -14,6 +14,15 @@
   import { MOTION, scaleFor } from "@toc/board";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
+  import type { Flight } from "../board/CardFlights.svelte";
+  import {
+    dealFlights,
+    exchangeFlights,
+    type FlightSpec,
+    finishFlights,
+    layFlights,
+    playFlight,
+  } from "../board/cardFx.ts";
   import { anchorOf, type Facing } from "../board/geometry.ts";
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
@@ -58,6 +67,9 @@
   let moving = $state.raw<PawnId[]>([]);
   /** The particles of the party of the fourth knight home, while they fly. */
   let burst = $state.raw<Burst | null>(null);
+  /** The cards on their way over the board: dealt, played, exchanged, laid down. */
+  let flights = $state.raw<Flight[]>([]);
+  let flightSeq = 0;
   /** The knight the player tapped last (a stable knight stands for the exit, A-11). */
   let tapped = $state<PawnId | null>(null);
   /** A tap on the board missed every lit knight. */
@@ -80,6 +92,32 @@
     if (fresh.length === 0) return;
     moving = [...moving, ...fresh];
     flushSync();
+  }
+
+  /**
+   * Sends cards flying and resolves once they have all landed; they are taken away then, in the same
+   * task in which the Director shows them on the felt. `leadMs` is the delay shared with the audio.
+   */
+  function launch(specs: FlightSpec[], leadMs: number): Promise<void> {
+    if (specs.length === 0) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      let left = specs.length;
+      const mine: Flight[] = specs.map((spec) => {
+        let done = false;
+        return {
+          id: ++flightSeq,
+          spec: { ...spec, delayMs: spec.delayMs + leadMs },
+          onDone() {
+            if (done) return;
+            done = true;
+            if (--left > 0) return;
+            flights = flights.filter((flight) => !mine.includes(flight));
+            resolve();
+          },
+        };
+      });
+      flights = [...flights, ...mine];
+    });
   }
 
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
@@ -141,6 +179,13 @@
           leadMs,
           mode,
         ),
+      deal: (seats, leadMs, mode) => launch(dealFlights(seats, session?.k ?? 0, mode), leadMs),
+      playCard: (seat, card, leadMs, mode) =>
+        launch([playFlight(seat, card, session?.k ?? 0, mode)], leadMs),
+      exchange: (leadMs, mode) => launch(exchangeFlights(session?.k ?? 0, mode), leadMs),
+      lay: (seat, cards, leadMs, mode) =>
+        launch(layFlights(seat, cards, session?.k ?? 0, mode), leadMs),
+      finishCards: finishFlights,
     },
     facingOf: (pawn) => facings[pawn] ?? "right",
     commit(pawn, _place, facing) {
@@ -168,6 +213,7 @@
     facings = Object.fromEntries(PAWNS.map(({ id }) => [id, "right" as Facing]));
     moving = [];
     burst = null;
+    flights = [];
     tapped = null;
     missed = false;
     await tick();
@@ -312,6 +358,19 @@
     return null;
   });
 
+  /**
+   * The new hand is held back, face down, until the cards of the deal have landed: the view already
+   * holds it while the felt still counts none (the Director has not reached the deal yet).
+   */
+  const concealed = $derived(
+    session !== undefined &&
+      render !== null &&
+      view !== undefined &&
+      session.pace !== "test" &&
+      view.hand.length > 0 &&
+      render.handSizes[session.human] === 0,
+  );
+
   const verdicts = $derived.by((): Partial<Record<CardId, Playability>> => {
     if (session === undefined || view === undefined || view.phase !== "play") return {};
     return playability(view, session.human);
@@ -382,7 +441,7 @@
       </div>
 
       <div class="stage">
-        <Board {k} {render} {discardTop} {burst}>
+        <Board {k} {render} {discardTop} {burst} {flights}>
           {#snippet under(px)}
             <Overlay
               layer="under"
@@ -491,6 +550,8 @@
             playability={verdicts}
             selected={selectedCard}
             {received}
+            {concealed}
+            pace={session.pace}
             onpick={pickCard}
           />
         </div>

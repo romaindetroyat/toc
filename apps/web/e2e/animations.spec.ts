@@ -6,12 +6,18 @@ import { etatParam } from "./position.ts";
 // home entry and the party of the fourth knight, then fast mode and reduced motion. The positions
 // are made by hand with the `etat` debug parameter and played at normal speed (no `vitesse=test`).
 //
-// Every Web Animation on a knight is recorded by a requestAnimationFrame loop installed before the
-// page loads: which knight, which inner group, its duration, delay and the moment it begins. The
-// sounds come from window.__tocDebug.audio.cues (debug builds), read by id and by time.
+// Every Web Animation on a knight, a card in flight or a card of the hand is recorded by a
+// requestAnimationFrame loop installed before the page loads: which knight, which inner group, its
+// duration, delay and the moment it begins. The sounds come from window.__tocDebug.audio.cues (debug
+// builds), read by id and by time.
+//
+// The cards (plan 01-22): a card in flight has the role `flight-deal`, `flight-play`,
+// `flight-exchange` or `flight-lay`; a card of the hand that flips open or slides in has the role
+// `hand-card`. Its `card` field is the card id (`back` for a face-down card).
 
 type Rec = {
   pawn: string | null;
+  card: string | null;
   role: string;
   duration: number;
   delay: number;
@@ -35,8 +41,18 @@ function recorder() {
       if (known.has(animation) || animation.startTime === null) continue;
       const target = animation.effect && (animation.effect as KeyframeEffect).target;
       if (!(target instanceof Element)) continue;
-      const owner = target.closest("[data-pawn], [data-particles]");
+      const owner = target.closest(
+        "[data-pawn], [data-particles], [data-flight], [data-hand] [data-card]",
+      );
       if (owner === null) continue;
+      const flight = owner.getAttribute("data-flight");
+      const role =
+        target.getAttribute("data-role") ??
+        (flight !== null
+          ? `flight-${flight}`
+          : owner.hasAttribute("data-card")
+            ? "hand-card"
+            : "particle");
       known.add(animation);
       const timing = animation.effect?.getTiming();
       const duration = Number(timing?.duration);
@@ -45,7 +61,8 @@ function recorder() {
       const begins = Number(animation.startTime) + delay;
       w.__anims.push({
         pawn: owner.getAttribute("data-pawn"),
-        role: target.getAttribute("data-role") ?? "particle",
+        card: owner.getAttribute("data-flight-card") ?? owner.getAttribute("data-card"),
+        role,
         duration,
         delay,
         iterations,
@@ -106,23 +123,47 @@ async function playCard(page: Page, card: string, pawn: string, target?: string)
 }
 
 /**
- * Freezes every knight animation at step time `at` (ms after the step started, lead included),
- * takes the screenshot and lets them run on. For the human check of plan 01-22.
+ * Freezes every animation that matches `selector` (the knights by default) at step time `at` (ms after
+ * the step started, lead included), takes the screenshot and lets them run on. For the human check.
  */
-async function shoot(page: Page, name: string, at: number) {
-  await page.evaluate((time) => {
-    const w = window as unknown as TocWindow;
-    w.__paused = [];
-    for (const animation of document.getAnimations()) {
-      const target = animation.effect && (animation.effect as KeyframeEffect).target;
-      if (!(target instanceof Element) || !target.closest("[data-pawn], [data-particles]"))
-        continue;
-      if (animation.playState !== "running") continue;
-      animation.pause();
-      animation.currentTime = time;
-      w.__paused.push(animation);
-    }
-  }, at);
+async function shoot(
+  page: Page,
+  name: string,
+  at: number,
+  selector = "[data-pawn], [data-particles]",
+  minimum = 1,
+) {
+  // Waits, frame by frame, until `minimum` animations of the selector are running, then freezes them
+  // all in the same frame: a screenshot of cards in flight cannot be taken a poll too late.
+  await page.evaluate(
+    ([time, only, count]) =>
+      new Promise<void>((resolve) => {
+        const w = window as unknown as TocWindow;
+        const attempt = () => {
+          const running = document.getAnimations().filter((animation) => {
+            const target = animation.effect && (animation.effect as KeyframeEffect).target;
+            return (
+              target instanceof Element &&
+              target.closest(only as string) !== null &&
+              animation.playState === "running" &&
+              animation.startTime !== null
+            );
+          });
+          if (running.length < (count as number)) {
+            requestAnimationFrame(attempt);
+            return;
+          }
+          w.__paused = running;
+          for (const animation of running) {
+            animation.pause();
+            animation.currentTime = time as number;
+          }
+          resolve();
+        };
+        attempt();
+      }),
+    [at, selector, minimum] as const,
+  );
   const project = test.info().project.name;
   await page.screenshot({ path: `test-results/anim-${name}-${project}.png` });
   await page.evaluate(() => {
@@ -448,4 +489,209 @@ test.describe("Réduire les animations : glissement, fondus, pas de ruade ni de 
     const records_ = await records(page);
     expect(records_.filter((r) => r.role === "arc")).toHaveLength(0);
   });
+});
+
+// ---- The cards (plan 01-22) ------------------------------------------------------------------
+// The deal, a played card, the exchange, a dead hand laid down and the win, at normal speed. The deal
+// and the exchange are those of a seeded new game (`graine`, no `vitesse=test`, so the bots take
+// their time); the other positions are made by hand.
+
+const SEED = "00c0ffee00c0ffee1234567890abcdef";
+
+/** The records of the cards in flight of one kind, in the order they begin. */
+const flightsOf = (all: Rec[], kind: string) =>
+  all.filter((r) => r.role === `flight-${kind}`).sort((a, b) => a.begins - b.begins);
+const handCards = (all: Rec[]) =>
+  all.filter((r) => r.role === "hand-card").sort((a, b) => a.begins - b.begins);
+
+async function openSeeded(page: Page, init?: () => void) {
+  await page.addInitScript(recorder);
+  if (init) await page.addInitScript(init);
+  await page.goto("/");
+  await page.goto(`/#/partie?graine=${SEED}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+}
+
+/** Opens a hand-made position that does not start on a playable hand (a dead hand, an exchange). */
+async function openAny(page: Page, etat: unknown) {
+  await page.addInitScript(recorder);
+  await page.goto("/");
+  await page.goto(`/#/partie?etat=${etatParam(etat)}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+}
+
+/** Plays the banner of the game screen: the moments it was put on the page and taken off it. */
+function bannerWatch() {
+  const w = window as unknown as { __banner: { on: number | null; off: number | null } };
+  w.__banner = { on: null, off: null };
+  new MutationObserver(() => {
+    const present = document.querySelector("[data-deal-banner]") !== null;
+    if (present && w.__banner.on === null) w.__banner.on = performance.now();
+    if (!present && w.__banner.on !== null && w.__banner.off === null)
+      w.__banner.off = performance.now();
+  }).observe(document, { childList: true, subtree: true });
+}
+
+test("la donne : 20 cartes de 250 ms à 40 ms d’intervalle avec le bruit de la donne, puis la main se retourne", async ({
+  page,
+}) => {
+  await openSeeded(page);
+  await expect
+    .poll(async () => flightsOf(await records(page), "deal").length, { timeout: 10_000 })
+    .toBe(20);
+  const deal = flightsOf(await records(page), "deal");
+  for (const [i, flight] of deal.entries()) {
+    near(flight.duration, 250, 1);
+    near(flight.begins - (deal[0] as Rec).begins, i * 40, 6);
+    expect(flight.card).toBe("back");
+  }
+  await shoot(page, "donne", LEAD + 300, "[data-flight]", 20);
+
+  const riffle = (await cues(page)).filter((c) => c.id === "carte-donne");
+  expect(riffle).toHaveLength(1);
+  near((riffle[0] as Cue).at - (riffle[0] as Cue).requestedAt, 0.06, 0.03);
+
+  // The five cards of the player come face up one after the other, once the deal has landed.
+  await expect.poll(async () => handCards(await records(page)).length).toBe(5);
+  const flips = handCards(await records(page));
+  for (const [i, flip] of flips.entries()) {
+    near(flip.duration, 250, 1);
+    near(flip.delay, i * 40, 1);
+  }
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+  await expect(page.locator("[data-talon]")).toHaveAttribute("data-talon", "32");
+  await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
+});
+
+test("la bannière de donne reste 1,2 s sur le plateau", async ({ page }) => {
+  await openSeeded(page, bannerWatch);
+  await expect(page.locator("[data-deal-banner]")).toBeVisible();
+  await expect(page.locator("[data-deal-banner]")).toHaveCount(0, { timeout: 5_000 });
+  const { on, off } = await page.evaluate(
+    () => (window as unknown as { __banner: { on: number; off: number } }).__banner,
+  );
+  // 1.2 s on screen, then its 200 ms fade out.
+  expect(off - on).toBeGreaterThanOrEqual(1190);
+  expect(off - on).toBeLessThanOrEqual(1600);
+});
+
+test("une carte jouée vole 300 ms jusqu’à son emplacement du tapis avec le bruit de la carte, avant le cheval", async ({
+  page,
+}) => {
+  // Bleu plays a 2; then Jaune, a bot whose only card is a 7, plays it with its only knight.
+  await openPosition(page, {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 30 }, "S", "S", "S"], jaune: [{ p: 60 }, "S", "S", "S"] },
+    hands: { bleu: ["2S"], jaune: ["7H"] },
+  });
+  await playCard(page, "2 de pique", "bleu0");
+
+  await expect
+    .poll(async () => flightsOf(await records(page), "play").length, { timeout: 15_000 })
+    .toBe(2);
+  const [mine, theirs] = flightsOf(await records(page), "play") as [Rec, Rec];
+  expect([mine.card, theirs.card]).toEqual(["2S", "7H"]);
+  near(mine.duration, 300, 1);
+  near(theirs.duration, 300, 1);
+
+  // The card lands, then the knight leaps (its own 60 ms lead after the card).
+  const mover = await waitFor(page, "bleu0", "mover", 533);
+  near(mover.begins - mine.ends, LEAD, 12);
+  const seven = await waitFor(page, "jaune0", "mover", 1198);
+  expect(seven.begins).toBeGreaterThan(theirs.ends - 8);
+
+  const sounds = (await cues(page)).filter((c) => c.id === "carte-pose");
+  expect(sounds.length).toBeGreaterThanOrEqual(2);
+  near((sounds[0] as Cue).at - (sounds[0] as Cue).requestedAt, 0.06, 0.03);
+
+  await expect(page.locator('[data-felt-last="bleu"] [data-felt-card="2S"]')).toBeVisible();
+  await expect(page.locator('[data-felt-last="jaune"] [data-felt-card="7H"]')).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+});
+
+test("l’échange : quatre cartes se croisent en 300 ms avec le bruit de la glissade, la reçue entre dans la main", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await openSeeded(page);
+  await expect(page.locator("[data-hand]")).not.toHaveClass(/concealed/, { timeout: 10_000 });
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+  await page.locator("[data-hand] [data-card]").first().click();
+  await page.getByRole("button", { name: "Passer cette carte" }).click();
+
+  // The bots choose one by one; when the last has chosen, the four cards cross.
+  await shoot(page, "cartes-echange", LEAD + 150, "[data-flight]", 4);
+  const crossing = flightsOf(await records(page), "exchange");
+  expect(crossing).toHaveLength(4);
+  for (const flight of crossing) {
+    near(flight.duration, 300, 1);
+    near(flight.begins, (crossing[0] as Rec).begins, 6);
+    expect(flight.card).toBe("back");
+  }
+
+  const slide = (await cues(page)).filter((c) => c.id === "carte-echange");
+  expect(slide).toHaveLength(1);
+  near((slide[0] as Cue).at - (slide[0] as Cue).requestedAt, 0.06, 0.03);
+
+  // The received card slides into the hand when the crossing is over.
+  await expect(page.getByText("Reçue", { exact: true })).toBeVisible();
+  await expect.poll(async () => handCards(await records(page)).length).toBeGreaterThan(0);
+  const arrival = handCards(await records(page)).at(-1) as Rec;
+  near(arrival.delay, 360, 1);
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+});
+
+test("main posée : les cartes se couchent 350 ms chacune, à 60 ms d’intervalle, face visible", async ({
+  page,
+}) => {
+  await openAny(page, {
+    turn: "bleu",
+    hands: { bleu: ["2S", "4S", "11S"], jaune: ["2H", "3H", "5H"] },
+    pawns: { jaune: [{ p: 5 }, "S", "S", "S"] },
+  });
+  await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "deadHand");
+  await page.getByRole("button", { name: "Poser mes cartes" }).click();
+
+  await shoot(page, "main-posee", LEAD + 120, "[data-flight]", 3);
+  const laid = flightsOf(await records(page), "lay");
+  expect(laid).toHaveLength(3);
+  expect(laid.map((f) => f.card).sort()).toEqual(["11S", "2S", "4S"]);
+  for (const [i, flight] of laid.entries()) {
+    near(flight.duration, 350, 1);
+    near(flight.begins - (laid[0] as Rec).begins, i * 60, 6);
+  }
+
+  const sounds = (await cues(page)).filter((c) => c.id === "carte-pose");
+  expect(sounds).toHaveLength(1);
+  await expect(page.locator('[data-felt-posed="bleu"] [data-felt-card]')).toHaveCount(3);
+  await expect(page.locator("[data-flight]")).toHaveCount(0);
+});
+
+test("la victoire : les huit chevaux de l’équipe gagnante sautent une fois, 600 ms, avant l’écran de fin", async ({
+  page,
+}) => {
+  // Bleu's 5 brings the last knight home: the team Bleu-Rouge has its eight knights home.
+  await openPosition(page, {
+    turn: "bleu",
+    pawns: {
+      bleu: [{ p: 66 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+    },
+    hands: { bleu: ["5S"] },
+  });
+  await playCard(page, "5 de pique", "bleu0");
+
+  const winners = ["bleu0", "bleu1", "bleu2", "bleu3", "rouge0", "rouge1", "rouge2", "rouge3"];
+  const hops = [];
+  for (const pawn of winners) hops.push(await waitFor(page, pawn, "arc", 600));
+  for (const hop of hops) near(hop.begins, (hops[0] as Rec).begins, 8);
+  // No other knight hops.
+  const others = (await records(page)).filter(
+    (r) => r.role === "arc" && Math.abs(r.duration - 600) <= 1 && !winners.includes(r.pawn ?? ""),
+  );
+  expect(others).toHaveLength(0);
+
+  await expect(page.locator("[data-end-screen]")).toBeVisible({ timeout: 10_000 });
 });

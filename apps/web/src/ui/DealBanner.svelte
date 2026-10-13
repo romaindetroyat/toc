@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MOTION, REDUCED, scaleFor } from "@toc/board";
   import type { Color, RenderState } from "@toc/engine";
   import { fade, scale } from "svelte/transition";
   import { game } from "../i18n/fr/game.ts";
@@ -12,8 +13,10 @@
 
   let { render, names }: Props = $props();
 
-  /** How long the plate stays over the board. */
-  const SHOWN_MS = 1200;
+  // The plate stays 1.2 s over the board, 0.4 times that in fast mode; it fades in and out in 150 ms
+  // when motion is reduced (UI-SPEC « Deal banner »).
+  const pace = $derived(settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal");
+  const shownMs = $derived(MOTION.banner * scaleFor(pace));
   /** Cards per player at each of the three deals of a shuffle (RULES: 5, 4, 4). */
   const CARDS = [5, 4, 4] as const;
 
@@ -36,15 +39,18 @@
     clearTimeout(timer);
     timer = setTimeout(() => {
       lines = null;
-    }, SHOWN_MS);
+    }, shownMs);
   });
 
   $effect(() => () => clearTimeout(timer));
 
   // Reduced motion: a fade only. Otherwise the plate also grows a little as it appears.
   const intro = (node: Element) =>
-    settings.reduceMotion ? fade(node, { duration: 150 }) : scale(node, { start: 0.9, duration: 200 });
-  const outro = (node: Element) => fade(node, { duration: settings.reduceMotion ? 150 : 200 });
+    pace === "reduced"
+      ? fade(node, { duration: REDUCED.cards })
+      : scale(node, { start: 0.9, duration: 200 * scaleFor(pace) });
+  const outro = (node: Element) =>
+    fade(node, { duration: pace === "reduced" ? REDUCED.cards : 200 * scaleFor(pace) });
 </script>
 
 <!-- Deal banner (UI-SPEC): a walnut plate at 70 % centred on the board for 1.2 s. It never takes a tap. -->

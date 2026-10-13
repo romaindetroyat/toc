@@ -10,9 +10,11 @@
     tilt?: number;
     /** Board units per screen pixel, so the inner border stays 2 screen pixels wide. */
     px?: number;
+    /** Without the knight and its filter: for the cards in flight, which move many at a time. */
+    plain?: boolean;
   };
 
-  let { x, y, w = 160, h = 224, tilt = 0, px = 3 }: Props = $props();
+  let { x, y, w = 160, h = 224, tilt = 0, px = 3, plain = false }: Props = $props();
 
   const WALNUT = "#2B1D12";
   const OAK = "#D8C6B0";
@@ -26,14 +28,16 @@
 <!-- Card back (UI-SPEC): oak surface, a 2 px #A46F2A inner border and a walnut knight silhouette taken
      from the knight sprite of KnightDefs (the sprite's alpha, painted walnut). -->
 <g transform={`translate(${x} ${y}) rotate(${tilt})`} data-card-back>
-  <defs>
-    <filter id="card-back-walnut" x="0" y="0" width="100%" height="100%">
-      <feColorMatrix
-        type="matrix"
-        values="0 0 0 0 0.169  0 0 0 0 0.114  0 0 0 0 0.071  0 0 0 1 0"
-      />
-    </filter>
-  </defs>
+  {#if !plain}
+    <defs>
+      <filter id="card-back-walnut" x="0" y="0" width="100%" height="100%">
+        <feColorMatrix
+          type="matrix"
+          values="0 0 0 0 0.169  0 0 0 0 0.114  0 0 0 0 0.071  0 0 0 1 0"
+        />
+      </filter>
+    </defs>
+  {/if}
   <rect
     x={-w / 2}
     y={-h / 2}
@@ -55,12 +59,14 @@
     stroke={BORDER}
     stroke-width={2 * px}
   />
-  <use
-    href="#knight-bleu"
-    x={-knightW / 2}
-    y={-knightH / 2}
-    width={knightW}
-    height={knightH}
-    filter="url(#card-back-walnut)"
-  />
+  {#if !plain}
+    <use
+      href="#knight-bleu"
+      x={-knightW / 2}
+      y={-knightH / 2}
+      width={knightW}
+      height={knightH}
+      filter="url(#card-back-walnut)"
+    />
+  {/if}
 </g>

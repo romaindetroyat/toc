@@ -7,7 +7,9 @@
 </script>
 
 <script lang="ts">
+  import { MOTION, type Mode, REDUCED, scaleFor } from "@toc/board";
   import { type CardId, type Playability, sortHand } from "@toc/engine";
+  import { tick, untrack } from "svelte";
   import { cardSize, fanLayout } from "../cards/fan.ts";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
@@ -21,10 +23,23 @@
     selected?: CardId | null;
     /** The card received from the partner, marked until it is played (D-21). */
     received?: CardId | null;
+    /** The cards of a new deal are still on their way: the hand is held back, then turned face up. */
+    concealed?: boolean;
+    /** The pace of the card motions: the settings by default, `test` turns them off. */
+    pace?: Mode | "test";
     onpick?: (card: CardId) => void;
   };
 
-  let { hand, mode, playability = {}, selected = null, received = null, onpick }: Props = $props();
+  let {
+    hand,
+    mode,
+    playability = {},
+    selected = null,
+    received = null,
+    concealed = false,
+    pace = settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
+    onpick,
+  }: Props = $props();
 
   let viewportWidth = $state(0);
   let viewportHeight = $state(0);
@@ -58,6 +73,63 @@
     return `translate(${slot.dx}px, ${slot.drop - lift}px) rotate(${slot.rotation}deg)`;
   }
 
+  // The cards come face up when the deal has landed: each flips open (a fade when motion is reduced),
+  // 40 ms after the one before. Only a change seen while the fan is on screen animates, so the fan
+  // that comes back after the 7 panel does not replay it.
+  let wasConcealed = untrack(() => concealed);
+  $effect(() => {
+    const hidden = concealed;
+    if (wasConcealed && !hidden && pace !== "test") {
+      const calm = pace === "reduced";
+      const scale = scaleFor(pace);
+      cards.forEach((card, i) => {
+        buttons[card]?.animate(
+          calm
+            ? [{ opacity: 0 }, { opacity: 1 }]
+            : [
+                { transform: "scaleX(0.05)", opacity: 0 },
+                { transform: "scaleX(1)", opacity: 1 },
+              ],
+          {
+            duration: calm ? REDUCED.cards : MOTION.dealCard * scale,
+            delay: calm ? 0 : i * MOTION.dealStagger * scale,
+            easing: "ease-out",
+            fill: "backwards",
+          },
+        );
+      });
+    }
+    wasConcealed = hidden;
+  });
+
+  // The card from the partner joins the hand once the four cards have crossed the felt.
+  let seenReceived = untrack(() => received);
+  $effect(() => {
+    const card = received;
+    const fresh = card !== null && card !== seenReceived && pace !== "test";
+    seenReceived = card;
+    if (!fresh) return;
+    const calm = pace === "reduced";
+    const scale = scaleFor(pace);
+    // The element exists once the DOM has been updated for this card.
+    void tick().then(() => {
+      untrack(() => buttons[card])?.animate(
+        calm
+          ? [{ opacity: 0 }, { opacity: 1 }]
+          : [
+              { transform: "translateY(36px)", opacity: 0 },
+              { transform: "translateY(0)", opacity: 1 },
+            ],
+        {
+          duration: calm ? REDUCED.cards : MOTION.dealCard * scale,
+          delay: (calm ? REDUCED.cards : MOTION.exchangeCross * scale) + 60,
+          easing: "ease-out",
+          fill: "backwards",
+        },
+      );
+    });
+  });
+
   const roving = $derived(Math.min(active, Math.max(0, cards.length - 1)));
   let buttons = $state<Record<string, HTMLElement | undefined>>({});
 
@@ -79,6 +151,7 @@
 <div
   class="fan"
   class:still={settings.reduceMotion}
+  class:concealed
   role="toolbar"
   tabindex="-1"
   aria-label={game.hand.label}
@@ -89,7 +162,7 @@
   data-hand
   data-mode={mode}
 >
-  {#if cards.length === 0}
+  {#if cards.length === 0 && !concealed}
     <!-- Between deals the hand is empty (UI-SPEC « Plus de cartes »). -->
     <div class="empty" data-hand-empty>
       <p class="heading">{game.empty.heading}</p>
@@ -173,6 +246,12 @@
 
   .still .slot {
     transition: none;
+  }
+
+  /* A new hand waits, invisible and out of reach, for the cards of the deal to land. */
+  .concealed .slot {
+    opacity: 0;
+    pointer-events: none;
   }
 
   @media (prefers-reduced-motion: reduce) {

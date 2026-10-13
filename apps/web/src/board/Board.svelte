@@ -13,6 +13,7 @@
   import type { CardId, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { board as t } from "../i18n/fr/board.ts";
+  import CardFlights, { type Flight } from "./CardFlights.svelte";
   import FeltTable from "./FeltTable.svelte";
   import Particles from "./Particles.svelte";
 
@@ -21,12 +22,13 @@
   // `under` and `over` are drawn behind and in front of the knights (`children`), `hits` on top of
   // all; each receives the number of board units per screen pixel.
   // With a render state the felt is drawn as a card table under all of them (D-08).
-  // `burst` puts the particles of the party above the knights.
+  // `burst` puts the particles of the party above the knights; `flights` the cards that are moving.
   let {
     k = 0,
     render,
     discardTop = null,
     burst = null,
+    flights = [],
     children,
     under,
     over,
@@ -37,6 +39,8 @@
     /** The card on top of the défausse, or null when it is empty. */
     discardTop?: CardId | null;
     burst?: Burst | null;
+    /** The cards in flight: dealt, played, exchanged or laid down. */
+    flights?: Flight[];
     children?: Snippet;
     under?: Snippet<[number]>;
     over?: Snippet<[number]>;
@@ -108,6 +112,9 @@
         durationMs={burst.durationMs}
         onDone={burst.onDone}
       />
+    {/if}
+    {#if flights.length > 0}
+      <CardFlights {flights} {px} />
     {/if}
     {@render over?.(px)}
     {@render hits?.(px)}

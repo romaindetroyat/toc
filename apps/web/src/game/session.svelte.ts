@@ -41,6 +41,8 @@ export type Session = {
   readonly human: Color;
   /** Clockwise quarter turns of the board toward the human (D-05). */
   readonly k: number;
+  /** The pace of the moment (settings, or `test` under the debug speed): read again at each use. */
+  readonly pace: DirectorMode;
   /** « toi » for the human, a horse name for each bot. */
   readonly names: Record<Color, string>;
   /** What the human may know now. */
@@ -88,14 +90,15 @@ export function createSession(
   const k = quarterTurnsFor(human);
   const testSpeed = debug.vitesse === "test";
 
+  const paceNow = (): DirectorMode =>
+    testSpeed ? "test" : settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal";
   const director = createDirector({
     animator: env.animator,
     audio: env.audio ?? audio,
     quarterTurns: k,
     facingOf: env.facingOf,
     commit: env.commit,
-    getMode: (): DirectorMode =>
-      testSpeed ? "test" : settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
+    getMode: paceNow,
   });
   // The controller hands every play to the Director; the session listens in to word the bots' plays.
   let lastPlay = $state.raw<BotPlay | null>(null);
@@ -157,6 +160,9 @@ export function createSession(
   return {
     human,
     k,
+    get pace() {
+      return paceNow();
+    },
     names: controller.names,
     get view() {
       return view;
@@ -179,6 +185,9 @@ export function createSession(
     stats: () => controller.stats(),
     start() {
       ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
+      // The first deal of a new game is dealt on screen too: the bots wait for the Director to be idle.
+      const opening = controller.openingDeal();
+      if (opening.length > 0) director.openDeal(opening);
       controller.start();
     },
     send(event) {

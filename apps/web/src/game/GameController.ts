@@ -15,7 +15,6 @@ import {
   type GameEvent,
   type GameState,
   IllegalActionError,
-  newGame,
   next,
   nextColor,
   type PlayerView,
@@ -23,6 +22,7 @@ import {
   type Scenario,
   scenarioState,
   shuffle,
+  startGame,
   teamOf,
   viewFor,
 } from "@toc/engine";
@@ -65,6 +65,8 @@ export type GameController = {
   readonly names: Record<Color, string>;
   /** What the human may know now. A fresh object each call. */
   view(): PlayerView;
+  /** The events of the first deal of a new game (none when a scenario sets the position up). */
+  openingDeal(): GameEvent[];
   /** The human's action, validated by the engine. Nothing changes when it is refused. */
   submit(action: Action): SubmitResult;
   /** Called after every applied action, the human's and the bots'. Returns the unsubscribe function. */
@@ -129,12 +131,18 @@ export function createGame(options: CreateGameOptions): GameController {
         })();
 
   let state: GameState;
+  let opening: GameEvent[] = [];
   if (scenario !== undefined) {
     state = scenarioState(scenario, seed);
   } else {
     let u: number;
     [u, botRng] = next(botRng);
-    state = newGame({ firstDealer: COLORS[Math.floor(u * COLORS.length)] as Color }, seed);
+    const started = startGame(
+      { firstDealer: COLORS[Math.floor(u * COLORS.length)] as Color },
+      seed,
+    );
+    state = started.state;
+    opening = started.events;
   }
 
   const [horses, afterNames] = shuffle(BOT_NAMES, botRng);
@@ -222,6 +230,7 @@ export function createGame(options: CreateGameOptions): GameController {
     human,
     names,
     view: () => viewFor(state, human),
+    openingDeal: () => opening,
     submit(action) {
       if (disposed) return { ok: false, error: "illegal" };
       try {
