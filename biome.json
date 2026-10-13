@@ -1,0 +1,36 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": false
+  },
+  "files": {
+    "includes": [
+      "**/*.ts",
+      "**/*.mjs",
+      "**/*.json",
+      "!**/*.svelte",
+      "!**/node_modules",
+      "!**/dist",
+      "!packages/board/layout.json",
+      "!apps/web/public",
+      "!docs",
+      "!assets",
+      "!.planning",
+      "!.claude",
+      "!**/test-results",
+      "!**/playwright-report"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "toc",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "^22",
+    "fast-check": "4.10.2",
+    "sharp": "0.35.5",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

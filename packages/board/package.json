@@ -1,0 +1,16 @@
+{
+  "name": "@toc/board",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/index.ts",
+    "./layout.json": "./layout.json"
+  },
+  "dependencies": {
+    "@toc/engine": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
