@@ -5,3 +5,4 @@ export * from "./rules.ts";
 export * from "./state.ts";
 export * from "./topology.ts";
 export * from "./types.ts";
+export * from "./view.ts";

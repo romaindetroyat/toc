@@ -17,6 +17,7 @@ import {
   sortHand,
   startGame,
   teamOf,
+  viewFor,
 } from "../src/index.ts";
 
 type Seed = [number, number, number, number];
@@ -359,5 +360,89 @@ describe("simultaneous exchange (R-04)", () => {
     expect(JSON.stringify(frozen)).toBe(JSON.stringify(state));
     const played = deepFreeze(emptyHands(exchanged));
     expect(() => endDeal(played)).not.toThrow();
+  });
+});
+
+describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
+  it("is tagged kind 'view' and carries the seat's own hand and the hand sizes", () => {
+    const { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const view = viewFor(state, "jaune");
+    expect(view.kind).toBe("view");
+    expect(view.seat).toBe("jaune");
+    expect(view.hand).toEqual(state.hands.jaune);
+    expect(view.handSizes).toEqual({ bleu: 5, jaune: 5, rouge: 5, vert: 5 });
+    expect(view.talonSize).toBe(32);
+    expect(view.dealer).toBe("bleu");
+    expect(view.phase).toBe("exchange");
+    expect(view.rules).toEqual(state.rules);
+  });
+
+  it("never contains a card id of another seat's hand, in every phase and for every seat", () => {
+    let { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const stages: GameState[] = [state];
+    // two gives: the givers' cards must stay private
+    state = giveCard(state, "bleu", state.hands.bleu[0] as CardId).state;
+    state = giveCard(state, "rouge", state.hands.rouge[0] as CardId).state;
+    stages.push(state);
+    state = giveCard(state, "jaune", state.hands.jaune[0] as CardId).state;
+    state = giveCard(state, "vert", state.hands.vert[0] as CardId).state;
+    stages.push(state);
+    for (const stage of stages) {
+      for (const seat of COLORS) {
+        const json = JSON.stringify(viewFor(stage, seat));
+        const mine = new Set<string>(stage.hands[seat]);
+        for (const other of COLORS) {
+          if (other === seat) continue;
+          for (const card of stage.hands[other]) {
+            if (mine.has(card)) continue;
+            expect(json).not.toContain(`"${card}"`);
+          }
+        }
+      }
+    }
+  });
+
+  it("hides the talon order, the rng and the other seats' exchange choices", () => {
+    let { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const given = state.hands.rouge[0] as CardId;
+    state = giveCard(state, "rouge", given).state;
+    const own = viewFor(state, "rouge");
+    expect(own.given).toBe(given);
+    const other = viewFor(state, "jaune");
+    expect(other.given).toBeNull();
+    expect(JSON.stringify(other)).not.toContain(`"${given}"`);
+    expect(other.hasGiven).toEqual({ bleu: false, jaune: false, rouge: true, vert: false });
+    const json = JSON.stringify(other);
+    expect(json).not.toContain("rng");
+    expect(json).not.toContain('"talon"');
+    for (const card of state.talon) expect(json).not.toContain(`"${card}"`);
+  });
+
+  it("shows the received card to its owner only and the public piles to everybody", () => {
+    const { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const played = exchangeAll(state).state;
+    const mine = viewFor(played, "bleu");
+    expect(mine.received).toBe(played.received.bleu);
+    expect(mine.given).toBeNull();
+    expect(viewFor(played, "vert").received).toBe(played.received.vert);
+    const felt = {
+      ...played,
+      discard: ["5H", "9D"] as CardId[],
+      posed: { ...played.posed, rouge: ["2C"] as CardId[] },
+    };
+    for (const seat of COLORS) {
+      const view = viewFor(felt, seat);
+      expect(view.discard).toEqual(["5H", "9D"]);
+      expect(view.posed.rouge).toEqual(["2C"]);
+    }
+  });
+
+  it("returns a copy: changing the view does not touch the state", () => {
+    const { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const before = JSON.stringify(state);
+    const view = viewFor(state, "bleu");
+    view.hand.pop();
+    view.discard.push("1S");
+    expect(JSON.stringify(state)).toBe(before);
   });
 });
