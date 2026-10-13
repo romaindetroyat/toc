@@ -2,7 +2,7 @@
 
 **Phase:** 1
 **Generated:** 2026-10-13
-**Built by:** plan `01-01` (task 2 is the tracer; task 3 hardens the board slice)
+**Built by:** plan `01-01` (task 2 is the tracer); plan `01-02` hardens the board slice (tests, srcset, loading/error states, debug overlay)
 
 ## Capability Proven End-to-End
 
@@ -36,12 +36,12 @@ Layers crossed by that one path: pnpm workspace → `packages/engine` (pure topo
 ```
 toc/
 ├── package.json, pnpm-workspace.yaml, tsconfig.base.json, biome.json, vitest.config.ts
-├── RULES.md                         # French, numbered, validated by Romain (plans 01-02, 01-03)
+├── RULES.md                         # French, numbered (plans 01-03, 01-05), validated by Romain (plan 01-07)
 ├── assets/plateau/quart-*.webp      # sources, untouched
-├── assets/audio/LICENSES.md         # licence manifest (plan 01-05)
-├── assets/cartes/CHOIX.md           # card-art decision record (plan 01-03)
-├── docs/regles/R-xx.y.webp          # scenario pictures for RULES.md (plan 01-02)
-├── packages/engine/  src/ (pure rules) · scenarios/ (declarative fixtures) · test/
+├── assets/audio/LICENSES.md         # licence manifest (plan 01-11; card art rows in plan 01-20)
+├── assets/cartes/CHOIX.md           # card-art decision record (plan 01-07)
+├── docs/regles/R-xx.y.webp          # scenario pictures for RULES.md (plan 01-05)
+├── packages/engine/  src/ (pure rules) · scenarios/ (declarative fixtures: table, cartes, valet-sept, prises-maison, fin) · test/
 ├── packages/board/   layout.json · src/{layout,hopTimeline,rotate,motion}.ts
 ├── packages/bots/    src/randomLegal.ts (level 1)
 ├── apps/web/         src/{routes,board,game,audio,ui,i18n/fr,settings,licences,cards}/ · e2e/ · playwright.config.ts
@@ -51,9 +51,9 @@ toc/
 ## Stack Touched in Phase 1
 
 - [x] Project scaffold (framework, build, lint, test runner) — plan 01-01 task 2
-- [x] Routing — `#/` and `#/partie` in the tracer; `#/sons` in plan 01-05
-- [ ] Database — not applicable in Phase 1 (no server by design). The persistence read/write path is `localStorage` settings (`toc.settings.v1`, last colour) delivered by plan 01-04; Durable Object SQLite and D1 are Phase 2
-- [x] UI — « Jouer la partie » tap unlocks audio and opens the board; tap on the knight emits a `pawnMoved` event through the Director (replaced by the card → cheval → « Jouer » flow in plan 01-08 without changing the event/Director architecture)
+- [x] Routing — `#/` and `#/partie` in the tracer; `#/sons` in plan 01-09
+- [ ] Database — not applicable in Phase 1 (no server by design). The persistence read/write path is `localStorage` settings (`toc.settings.v1`, last colour) delivered by plan 01-06; Durable Object SQLite and D1 are Phase 2
+- [x] UI — « Jouer la partie » tap unlocks audio and opens the board; tap on the knight emits a `pawnMoved` event through the Director (replaced by the card → cheval → « Jouer » flow in plan 01-16 without changing the event/Director architecture)
 - [x] Deployment — documented local full-stack run commands (above); Playwright runs against `vite preview` of the production build
 
 ## Out of Scope (Deferred to Later Slices)
