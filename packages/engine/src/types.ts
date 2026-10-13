@@ -196,6 +196,8 @@ export type Scenario = {
     legal?: boolean;
     reason?: Reason;
     captured?: PawnId[];
+    /** For each captured pawn, the 0-based index in the attacker's path where it is eaten (the 7 eats on the way). */
+    capturedAtStep?: Partial<Record<PawnId, number>>;
     after?: { pawns: Partial<Record<Color, PawnSpec[]>> };
     events?: GameEvent["t"][];
     legalInclude?: Action[];
@@ -213,6 +215,10 @@ export type Scenario = {
     /** The 52 cards are all accounted for (hands, talon, discard, felt) after the script. */
     conserved?: boolean;
   };
-  /** G-numbers the scenario depends on, plus "seven" when it depends on whether a 7 in hand can be played. */
+  /**
+   * G-numbers the scenario depends on, plus "seven" when it depends on whether a 7 in hand can be played,
+   * plus "alt" when the scenario describes the ALTERNATIVE value of an open point (G1, G12): the engine
+   * tests run it only if Romain picks that alternative, and skip it otherwise.
+   */
   flags?: string[];
 };
