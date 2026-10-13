@@ -28,7 +28,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [ ] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
 - [ ] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
-- [ ] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
+- [x] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
 
 ### Jouer un tour (PLAY)
 
@@ -134,7 +134,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | RULE-17 | Phase 1 | Pending |
 | RULE-18 | Phase 1 | Pending |
 | RULE-19 | Phase 2 | Pending |
-| RULE-20 | Phase 1 | Pending |
+| RULE-20 | Phase 1 | Complete |
 | PLAY-01 | Phase 1 | Pending |
 | PLAY-02 | Phase 1 | Pending |
 | PLAY-03 | Phase 1 | Pending |
