@@ -1,19 +1,24 @@
 import {
   type Action,
+  apply,
   type CardId,
   type Color,
   type GameState,
+  nextSteps,
   type PawnId,
   type Place,
+  previewPlan,
   type Reason,
   resolveMove,
   type Scenario,
+  type SevenPlan,
   scenarioState,
   viewFor,
 } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import {
   initialTurnUi,
+  knightLetter,
   reduceTurnUi,
   type TurnCtx,
   type TurnUiEvent,
@@ -436,30 +441,6 @@ describe("the preview is the engine's own resolveMove (PLAY-02)", () => {
     const ctx = ctxOf(SINGLE);
     const start = synced(ctx);
     expect(reduceTurnUi(start, { t: "tapPawn", pawn: "bleu0" }, ctx).state).toBe(start);
-  });
-});
-
-describe("cards the later plans complete", () => {
-  it("lets a 7 be selected without producing a candidate (plan 01-21)", () => {
-    const state = build({
-      pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 30 }, "S", "S", "S"] },
-      hands: { bleu: ["7H", "11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
-      turn: "bleu",
-    });
-    const ctx = ctxOf(state);
-    expect(ctx.playability["7H"]).toEqual({ playable: true });
-    expect(ctx.playability["11H"]).toEqual({ playable: true });
-    for (const card of ["7H"] as const) {
-      const [selected, pawn] = run(
-        synced(ctx),
-        ctx,
-        { t: "tapCard", card },
-        { t: "tapPawn", pawn: "bleu0" },
-      );
-      expect(selected?.state).toEqual({ kind: "cardSelected", card, candidates: [] });
-      expect(pawn?.state).toEqual(selected?.state);
-      expect(pawn?.submit).toBeUndefined();
-    }
   });
 });
 
@@ -933,5 +914,356 @@ describe("the tray: knights too close to tell apart", () => {
     expect(trayLetters(["bleu1", "bleu2"])).toEqual(["B", "C"]);
     expect(trayLetters(["jaune0", "bleu3", "vert1"])).toEqual(["A", "D", "B"]);
     expect(trayLetters(["jaune0", "bleu0", "vert1"])).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
+  // bleu0 on cell 5, bleu1 on cell 20, a Jaune knight on cell 8: bleu0 eats it on the way with a 7 or more.
+  const WITH_CAPTURE = build({
+    pawns: {
+      bleu: [{ p: 5 }, { p: 20 }, "S", "S"],
+      jaune: [{ p: 62 }, "S", "S", "S"],
+    },
+    hands: { bleu: ["7H", "11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+    turn: "bleu",
+  });
+
+  type Building = Extract<TurnUiState, { kind: "sevenBuilding" }>;
+  const building = (state: TurnUiState): Building => {
+    expect(state.kind).toBe("sevenBuilding");
+    return state as Building;
+  };
+  const lit = (state: Building) =>
+    Object.entries(state.steps)
+      .filter(([, steps]) => (steps ?? []).length > 0)
+      .map(([pawn]) => pawn);
+
+  /** Taps the 7, then plays the (knight, steps) pairs one after the other. */
+  function build7(ctx: TurnCtx, ...moves: [PawnId, number][]): Building {
+    let state = reduceTurnUi(synced(ctx), { t: "tapCard", card: "7H" }, ctx).state;
+    for (const [pawn, steps] of moves) {
+      state = reduceTurnUi(state, { t: "tapPawn", pawn }, ctx).state;
+      state = reduceTurnUi(state, { t: "pickSteps", steps }, ctx).state;
+    }
+    return building(state);
+  }
+
+  it("enters the splitter on a 7: Reste 7, no row, the knights that can move are lit", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const [tapped] = run(synced(ctx), ctx, { t: "tapCard", card: "7H" });
+    const state = building(tapped?.state as TurnUiState);
+    expect(state).toMatchObject({ card: "7H", plan: [], remaining: 7 });
+    expect(state.selected).toBeUndefined();
+    expect(state.preview).toEqual({ moves: [], captures: [] });
+    expect(lit(state)).toEqual(["bleu0", "bleu1"]);
+    expect(tapped?.submit).toBeUndefined();
+    // The chips come from the engine and from nothing else (T-01-31).
+    expect(state.steps).toEqual(nextSteps(ctx.view, "bleu", "7H", []));
+  });
+
+  it("keeps a stable knight out: it is not one to tap", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const [, stable] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "tapPawn", pawn: "bleu2" },
+    );
+    expect(building(stable?.state as TurnUiState).selected).toBeUndefined();
+  });
+
+  it("taps a knight to choose its steps, and the same knight again to let it go", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const [, first, second] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "bleu0" },
+    );
+    expect(building(first?.state as TurnUiState).selected).toBe("bleu0");
+    expect(building(second?.state as TurnUiState).selected).toBeUndefined();
+    // A tap on the board that lands on one knight does the same as a tap on the knight.
+    const [, near] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "tapAt", near: ["bleu1"] },
+    );
+    expect(building(near?.state as TurnUiState).selected).toBe("bleu1");
+  });
+
+  it("asks for a knight when a number of steps is chosen before any", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const [, early] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "pickSteps", steps: 3 },
+    );
+    const state = building(early?.state as TurnUiState);
+    expect(state.notice).toBe("pickKnight");
+    expect(state.plan).toEqual([]);
+    expect(state.remaining).toBe(7);
+  });
+
+  it("adds the micro-move, lowers Reste and shows the capture in transit", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const state = build7(ctx, ["bleu0", 4]);
+    expect(state.plan).toEqual([{ pawn: "bleu0", steps: 4 }]);
+    expect(state.remaining).toBe(3);
+    expect(state.selected).toBeUndefined();
+    expect(state.notice).toBeUndefined();
+    // The preview is the engine's own previewPlan: bleu0 passes the Jaune knight on cell 8.
+    const played = previewPlan(ctx.view, "bleu", "7H", state.plan);
+    expect(played.ok).toBe(true);
+    expect(state.preview.moves).toHaveLength(1);
+    expect(state.preview.moves[0]).toMatchObject({
+      pawn: "bleu0",
+      from: { z: "ring", cell: 5 },
+    });
+    expect(state.preview.moves[0]?.path).toHaveLength(4);
+    expect(state.preview.captures).toEqual([
+      { by: "bleu0", victim: "jaune0", at: { z: "ring", cell: 8 }, move: 0, atStep: 2 },
+    ]);
+    // The offers follow the plan so far.
+    expect(state.steps).toEqual(nextSteps(ctx.view, "bleu", "7H", state.plan));
+  });
+
+  it("splits the 7 over two knights, one row per micro-move, and confirms once at Reste 0", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const state = build7(ctx, ["bleu0", 3], ["bleu1", 4]);
+    expect(state.plan).toEqual([
+      { pawn: "bleu0", steps: 3 },
+      { pawn: "bleu1", steps: 4 },
+    ]);
+    expect(state.remaining).toBe(0);
+    expect(state.preview.moves.map((move) => move.pawn)).toEqual(["bleu0", "bleu1"]);
+    expect(lit(state)).toEqual([]);
+
+    const [confirmed] = run(state, ctx, { t: "confirm" });
+    expect(confirmed?.submit).toEqual({
+      t: "seven",
+      card: "7H",
+      plan: [
+        { pawn: "bleu0", steps: 3 },
+        { pawn: "bleu1", steps: 4 },
+      ],
+    });
+    expect(confirmed?.state).toEqual({ kind: "waiting" });
+    // The engine accepts exactly what is submitted.
+    expect(() => apply(WITH_CAPTURE, "bleu", confirmed?.submit as never)).not.toThrow();
+  });
+
+  it("ignores « Jouer » while steps remain, and submits nothing before it", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const state = build7(ctx, ["bleu0", 3]);
+    const [early] = run(state, ctx, { t: "confirm" });
+    expect(early?.submit).toBeUndefined();
+    expect(early?.state).toEqual(state);
+    // No step of the way submits anything.
+    const every = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "pickSteps", steps: 3 },
+      { t: "tapPawn", pawn: "bleu1" },
+    );
+    for (const result of every) expect(result.submit).toBeUndefined();
+  });
+
+  it("merges two consecutive choices of one knight in the preview, but keeps two rows to undo", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const state = build7(ctx, ["bleu0", 2], ["bleu0", 5]);
+    expect(state.plan).toEqual([
+      { pawn: "bleu0", steps: 2 },
+      { pawn: "bleu0", steps: 5 },
+    ]);
+    expect(state.remaining).toBe(0);
+    expect(state.preview.moves).toHaveLength(1);
+    expect(state.preview.moves[0]?.path).toHaveLength(7);
+    const [confirmed] = run(state, ctx, { t: "confirm" });
+    expect(confirmed?.submit).toEqual({
+      t: "seven",
+      card: "7H",
+      plan: [{ pawn: "bleu0", steps: 7 }],
+    });
+  });
+
+  it("refuses a number of steps that would make the 7 impossible to finish, and says so", () => {
+    // bleu0 stands 4 cells from the home: only 3 or 7 steps leave a 7 that can be finished.
+    const near = build({
+      pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(near);
+    const picked = build7(ctx);
+    const tapped = reduceTurnUi(picked, { t: "tapPawn", pawn: "bleu0" }, ctx).state;
+    const offered = building(tapped).steps.bleu0 ?? [];
+    expect(offered).toEqual([3, 7]);
+    const refused = reduceTurnUi(tapped, { t: "pickSteps", steps: 1 }, ctx);
+    const state = building(refused.state);
+    expect(state.notice).toBe("stepRefused");
+    expect(state.plan).toEqual([]);
+    expect(state.selected).toBe("bleu0");
+    expect(refused.submit).toBeUndefined();
+    // A step count beyond the rest is refused the same way.
+    const beyond = reduceTurnUi(tapped, { t: "pickSteps", steps: 9 }, ctx);
+    expect(building(beyond.state).notice).toBe("stepRefused");
+    // A later good choice clears the notice.
+    const good = reduceTurnUi(refused.state, { t: "pickSteps", steps: 3 }, ctx);
+    expect(building(good.state).notice).toBeUndefined();
+    expect(building(good.state).remaining).toBe(4);
+  });
+
+  it("goes on with the partner's knights once the fourth knight is home, in the middle of the 7 (G12)", () => {
+    const near = build({
+      pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(near);
+    const state = build7(ctx, ["bleu0", 3]);
+    expect(state.remaining).toBe(4);
+    expect(state.steps.rouge0).toEqual([4]);
+    const done = build7(ctx, ["bleu0", 3], ["rouge0", 4]);
+    expect(done.remaining).toBe(0);
+    const [confirmed] = run(done, ctx, { t: "confirm" });
+    expect(confirmed?.submit).toEqual({
+      t: "seven",
+      card: "7H",
+      plan: [
+        { pawn: "bleu0", steps: 3 },
+        { pawn: "rouge0", steps: 4 },
+      ],
+    });
+  });
+
+  it("a finished player plays the 7 with his partner's knights (RULE-17)", () => {
+    const finished = build({
+      pawns: {
+        bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+        rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+      },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(finished);
+    const [prompt] = run(initialTurnUi, ctx, { t: "sync" });
+    expect(prompt?.state).toEqual({ kind: "finishedPrompt" });
+    const state = build7(ctx, ["rouge0", 3], ["rouge1", 4]);
+    expect(lit(build7(ctx))).toEqual(["rouge0", "rouge1"]);
+    const [confirmed] = run(state, ctx, { t: "confirm" });
+    expect(confirmed?.submit).toMatchObject({ t: "seven", card: "7H" });
+    expect(() => apply(finished, "bleu", confirmed?.submit as never)).not.toThrow();
+  });
+
+  it("removes only the last micro-move with undoLast, and restores the previous preview", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const one = build7(ctx, ["bleu0", 4]);
+    const two = build7(ctx, ["bleu0", 4], ["bleu1", 2]);
+    expect(two.plan).toHaveLength(2);
+    const [undone] = run(two, ctx, { t: "undoLast" });
+    expect(undone?.state).toEqual(one);
+    const [again] = run(one, ctx, { t: "undoLast" });
+    expect(building(again?.state as TurnUiState)).toMatchObject({ plan: [], remaining: 7 });
+    expect(building(again?.state as TurnUiState).preview).toEqual({ moves: [], captures: [] });
+    // Nothing to undo at the start: the state is unchanged.
+    const fresh = build7(ctx);
+    expect(run(fresh, ctx, { t: "undoLast" })[0]?.state).toEqual(fresh);
+    expect(run(two, ctx, { t: "undoLast" })[0]?.submit).toBeUndefined();
+  });
+
+  it("undoes a micro-move merged into the one before it on its own", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const merged = build7(ctx, ["bleu0", 2], ["bleu0", 3]);
+    const [undone] = run(merged, ctx, { t: "undoLast" });
+    const state = building(undone?.state as TurnUiState);
+    expect(state.plan).toEqual([{ pawn: "bleu0", steps: 2 }]);
+    expect(state.remaining).toBe(5);
+  });
+
+  it("« Tout annuler » returns to card choice with no card selected, from any point", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    for (const state of [
+      build7(ctx),
+      build7(ctx, ["bleu0", 3]),
+      build7(ctx, ["bleu0", 3], ["bleu1", 4]),
+    ]) {
+      const [cancelled] = run(state, ctx, { t: "cancelAll" });
+      expect(cancelled?.state).toEqual({ kind: "idle" });
+      expect(cancelled?.submit).toBeUndefined();
+    }
+    for (const event of [{ t: "escape" }, { t: "changeCard" }, { t: "cancel" }] as const) {
+      expect(run(build7(ctx, ["bleu0", 3]), ctx, event)[0]?.state).toEqual({ kind: "idle" });
+    }
+    // The card itself, tapped again, lets go too.
+    const [back] = run(build7(ctx, ["bleu0", 3]), ctx, { t: "tapCard", card: "7H" });
+    expect(back?.state).toEqual({ kind: "idle" });
+  });
+
+  it("switches to the Valet from the splitter, with the plan dropped", () => {
+    const ctx = ctxOf(WITH_CAPTURE);
+    const [jack] = run(build7(ctx, ["bleu0", 3]), ctx, { t: "tapCard", card: "11H" });
+    expect(jack?.state.kind).toBe("jackPick");
+  });
+
+  it("opens the tray for two knights too close to tell apart, and the chosen one is selected", () => {
+    const close = build({
+      pawns: { bleu: [{ p: 5 }, { p: 6 }, "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(close);
+    const [, tray] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "tapAt", near: ["bleu0", "bleu1"] },
+    );
+    expect(tray?.state).toMatchObject({ kind: "tray", card: "7H", options: ["bleu0", "bleu1"] });
+    const trayState = tray?.state as Extract<TurnUiState, { kind: "tray" }>;
+    const next = trayState.next;
+    expect(next.kind).toBe("sevenBuilding");
+    const [chosen] = run(tray?.state as TurnUiState, ctx, { t: "chooseTrayOption", pawn: "bleu1" });
+    expect(building(chosen?.state as TurnUiState).selected).toBe("bleu1");
+    // « Choisir un autre cheval » goes back to the splitter, the plan kept.
+    const [closed] = run(tray?.state as TurnUiState, ctx, { t: "closeTray" });
+    expect(closed?.state).toEqual(next);
+  });
+
+  it("never offers a plan the engine would refuse, whatever the order of the choices", () => {
+    // Walk every first choice on a busy board: what the chips offer always completes to a legal 7.
+    const busy = build({
+      pawns: {
+        bleu: [{ p: 5 }, { p: 20 }, { p: 40 }, "S"],
+        jaune: [{ p: 62 }, { p: 70 }, "S", "S"],
+        rouge: [{ p: 30 }, "S", "S", "S"],
+      },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(busy);
+    let state: TurnUiState = build7(ctx);
+    for (let guard = 0; guard < 8 && building(state).remaining > 0; guard++) {
+      const here = building(state);
+      const pawn = lit(here)[0] as PawnId;
+      const steps = Math.max(...(here.steps[pawn] ?? [0]));
+      state = reduceTurnUi(
+        reduceTurnUi(state, { t: "tapPawn", pawn }, ctx).state,
+        { t: "pickSteps", steps },
+        ctx,
+      ).state;
+    }
+    expect(building(state).remaining).toBe(0);
+    const plan: SevenPlan = building(state).plan;
+    expect(() => apply(busy, "bleu", { t: "seven", card: "7H", plan })).not.toThrow();
+  });
+
+  it("labels the knights A to D by their index in their colour", () => {
+    expect(knightLetter("bleu0")).toBe("A");
+    expect(knightLetter("rouge3")).toBe("D");
   });
 });

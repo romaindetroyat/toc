@@ -58,14 +58,40 @@
   const destination = $derived(points.length > 1 ? (points[points.length - 1] ?? null) : null);
 
   // A chevron every three cells, turned along the path.
-  const chevrons = $derived(
-    points.slice(1).flatMap((to, j) => {
-      const from = points[j];
+  function chevronsOf(line: readonly Point[]) {
+    return line.slice(1).flatMap((to, j) => {
+      const from = line[j];
       if (j % 3 !== 1 || from === undefined) return [];
       const angle = (Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI;
       return [{ x: (from[0] + to[0]) / 2, y: (from[1] + to[1]) / 2, angle }];
+    });
+  }
+  const chevrons = $derived(chevronsOf(points));
+
+  // The 7 (D-17): one dashed path per micro-move so far, a ghost where each moved knight will stand with
+  // the steps it was given, and the × badge on every knight eaten on the way.
+  const building = $derived(
+    ui.kind === "sevenBuilding"
+      ? ui
+      : ui.kind === "tray" && ui.next.kind === "sevenBuilding"
+        ? ui.next
+        : null,
+  );
+  const sevenRoutes = $derived(
+    (building?.preview.moves ?? []).map((move) => {
+      const line: Point[] = [anchorOf(move.from, k), ...move.path.map((place) => anchorOf(place, k))];
+      return { pawn: move.pawn, points: line, chevrons: chevronsOf(line), steps: move.path.length };
     }),
   );
+  const sevenGhosts = $derived.by(() => {
+    const byPawn = new Map<PawnId, { at: Point; steps: number }>();
+    for (const route of sevenRoutes) {
+      const end = route.points[route.points.length - 1];
+      if (end === undefined) continue;
+      byPawn.set(route.pawn, { at: end, steps: (byPawn.get(route.pawn)?.steps ?? 0) + route.steps });
+    }
+    return [...byPawn].map(([pawn, ghost]) => ({ pawn, ...ghost }));
+  });
 
   const badge = $derived.by((): string | null => {
     if (preview === null) return null;
@@ -215,6 +241,39 @@
         {/each}
       </g>
     {/if}
+
+    {#each sevenRoutes as route, i (i)}
+      {@const line = route.points.map(([x, y]) => `${x},${y}`).join(" ")}
+      <g data-seven-path={route.pawn}>
+        <polyline
+          points={line}
+          fill="none"
+          stroke={CREAM}
+          stroke-width="16"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <polyline
+          points={line}
+          fill="none"
+          stroke={WALNUT}
+          stroke-width="10"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-dasharray="28 24"
+        />
+        {#each route.chevrons as c, j (j)}
+          <path
+            d="M -12 -14 L 16 0 L -12 14 Z"
+            fill={WALNUT}
+            stroke={CREAM}
+            stroke-width="4"
+            stroke-linejoin="round"
+            transform={`translate(${c.x} ${c.y}) rotate(${c.angle})`}
+          />
+        {/each}
+      </g>
+    {/each}
   </g>
 {:else}
   <g data-overlay="over" pointer-events="none">
@@ -245,6 +304,48 @@
         {/if}
       </g>
     {/if}
+
+    {#each sevenGhosts as ghost (ghost.pawn)}
+      <g data-seven-ghost={ghost.pawn} transform={`translate(${ghost.at[0]} ${ghost.at[1]})`}>
+        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={CREAM} stroke-width="8" />
+        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={WALNUT} stroke-width="4" />
+        <use
+          href={`#knight-${pawnColor(ghost.pawn)}`}
+          x="-55"
+          y="-186"
+          width="110"
+          height="190"
+          opacity="0.55"
+        />
+        <g data-badge transform={`translate(${62} ${-190})`}>
+          <circle r={21 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
+          <text
+            text-anchor="middle"
+            dominant-baseline="central"
+            fill={CREAM}
+            font-size={14 * px}
+            font-weight="700"
+            style="font-family: var(--font-ui)">{game.preview.plus(ghost.steps)}</text
+          >
+        </g>
+      </g>
+    {/each}
+
+    {#each building?.preview.captures ?? [] as capture (capture.victim)}
+      {@const [x, y] = anchorOf(capture.at, k)}
+      <g data-capture={capture.victim} transform={`translate(${x} ${y - 196})`}>
+        <g class="pop" class:still>
+          <circle r={12 * px} fill={BRICK} stroke={CREAM} stroke-width={2 * px} />
+          <path
+            d={`M ${-5 * px} ${-5 * px} L ${5 * px} ${5 * px} M ${5 * px} ${-5 * px} L ${-5 * px} ${5 * px}`}
+            stroke="#FFFFFF"
+            stroke-width={2.4 * px}
+            stroke-linecap="round"
+            fill="none"
+          />
+        </g>
+      </g>
+    {/each}
 
     {#if swap !== null}
       <g data-swap-preview>

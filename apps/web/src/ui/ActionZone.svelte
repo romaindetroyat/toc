@@ -125,6 +125,7 @@
       case "jackTarget":
         return [missed ? game.turn.chooseLit : game.turn.jackSecond];
       case "tray":
+      case "sevenBuilding":
         return [];
       case "preview": {
         const out = [describe(ui)];

@@ -31,6 +31,7 @@
   import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import SevenPanel from "../ui/SevenPanel.svelte";
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -226,7 +227,12 @@
   const candidates = $derived.by((): PawnId[] => {
     if (render === null) return [];
     const out = new Set<PawnId>();
-    if (flow.kind === "jackPick") for (const pawn of flow.pawns) out.add(pawn);
+    if (flow.kind === "sevenBuilding") {
+      // The knights the engine still lets move; the one whose chips are shown is drawn as selected.
+      for (const [pawn, steps] of Object.entries(flow.steps) as [PawnId, number[]][]) {
+        if (steps.length > 0) out.add(pawn);
+      }
+    } else if (flow.kind === "jackPick") for (const pawn of flow.pawns) out.add(pawn);
     else if (flow.kind === "jackTarget") {
       out.add(flow.pawn);
       for (const pawn of flow.targets) out.add(pawn);
@@ -253,6 +259,7 @@
 
   const selectedPawn = $derived.by((): PawnId | null => {
     if (render === null) return null;
+    if (flow.kind === "sevenBuilding") return flow.selected ?? null;
     if (flow.kind === "jackTarget") return flow.pawn;
     if (flow.kind !== "preview") return null;
     const action = flow.action;
@@ -273,6 +280,7 @@
       case "modeChoice":
       case "jackPick":
       case "jackTarget":
+      case "sevenBuilding":
       case "tray":
       case "preview":
         return "turn";
@@ -314,6 +322,7 @@
       ui.kind === "modeChoice" ||
       ui.kind === "jackPick" ||
       ui.kind === "jackTarget" ||
+      ui.kind === "sevenBuilding" ||
       ui.kind === "tray" ||
       ui.kind === "preview"
       ? ui.card
@@ -423,6 +432,7 @@
                 ui.kind === "cardSelected" ||
                 ui.kind === "jackPick" ||
                 ui.kind === "jackTarget" ||
+                ui.kind === "sevenBuilding" ||
                 ui.kind === "preview"
               }
               onpick={pickPawn}
@@ -436,38 +446,55 @@
         <DealBanner {render} names={session.names} />
       </div>
 
-      <div class="action">
-        <ActionZone
-          {ui}
-          {view}
-          human={session.human}
-          names={session.names}
-          hint={session.hint}
-          {missed}
-          thinking={session.thinking}
-          lastPlay={session.lastPlay}
-          onconfirm={() => send({ t: "confirm" })}
-          oncancel={() => send({ t: "cancel" })}
-          onchangeCard={() => send({ t: "changeCard" })}
-          ongive={() => send({ t: "give" })}
-          onpose={() => send({ t: "pose" })}
-          onexit={chooseExit}
-          onadvance={() => send({ t: "chooseAdvance" })}
-          ontrayPick={pickTrayOption}
-          ontrayClose={() => send({ t: "closeTray" })}
-        />
-      </div>
+      {#if flow.kind === "sevenBuilding"}
+        <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
+        <div class="seven">
+          <SevenPanel
+            seven={flow}
+            tray={ui.kind === "tray" ? ui : null}
+            {missed}
+            onpickSteps={(steps) => send({ t: "pickSteps", steps })}
+            onundo={() => send({ t: "undoLast" })}
+            oncancelAll={() => send({ t: "cancelAll" })}
+            onconfirm={() => send({ t: "confirm" })}
+            ontrayPick={pickTrayOption}
+            ontrayClose={() => send({ t: "closeTray" })}
+          />
+        </div>
+      {:else}
+        <div class="action">
+          <ActionZone
+            {ui}
+            {view}
+            human={session.human}
+            names={session.names}
+            hint={session.hint}
+            {missed}
+            thinking={session.thinking}
+            lastPlay={session.lastPlay}
+            onconfirm={() => send({ t: "confirm" })}
+            oncancel={() => send({ t: "cancel" })}
+            onchangeCard={() => send({ t: "changeCard" })}
+            ongive={() => send({ t: "give" })}
+            onpose={() => send({ t: "pose" })}
+            onexit={chooseExit}
+            onadvance={() => send({ t: "chooseAdvance" })}
+            ontrayPick={pickTrayOption}
+            ontrayClose={() => send({ t: "closeTray" })}
+          />
+        </div>
 
-      <div class="hand">
-        <HandFan
-          hand={view.hand}
-          mode={handMode}
-          playability={verdicts}
-          selected={selectedCard}
-          {received}
-          onpick={pickCard}
-        />
-      </div>
+        <div class="hand">
+          <HandFan
+            hand={view.hand}
+            mode={handMode}
+            playability={verdicts}
+            selected={selectedCard}
+            {received}
+            onpick={pickCard}
+          />
+        </div>
+      {/if}
     </div>
 
     {#if render.phase === "won" && render.winner !== null}
@@ -548,6 +575,12 @@
   .hand {
     grid-area: hand;
     padding: 0 var(--space-md);
+  }
+
+  /* The 7 panel takes the rows of the action zone and of the hand. */
+  .seven {
+    grid-row: action / hand;
+    grid-column: action;
   }
 
   /* Landscape (phones included): the board at the left, the right panel at least 320 wide. */

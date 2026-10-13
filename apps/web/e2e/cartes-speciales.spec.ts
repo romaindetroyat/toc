@@ -228,3 +228,184 @@ test("chevaux serrés : le plateau propose des pastilles A et B, « Choisir un a
   await page.getByRole("button", { name: "Jouer", exact: true }).click();
   await expect.poll(() => placeOf(page, "bleu1")).toBe("ring:9");
 });
+
+// ---------------------------------------------------------------------------------------------
+// The 7, knight by knight (PLAY-03, D-17) and the finished player's partner knights (RULE-17).
+
+const panel = (page: Page) => page.locator("[data-seven-panel]");
+const counter = (page: Page) => page.locator("[data-remaining]");
+const rows = (page: Page) => page.locator("[data-seven-row]");
+const chip = (page: Page, steps: number) => page.getByRole("button", { name: `${steps} pas` });
+const tap = (page: Page, pawn: string) =>
+  page.locator(`[data-hit="${pawn}"]`).click({ force: true });
+
+// bleu0 on cell 5, bleu1 on cell 20, a Jaune knight on cell 8 that bleu0 eats on the way.
+const SEVEN_CAPTURE = {
+  turn: "bleu",
+  pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"], jaune: [{ p: 62 }, "S", "S", "S"] },
+  hands: { bleu: ["7H"] },
+};
+
+test("le 7 : réparti sur deux chevaux, prise en chemin, un seul « Jouer »", async ({ page }) => {
+  await openPosition(page, SEVEN_CAPTURE);
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+
+  // The panel replaces the action zone and the hand; nothing is spread yet.
+  await expect(panel(page)).toBeVisible();
+  await expect(page.locator("[data-hand]")).toHaveCount(0);
+  await expect(page.locator("[data-action-zone]")).toHaveCount(0);
+  await expect(panel(page)).toContainText("Le 7 : répartis tes pas");
+  await expect(counter(page)).toHaveText("Reste 7");
+  await expect(rows(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Jouer", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Retirer le dernier pas" })).toBeDisabled();
+  await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
+  await expect(page.locator('[data-halo="bleu1"]')).toBeVisible();
+
+  // First knight: 4 steps, which pass the Jaune knight. The × badge shows before « Jouer ».
+  await tap(page, "bleu0");
+  await expect(panel(page)).toContainText("Combien de pas pour ce cheval ?");
+  await chip(page, 4).click();
+  await expect(counter(page)).toHaveText("Reste 3");
+  await expect(rows(page)).toHaveText(["Cheval A : 4 pas"]);
+  await expect(page.locator('[data-capture="jaune0"]')).toBeVisible();
+  await expect(page.locator('[data-seven-ghost="bleu0"]')).toBeVisible();
+  await expect(page.locator("[data-seven-path]")).toHaveCount(1);
+  await expect(panel(page)).toContainText("Il reste 3 pas à jouer.");
+  await expect(page.getByRole("button", { name: "Jouer", exact: true })).toBeDisabled();
+  // Only the chips up to what is left are offered.
+  await expect(page.locator("[data-step]")).toHaveCount(3);
+
+  // Undo takes back this micro-move only: back to Reste 7, no capture, no row.
+  await page.getByRole("button", { name: "Retirer le dernier pas" }).click();
+  await expect(counter(page)).toHaveText("Reste 7");
+  await expect(rows(page)).toHaveCount(0);
+  await expect(page.locator("[data-capture]")).toHaveCount(0);
+
+  // Again, then a second knight for the rest.
+  await tap(page, "bleu0");
+  await chip(page, 4).click();
+  await tap(page, "bleu1");
+  await chip(page, 3).click();
+  await expect(counter(page)).toHaveText("Tout est réparti.");
+  await expect(rows(page)).toHaveText(["Cheval A : 4 pas", "Cheval B : 3 pas"]);
+  await expect(page.locator("[data-seven-path]")).toHaveCount(2);
+
+  // « Retirer le dernier pas » from here restores the previous preview, the capture included.
+  await page.getByRole("button", { name: "Retirer le dernier pas" }).click();
+  await expect(counter(page)).toHaveText("Reste 3");
+  await expect(page.locator('[data-capture="jaune0"]')).toBeVisible();
+  await tap(page, "bleu1");
+  await chip(page, 3).click();
+
+  // Nothing has moved yet (D-19): the victim is still on its cell.
+  await page.waitForTimeout(1000);
+  expect(await placeOf(page, "jaune0")).toBe("ring:8");
+  expect(await placeOf(page, "bleu0")).toBe("ring:5");
+
+  const play = page.getByRole("button", { name: "Jouer", exact: true });
+  await expect(play).toBeEnabled();
+  await play.click();
+  await expect.poll(() => placeOf(page, "bleu0")).toBe("ring:9");
+  expect(await placeOf(page, "bleu1")).toBe("ring:23");
+  await expect.poll(() => placeOf(page, "jaune0")).toMatch(/^stable:jaune:/);
+  await expect(panel(page)).toHaveCount(0);
+});
+
+test("le 7 : « Tout annuler » rend la main, rien n’a bougé", async ({ page }) => {
+  await openPosition(page, SEVEN_CAPTURE);
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await tap(page, "bleu0");
+  await chip(page, 2).click();
+  await tap(page, "bleu1");
+  await chip(page, 5).click();
+  await expect(counter(page)).toHaveText("Tout est réparti.");
+
+  await page.getByRole("button", { name: "Tout annuler" }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(zone(page)).toHaveAttribute("data-state", "idle");
+  await expect(page.locator("[data-hand]")).toBeVisible();
+  await expect(page.locator('[data-card="7H"]')).toHaveAttribute("data-state", "playable");
+  expect(await placeOf(page, "bleu0")).toBe("ring:5");
+  expect(await placeOf(page, "bleu1")).toBe("ring:20");
+});
+
+test("le 7 : un nombre de pas qui empêcherait de finir est grisé et s’explique au toucher", async ({
+  page,
+}) => {
+  // bleu0 is four cells from the home: only 3 or 7 steps leave a 7 that can be finished.
+  await openPosition(page, {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+    hands: { bleu: ["7H"] },
+  });
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await tap(page, "bleu0");
+  await expect(chip(page, 1)).toHaveAttribute("aria-disabled", "true");
+  await expect(chip(page, 3)).toHaveAttribute("aria-disabled", "false");
+  await expect(chip(page, 7)).toHaveAttribute("aria-disabled", "false");
+
+  // A chip that is off is still tappable (aria-disabled): Playwright needs force to try it.
+  await chip(page, 1).click({ force: true });
+  await expect(panel(page)).toContainText("Ce nombre de pas t’empêcherait de finir le 7.");
+  await expect(counter(page)).toHaveText("Reste 7");
+  await expect(rows(page)).toHaveCount(0);
+
+  // A good number clears the explanation and the partner's knight takes over for the rest (G12).
+  await chip(page, 3).click();
+  await expect(counter(page)).toHaveText("Reste 4");
+  await expect(panel(page)).not.toContainText("Ce nombre de pas");
+  await tap(page, "rouge0");
+  await chip(page, 4).click();
+  await expect(rows(page)).toHaveText(["Cheval A bleu : 3 pas", "Cheval A rouge : 4 pas"]);
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+  await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "home:bleu:0");
+  await expect(page.locator('[data-pawn="rouge0"]')).toHaveAttribute("data-place", "ring:49");
+});
+
+test("le 7 : un chiffre sans cheval choisi demande d’abord un cheval", async ({ page }) => {
+  await openPosition(page, SEVEN_CAPTURE);
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await chip(page, 3).click({ force: true });
+  await expect(panel(page)).toContainText("Choisis un cheval.");
+  await expect(counter(page)).toHaveText("Reste 7");
+  await expect(rows(page)).toHaveCount(0);
+});
+
+test("RULE-17 : un joueur dont les quatre chevaux sont rentrés joue ceux de son partenaire", async ({
+  page,
+}) => {
+  const finished = {
+    turn: "bleu",
+    pawns: {
+      bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+    },
+    hands: { bleu: ["5H", "7H"] },
+  };
+  await page.goto("/");
+  await page.goto(`/#/partie?etat=${etatParam(finished)}&vitesse=test`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+  await expect(zone(page)).toHaveAttribute("data-state", "finishedPrompt");
+  await expect(zone(page)).toContainText("Tes quatre chevaux sont rentrés.");
+
+  // A number card with a partner knight.
+  await page.getByRole("button", { name: "5 de cœur, jouable" }).click();
+  await expect(page.locator('[data-halo="rouge0"]')).toBeVisible();
+  await expect(page.locator('[data-halo="rouge1"]')).toBeVisible();
+  await tap(page, "rouge0");
+  await expect(zone(page)).toHaveAttribute("data-state", "preview");
+  // Back to the card choice: the 7, spread over both partner knights.
+  await page.getByRole("button", { name: "Annuler ce coup" }).click();
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(page.locator('[data-halo="rouge0"]')).toBeVisible();
+  await tap(page, "rouge0");
+  await chip(page, 3).click();
+  await tap(page, "rouge1");
+  await chip(page, 4).click();
+  await expect(counter(page)).toHaveText("Tout est réparti.");
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+  await expect(page.locator('[data-pawn="rouge0"]')).toHaveAttribute("data-place", "ring:48");
+  await expect(page.locator('[data-pawn="rouge1"]')).toHaveAttribute("data-place", "ring:70");
+});

@@ -14,17 +14,23 @@ import {
   type CardId,
   COLORS,
   type Color,
+  isComplete,
   isFinished,
   legalActions,
+  nextSteps,
+  normalizePlan,
   type PawnId,
   type Place,
   type Playability,
   type PlayerView,
   pawnColor,
+  placeOf,
   playability,
+  previewPlan,
   type Reason,
   rankOf,
   resolveMove,
+  type SevenPlan,
   teamOf,
 } from "@toc/engine";
 
@@ -38,6 +44,21 @@ export type PreviewDescription = {
   steps: number;
   entersHome: boolean;
 };
+
+/** One micro-move of the 7 as the board draws it: the knight, where it starts and every cell it enters. */
+export type SevenMove = { pawn: PawnId; from: Place; path: Place[] };
+
+/** A knight eaten on the way by the micro-move number `move` (an index into `moves`), at its `atStep`-th cell. */
+export type SevenCapture = {
+  by: PawnId;
+  victim: PawnId;
+  at: Place;
+  move: number;
+  atStep: number;
+};
+
+/** The plan so far, played by the engine (previewPlan): what the board shows before « Jouer ». */
+export type SevenPreview = { moves: SevenMove[]; captures: SevenCapture[] };
 
 export type TurnUiState =
   /** Not his turn, a move is playing, or the game is over: the board is locked. */
@@ -53,6 +74,22 @@ export type TurnUiState =
   | { kind: "jackPick"; card: CardId; candidates: Action[]; pawns: PawnId[] }
   /** Valet, second tap: the knights `pawn` can be swapped with. */
   | { kind: "jackTarget"; card: CardId; candidates: Action[]; pawn: PawnId; targets: PawnId[] }
+  /**
+   * The 7 (D-17): the steps are spread knight by knight. `plan` is what the player chose, one entry per
+   * choice (the engine merges consecutive entries of one knight); `steps` is what each knight may still
+   * be given, straight from nextSteps; `selected` is the knight whose chips are shown.
+   */
+  | {
+      kind: "sevenBuilding";
+      card: CardId;
+      plan: SevenPlan;
+      remaining: number;
+      selected?: PawnId;
+      steps: Partial<Record<PawnId, number[]>>;
+      preview: SevenPreview;
+      /** What the last refused choice was: a number of steps that cannot be finished, or no knight yet. */
+      notice?: "stepRefused" | "pickKnight";
+    }
   /** Candidate knights too close to tell apart: chips to choose from; `next` is where the flow resumes. */
   | { kind: "tray"; card: CardId; options: PawnId[]; next: TurnUiState }
   | {
@@ -88,6 +125,12 @@ export type TurnUiEvent =
   | { t: "chooseAdvance" }
   | { t: "chooseTrayOption"; pawn: PawnId }
   | { t: "closeTray" }
+  /** The 7: give `steps` to the selected knight. */
+  | { t: "pickSteps"; steps: number }
+  /** The 7: take back the last micro-move only (order matters). */
+  | { t: "undoLast" }
+  /** The 7: drop the plan and the card. */
+  | { t: "cancelAll" }
   | { t: "confirm" }
   | { t: "cancel" }
   | { t: "changeCard" }
@@ -101,7 +144,7 @@ export type TurnCtx = {
   view: PlayerView;
   seat: Color;
   playability: Record<CardId, Playability>;
-  /** legalActions(view, seat, { sevenPlans: 'none' }): the 7 is added by plan 01-21. */
+  /** legalActions(view, seat, { sevenPlans: 'none' }): the 7 is spread by sevenBuilding, with nextSteps. */
   legal: Action[];
 };
 
@@ -139,6 +182,7 @@ function isOwnTurn(state: TurnUiState): boolean {
     state.kind === "modeChoice" ||
     state.kind === "jackPick" ||
     state.kind === "jackTarget" ||
+    state.kind === "sevenBuilding" ||
     state.kind === "tray" ||
     state.kind === "preview" ||
     state.kind === "deadHand"
@@ -152,6 +196,7 @@ function hasCard(state: TurnUiState): state is Extract<TurnUiState, { card: Card
     state.kind === "modeChoice" ||
     state.kind === "jackPick" ||
     state.kind === "jackTarget" ||
+    state.kind === "sevenBuilding" ||
     state.kind === "tray" ||
     state.kind === "preview"
   );
@@ -256,6 +301,9 @@ function previewState(
 
 /** The state a tap on a card leads to: the question, the Valet's first tap, or the candidate knights. */
 function selectCard(card: CardId, ctx: TurnCtx): TurnUiState {
+  if (rankOf(card) === 7) {
+    return buildSeven(card, [], undefined, ctx) ?? { kind: "cardSelected", card, candidates: [] };
+  }
   if (rankOf(card) === 11) {
     const candidates = swapsOf(ctx, card);
     const pawns = [...new Set(candidates.flatMap((a) => (a.t === "swap" ? [a.pawn] : [])))];
@@ -266,6 +314,105 @@ function selectCard(card: CardId, ctx: TurnCtx): TurnUiState {
   const advance = candidates.filter((a) => a.t === "move");
   if (exit !== undefined && advance.length > 0) return { kind: "modeChoice", card, exit, advance };
   return { kind: "cardSelected", card, candidates };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The 7, knight by knight (D-17). Every number of steps offered comes from nextSteps, and the preview
+// is previewPlan: the engine's own micro-moves, with the same captures in transit.
+
+/** The sum of a plan's steps. */
+const spent = (plan: SevenPlan): number => plan.reduce((sum, entry) => sum + entry.steps, 0);
+
+/** « A » to « D »: the knight's index in its colour, as written on the 7 panel's rows. */
+export function knightLetter(pawn: PawnId): string {
+  return "ABCD".charAt(Number(pawn.slice(-1)));
+}
+
+/** The plan so far as the board draws it, read from the events of previewPlan; null when it is refused. */
+function sevenPreview(card: CardId, plan: SevenPlan, ctx: TurnCtx): SevenPreview | null {
+  const played = previewPlan(ctx.view, ctx.seat, card, plan);
+  if (!played.ok) return null;
+  // Where each knight stands as the micro-moves go by: the `from` of a move into the home is not an event.
+  const at = new Map<PawnId, Place>();
+  for (const [id, pawn] of Object.entries(ctx.view.pawns) as [
+    PawnId,
+    PlayerView["pawns"][PawnId],
+  ][]) {
+    at.set(id, placeOf(id, pawn));
+  }
+  const moves: SevenMove[] = [];
+  const captures: SevenCapture[] = [];
+  for (const event of played.events) {
+    if (event.t === "pawnMoved" || event.t === "pawnEnteredHome") {
+      const from = at.get(event.pawn) as Place;
+      moves.push({ pawn: event.pawn, from, path: event.path });
+      at.set(
+        event.pawn,
+        event.t === "pawnMoved"
+          ? (event.path[event.path.length - 1] as Place)
+          : { z: "home", color: pawnColor(event.pawn), slot: event.slot },
+      );
+    } else if (event.t === "pawnCaptured") {
+      captures.push({
+        by: event.by,
+        victim: event.victim,
+        at: event.at,
+        move: moves.length - 1,
+        atStep: event.atStep,
+      });
+    } else if (event.t === "pawnSentHome") {
+      at.set(event.pawn, event.to);
+    }
+  }
+  return { moves, captures };
+}
+
+/** The splitter for `plan`: what is left, what each knight may be given, and the preview. */
+function buildSeven(
+  card: CardId,
+  plan: SevenPlan,
+  selected: PawnId | undefined,
+  ctx: TurnCtx,
+): Extract<TurnUiState, { kind: "sevenBuilding" }> | null {
+  const preview = sevenPreview(card, plan, ctx);
+  if (preview === null) return null;
+  const state: Extract<TurnUiState, { kind: "sevenBuilding" }> = {
+    kind: "sevenBuilding",
+    card,
+    plan,
+    remaining: 7 - spent(plan),
+    steps: nextSteps(ctx.view, ctx.seat, card, plan),
+    preview,
+  };
+  if (selected !== undefined) state.selected = selected;
+  return state;
+}
+
+function pickSteps(state: TurnUiState, steps: number, ctx: TurnCtx): TurnUiResult {
+  if (state.kind !== "sevenBuilding") return { state };
+  const { selected } = state;
+  if (selected === undefined) return { state: { ...state, notice: "pickKnight" } };
+  if (!(state.steps[selected] ?? []).includes(steps)) {
+    return { state: { ...state, notice: "stepRefused" } };
+  }
+  const next = buildSeven(state.card, [...state.plan, { pawn: selected, steps }], undefined, ctx);
+  return { state: next ?? state };
+}
+
+function undoLast(state: TurnUiState, ctx: TurnCtx): TurnUiResult {
+  if (state.kind !== "sevenBuilding" || state.plan.length === 0) return { state };
+  const next = buildSeven(state.card, state.plan.slice(0, -1), undefined, ctx);
+  return { state: next ?? state };
+}
+
+/** « Jouer » of the 7: only with nothing left to spread, and only a plan the engine plays whole (T-01-31). */
+function confirmSeven(state: Extract<TurnUiState, { kind: "sevenBuilding" }>, ctx: TurnCtx) {
+  const plan = normalizePlan(state.plan);
+  if (state.remaining !== 0 || !isComplete(ctx.view, ctx.seat, state.card, plan)) return { state };
+  return {
+    state: { kind: "waiting" } as TurnUiState,
+    submit: { t: "seven", card: state.card, plan } as Action,
+  };
 }
 
 function tapCard(state: TurnUiState, card: CardId, ctx: TurnCtx): TurnUiResult {
@@ -294,6 +441,12 @@ function stepFor(state: TurnUiState, pawn: PawnId, ctx: TurnCtx): TurnUiState | 
     }
     case "jackTarget":
       return stepFromSwap(state, state.pawn, state.targets, pawn, ctx);
+    case "sevenBuilding": {
+      // A knight with something to be given is selected; the same knight again lets it go.
+      if ((state.steps[pawn] ?? []).length === 0) return null;
+      const { selected: _, notice: __, ...rest } = state;
+      return pawn === state.selected ? rest : { ...rest, selected: pawn };
+    }
     case "preview": {
       if (state.action.t === "swap") {
         const own = state.action.pawn;
@@ -440,7 +593,14 @@ export function reduceTurnUi(state: TurnUiState, event: TurnUiEvent, ctx: TurnCt
       return chooseTrayOption(state, event.pawn, ctx);
     case "closeTray":
       return state.kind === "tray" ? { state: state.next } : { state };
+    case "pickSteps":
+      return pickSteps(state, event.steps, ctx);
+    case "undoLast":
+      return undoLast(state, ctx);
+    case "cancelAll":
+      return hasCard(state) ? { state: IDLE } : { state };
     case "confirm":
+      if (state.kind === "sevenBuilding") return confirmSeven(state, ctx);
       return state.kind === "preview"
         ? { state: { kind: "waiting" }, submit: state.action }
         : { state };

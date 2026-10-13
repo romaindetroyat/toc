@@ -110,6 +110,12 @@ export const game = {
     remaining: (n: number) => `Reste ${n}`,
     allSpread: "Tout est réparti.",
     plan: (letter: string, n: number) => `Cheval ${letter} : ${n} pas`,
+    /** When the plan holds knights of two colours (the partner's after the fourth home), the colour is named. */
+    planColour: (letter: string, color: Color, n: number) =>
+      `Cheval ${letter} ${colourWord(color)} : ${n} pas`,
+    chooseSteps: "Combien de pas pour ce cheval ?",
+    /** The played card, named for screen readers (the panel replaces the hand). */
+    card: (card: string) => `Carte jouée : ${card}`,
     chipAria: (n: number) => `${n} pas`,
     chipDisabled: "Ce nombre de pas t’empêcherait de finir le 7.",
     undo: "Retirer le dernier pas",
