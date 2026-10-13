@@ -385,7 +385,7 @@ describe("the preview is the engine's own resolveMove (PLAY-02)", () => {
   });
 
   it("marks a move that enters the home", () => {
-    // Progress 68 + 3 = 71 > 70: the knight turns into its home.
+    // Progress 68 + 3: through the entry square (cell 70) into the first home slot.
     const { result } = previewOf(
       {
         pawns: { bleu: [{ p: 68 }, "S", "S", "S"] },
@@ -397,7 +397,8 @@ describe("the preview is the engine's own resolveMove (PLAY-02)", () => {
     );
     if (result?.state.kind !== "preview") throw new Error("no preview");
     const last = result.state.path[result.state.path.length - 1] as Place;
-    expect(result.state.description.entersHome).toBe(last.z === "home");
+    expect(last).toEqual({ z: "home", color: "bleu", slot: 0 });
+    expect(result.state.description.entersHome).toBe(true);
   });
 
   it("switches the preview when another candidate is tapped, and ignores a non-candidate", () => {
@@ -470,7 +471,7 @@ describe("the exchange", () => {
   const ctx = ctxOf(exchange);
 
   it("selects, unselects and gives a card, and submits only on give", () => {
-    const [select, again, reselect, other, escape, pick, give] = run(
+    const [select, again, reselect, other, cleared, pick, give] = run(
       { kind: "exchange" },
       ctx,
       { t: "selectGive", card: "3H" },
@@ -485,8 +486,8 @@ describe("the exchange", () => {
     expect(again?.state).toEqual({ kind: "exchange" });
     expect(reselect?.state).toEqual({ kind: "exchange", selected: "3H" });
     expect(other?.state).toEqual({ kind: "exchange", selected: "5H" });
-    expect(escape?.state).toEqual({ kind: "exchange" });
-    for (const step of [select, again, reselect, other, escape, pick]) {
+    expect(cleared?.state).toEqual({ kind: "exchange" });
+    for (const step of [select, again, reselect, other, cleared, pick]) {
       expect(step?.submit).toBeUndefined();
     }
     expect(give?.submit).toEqual({ t: "give", card: "6H" });
