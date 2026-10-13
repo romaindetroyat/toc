@@ -90,7 +90,7 @@ describe("home entry (D-01, D-02, D-03)", () => {
 
   it("a pawn of another colour enters its own home by its own entry square", () => {
     const b = board({ jaune0: { p: 68 } });
-    const r = walk(b, "jaune0", 3, 1, alone("jaune0"));
+    const r = walk(b, "jaune0", 5, 1, alone("jaune0"));
     expect(r.ok && r.end).toEqual({ zone: "home", slot: 2 });
     expect(r.ok && r.path[r.path.length - 1]).toEqual({ z: "home", color: "jaune", slot: 2 });
   });
