@@ -29,7 +29,9 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-01.1 — Bleu et rouge sont partenaires, jaune et vert aussi
+  ![R-01.1](docs/regles/R-01.1.webp)
 - R-01.2 — Les partenaires restent face à face quel que soit le donneur
+  ![R-01.2](docs/regles/R-01.2.webp)
 
 ### R-02 Plateau et progression
 
@@ -43,9 +45,13 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-02.1 — La progression compte les cases parcourues depuis la sortie
+  ![R-02.1](docs/regles/R-02.1.webp)
 - R-02.2 — Reculer de 4 depuis la sortie donne une progression de −4
+  ![R-02.2](docs/regles/R-02.2.webp)
 - R-02.3 — Un pion à −2 est sur sa case d’entrée sans avoir fait le tour
+  ![R-02.3](docs/regles/R-02.3.webp)
 - R-02.4 — Un pion bleu peut s’arrêter sur la case de sortie du jaune
+  ![R-02.4](docs/regles/R-02.4.webp)
 
 ### R-03 Paquet, donnes et donneur
 
@@ -58,10 +64,15 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-03.1 — La première donne est de 5 cartes, le joueur après le donneur commence
+  ![R-03.1](docs/regles/R-03.1.webp)
 - R-03.2 — La deuxième donne est de 4 cartes, avec le même donneur
+  ![R-03.2](docs/regles/R-03.2.webp)
 - R-03.3 — La troisième donne est de 4 cartes, avec le même donneur
+  ![R-03.3](docs/regles/R-03.3.webp)
 - R-03.4 — Après la troisième donne on rebat et le donneur passe au suivant
+  ![R-03.4](docs/regles/R-03.4.webp)
 - R-03.5 — Les 52 cartes restent toutes présentes après la donne et l’échange
+  ![R-03.5](docs/regles/R-03.5.webp)
 
 ### R-04 Échange de carte
 
@@ -78,10 +89,15 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-04.1 — Trois choix ne suffisent pas : rien ne bouge avant le quatrième
+  ![R-04.1](docs/regles/R-04.1.webp)
 - R-04.2 — Au quatrième choix les quatre cartes changent de main ensemble
+  ![R-04.2](docs/regles/R-04.2.webp)
 - R-04.3 — Une main qui semble injouable échange quand même
+  ![R-04.3](docs/regles/R-04.3.webp)
 - R-04.4 — La carte reçue ne compte pas dans la taille de la donne
+  ![R-04.4](docs/regles/R-04.4.webp)
 - R-04.5 — On ne peut donner qu’une carte de sa main
+  ![R-04.5](docs/regles/R-04.5.webp)
 
 ### R-05 Tour et obligation de jouer
 
@@ -95,8 +111,11 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-05.1 — Le tour passe dans le sens horaire : bleu, jaune, rouge, vert
+  ![R-05.1](docs/regles/R-05.1.webp)
 - R-05.2 — Quand une carte est jouable, poser sa main est interdit
+  ![R-05.2](docs/regles/R-05.2.webp)
 - R-05.3 — Un joueur sans carte est sauté
+  ![R-05.3](docs/regles/R-05.3.webp)
 
 ### R-06 As et Roi
 
@@ -110,10 +129,15 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-06.1 — L’As sort un pion ou avance de 1 : les deux sont permis
+  ![R-06.1](docs/regles/R-06.1.webp)
 - R-06.2 — Le Roi sort un pion ou avance de 13
+  ![R-06.2](docs/regles/R-06.2.webp)
 - R-06.3 — Sans pion à l’écurie, l’As ne peut qu’avancer
+  ![R-06.3](docs/regles/R-06.3.webp)
 - R-06.4 — Sortir sur un adversaire garé sur ma sortie le mange
+  ![R-06.4](docs/regles/R-06.4.webp)
 - R-06.5 — Mon pion sur ma sortie m’empêche d’en sortir un second
+  ![R-06.5](docs/regles/R-06.5.webp)
 
 ### R-07 Cartes à avancer
 
@@ -127,10 +151,15 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-07.1 — La Dame avance de 12
+  ![R-07.1](docs/regles/R-07.1.webp)
 - R-07.2 — Les cartes 10, 9, 8, 6, 3 et 2 avancent du nombre indiqué
+  ![R-07.2](docs/regles/R-07.2.webp)
 - R-07.3 — Le 5 ne fait avancer que mes propres pions
+  ![R-07.3](docs/regles/R-07.3.webp)
 - R-07.4 — On ne s’arrête jamais sur un de ses propres pions
+  ![R-07.4](docs/regles/R-07.4.webp)
 - R-07.5 — Un cheval passe par-dessus les autres sans les manger
+  ![R-07.5](docs/regles/R-07.5.webp)
 
 ### R-08 Le 4
 
@@ -145,11 +174,17 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-08.1 — Le 4 recule un pion qui vient de sortir
+  ![R-08.1](docs/regles/R-08.1.webp)
 - R-08.2 — Le 4 qui recule sur un adversaire le mange
+  ![R-08.2](docs/regles/R-08.2.webp)
 - R-08.3 — On n’entre jamais dans la maison en reculant
+  ![R-08.3](docs/regles/R-08.3.webp)
 - R-08.4 — Le 4 ne dépasse pas un pion protégé sur sa sortie
+  ![R-08.4](docs/regles/R-08.4.webp)
 - R-08.5 — Mon pion protégé sur ma sortie bloque aussi mon autre pion
+  ![R-08.5](docs/regles/R-08.5.webp)
 - R-08.6 — Un pion à l’écurie ne peut pas reculer : le 4 est injouable
+  ![R-08.6](docs/regles/R-08.6.webp)
 
 ### R-09 Le Valet
 
@@ -165,14 +200,23 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-09.1 — Le Valet échange un de mes pions avec celui d’un adversaire
+  ![R-09.1](docs/regles/R-09.1.webp)
 - R-09.2 — Le Valet échange aussi avec le pion du partenaire
+  ![R-09.2](docs/regles/R-09.2.webp)
 - R-09.3 — Deux pions du même joueur ne s’échangent jamais
+  ![R-09.3](docs/regles/R-09.3.webp)
 - R-09.4 — Un pion à l’écurie ne s’échange pas
+  ![R-09.4](docs/regles/R-09.4.webp)
 - R-09.5 — Un pion rentré dans la maison ne s’échange pas
+  ![R-09.5](docs/regles/R-09.5.webp)
 - R-09.6 — Mon pion protégé sur ma sortie ne peut pas être échangé
+  ![R-09.6](docs/regles/R-09.6.webp)
 - R-09.7 — Sans cible, le Valet est injouable mais le reste de la main se joue
+  ![R-09.7](docs/regles/R-09.7.webp)
 - R-09.8 — Après l’échange, chaque pion prend la progression de sa nouvelle case (choix par défaut)
+  ![R-09.8](docs/regles/R-09.8.webp)
 - R-09.9 — Autre choix possible : chaque pion garde ses tours déjà faits (alternative de G1)
+  ![R-09.9](docs/regles/R-09.9.webp)
 
 ### R-10 Le 7
 
@@ -189,18 +233,31 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-10.1 — Les 7 pas sur un seul pion
+  ![R-10.1](docs/regles/R-10.1.webp)
 - R-10.2 — Le 7 réparti en 3 + 4 sur deux pions
+  ![R-10.2](docs/regles/R-10.2.webp)
 - R-10.3 — Le 7 réparti en 2 + 2 + 3 sur trois pions
+  ![R-10.3](docs/regles/R-10.3.webp)
 - R-10.4 — Le 7 mange un adversaire qu’il dépasse en chemin
+  ![R-10.4](docs/regles/R-10.4.webp)
 - R-10.5 — Le 7 mange un adversaire sur sa case d’arrivée
+  ![R-10.5](docs/regles/R-10.5.webp)
 - R-10.6 — Le 7 mange aussi le pion du partenaire qu’il dépasse
+  ![R-10.6](docs/regles/R-10.6.webp)
 - R-10.7 — Un seul 7 peut manger plusieurs pions, chacun à son passage
+  ![R-10.7](docs/regles/R-10.7.webp)
 - R-10.8 — Le 7 dépasse ses propres pions sans les manger
+  ![R-10.8](docs/regles/R-10.8.webp)
 - R-10.9 — Le 7 ne peut pas finir sur un de ses propres pions
+  ![R-10.9](docs/regles/R-10.9.webp)
 - R-10.10 — Un 7 qu’on ne peut pas jouer en entier est injouable, même en partie possible
+  ![R-10.10](docs/regles/R-10.10.webp)
 - R-10.11 — L’ordre compte : déplacer d’abord le pion de devant libère la place
+  ![R-10.11](docs/regles/R-10.11.webp)
 - R-10.12 — Un plan invalide est refusé en entier : rien ne bouge
+  ![R-10.12](docs/regles/R-10.12.webp)
 - R-10.13 — Le même pion peut revenir plus tard dans le plan du 7
+  ![R-10.13](docs/regles/R-10.13.webp)
 
 ### R-11 Prise
 
@@ -216,9 +273,13 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-11.1 — S’arrêter sur un adversaire le mange
+  ![R-11.1](docs/regles/R-11.1.webp)
 - R-11.2 — S’arrêter sur le pion du partenaire le mange aussi
+  ![R-11.2](docs/regles/R-11.2.webp)
 - R-11.3 — On ne s’arrête jamais sur un de ses propres pions, même de loin
+  ![R-11.3](docs/regles/R-11.3.webp)
 - R-11.4 — Un pion mangé perd tous ses tours et retourne à l’écurie
+  ![R-11.4](docs/regles/R-11.4.webp)
 
 ### R-12 Case de sortie protégée
 
@@ -234,15 +295,25 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-12.1 — On ne dépasse pas un pion protégé sur sa sortie
+  ![R-12.1](docs/regles/R-12.1.webp)
 - R-12.2 — Reculer de 4 ne dépasse pas non plus un pion protégé
+  ![R-12.2](docs/regles/R-12.2.webp)
 - R-12.3 — Un pas du 7 ne traverse pas un pion protégé : le plan est refusé
+  ![R-12.3](docs/regles/R-12.3.webp)
 - R-12.4 — Le Valet ne peut pas viser un pion protégé sur sa sortie
+  ![R-12.4](docs/regles/R-12.4.webp)
 - R-12.5 — On ne peut pas manger un pion protégé en s’arrêtant sur lui
+  ![R-12.5](docs/regles/R-12.5.webp)
 - R-12.6 — Un adversaire garé sur ma sortie est mangé quand j’y sors un pion
+  ![R-12.6](docs/regles/R-12.6.webp)
 - R-12.7 — Mon pion sur ma sortie m’empêche d’en sortir un second
+  ![R-12.7](docs/regles/R-12.7.webp)
 - R-12.8 — Sur la sortie d’une autre couleur, un pion est un pion ordinaire : on le mange
+  ![R-12.8](docs/regles/R-12.8.webp)
 - R-12.9 — Un pion revenu sur sa sortie après un tour de plus est protégé aussi
+  ![R-12.9](docs/regles/R-12.9.webp)
 - R-12.10 — Mon pion protégé bloque aussi le passage de mes autres pions
+  ![R-12.10](docs/regles/R-12.10.webp)
 
 ### R-13 Entrée dans la maison
 
@@ -258,20 +329,35 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-13.1 — Au compte exact, le pion entre dans la case 0 de la maison
+  ![R-13.1](docs/regles/R-13.1.webp)
 - R-13.2 — Au compte exact, le pion entre dans la case 1 de la maison
+  ![R-13.2](docs/regles/R-13.2.webp)
 - R-13.3 — Un 7 joué en entier peut entrer dans la case 2 de la maison
+  ![R-13.3](docs/regles/R-13.3.webp)
 - R-13.4 — Au compte exact, le pion entre dans la case 3 de la maison
+  ![R-13.4](docs/regles/R-13.4.webp)
 - R-13.5 — Si le compte dépasse le fond de la maison, le pion repart pour un tour
+  ![R-13.5](docs/regles/R-13.5.webp)
 - R-13.6 — Si la case visée de la maison est occupée, le pion repart pour un tour
+  ![R-13.6](docs/regles/R-13.6.webp)
 - R-13.7 — Un pion déjà rentré ne se saute pas : le pion repart pour un tour
+  ![R-13.7](docs/regles/R-13.7.webp)
 - R-13.8 — Quand le compte tombe juste, l’entrée est obligatoire : pas de tour de plus
+  ![R-13.8](docs/regles/R-13.8.webp)
 - R-13.9 — Un pion rentré avance encore dans la maison, au compte exact
+  ![R-13.9](docs/regles/R-13.9.webp)
 - R-13.10 — Dans la maison, un pion ne saute pas un autre pion rentré
+  ![R-13.10](docs/regles/R-13.10.webp)
 - R-13.11 — Au fond de la maison, un pion ne peut pas aller plus loin
+  ![R-13.11](docs/regles/R-13.11.webp)
 - R-13.12 — Un pion qui a reculé n’a pas fait le tour : il passe devant l’entrée sans entrer
+  ![R-13.12](docs/regles/R-13.12.webp)
 - R-13.13 — Arriver pile sur le carré 16 ne fait pas entrer dans la maison
+  ![R-13.13](docs/regles/R-13.13.webp)
 - R-13.14 — Depuis le carré 16, le compte suivant fait entrer dans la maison
+  ![R-13.14](docs/regles/R-13.14.webp)
 - R-13.15 — Après un tour de plus, le pion entre au passage suivant
+  ![R-13.15](docs/regles/R-13.15.webp)
 
 ### R-14 Main injouable
 
@@ -286,9 +372,13 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-14.1 — Une main en partie jouable doit se jouer : on ne peut pas la poser
+  ![R-14.1](docs/regles/R-14.1.webp)
 - R-14.2 — Une main entièrement injouable est posée face visible
+  ![R-14.2](docs/regles/R-14.2.webp)
 - R-14.3 — Si les quatre mains sont injouables, la donne se termine et la suivante commence
+  ![R-14.3](docs/regles/R-14.3.webp)
 - R-14.4 — Le joueur qui a posé ses cartes est sauté jusqu’à la donne suivante
+  ![R-14.4](docs/regles/R-14.4.webp)
 
 ### R-15 Joueur qui a fini
 
@@ -303,14 +393,23 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-15.1 — Un joueur qui a fini avance un pion de son partenaire avec le 2
+  ![R-15.1](docs/regles/R-15.1.webp)
 - R-15.2 — Le 5 fait avancer les pions du partenaire quand on a fini
+  ![R-15.2](docs/regles/R-15.2.webp)
 - R-15.3 — Le 7 se répartit entre les pions du partenaire
+  ![R-15.3](docs/regles/R-15.3.webp)
 - R-15.4 — Le Valet échange un pion du partenaire avec un adversaire
+  ![R-15.4](docs/regles/R-15.4.webp)
 - R-15.5 — L’As sort un pion du partenaire de son écurie
+  ![R-15.5](docs/regles/R-15.5.webp)
 - R-15.6 — Un pion du partenaire joué par moi mange comme un de mes pions
+  ![R-15.6](docs/regles/R-15.6.webp)
 - R-15.7 — Tant qu’il me reste un pion à jouer, je ne joue pas ceux de mon partenaire
+  ![R-15.7](docs/regles/R-15.7.webp)
 - R-15.8 — Un 7 qui rentre mon dernier pion peut finir avec les pions du partenaire (choix par défaut)
+  ![R-15.8](docs/regles/R-15.8.webp)
 - R-15.9 — Autre choix possible : le 7 se joue entièrement avec les pions d’avant le tour (alternative de G12)
+  ![R-15.9](docs/regles/R-15.9.webp)
 
 ### R-16 Fin de partie
 
@@ -323,9 +422,13 @@ Les points déjà tranchés avec Romain sont écrits sans réserve. Tout le rest
 
 **Scénarios**
 - R-16.1 — Le huitième pion rentré donne la victoire à l’équipe
+  ![R-16.1](docs/regles/R-16.1.webp)
 - R-16.2 — Avec sept pions rentrés, la partie continue
+  ![R-16.2](docs/regles/R-16.2.webp)
 - R-16.3 — Un 7 qui rentre le huitième pion donne aussi la victoire
+  ![R-16.3](docs/regles/R-16.3.webp)
 - R-16.4 — Le huitième pion peut être rentré par le partenaire qui a déjà fini
+  ![R-16.4](docs/regles/R-16.4.webp)
 
 ## Points à valider
 
