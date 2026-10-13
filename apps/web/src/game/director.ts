@@ -1,5 +1,6 @@
 import { type HopTimeline, hopTimeline, type Point } from "@toc/board";
 import type { GameEvent, PawnId, Place } from "@toc/engine";
+import { anchorOf } from "../board/geometry.ts";
 
 /** Lead between "now" and the start of a move, shared by the animation and the audio clock. */
 export const LEAD_S = 0.06;
@@ -12,7 +13,8 @@ export type DirectorDeps = {
     now(): number;
     scheduleClops(offsetsMs: number[], t0: number): void;
   };
-  placeOf(place: Place): Point;
+  /** Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. */
+  quarterTurns: number;
   /** Called once an event has been played, to move the pawn's static anchor to its new place. */
   commit(pawn: PawnId, place: Place): void;
 };
@@ -33,7 +35,7 @@ export function createDirector(deps: DirectorDeps): Director {
     if (event.t === "pawnMoved") {
       const landing = event.path[event.path.length - 1];
       if (!landing) return;
-      const points = [deps.placeOf(event.from), ...event.path.map((p) => deps.placeOf(p))];
+      const points = [event.from, ...event.path].map((p) => anchorOf(p, deps.quarterTurns));
       const timeline = hopTimeline(event.path.length, "normal");
       const t0 = deps.audio.now() + LEAD_S;
       deps.audio.scheduleClops(timeline.clops, t0);

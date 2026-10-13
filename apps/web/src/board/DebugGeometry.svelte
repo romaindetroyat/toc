@@ -1,6 +1,18 @@
 <script lang="ts">
-  import { CARD_SIZE, DEFAUSSE, FELT_SQUARE, LAST_CARD_SLOT, LAYOUT, TALON } from "@toc/board";
-  import { COLORS, type Color } from "@toc/engine";
+  import {
+    CARD_SIZE,
+    DEFAUSSE,
+    FELT_SQUARE,
+    LAST_CARD_SLOT,
+    type Point,
+    rotatePoint,
+    TALON,
+  } from "@toc/board";
+  import { COLORS, type Color, ENTRY, EXIT, type PawnIndex } from "@toc/engine";
+  import { anchorOf } from "./geometry.ts";
+
+  // Same k as Board.svelte: every point is drawn at its rotated screen anchor.
+  let { k = 0 }: { k?: number } = $props();
 
   // Debug-only overlay (plan 01-02): every calibrated cell and felt slot, drawn over the art.
   // Sizes are in screen pixels through --px (board units per screen pixel, set by Board.svelte).
@@ -11,14 +23,22 @@
     vert: "#019c01",
   };
 
-  const slots = COLORS.map((color) => ({
-    color,
-    stable: LAYOUT.pieces[color].stable,
-    home: LAYOUT.pieces[color].home,
-    diamond: LAYOUT.pieces[color].diamond,
-    square: LAYOUT.pieces[color].square,
-    card: LAST_CARD_SLOT[color],
-  }));
+  const SLOTS = [0, 1, 2, 3] as const satisfies readonly PawnIndex[];
+  const RING = Array.from({ length: 72 }, (_, cell) => cell);
+
+  const slots = $derived(
+    COLORS.map((color) => ({
+      color,
+      stable: SLOTS.map((slot) => anchorOf({ z: "stable", color, slot }, k)),
+      home: SLOTS.map((slot) => anchorOf({ z: "home", color, slot }, k)),
+      diamond: anchorOf({ z: "ring", cell: EXIT[color] }, k),
+      square: anchorOf({ z: "ring", cell: ENTRY[color] }, k),
+      card: rotatePoint(LAST_CARD_SLOT[color], k),
+    })),
+  );
+  const ring = $derived(RING.map((cell) => anchorOf({ z: "ring", cell }, k)));
+  const talon: Point = $derived(rotatePoint(TALON, k));
+  const defausse: Point = $derived(rotatePoint(DEFAUSSE, k));
 </script>
 
 <g data-debug-geometry class="debug">
@@ -30,7 +50,7 @@
     height={FELT_SQUARE.max - FELT_SQUARE.min}
   />
 
-  {#each LAYOUT.ring as [x, y], i (i)}
+  {#each ring as [x, y], i (i)}
     <circle class="ring-dot" cx={x} cy={y} />
     <text class="label" {x} {y} data-ring={i}>{i}</text>
   {/each}
@@ -59,20 +79,20 @@
 
   <rect
     class="card"
-    x={TALON[0] - CARD_SIZE.w / 2}
-    y={TALON[1] - CARD_SIZE.h / 2}
+    x={talon[0] - CARD_SIZE.w / 2}
+    y={talon[1] - CARD_SIZE.h / 2}
     width={CARD_SIZE.w}
     height={CARD_SIZE.h}
   />
-  <text class="label slot" x={TALON[0]} y={TALON[1]}>talon</text>
+  <text class="label slot" x={talon[0]} y={talon[1]}>talon</text>
   <rect
     class="card"
-    x={DEFAUSSE[0] - CARD_SIZE.w / 2}
-    y={DEFAUSSE[1] - CARD_SIZE.h / 2}
+    x={defausse[0] - CARD_SIZE.w / 2}
+    y={defausse[1] - CARD_SIZE.h / 2}
     width={CARD_SIZE.w}
     height={CARD_SIZE.h}
   />
-  <text class="label slot" x={DEFAUSSE[0]} y={DEFAUSSE[1]}>défausse</text>
+  <text class="label slot" x={defausse[0]} y={defausse[1]}>défausse</text>
 </g>
 
 <style>

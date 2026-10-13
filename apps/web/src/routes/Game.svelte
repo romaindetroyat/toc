@@ -1,15 +1,21 @@
 <script lang="ts">
   import { type Component, flushSync } from "svelte";
-  import { placeXY } from "@toc/board";
-  import { forwardCells, type PawnId, type Place } from "@toc/engine";
+  import { quarterTurnsFor } from "@toc/board";
+  import { EXIT, forwardCells, type PawnId, type Place } from "@toc/engine";
   import * as audio from "../audio/engine.ts";
   import { clear, hop } from "../board/animator.ts";
   import Board from "../board/Board.svelte";
+  import { anchorOf } from "../board/geometry.ts";
   import Knight from "../board/Knight.svelte";
   import { createDirector } from "../game/director.ts";
+  import { settings } from "../settings/store.svelte.ts";
 
-  const PAWN: PawnId = "bleu0";
-  /** Tracer: a tap moves the blue knight forward by this many cells. */
+  // The human sits at the bottom: the board is turned by k quarter turns toward their colour (D-05).
+  // Read once: the colour cannot change while a game is on screen.
+  const human = settings.lastColor;
+  const k = quarterTurnsFor(human);
+  const PAWN: PawnId = `${human}0`;
+  /** Tracer: a tap moves the human's first knight forward by this many cells. */
   const STEPS = 4;
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
@@ -26,7 +32,7 @@
     });
   }
 
-  let place = $state.raw<Place>({ z: "ring", cell: 0 });
+  let place = $state.raw<Place>({ z: "ring", cell: EXIT[human] });
   let progress = 0;
   let moving = false;
   let mover = $state<SVGGElement>();
@@ -34,7 +40,7 @@
 
   const director = createDirector({
     audio,
-    placeOf: placeXY,
+    quarterTurns: k,
     animator: {
       hop(_pawn, points, timeline, leadMs) {
         if (!mover || !arc) throw new Error("knight is not mounted");
@@ -49,14 +55,14 @@
     },
   });
 
-  const xy = $derived(placeXY(place));
+  const xy = $derived(anchorOf(place, k));
   const ring = $derived(place.z === "ring" ? place.cell : -1);
 
   async function onselect() {
     if (moving) return;
     moving = true;
     director.enqueue([
-      { t: "pawnMoved", pawn: PAWN, from: place, path: forwardCells("bleu", progress, STEPS), dir: 1 },
+      { t: "pawnMoved", pawn: PAWN, from: place, path: forwardCells(human, progress, STEPS), dir: 1 },
     ]);
     progress += STEPS;
     await director.idle();
@@ -65,10 +71,10 @@
 </script>
 
 <main class="game">
-  <Board>
+  <Board {k}>
     <Knight
       pawn={PAWN}
-      color="bleu"
+      color={human}
       x={xy[0]}
       y={xy[1]}
       {ring}
@@ -77,7 +83,7 @@
       {onselect}
     />
     {#if Geometry}
-      <Geometry />
+      <Geometry {k} />
     {/if}
   </Board>
 </main>

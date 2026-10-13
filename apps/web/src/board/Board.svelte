@@ -2,7 +2,10 @@
   import type { Snippet } from "svelte";
   import { board as t } from "../i18n/fr/board.ts";
 
-  let { children }: { children?: Snippet } = $props();
+  // k = clockwise quarter turns of the art (D-05). Only the art turns: the overlay svg stays upright
+  // and its children are placed at anchorOf(place, k).
+  let { k = 0, children }: { k?: number; children?: Snippet } = $props();
+  const turn = $derived(`rotate(${k * 90}deg)`);
 
   // The three composites produced by tools/build-board.mjs; the browser picks one from `sizes`.
   const SRCSET = "/plateau-640.webp 640w, /plateau-1280.webp 1280w, /plateau-2560.webp 2560w";
@@ -32,17 +35,19 @@
   class="board"
   class:loaded={status === "loaded"}
   data-board
+  data-k={k}
   bind:clientWidth={width}
   style:--px={width > 0 ? 2560 / width : 1}
 >
   <!-- Backdrop while the image loads: oak with the felt square, no spinner. -->
-  <div class="felt" aria-hidden="true"></div>
+  <div class="felt" aria-hidden="true" style:transform={turn}></div>
   <img
     bind:this={img}
     src={bust(FALLBACK)}
     srcset={bust(SRCSET)}
     sizes={width > 0 ? `${width}px` : "100vw"}
     alt={t.alt}
+    style:transform={turn}
     draggable="false"
     onload={() => {
       status = "loaded";
