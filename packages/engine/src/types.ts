@@ -160,7 +160,19 @@ export type RuleId =
   | "R-15"
   | "R-16";
 
-/** A rules case written as data: it feeds RULES.md, the engine acceptance tests and the debug loader. */
+/**
+ * A rules case written as data: it feeds RULES.md, the engine acceptance tests and the debug loader.
+ *
+ * Conventions for scenarioState (plan 01-10):
+ * - a colour missing from `before.pawns` has its four pawns in the stable; a colour missing from
+ *   `before.hands` has an empty hand; the talon holds the cards that are in no hand;
+ * - `before.phase` defaults to "play"; `phase: "exchange"` with explicit hands is an exchange case;
+ * - deal cases: the four hands empty with `phase: "play"` means "the deal `dealIndex` has just
+ *   ended"; the engine then runs the next deal and `expect.deal` describes it (sizes in the order
+ *   bleu, jaune, rouge, vert). `phase: "exchange"` with no hands at all means "the first deal of
+ *   the game", dealt by the engine from the seed;
+ * - `expect.events` lists the types of the events emitted by the action (or by the whole script), in order.
+ */
 export type Scenario = {
   /** `R-NN.k`, for example "R-08.2". */
   id: `${RuleId}.${number}`;
@@ -190,6 +202,16 @@ export type Scenario = {
     legalExclude?: Action[];
     playable?: Partial<Record<CardId, boolean>>;
     deal?: { sizes?: number[]; dealer?: Color; first?: Color };
+    /** Seat to play after the action or script. */
+    turn?: Color;
+    /** Phase after the action or script. */
+    phase?: Phase;
+    /** Card each listed seat holds as « reçue » after the exchange. */
+    received?: Partial<Record<Color, CardId>>;
+    /** Hand size of each listed seat after the action or script. */
+    handSizes?: Partial<Record<Color, number>>;
+    /** The 52 cards are all accounted for (hands, talon, discard, felt) after the script. */
+    conserved?: boolean;
   };
   /** G-numbers the scenario depends on, plus "seven" when it depends on whether a 7 in hand can be played. */
   flags?: string[];
