@@ -1,7 +1,7 @@
 import { LAYOUT, placeXY, rotatePoint } from "@toc/board";
 import { COLORS, type Place } from "@toc/engine";
 import { describe, expect, it } from "vitest";
-import { anchorOf, screenDelta } from "./geometry.ts";
+import { anchorOf, facingFor, placeKey, screenDelta } from "./geometry.ts";
 
 const places: Place[] = [
   { z: "ring", cell: 0 },
@@ -41,5 +41,40 @@ describe("anchorOf", () => {
 describe("screenDelta", () => {
   it("is b minus a", () => {
     expect(screenDelta([10, 20], [15, 12])).toEqual([5, -8]);
+  });
+});
+
+describe("facingFor", () => {
+  it("faces right for a rightward hop and left for a leftward hop", () => {
+    expect(facingFor("left", 120, 0)).toBe("right");
+    expect(facingFor("right", -120, 0)).toBe("left");
+    expect(facingFor("right", 100, 60)).toBe("right");
+    expect(facingFor("left", -100, -60)).toBe("left");
+  });
+
+  it("keeps the previous facing on a near-vertical hop (|dx| < 0.35 * |dy|)", () => {
+    expect(facingFor("left", 30, 120)).toBe("left");
+    expect(facingFor("right", -30, -120)).toBe("right");
+    expect(facingFor("right", 0, 120)).toBe("right");
+    expect(facingFor("left", 0, -120)).toBe("left");
+  });
+
+  it("turns as soon as the horizontal part reaches 0.35 of the vertical one", () => {
+    expect(facingFor("left", 0.35 * 100, 100)).toBe("right");
+    expect(facingFor("right", -0.35 * 100, 100)).toBe("left");
+    expect(facingFor("left", 0.34 * 100, 100)).toBe("left");
+  });
+
+  it("keeps the previous facing when the hop goes nowhere", () => {
+    expect(facingFor("left", 0, 0)).toBe("left");
+    expect(facingFor("right", 0, 0)).toBe("right");
+  });
+});
+
+describe("placeKey", () => {
+  it("writes ring, stable and home places", () => {
+    expect(placeKey({ z: "ring", cell: 22 })).toBe("ring:22");
+    expect(placeKey({ z: "stable", color: "vert", slot: 3 })).toBe("stable:vert:3");
+    expect(placeKey({ z: "home", color: "jaune", slot: 0 })).toBe("home:jaune:0");
   });
 });

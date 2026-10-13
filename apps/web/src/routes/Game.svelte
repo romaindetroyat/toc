@@ -1,12 +1,12 @@
 <script lang="ts">
   import { type Component, flushSync } from "svelte";
   import { quarterTurnsFor } from "@toc/board";
-  import { EXIT, forwardCells, type PawnId, type Place } from "@toc/engine";
+  import { COLORS, EXIT, forwardCells, type PawnId, type Place } from "@toc/engine";
   import * as audio from "../audio/engine.ts";
-  import { clear, hop } from "../board/animator.ts";
+  import { clear, hop, type PawnParts, partsOf } from "../board/animator.ts";
   import Board from "../board/Board.svelte";
-  import { anchorOf } from "../board/geometry.ts";
-  import Knight from "../board/Knight.svelte";
+  import { anchorOf, type Facing } from "../board/geometry.ts";
+  import Pawn from "../board/Pawn.svelte";
   import { createDirector } from "../game/director.ts";
   import { settings } from "../settings/store.svelte.ts";
 
@@ -32,56 +32,95 @@
     });
   }
 
-  let place = $state.raw<Place>({ z: "ring", cell: EXIT[human] });
+  // Sixteen pawns. Until the engine drives the render state (plan 01-16), each one sits in its own
+  // stable slot (slot = pawn index), except the human's pawn 0, which stands on its exit diamond so
+  // the tracer tap keeps working.
+  const PAWNS = COLORS.flatMap((color) =>
+    ([0, 1, 2, 3] as const).map((slot) => ({ id: `${color}${slot}` as PawnId, color, slot })),
+  );
+  const placements: Record<string, Place> = {};
+  for (const { id, color, slot } of PAWNS) {
+    placements[id] = { z: "stable", color, slot };
+  }
+  placements[PAWN] = { z: "ring", cell: EXIT[human] };
+
+  let places = $state.raw<Record<string, Place>>(placements);
+  let facings = $state.raw<Record<string, Facing>>(
+    Object.fromEntries(PAWNS.map(({ id }) => [id, "right" as Facing])),
+  );
+  let movingPawn = $state<PawnId>();
   let progress = 0;
-  let moving = false;
-  let mover = $state<SVGGElement>();
-  let arc = $state<SVGGElement>();
+
+  // Outer groups of the pawns, to reach their animated inner groups.
+  const els: Record<string, SVGGElement | undefined> = {};
+
+  // Lower on screen = in front; the pawn on the move is on top of all the others (UI-SPEC).
+  const drawn = $derived(
+    PAWNS.map((pawn) => {
+      const [x, y] = anchorOf(places[pawn.id] as Place, k);
+      return { ...pawn, x, y };
+    }).sort((a, b) => {
+      if (a.id === movingPawn) return 1;
+      if (b.id === movingPawn) return -1;
+      return a.y - b.y || a.id.localeCompare(b.id);
+    }),
+  );
 
   const director = createDirector({
     audio,
     quarterTurns: k,
     animator: {
-      hop(_pawn, points, timeline, leadMs) {
-        if (!mover || !arc) throw new Error("knight is not mounted");
-        return hop(mover, arc, points, timeline, leadMs);
+      hop(pawn, points, timeline, leadMs, pawnFacings) {
+        const parts = partsOf(els[pawn]);
+        if (!parts) throw new Error(`pawn ${pawn} is not mounted`);
+        return hop(parts, points, timeline, leadMs, pawnFacings);
       },
     },
-    commit(_pawn, next) {
-      place = next;
+    facingOf: (pawn) => facings[pawn] ?? "right",
+    commit(pawn, next, facing) {
+      places = { ...places, [pawn]: next };
+      facings = { ...facings, [pawn]: facing };
       // Move the static anchor first, then drop the animation offset, in the same task (no flicker).
       flushSync();
-      if (mover && arc) clear(mover, arc);
+      const parts: PawnParts | null = partsOf(els[pawn]);
+      if (parts) clear(parts);
     },
   });
 
-  const xy = $derived(anchorOf(place, k));
-  const ring = $derived(place.z === "ring" ? place.cell : -1);
-
   async function onselect() {
-    if (moving) return;
-    moving = true;
+    if (movingPawn) return;
+    movingPawn = PAWN;
+    // The moving pawn is re-ordered on top before its animation starts (moving a node would cut it).
+    flushSync();
     director.enqueue([
-      { t: "pawnMoved", pawn: PAWN, from: place, path: forwardCells(human, progress, STEPS), dir: 1 },
+      {
+        t: "pawnMoved",
+        pawn: PAWN,
+        from: places[PAWN] as Place,
+        path: forwardCells(human, progress, STEPS),
+        dir: 1,
+      },
     ]);
     progress += STEPS;
     await director.idle();
-    moving = false;
+    movingPawn = undefined;
   }
 </script>
 
 <main class="game">
   <Board {k}>
-    <Knight
-      pawn={PAWN}
-      color={human}
-      x={xy[0]}
-      y={xy[1]}
-      {ring}
-      bind:mover
-      bind:arc
-      {onselect}
-    />
+    {#each drawn as pawn (pawn.id)}
+      <Pawn
+        pawn={pawn.id}
+        color={pawn.color}
+        x={pawn.x}
+        y={pawn.y}
+        place={places[pawn.id] as Place}
+        facing={facings[pawn.id]}
+        bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
+        onselect={pawn.id === PAWN ? onselect : undefined}
+      />
+    {/each}
     {#if Geometry}
       <Geometry {k} />
     {/if}

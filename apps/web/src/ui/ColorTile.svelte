@@ -30,8 +30,8 @@
   const tagId = $derived(`tile-tag-${color}`);
 </script>
 
-<!-- One radio of the colour choice. Oak surface, the knight of that colour in a 64 px slot (a disc
-     in the pawn body colour until plan 01-08 draws the knight there), the seat chip. -->
+<!-- One radio of the colour choice. Oak surface, the knight of that colour in a 64 px slot (the
+     symbol from KnightDefs, mounted once in App.svelte), the seat chip. -->
 <button
   bind:this={el}
   type="button"
@@ -48,7 +48,9 @@
   {onkeydown}
 >
   <span class="visual" aria-hidden="true">
-    <span class="disc"></span>
+    <svg viewBox="0 0 110 190" width="37" height="64" focusable="false">
+      <use href={`#knight-${color}`} />
+    </svg>
   </span>
   <SeatChip {color} />
   {#if selected}
@@ -107,27 +109,6 @@
     place-items: center;
     width: 64px;
     height: 64px;
-  }
-
-  .disc {
-    width: 48px;
-    height: 48px;
-    border: 3px solid #2b1d12;
-    border-radius: 50%;
-    background: var(--tile-pawn);
-  }
-
-  .tile[data-color="bleu"] {
-    --tile-pawn: var(--pawn-bleu);
-  }
-  .tile[data-color="jaune"] {
-    --tile-pawn: var(--pawn-jaune);
-  }
-  .tile[data-color="rouge"] {
-    --tile-pawn: var(--pawn-rouge);
-  }
-  .tile[data-color="vert"] {
-    --tile-pawn: var(--pawn-vert);
   }
 
   .check {

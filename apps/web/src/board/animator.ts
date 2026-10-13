@@ -1,22 +1,39 @@
 import type { HopTimeline, Point } from "@toc/board";
+import type { Facing } from "./geometry.ts";
 
 /** Hop arc height as a fraction of the cell pitch (UI-SPEC: 18 %). */
 const ARC_HEIGHT = 0.18;
 
+/** The three animated inner groups of a Pawn.svelte. */
+export type PawnParts = {
+  mover: SVGGElement;
+  arc: SVGGElement;
+  facing: SVGGElement;
+};
+
+/** Finds the animated inner groups of a pawn from its outer group (null when it is not mounted). */
+export function partsOf(outer: SVGGElement | undefined): PawnParts | null {
+  const mover = outer?.querySelector<SVGGElement>('[data-role="mover"]');
+  const arc = outer?.querySelector<SVGGElement>('[data-role="arc"]');
+  const facing = outer?.querySelector<SVGGElement>('[data-role="facing"]');
+  return mover && arc && facing ? { mover, arc, facing } : null;
+}
+
 /**
  * Move a pawn along `points` (start anchor first, then every cell entered) in one lock-step pair of
  * animations: `mover` translates along the path over `timeline.total`, `arc` bounces once per hop.
- * Both start together after `leadMs`, the same lead the audio clops are scheduled with.
+ * `facing` mirrors the sprite per hop (`facings[i]` holds during hop i, switching at its start).
+ * All start together after `leadMs`, the same lead the audio clops are scheduled with.
  * Offsets are relative to the pawn's static anchor; `px` in translate() equals SVG user units.
- * Resolves when both animations have finished. The mover keeps its end offset (fill: forwards)
+ * Resolves when the animations have finished. The mover keeps its end offset (fill: forwards)
  * until `clear()` is called, after the static anchor has moved.
  */
 export async function hop(
-  mover: SVGGElement,
-  arc: SVGGElement,
+  { mover, arc, facing }: PawnParts,
   points: Point[],
   timeline: HopTimeline,
   leadMs = 0,
+  facings: Facing[] = [],
 ): Promise<void> {
   const start = points[0];
   if (!start || points.length < 2) return;
@@ -51,10 +68,35 @@ export async function hop(
       iterations: Math.max(1, Math.round(timeline.total / timeline.hop)),
     },
   );
-  await Promise.all([a1.finished, a2.finished]);
+  const flips =
+    facings.length > 0
+      ? facing.animate(facingKeyframes(facings, n), {
+          duration: timeline.total,
+          delay: leadMs,
+          fill: "both",
+          easing: "linear",
+        })
+      : null;
+  await Promise.all([a1.finished, a2.finished, flips?.finished]);
+}
+
+/** Facing is constant during a hop: each keyframe holds its value until the next one (a step). */
+function facingKeyframes(facings: Facing[], n: number): Keyframe[] {
+  const scale = (f: Facing) => `scale(${f === "left" ? -1 : 1}, 1)`;
+  const last = facings[facings.length - 1] ?? "right";
+  return [
+    ...Array.from({ length: n }, (_, i) => ({
+      transform: scale(facings[i] ?? last),
+      offset: i / n,
+      easing: "steps(1, jump-end)",
+    })),
+    { transform: scale(facings[n - 1] ?? last), offset: 1 },
+  ];
 }
 
 /** Drop the animations of a pawn (after its static anchor has been moved to the landing cell). */
-export function clear(mover: SVGGElement, arc: SVGGElement): void {
-  for (const a of [...mover.getAnimations(), ...arc.getAnimations()]) a.cancel();
+export function clear({ mover, arc, facing }: PawnParts): void {
+  for (const a of [...mover.getAnimations(), ...arc.getAnimations(), ...facing.getAnimations()]) {
+    a.cancel();
+  }
 }

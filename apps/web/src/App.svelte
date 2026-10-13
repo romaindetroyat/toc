@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KnightDefs from "./board/KnightDefs.svelte";
   import Game from "./routes/Game.svelte";
   import Launch from "./routes/Launch.svelte";
 
@@ -14,6 +15,9 @@
     return () => window.removeEventListener("hashchange", onHashChange);
   });
 </script>
+
+<!-- The knight symbols, once for the whole document: the board and the colour tiles share them. -->
+<KnightDefs />
 
 {#if route === "#/partie"}
   <Game />
