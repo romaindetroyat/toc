@@ -3,18 +3,19 @@
 // Relative imports carry the explicit .ts extension and syntax is erasable-only
 // so Node 22 can import this file directly (tools/ scripts).
 //
-// API implemented by plans 01-10, 01-12 and 01-13 (signatures fixed here, bodies not written yet):
+// API implemented by plans 01-10, 01-12 and 01-13 (signatures fixed here):
 //
 //   newGame(cfg: GameConfig, seed: [number, number, number, number]): GameState
-//   legalActions(stateOrView: GameState | PlayerView, seat: Color): Action[]
+//   legalActions(stateOrView: GameState | PlayerView, seat: Color, opts?: { sevenPlans?: "all" | "none" }): Action[]
 //   apply(state: GameState, seat: Color, action: Action): { state: GameState; events: GameEvent[] }
 //       throws IllegalActionError for any action that is not in legalActions
 //   resolveMove(view: PlayerView, seat: Color, action: Action): MoveResolution
 //       pure preview on a copy: path, captures, landing place (same code as apply)
 //   viewFor(state: GameState, seat: Color): PlayerView
 //   playability(view: PlayerView, seat: Color): Record<CardId, { playable: true } | { playable: false; reason: Reason }>
-//   nextSteps(view: PlayerView, seat: Color, card: CardId, partialPlan: SevenPlan): Map<PawnId, number[]>
+//   nextSteps(view: PlayerView, seat: Color, card: CardId, partialPlan: SevenPlan): Partial<Record<PawnId, number[]>>
 //   isComplete(view: PlayerView, seat: Color, card: CardId, plan: SevenPlan): boolean
+//   sevenPlans(view: PlayerView, seat: Color, card: CardId, limit?: number): SevenPlan[]
 //   scenarioState(before: Scenario['before'], seed: [number, number, number, number]): GameState
 //
 // The `kind` discriminant makes it a type error to pass a GameState where a PlayerView is expected:

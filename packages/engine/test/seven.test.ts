@@ -424,7 +424,8 @@ describe("nextSteps: only the steps after which the 7 can still be completed", (
       "bleu",
     );
     const offered = nextSteps(viewFor(state, "bleu"), "bleu", CARD, plan(["bleu3", 2]));
-    expect(offered.rouge0).toEqual([1, 2, 3, 4, 5]);
+    // The 7 is played in full: with 5 steps left and one partner pawn on the ring, only the 5 completes.
+    expect(offered.rouge0).toEqual([5]);
   });
 });
 

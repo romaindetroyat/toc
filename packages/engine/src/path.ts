@@ -1,5 +1,5 @@
 // The single movement path (RESEARCH Pattern 1): walk() is used by legality, previews, captures,
-// the 7 (plan 01-13) and animation. No second movement code path exists for the 4, the Valet or the 7.
+// the 7 (plan 01-13, seven.ts) and animation. No second movement code path exists for the 4, the Valet or the 7.
 // Rules read: RULES.md R-02, R-08, R-12, R-13 and the choices G2, G3, G4 through `board.rules`.
 // Pure, no I/O, erasable syntax only.
 
@@ -11,6 +11,7 @@ import {
   type PawnId,
   type Place,
   pawnColor,
+  pawnIndex,
   RING,
   ringIndex,
 } from "./topology.ts";
@@ -50,6 +51,35 @@ export type WalkOpts = {
   ignoreProtection?: boolean;
 };
 
+/** Where the pawn `id` stands, as a board place (its stable slot, its ring cell or its home slot). */
+export function placeOf(id: PawnId, pawn: Pawn): Place {
+  const color = pawnColor(id);
+  if (pawn.zone === "stable") return stablePlace(id);
+  if (pawn.zone === "home") return { z: "home", color, slot: pawn.slot };
+  return { z: "ring", cell: ringIndex(color, pawn.progress) };
+}
+
+/** The stable slot of the pawn `id`. */
+export function stablePlace(id: PawnId): Place {
+  return { z: "stable", color: pawnColor(id), slot: pawnIndex(id) };
+}
+
+/** Ring pawns by cell, in ALL_PAWNS order: one scan of the 16 pawns per walk instead of one per cell. */
+type Occupancy = (PawnId[] | undefined)[];
+
+function ringOccupancy(board: Board): Occupancy {
+  const occ: Occupancy = new Array(RING);
+  for (const id of ALL_PAWNS) {
+    const pawn = board.pawns[id];
+    if (pawn.zone !== "ring") continue;
+    const cell = ringIndex(pawnColor(id), pawn.progress);
+    const here = occ[cell];
+    if (here === undefined) occ[cell] = [id];
+    else here.push(id);
+  }
+  return occ;
+}
+
 const ringPlace = (cell: number): Place => ({ z: "ring", cell });
 
 function homePlace(color: Color, slot: number): Place {
@@ -76,17 +106,23 @@ function occupantsAt(board: Board, cell: number, except: PawnId): PawnId[] {
   });
 }
 
-/**
- * The protected pawn that stops `moving` on `cell`, or null. A protected pawn blocks every other pawn,
- * its own colour included when PROTECTED_BLOCKS_OWNER (G4).
- */
-export function blocksPath(cell: number, moving: PawnId, board: Board): PawnId | null {
-  for (const id of occupantsAt(board, cell, moving)) {
+/** The protected pawn among `here` that stops `moving`, or null (own colour included under G4). */
+function protectorOf(board: Board, here: readonly PawnId[], moving: PawnId): PawnId | null {
+  for (const id of here) {
+    if (id === moving) continue;
     if (!isProtected(id, board.pawns[id], board.rules)) continue;
     if (pawnColor(id) === pawnColor(moving) && !board.rules.PROTECTED_BLOCKS_OWNER) continue;
     return id;
   }
   return null;
+}
+
+/**
+ * The protected pawn that stops `moving` on `cell`, or null. A protected pawn blocks every other pawn,
+ * its own colour included when PROTECTED_BLOCKS_OWNER (G4).
+ */
+export function blocksPath(cell: number, moving: PawnId, board: Board): PawnId | null {
+  return protectorOf(board, occupantsAt(board, cell, moving), moving);
 }
 
 type Stretch =
@@ -105,23 +141,28 @@ function ringStretch(
   dir: 1 | -1,
   lands: boolean,
   opts: WalkOpts,
+  occ: Occupancy,
 ): Stretch {
   const color = pawnColor(id);
   const path: Place[] = [];
   const captures: Capture[] = [];
   for (let i = 1; i <= count; i++) {
     const cell = ringIndex(color, from + dir * i);
-    if (!opts.ignoreProtection && blocksPath(cell, id, board) !== null) {
-      return { ok: false, reason: "blocked-protected" };
-    }
-    const landing = lands && i === count;
-    for (const other of occupantsAt(board, cell, id)) {
-      const own = opts.ownIds.includes(other);
-      if (landing) {
-        if (own) return { ok: false, reason: "own-pawn" };
-        captures.push({ victim: other, atStep: i - 1 });
-      } else if (opts.capturePassed && !own) {
-        captures.push({ victim: other, atStep: i - 1 });
+    const here = occ[cell];
+    if (here !== undefined) {
+      if (!opts.ignoreProtection && protectorOf(board, here, id) !== null) {
+        return { ok: false, reason: "blocked-protected" };
+      }
+      const landing = lands && i === count;
+      for (const other of here) {
+        if (other === id) continue;
+        const own = opts.ownIds.includes(other);
+        if (landing) {
+          if (own) return { ok: false, reason: "own-pawn" };
+          captures.push({ victim: other, atStep: i - 1 });
+        } else if (opts.capturePassed && !own) {
+          captures.push({ victim: other, atStep: i - 1 });
+        }
       }
     }
     path.push(ringPlace(cell));
@@ -175,6 +216,7 @@ export function walk(
   }
 
   const from = pawn.progress;
+  const occ = ringOccupancy(board);
   if (dir === 1) {
     // The entry square is crossed (or stood on) at progress q, q >= 70, q = 70 mod 72; `r` steps lie beyond it.
     for (let k = 0; k < steps; k++) {
@@ -189,7 +231,7 @@ export function walk(
           return { ok: false, reason: "home-blocked" };
         break; // G2 continue: the pawn does not jump the home pawn and goes round again
       }
-      const stretch = ringStretch(board, pawnId, from, k, 1, false, opts);
+      const stretch = ringStretch(board, pawnId, from, k, 1, false, opts, occ);
       if (!stretch.ok) return stretch;
       const path = [...stretch.path];
       for (let slot = 0; slot < r; slot++) path.push(homePlace(color, slot));
@@ -202,7 +244,7 @@ export function walk(
     }
   }
 
-  const stretch = ringStretch(board, pawnId, from, steps, dir, true, opts);
+  const stretch = ringStretch(board, pawnId, from, steps, dir, true, opts, occ);
   if (!stretch.ok) return stretch;
   return {
     ok: true,

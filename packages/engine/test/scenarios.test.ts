@@ -1,7 +1,6 @@
 // The RULES.md scenarios as executable acceptance tests (success criterion 1).
 // Every fixture of packages/engine/scenarios is built with scenarioState() and checked against the engine.
-// Scenarios that need the 7 are `todo` until plan 01-13; the « alt » scenarios (R-09.9, R-15.9) describe
-// the alternative of an open point and are skipped.
+// The « alt » scenarios (R-09.9, R-15.9) describe the alternative of an open point and are skipped.
 
 import { describe, expect, it } from "vitest";
 import { scenarios } from "../scenarios/index.ts";
@@ -32,18 +31,6 @@ import {
 
 type Seed = [number, number, number, number];
 const FIXED_SEED: Seed = [101, 202, 303, 404];
-
-function mentionsSeven(value: unknown): boolean {
-  return /"t":"seven"|"seven-incomplete"/.test(JSON.stringify(value));
-}
-
-/** True when the scenario depends on whether a 7 can be played (plan 01-13). */
-function sevenDependent(sc: Scenario): boolean {
-  if (sc.rule === "R-10" || sc.flags?.includes("seven")) return true;
-  if (mentionsSeven([sc.action, sc.script, sc.expect])) return true;
-  const sevens = Object.keys(sc.expect.playable ?? {}).some((card) => card.startsWith("7"));
-  return sevens;
-}
 
 function specOf(pawn: Pawn): PawnSpec {
   if (pawn.zone === "stable") return "S";
@@ -191,9 +178,6 @@ for (const rule of RULE_IDS) {
       const name = `${sc.id} ${sc.title}`;
       if (sc.flags?.includes("alt")) {
         it.skip(`${name} (alternative of an open point, not implemented)`, () => {});
-      } else if (sevenDependent(sc)) {
-        // The 7 is added by plan 01-13 (RULE-10, RULE-11).
-        it.todo(name);
       } else {
         it(name, () => run(sc));
       }

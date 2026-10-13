@@ -5,8 +5,9 @@
 
 import type { GameEvent } from "./events.ts";
 import { legalActions } from "./legal.ts";
-import { movesForCard, sameAction } from "./moves.ts";
-import type { Board } from "./path.ts";
+import { homeCount, movesForCard, sameAction, winningTeam } from "./moves.ts";
+import { type Board, placeOf, stablePlace } from "./path.ts";
+import { applyPlan } from "./seven.ts";
 import { endDeal, giveCard, isDealOver } from "./state.ts";
 import {
   COLORS,
@@ -16,9 +17,6 @@ import {
   type PawnId,
   type Place,
   pawnColor,
-  pawnIndex,
-  ringIndex,
-  type Team,
   teamOf,
 } from "./topology.ts";
 import type { Action, CardId, GameState, Pawn } from "./types.ts";
@@ -46,22 +44,6 @@ function copyPawns(pawns: Record<PawnId, Pawn>): Record<PawnId, Pawn> {
   const copy = {} as Record<PawnId, Pawn>;
   for (const id of Object.keys(pawns) as PawnId[]) copy[id] = { ...pawns[id] };
   return copy;
-}
-
-function stablePlace(id: PawnId): Place {
-  return { z: "stable", color: pawnColor(id), slot: pawnIndex(id) };
-}
-
-/** Where `pawn` stands, as a board place. */
-function placeOf(id: PawnId, pawn: Pawn): Place {
-  const color = pawnColor(id);
-  if (pawn.zone === "stable") return stablePlace(id);
-  if (pawn.zone === "home") return { z: "home", color, slot: pawn.slot };
-  return { z: "ring", cell: ringIndex(color, pawn.progress) };
-}
-
-function homeCount(pawns: Record<PawnId, Pawn>, color: Color): number {
-  return ([0, 1, 2, 3] as const).filter((i) => pawns[`${color}${i}`]?.zone === "home").length;
 }
 
 /**
@@ -148,15 +130,6 @@ function nextHolder(hands: Record<Color, CardId[]>, seat: Color): Color | null {
   return null;
 }
 
-/** The team whose eight pawns are all home, if any (RULE-18). */
-function winningTeam(pawns: Record<PawnId, Pawn>): Team | null {
-  for (const team of ["bleu-rouge", "jaune-vert"] as const) {
-    const colors = COLORS.filter((c) => teamOf(c) === team);
-    if (colors.every((c) => homeCount(pawns, c) === 4)) return team;
-  }
-  return null;
-}
-
 function reject(state: GameState, seat: Color, action: Action): never {
   if (state.phase === "won") throw new IllegalActionError("game-over", "the game is over");
   if (state.phase === "play" && state.turn !== seat && action.t !== "give") {
@@ -170,58 +143,66 @@ function reject(state: GameState, seat: Color, action: Action): never {
 
 /**
  * Plays one action. Returns a new state and the events (the input is never mutated). Throws
- * IllegalActionError for anything legalActions(state, seat) does not list.
+ * IllegalActionError for anything legalActions(state, seat) does not list. A 7 is checked by playing
+ * its plan (applyPlan: sum 7, every micro-move legal in turn) rather than by listing every plan; a plan
+ * that spells one pawn's consecutive entries separately is the same plan as the merged one.
  */
 export function apply(
   state: GameState,
   seat: Color,
   action: Action,
 ): { state: GameState; events: GameEvent[] } {
-  if (!legalActions(state, seat).some((legal) => sameAction(legal, action))) {
-    return reject(state, seat, action);
-  }
-
-  if (action.t === "give") return giveCard(state, seat, action.card);
-
   const hands = { ...state.hands };
   const events: GameEvent[] = [];
   let next: GameState;
 
-  if (action.t === "discard") {
-    const cards = state.hands[seat].slice();
-    hands[seat] = [];
-    events.push({ t: "handDiscarded", seat, cards });
-    next = { ...state, hands, posed: { ...state.posed, [seat]: cards } };
-  } else if (action.t === "seven") {
-    // Plan 01-13 adds the 7; legalActions never lists it before.
-    return reject(state, seat, action);
-  } else {
-    const resolved = resolveMove(state, seat, action);
+  if (action.t === "seven") {
+    const mayPlay =
+      state.phase === "play" &&
+      state.turn === seat &&
+      rankOf(action.card) === 7 &&
+      state.hands[seat].includes(action.card);
+    const played = mayPlay ? applyPlan(state, seat, action.card, action.plan) : null;
+    if (played === null || !played.ok) return reject(state, seat, action);
     hands[seat] = state.hands[seat].filter((card) => card !== action.card);
-    events.push({ t: "cardPlayed", seat, card: action.card }, ...resolved.events);
-
-    const winner = winningTeam(resolved.pawns);
-    const captures = { ...state.captures };
-    captures[teamOf(seat)] += resolved.captured.length;
-    next = {
-      ...state,
-      pawns: resolved.pawns,
-      hands,
-      discard: [...state.discard, action.card],
-      lastPlayed: { ...state.lastPlayed, [seat]: action.card },
-      captures,
-    };
-
-    if (winner !== null) {
-      // The victory is checked after every move and comes before the end of the turn (R-16).
-      events.push({ t: "gameWon", team: winner });
-      return { state: { ...next, phase: "won", winner }, events };
+    events.push({ t: "cardPlayed", seat, card: action.card }, ...played.events);
+    const won = finishMove(state, seat, action.card, hands, played.pawns, played.captured, events);
+    if (won !== null) return won;
+    next = movedState(state, seat, action.card, hands, played.pawns, played.captured);
+  } else {
+    if (
+      !legalActions(state, seat, { sevenPlans: "none" }).some((legal) => sameAction(legal, action))
+    ) {
+      return reject(state, seat, action);
     }
-    for (const event of resolved.events) {
-      if (event.t === "pawnEnteredHome" && event.homeCount === 4) {
-        const finished = pawnColor(event.pawn);
-        events.push({ t: "playerFinished", seat: finished, partner: PARTNER[finished] });
+    if (action.t === "give") return giveCard(state, seat, action.card);
+
+    if (action.t === "discard") {
+      const cards = state.hands[seat].slice();
+      hands[seat] = [];
+      events.push({ t: "handDiscarded", seat, cards });
+      next = { ...state, hands, posed: { ...state.posed, [seat]: cards } };
+    } else {
+      const resolved = resolveMove(state, seat, action);
+      hands[seat] = state.hands[seat].filter((card) => card !== action.card);
+      events.push({ t: "cardPlayed", seat, card: action.card }, ...resolved.events);
+      const won = finishMove(
+        state,
+        seat,
+        action.card,
+        hands,
+        resolved.pawns,
+        resolved.captured,
+        events,
+      );
+      if (won !== null) return won;
+      for (const event of resolved.events) {
+        if (event.t === "pawnEnteredHome" && event.homeCount === 4) {
+          const finished = pawnColor(event.pawn);
+          events.push({ t: "playerFinished", seat: finished, partner: PARTNER[finished] });
+        }
       }
+      next = movedState(state, seat, action.card, hands, resolved.pawns, resolved.captured);
     }
   }
 
@@ -235,4 +216,45 @@ export function apply(
   events.push({ t: "turn", seat: nextColor(seat) });
   const ended = isDealOver(next) ? endDeal(next) : { state: next, events: [] };
   return { state: ended.state, events: [...events, ...ended.events] };
+}
+
+/** The state after a card was played and its pawns moved (hands already updated by the caller). */
+function movedState(
+  state: GameState,
+  seat: Color,
+  card: CardId,
+  hands: Record<Color, CardId[]>,
+  pawns: Record<PawnId, Pawn>,
+  captured: PawnId[],
+): GameState {
+  const captures = { ...state.captures };
+  captures[teamOf(seat)] += captured.length;
+  return {
+    ...state,
+    pawns,
+    hands,
+    discard: [...state.discard, card],
+    lastPlayed: { ...state.lastPlayed, [seat]: card },
+    captures,
+  };
+}
+
+/**
+ * The victory is checked after every move and comes before the end of the turn (R-16): when the played
+ * card brought the eighth pawn home, appends gameWon and returns the final state, otherwise null.
+ */
+function finishMove(
+  state: GameState,
+  seat: Color,
+  card: CardId,
+  hands: Record<Color, CardId[]>,
+  pawns: Record<PawnId, Pawn>,
+  captured: PawnId[],
+  events: GameEvent[],
+): { state: GameState; events: GameEvent[] } | null {
+  const winner = winningTeam(pawns);
+  if (winner === null) return null;
+  events.push({ t: "gameWon", team: winner });
+  const final = movedState(state, seat, card, hands, pawns, captured);
+  return { state: { ...final, phase: "won", winner }, events };
 }

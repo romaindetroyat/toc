@@ -1,5 +1,5 @@
 // Candidate moves of one card for one seat (RULES.md R-06 to R-09), built only on walk() and exitWalk().
-// controlledPawns() decides whose pawns a seat plays (R-15). The 7 is added by plan 01-13.
+// controlledPawns() decides whose pawns a seat plays (R-15). The 7 lives in seven.ts.
 // Pure, no I/O, erasable syntax only.
 
 import {
@@ -11,12 +11,37 @@ import {
   type WalkOpts,
   walk,
 } from "./path.ts";
-import { type Color, EXIT, PARTNER, type PawnId, pawnColor, RING, ringIndex } from "./topology.ts";
+import {
+  COLORS,
+  type Color,
+  EXIT,
+  PARTNER,
+  type PawnId,
+  pawnColor,
+  RING,
+  ringIndex,
+  type Team,
+  teamOf,
+} from "./topology.ts";
 import type { Action, CardId, Pawn } from "./types.ts";
 import { rankOf } from "./types.ts";
 
 function seatPawns(seat: Color): PawnId[] {
   return ([0, 1, 2, 3] as const).map((index): PawnId => `${seat}${index}`);
+}
+
+/** Pawns of `color` that stand in its home. */
+export function homeCount(pawns: Record<PawnId, Pawn>, color: Color): number {
+  return seatPawns(color).filter((id) => pawns[id]?.zone === "home").length;
+}
+
+/** The team whose eight pawns are all home, if any (RULE-18). */
+export function winningTeam(pawns: Record<PawnId, Pawn>): Team | null {
+  for (const team of ["bleu-rouge", "jaune-vert"] as const) {
+    const colors = COLORS.filter((c) => teamOf(c) === team);
+    if (colors.every((c) => homeCount(pawns, c) === 4)) return team;
+  }
+  return null;
 }
 
 /** True when the four pawns of `seat` are home (R-15). */
@@ -104,7 +129,7 @@ function canonical(value: unknown): string {
  * - As: leave the stable (lowest-index stable pawn, A-11) or advance 1; Roi: leave or advance 13;
  * - Dame 12, 2, 3, 5, 6, 8, 9, 10: advance; 4: back 4 (ring pawns only);
  * - Valet: swap one of my ring pawns with a ring pawn of another colour that is not mine;
- * - the 7 returns nothing until plan 01-13.
+ * - the 7 returns nothing here: it is a plan of several micro-moves, see seven.ts.
  */
 export function movesForCard(
   board: Board,
