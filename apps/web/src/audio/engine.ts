@@ -487,6 +487,12 @@ export function scheduleClops(offsetsMs: number[], t0: number): void {
 
 /** Play one sound now (or at audio-clock time `at`), with jitter. Fire-and-forget. */
 export function cue(id: SoundId, at?: number, opts?: CueOptions): void {
+  if (DEBUG && window.__tocDebug) {
+    // Debug builds: the e2e specs read which neighs were asked for, and when on the audio clock.
+    const log = window.__tocDebug.audio.cues ?? [];
+    log.push({ id, at: at ?? now(), requestedAt: now() });
+    window.__tocDebug.audio.cues = log;
+  }
   engine?.cue(id, at, opts);
 }
 

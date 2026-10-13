@@ -11,8 +11,9 @@
     playability,
     teamOf,
   } from "@toc/engine";
-  import { clear, hop, partsOf } from "../board/animator.ts";
-  import Board from "../board/Board.svelte";
+  import { MOTION, scaleFor } from "@toc/board";
+  import * as fx from "../board/animator.ts";
+  import Board, { type Burst } from "../board/Board.svelte";
   import { anchorOf, type Facing } from "../board/geometry.ts";
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
@@ -52,7 +53,10 @@
   let facings = $state.raw<Record<string, Facing>>(
     Object.fromEntries(PAWNS.map(({ id }) => [id, "right" as Facing])),
   );
-  let movingPawn = $state<PawnId>();
+  /** The knights on the move (or being thrown back), in front of all the others (UI-SPEC). */
+  let moving = $state.raw<PawnId[]>([]);
+  /** The particles of the party of the fourth knight home, while they fly. */
+  let burst = $state.raw<Burst | null>(null);
   /** The knight the player tapped last (a stable knight stands for the exit, A-11). */
   let tapped = $state<PawnId | null>(null);
   /** A tap on the board missed every lit knight. */
@@ -63,25 +67,79 @@
 
   let session = $state.raw<Session>();
 
+  const parts = (pawn: PawnId): fx.PawnParts => {
+    const found = fx.partsOf(els[pawn]);
+    if (!found) throw new Error(`pawn ${pawn} is not mounted`);
+    return found;
+  };
+
+  /** Puts the knights on top before their animations start (moving a node while it animates would cut it). */
+  function raise(pawns: PawnId[]) {
+    const fresh = pawns.filter((pawn) => !moving.includes(pawn));
+    if (fresh.length === 0) return;
+    moving = [...moving, ...fresh];
+    flushSync();
+  }
+
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
   const env: SessionEnv = {
     animator: {
-      hop(pawn, points, timeline, leadMs, pawnFacings) {
-        // The moving pawn is re-ordered on top before its animation starts (moving a node
-        // while it animates would cut the animation).
-        movingPawn = pawn;
-        flushSync();
-        const parts = partsOf(els[pawn]);
-        if (!parts) throw new Error(`pawn ${pawn} is not mounted`);
-        return hop(parts, points, timeline, leadMs, pawnFacings);
+      begin: raise,
+      hop(pawn, points, timeline, leadMs, pawnFacings, mode) {
+        raise([pawn]);
+        return fx.hop(parts(pawn), points, timeline, leadMs, pawnFacings, mode);
       },
       finish(pawn) {
-        const parts = partsOf(els[pawn]);
-        if (!parts) return;
-        for (const group of [parts.mover, parts.arc, parts.facing]) {
-          for (const animation of group.getAnimations()) animation.finish();
-        }
+        const found = fx.partsOf(els[pawn]);
+        if (found) fx.finish(found);
+        // The burst of a party goes with it.
+        burst?.onDone();
       },
+      exit(pawn, from, to, leadMs, facing, mode) {
+        raise([pawn]);
+        return fx.exitBound(parts(pawn), from, to, leadMs, facing, mode);
+      },
+      turn: (pawn, from, to, leadMs, mode) => fx.volteFace(parts(pawn), from, to, leadMs, mode),
+      rear: (pawn, leadMs, mode) => fx.rear(parts(pawn), leadMs, mode),
+      eject(pawn, from, to, leadMs, facing, mode) {
+        raise([pawn]);
+        return fx.eject(parts(pawn), from, to, leadMs, facing, mode);
+      },
+      swap(a, b, leadMs, mode) {
+        raise([a.pawn, b.pawn]);
+        return fx.swapArcs(
+          { parts: parts(a.pawn), from: a.from, to: a.to, facing: a.facing },
+          { parts: parts(b.pawn), from: b.from, to: b.to, facing: b.facing },
+          leadMs,
+          mode,
+        );
+      },
+      settle: (pawn, leadMs, mode) => fx.homeSettle(parts(pawn), leadMs, mode),
+      party: (pawn, at, leadMs, mode) =>
+        fx.party(
+          parts(pawn),
+          leadMs,
+          mode,
+          () =>
+            new Promise<void>((resolve) => {
+              burst = {
+                x: at[0],
+                y: at[1],
+                delayMs: leadMs,
+                durationMs: MOTION.partyBurst * scaleFor(mode),
+                onDone: () => {
+                  burst = null;
+                  resolve();
+                },
+              };
+            }),
+        ),
+      winHop: (pawns, leadMs, mode) =>
+        fx.winHop(
+          pawns.map((pawn) => parts(pawn)),
+          leadMs,
+          mode,
+        ),
     },
     facingOf: (pawn) => facings[pawn] ?? "right",
     commit(pawn, _place, facing) {
@@ -89,9 +147,9 @@
       // anchor, then drop the animation offset in the same task (no flicker).
       facings = { ...facings, [pawn]: facing };
       flushSync();
-      const parts = partsOf(els[pawn]);
-      if (parts) clear(parts);
-      movingPawn = undefined;
+      const found = fx.partsOf(els[pawn]);
+      if (found) fx.clear(found);
+      moving = moving.filter((each) => each !== pawn);
     },
   };
 
@@ -107,7 +165,8 @@
     session?.dispose();
     session = undefined;
     facings = Object.fromEntries(PAWNS.map(({ id }) => [id, "right" as Facing]));
-    movingPawn = undefined;
+    moving = [];
+    burst = null;
     tapped = null;
     missed = false;
     await tick();
@@ -153,8 +212,9 @@
           const [x, y] = anchorOf(render.pawns[pawn.id] as Place, k);
           return { ...pawn, x, y };
         }).sort((a, b) => {
-          if (a.id === movingPawn) return 1;
-          if (b.id === movingPawn) return -1;
+          const rankA = moving.indexOf(a.id);
+          const rankB = moving.indexOf(b.id);
+          if (rankA >= 0 || rankB >= 0) return rankA - rankB;
           return a.y - b.y || a.id.localeCompare(b.id);
         }),
   );
@@ -313,7 +373,7 @@
       </div>
 
       <div class="stage">
-        <Board {k} {render} {discardTop}>
+        <Board {k} {render} {discardTop} {burst}>
           {#snippet under(px)}
             <Overlay
               layer="under"

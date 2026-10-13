@@ -46,13 +46,24 @@
 
 {#snippet body()}
   <g data-role="mover">
-    <g data-role="arc">
-      <g transform={`scale(${size})`}>
+    <!-- The shadow stays on the ground: the animator scales and fades it while the knight leaps. -->
+    <g transform={`scale(${size})`}>
+      <g data-role="shadow">
         <use href="#knight-shadow" />
-        <g transform={lift > 0 ? `translate(0 ${-lift})` : undefined}>
-          <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
-            <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
-            <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+      </g>
+    </g>
+    <g data-role="arc">
+      <!-- squash scales the body about the feet (the local origin) on landing; rear pivots at the
+           feet too, inside the facing mirror so a left-facing knight rears backwards as well. -->
+      <g data-role="squash">
+        <g transform={`scale(${size})`}>
+          <g transform={lift > 0 ? `translate(0 ${-lift})` : undefined}>
+            <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
+              <g data-role="rear">
+                <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
+                <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+              </g>
+            </g>
           </g>
         </g>
       </g>
@@ -65,8 +76,8 @@
 {/snippet}
 
 <!-- Outer group: static anchor (attribute, never animated). Inside it only the inner groups move:
-     mover (translation along the path), arc (hop height), facing (mirror), all by the Web
-     Animations API. A pawn the player can act on is a button; the others are plain pictures. -->
+     mover (translation along the path), arc (hop height), squash (landing), facing (mirror), rear
+     (rearing), shadow, all by the Web Animations API. A pawn the player can act on is a button; the others are plain pictures. -->
 {#if onselect}
   <g
     bind:this={el}

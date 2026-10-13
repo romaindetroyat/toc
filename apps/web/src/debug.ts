@@ -12,6 +12,8 @@ declare global {
       audio: {
         scheduled: number[];
         history: number[][];
+        /** Every sound other than the clops that the game asked for: id, audio-clock time, request time. */
+        cues?: { id: string; at: number; requestedAt: number }[];
         /** Rendered synthesized sounds, keyed `recipe#variant`: duration in seconds and peak amplitude. */
         sounds?: Record<string, { duration: number; peak: number }>;
       };
