@@ -564,3 +564,66 @@ for (const screenSize of [PHONE, { width: 480, height: 320 }]) {
     });
   });
 }
+
+// --- The phone held sideways: the size targets, émulation Chromium (insets 0) (Task 3) ---
+
+/**
+ * UI-SPEC « Objectifs de taille », compact bar, Chromium emulation with insets 0: the board's width =
+ * max(0, min(innerWidth − 108, (innerHeight − band) / (0.5 + 0.02166))), band = 64 px from 640 px
+ * wide, else 120 px; a step of width × 107.05 / 3200.
+ */
+const TARGETS = [
+  // min(844 − 108 = 736, (390 − 64) / 0.52166 ≈ 624.9): height-limited, ≈ 625, cells ≈ 20.9 px.
+  { width: 844, height: 390, atLeast: 610, shot: true },
+  // The configured iPhone 13 landscape window: min(642, (342 − 64) / 0.52166 ≈ 532.9) ≈ 533, ≈ 17.8.
+  { width: PHONE.width, height: PHONE.height, atLeast: 520, shot: true },
+  // min(667 − 108 = 559, (375 − 64) / 0.52166 ≈ 596.2): width-limited, 559, cells ≈ 18.7 px.
+  { width: 667, height: 375, atLeast: 545, shot: false },
+  // Two rows: min(568 − 108 = 460, (320 − 120) / 0.52166 ≈ 383.4) ≈ 383, cells ≈ 12.8 px.
+  { width: 568, height: 320, atLeast: 370, shot: false },
+  // Two rows: min(480 − 108 = 372, (320 − 120) / 0.52166 ≈ 383.4): width-limited, 372, ≈ 12.4.
+  { width: 480, height: 320, atLeast: 360, shot: true },
+];
+
+test.describe("les tailles visées du téléphone tenu en largeur (émulation Chromium, insets 0)", () => {
+  test.skip(({ isMobile }) => isMobile, "explicit landscape viewports");
+
+  for (const target of TARGETS) {
+    test(`à ${target.width} × ${target.height}, le galet fait au moins ${target.atLeast} px de large et la Dame se joue`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: target.width, height: target.height });
+      await page.goto("/");
+      await page.goto("/#/partie?scenario=R-07.1");
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      const what = `${target.width} × ${target.height}`;
+      await expectInfoBeside(page, what);
+      await expectBandRows(page, what);
+      await expectBoard(page, what, target.atLeast);
+      await expectNoScroll(page, what);
+
+      // A move: the Dame, the knight, « Jouer »; bleu0 lands on the drawn cell 15.
+      await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+      await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
+      await settled(page);
+      await expectBandRows(page, `${what}, carte choisie`);
+      if (target.shot) {
+        // A picture for Romain's re-test, a card selected and its knight lit, past the zone's fade.
+        await page.waitForTimeout(400);
+        await page.screenshot({
+          path: `test-results/galet-emulation-${target.width}x${target.height}.png`,
+        });
+      }
+      await page.locator('[data-hit="bleu0"]').click({ force: true });
+      const play = page.getByRole("button", { name: "Jouer", exact: true });
+      await expect(play).toBeVisible();
+      await expectBandRows(page, `${what}, aperçu`);
+      await expectNoScroll(page, `${what}, aperçu`);
+      await play.click();
+      await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:15");
+      await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
+      await boardWidth(page);
+      await expectNoScroll(page, `${what}, après le coup`);
+    });
+  }
+});

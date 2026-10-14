@@ -1,14 +1,18 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { devices, expect, type Locator, type Page, test } from "@playwright/test";
 import { etatParam } from "./position.ts";
 
 // Touch targets (UI-SPEC « Touch targets »): every button, card slice, step chip, tray chip and candidate
-// knight hit circle measures at least 44 x 44 screen px on the smallest phones. Explicit viewports on the
-// desktop project (the phone project already is one phone size).
+// knight hit circle measures at least 44 x 44 screen px on the smallest phones, held sideways (Romain's
+// « paysage obligatoire »: the compact bar of plan 01-37; a screen taller than wide leaves the game in
+// 01-38). Explicit viewports on the desktop project.
 
 const VIEWPORTS = [
-  { width: 320, height: 480 },
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
+  { width: 480, height: 320 },
+  { width: 568, height: 320 },
+  { width: 667, height: 375 },
+  // The window Playwright emulates for an iPhone 13 held sideways (750 x 342 with Playwright 1.64).
+  devices["iPhone 13 landscape"].viewport,
+  { width: 844, height: 390 },
 ] as const;
 const MIN = 44;
 /** Layout rounding: a box of 43.9 px is a 44 px box. */
@@ -136,8 +140,8 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test.describe("le 7 sous le plateau à 375 x 667", () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+test.describe("le 7 sous le plateau à 667 x 375, le téléphone tenu en largeur", () => {
+  test.use({ viewport: { width: 667, height: 375 } });
   test.skip(({ isMobile }) => isMobile, "explicit viewport: desktop project only");
 
   test("le galet en largeur reste 2:1 et dans l’écran, le panneau avec lui", async ({ page }) => {
@@ -166,15 +170,15 @@ test.describe("le 7 sous le plateau à 375 x 667", () => {
     expect(Math.abs(board.height - 0.5 * board.width)).toBeLessThan(2);
     expect(board.width).toBeGreaterThan(90);
     expect(board.x).toBeGreaterThanOrEqual(0);
-    expect(board.x + board.width).toBeLessThanOrEqual(375 + 0.5);
+    expect(board.x + board.width).toBeLessThanOrEqual(667 + 0.5);
     expect(board.y + board.height).toBeLessThanOrEqual(seven.y + 1);
-    // Bar 56 + the 2:1 landscape galet and its head room + panel: everything is on screen, no scrolling to
-    // reach « Jouer ».
-    expect(seven.y + seven.height).toBeLessThanOrEqual(667 + 0.5);
+    // The 2:1 landscape galet and its head room over the compact bar, which the panel takes: everything
+    // is on screen, no scrolling to reach « Jouer ».
+    expect(seven.y + seven.height).toBeLessThanOrEqual(375 + 0.5);
     const play = await page.getByRole("button", { name: "Jouer", exact: true }).boundingBox();
-    expect((play?.y ?? 0) + (play?.height ?? 0)).toBeLessThanOrEqual(667);
+    expect((play?.y ?? 0) + (play?.height ?? 0)).toBeLessThanOrEqual(375);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(
-      667,
+      375,
     );
   });
 
@@ -196,15 +200,21 @@ test.describe("le 7 sous le plateau à 375 x 667", () => {
     await expect(page.locator("[data-seven-row]")).toHaveCount(7);
     const after = await page.locator("[data-seven-panel]").boundingBox();
     expect(after?.height).toBe(before?.height);
+    // In the compact bar the plan is one line that scrolls sideways (UI-SPEC addendum « Plateau
+    // galet », item 8).
     const region = page.locator("[data-seven-region]");
-    expect(await region.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    expect(
+      await region.evaluate(
+        (el) => el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth,
+      ),
+    ).toBe(true);
     // The newest row is the one in view.
     await expect(page.locator("[data-seven-row]").last()).toBeInViewport();
   });
 });
 
 test.describe("mouvement réduit", () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ viewport: { width: 667, height: 375 } });
   test.skip(({ isMobile }) => isMobile, "explicit viewport: desktop project only");
 
   test("les halos n’ont aucune animation en cours", async ({ page }) => {
