@@ -39,6 +39,11 @@ export type SessionEnv = Pick<
 > & {
   /** Default: the audio engine of the app. */
   audio?: DirectorDeps["audio"];
+  /**
+   * Resolves at once unless the game is on hold (the invitation to turn the screen shows), otherwise
+   * once it is released. The computer players wait for it before they act. Default: never on hold.
+   */
+  hold?: () => Promise<void>;
 };
 
 /** What a bot just played: its seat and the events of its play (the action zone words them). */
@@ -121,7 +126,12 @@ export function createSession(
       if (played !== undefined && played.seat !== human) lastPlay = { seat: played.seat, events };
       director.enqueue(events);
     },
-    idle: () => director.idle(),
+    // The controller awaits this before a bot's turn and again after its think delay: the Director's
+    // queue, then the screen's hold, so no computer player acts behind the invitation (plan 01-38).
+    async idle(): Promise<void> {
+      await director.idle();
+      await env.hold?.();
+    },
   };
   const controller = createGame({
     human,

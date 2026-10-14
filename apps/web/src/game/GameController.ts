@@ -215,6 +215,9 @@ export function createGame(options: CreateGameOptions): GameController {
         setThinking(nextBot());
         await sleep(thinkDelay(speedOf(), u));
         wake = null;
+        // The screen may have been held meanwhile (the invitation to turn it, plan 01-38): the bot
+        // plays only once the director is idle again, never behind the invitation.
+        await director.idle();
         // The state may have moved while the bot was thinking (the human's give in the exchange).
         const bot = nextBot();
         if (disposed || bot === null) {

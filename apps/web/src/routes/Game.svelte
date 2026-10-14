@@ -199,10 +199,30 @@
     untrack(announceVisibility);
   });
 
+  /**
+   * The computer players wait while the invitation shows (« Conséquence de mise en œuvre, à confirmer
+   * par Romain »): the session's idle awaits this hold, which resolves once the screen is back in
+   * landscape. Every pending hold is released then, and on destroy, so a disposed game's loop ends.
+   */
+  let holds: (() => void)[] = [];
+  function releaseHolds() {
+    const waiting = holds;
+    holds = [];
+    for (const resolve of waiting) resolve();
+  }
+  function hold(): Promise<void> {
+    if (!prompting || !alive) return Promise.resolve();
+    return new Promise<void>((resolve) => holds.push(resolve));
+  }
+  $effect(() => {
+    if (!prompting) untrack(releaseHolds);
+  });
+
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
   const env: SessionEnv = {
     layout: () => boardLayout,
     document: visibility,
+    hold,
     animator: {
       begin: raise,
       hop(pawn, points, timeline, leadMs, pawnFacings, mode) {
@@ -316,6 +336,7 @@
     return () => {
       alive = false;
       session?.dispose();
+      releaseHolds();
     };
   });
 
@@ -526,6 +547,12 @@
    * Échap is one of them (one step back); with a sheet open it is left to the sheet, which closes.
    */
   function onShortcut(event: KeyboardEvent) {
+    // Behind the invitation to turn the screen no key reaches the game, nor a sheet hidden with it
+    // (Échap would close it unseen). The native action is kept (Tab still moves the focus).
+    if (prompting) {
+      event.stopImmediatePropagation();
+      return;
+    }
     const intent = keyIntent(event, {
       ui,
       hand: view === undefined ? [] : sortHand(view.hand),
@@ -601,8 +628,56 @@
 
   /** The invitation's heading: it takes the focus when the invitation appears. */
   let rotateHeading = $state<HTMLHeadingElement | null>(null);
+  /** The game's wrapper, hidden behind the invitation. */
+  let playEl = $state<HTMLElement | null>(null);
+  /** The element of the game that had the focus when the invitation appeared. */
+  let focusBefore: HTMLElement | null = null;
+  let wasPrompting = false;
+
+  // Read before the game is hidden (a hidden element loses the focus).
+  $effect.pre(() => {
+    const now = prompting;
+    untrack(() => {
+      if (!now || wasPrompting) return;
+      const active = document.activeElement;
+      focusBefore = active instanceof HTMLElement && playEl?.contains(active) ? active : null;
+    });
+  });
+
+  /** Whether an element can take the focus again: still in the page, displayed, not inert, enabled. */
+  function focusable(element: HTMLElement | null): element is HTMLElement {
+    return (
+      element !== null &&
+      element.isConnected &&
+      element.getClientRects().length > 0 &&
+      element.closest("[inert]") === null &&
+      !(element as HTMLButtonElement).disabled
+    );
+  }
+
+  // The heading takes the focus when the invitation appears; when it goes, once the game is displayed
+  // again, the focus goes back to where it was, or else to the gear.
   $effect(() => {
-    if (prompting) rotateHeading?.focus({ preventScroll: true });
+    const now = prompting;
+    const heading = rotateHeading;
+    untrack(() => {
+      if (now) {
+        wasPrompting = true;
+        heading?.focus({ preventScroll: true });
+        return;
+      }
+      if (!wasPrompting) return;
+      wasPrompting = false;
+      const before = focusBefore;
+      focusBefore = null;
+      void tick().then(() => {
+        if (prompting) return;
+        if (focusable(before)) before.focus({ preventScroll: true });
+        if (before !== null && document.activeElement === before) return;
+        const gear = playEl?.querySelector<HTMLElement>("[data-settings-slot] button") ?? null;
+        if (focusable(gear)) gear.focus({ preventScroll: true });
+      });
+    });
   });
 </script>
 
@@ -622,7 +697,7 @@
   {/if}
   <!-- Behind the invitation to turn the screen the whole game is kept, mounted, but not displayed and
        inert: no focus, no tap, nothing for a screen reader. -->
-  <div class="play" class:away={prompting} data-game-play inert={prompting}>
+  <div class="play" class:away={prompting} data-game-play inert={prompting} bind:this={playEl}>
     {#if session !== undefined && render !== null && view !== undefined}
       <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
       <div class="layout" data-layout inert={ended}>
