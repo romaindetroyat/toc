@@ -90,7 +90,7 @@ test("table: la couleur choisie est retenue au rechargement de l’accueil", asy
 });
 
 test("table: les couleurs prennent leur côté, rien ne tourne", async ({ page }) => {
-  // Board C+ never turns (D-05): the seat k of the chosen colour (bleu 0, vert 1, rouge 2, jaune 3)
+  // The landscape galet never turns (D-05): the seat k of the chosen colour (bleu 0, vert 1, rouge 2, jaune 3)
   // puts that colour's camp at the bottom and the partner's at the top.
   for (const [color, seat] of [
     ["bleu", 0],
@@ -128,9 +128,9 @@ test("table: les cavaliers regardent dans le sens de la marche, tête gardée su
   expect(scale).toBe(facing === "left" ? "scale(-1 1)" : "scale(1 1)");
 });
 
-// Knights at three sizes for the human legibility check (UI-SPEC backstop): the board is as wide as
-// the viewport (2:3 viewports, so the whole board and its head room fit), and a ring knight is about
-// 0.058 x the board width: about 23, 52 and 122 px wide.
+// Knights at three sizes for the human legibility check (UI-SPEC backstop): the landscape galet is
+// as wide as the viewport (tall viewports, so the whole board and its head room fit), and a ring
+// knight is 0.95 step, about 0.0318 x the board width: about 12, 29 and 67 px wide.
 test.describe("cavaliers à trois tailles", () => {
   test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project takes the shots");
 

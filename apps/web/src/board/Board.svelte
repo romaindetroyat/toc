@@ -166,6 +166,17 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Below 314 px of board the felt (448 of the landscape galet's 3200 units) is less than 44 px tall,
+     so its button outgrows it and covers the knights around it (at 480 x 320 the board is 112 px
+     wide until 01-37). While knights are lit the button then lets the tap through to them: the hit
+     layer picks a knight or reports a miss. The felt stays a 44 px target the rest of the time and
+     to the keyboard. */
+  @container (max-width: 314px) {
+    .board:has(:global([data-hit-layer])) .tapis {
+      pointer-events: none;
+    }
+  }
+
   svg {
     position: absolute;
     inset: 0;

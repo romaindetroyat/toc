@@ -116,10 +116,14 @@ const SIZES: Gauge[] = [
   { name: "1280x800", width: 1280, height: 800 },
 ];
 
-/** Bleu holds a 7 and two knights on the ring: the 7 panel opens with one tap on the card. */
+/**
+ * Bleu holds a 7 and two knights on the ring: the 7 panel opens with one tap on the card. The knights
+ * stand on opposite sides of the ring, more than 44 px apart even on the 112 px landscape galet of
+ * 480 x 320, so each tap picks its knight without the « Lequel ? » tray.
+ */
 const SEVEN = {
   turn: "bleu",
-  pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+  pawns: { bleu: [{ p: 5 }, { p: 40 }, "S", "S"] },
   hands: { bleu: ["7H", "12H"] },
 };
 
@@ -157,13 +161,16 @@ async function expectFits(page: Page, what: string, selectors: string[]) {
   }
 }
 
-/** Board C+ is a portrait 2:3 board (D-07): 1.5 times as tall as it is wide. */
-async function expectPortraitBoard(page: Page, what: string) {
+/**
+ * The landscape galet, the game's only board (Romain's « paysage obligatoire », D-07): twice as wide
+ * as it is tall.
+ */
+async function expectLandscapeGalet(page: Page, what: string) {
   const box = await page.locator("[data-board]").boundingBox();
   expect(box, `${what}: no board`).not.toBeNull();
   expect(
-    Math.abs((box?.height ?? 0) - 1.5 * (box?.width ?? 1)),
-    `${what}: the board is not 2:3`,
+    Math.abs((box?.height ?? 0) - 0.5 * (box?.width ?? 1)),
+    `${what}: the board is not 2:1`,
   ).toBeLessThan(2);
   expect(box?.width ?? 0, `${what}: the board has no size`).toBeGreaterThan(90);
 }
@@ -190,7 +197,7 @@ for (const size of SIZES) {
 
       // The exchange: five cards in the hand, the choice asked in the action zone.
       await expect(zone(page)).toHaveAttribute("data-state", "exchange");
-      await expectPortraitBoard(page, "échange");
+      await expectLandscapeGalet(page, "échange");
       await expectFits(page, "échange", hand);
       await page.locator("[data-hand] [data-card]").first().click();
       await expectFits(page, "échange, carte choisie", hand);
@@ -209,13 +216,13 @@ for (const size of SIZES) {
       await page.locator(`[data-hit="${pawn}"]`).click({ force: true });
       await expect(page.locator("[data-ghost]")).toBeVisible();
       await expectFits(page, "aperçu du coup", hand);
-      await expectPortraitBoard(page, "aperçu");
+      await expectLandscapeGalet(page, "aperçu");
       await page.getByRole("button", { name: /^Jouer/ }).click();
       await expect(page.locator('[data-felt-last="bleu"]')).toBeVisible();
       await expectFits(page, "après le coup", hand);
     });
 
-    test(`le panneau du 7 tient sous le plateau (${size.name})`, async ({ page }) => {
+    test(`le panneau du 7 tient sous le plateau ou à côté (${size.name})`, async ({ page }) => {
       await page.goto("/");
       await page.goto(`/#/partie?etat=${etatParam(SEVEN)}&vitesse=test`);
       await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
@@ -223,25 +230,20 @@ for (const size of SIZES) {
       await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
       const panel = page.locator("[data-seven-panel]");
       await expect(panel).toBeVisible();
-      await expectPortraitBoard(page, "le 7");
+      await expectLandscapeGalet(page, "le 7");
       await expectFits(page, "le 7, rien de réparti", [
         "[data-board]",
         "[data-info-bar]",
         "[data-seven-panel]",
       ]);
 
-      // Under the board on a portrait screen, beside it on a landscape one.
+      // The panel never covers the board: it is below it or beside it.
       const board = await page.locator("[data-board]").boundingBox();
-      const below = await panel.boundingBox();
-      if (size.height > size.width) {
-        expect(below?.y ?? 0, "le panneau passe sous le plateau").toBeGreaterThanOrEqual(
-          (board?.y ?? 0) + (board?.height ?? 0) - 1,
-        );
-      } else {
-        expect(below?.x ?? 0, "le panneau passe à côté du plateau").toBeGreaterThanOrEqual(
-          (board?.x ?? 0) + (board?.width ?? 0) - 1,
-        );
-      }
+      const spot = await panel.boundingBox();
+      if (!board || !spot) throw new Error("no box for the board or the 7 panel");
+      const below = spot.y >= board.y + board.height - 1;
+      const beside = spot.x >= board.x + board.width - 1;
+      expect(below || beside, "le panneau passe sous le plateau ou à côté").toBe(true);
 
       // Two knights and their steps: the panel at its fullest still fits.
       await page.locator('[data-hit="bleu0"]').click({ force: true });
