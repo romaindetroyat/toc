@@ -230,7 +230,7 @@ Unplayable card reason (shown in the prompt line when the player taps a dimmed c
 | Element | Copy |
 |---------|------|
 | Sheet title | « Réglages » |
-| Rows | « Son » (master), « Bruitages », « Ambiance », « Volume de l’ambiance », « Réduire les animations » |
+| Rows | « Son » (master), « Bruitages », « Réduire les animations » (« Ambiance » and « Volume de l’ambiance » removed: Révisé par Romain le 2026-10-14, « Arrête le son d’ambiance, c’est pourri ») |
 | Helper, reduce motion | « Les déplacements sont instantanés, sans bonds, ruades ni effets. » |
 | Helper, Son | « Pas de son sur iPhone ? Vérifie que l’interrupteur de sonnerie, sur le côté, n’est pas en mode silencieux. » |
 | Links | « Tester les sons », « Crédits et licences », « Abandonner la partie » (in-game only), « Fermer » |
@@ -364,18 +364,17 @@ Dimmed board (walnut at 70%) stays visible behind a centred panel (`#4A2F1A`, ra
 
 ### Réglages sheet
 
-Bottom sheet on compact (slides up 250ms, max height 90dvh, drag handle not required), centred dialog 480 wide on larger screens; padding 24, row gap 24. Rows: **Son** switch (master, default on); **Bruitages** switch (default on); **Ambiance** switch (default on) + **Volume de l’ambiance** slider (0–100, default 30; slider thumb 44px target); **Réduire les animations** switch (initial value from `prefers-reduced-motion`, then the user choice wins). Links: « Tester les sons », « Crédits et licences »; in game also the destructive text button « Abandonner la partie » at the bottom. Persistence: `localStorage` key `toc.settings.v1` `{ sound, sfx, ambience, ambienceVolume, reduceMotion, fast, lastColor }`, every access in try/catch; if storage is unavailable, keep in memory and say nothing. Changes apply instantly; there is no Save button.
+Bottom sheet on compact (slides up 250ms, max height 90dvh, drag handle not required), centred dialog 480 wide on larger screens; padding 24, row gap 24. Rows: **Son** switch (master, default on); **Bruitages** switch (default on); **Réduire les animations** switch (initial value from `prefers-reduced-motion`, then the user choice wins). There is no ambience row any more (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri » — the « Ambiance » switch and the « Volume de l’ambiance » slider are gone). Links: « Tester les sons », « Crédits et licences »; in game also the destructive text button « Abandonner la partie » at the bottom. Persistence: `localStorage` key `toc.settings.v1` `{ sound, sfx, reduceMotion, fast, lastColor }` (an older stored object with `ambience` / `ambienceVolume` still loads; those keys are ignored and dropped at the next save), every access in try/catch; if storage is unavailable, keep in memory and say nothing. Changes apply instantly; there is no Save button.
 
 ### Sound test screen (for Romain, D-22)
 
-Full screen, scrollable. Header: title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone silent-switch hint. Sections and rows:
+Full screen, scrollable. Header: title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone silent-switch hint. Sections and rows (no « Ambiance » section: the ambience was removed on 2026-10-14):
 
 | Section | Rows |
 |---------|------|
 | Sabots | « 1 case », « 4 cases », « 7 cases », « 13 cases » + a distance slider 1–13 with a play button that plays the real cadence curve |
 | Hennissements | « Sortie de l’écurie », « Prise : ruade », « Prise : plainte », « Entrée dans la maison », « 4e cheval rentré (joyeux) », « Échange au Valet (surpris) » |
 | Cartes | « Donne », « Poser une carte », « Échange de carte » |
-| Ambiance | « Ambiance (boucle) » with play/stop and the volume slider |
 
 Each row: play button 44 × 44, the sound name (Body), a source tag (« Fichier libre (CC0) » / « Généré par le code » plus author + licence line from `LICENSES.md`), a segmented rating « À écouter · Bon · À changer » (default « À écouter »). If both a recorded and a generated version exist, the row shows two play buttons « Fichier » and « Généré » for A/B comparison. Footer: « Copier mes notes » copies a French plain-text list `nom : note` to the clipboard. Ratings persist in `toc.soundnotes.v1`.
 
@@ -483,9 +482,8 @@ All motion is `transform`/`opacity` through the Web Animations API on `<g>` wrap
 | Enter home | Joyful short neigh; the 4th pawn: longer joyful neigh | Final settle / rear-up |
 | Valet swap | Short surprised neigh | Take-off |
 | Deal / card played / exchange | Card sounds (deal riffle, card down, card slide) | With the matching animation |
-| Ambiance | Light countryside/stable loop, 1.5s fade-in after unlock, paused when the page is hidden | Own volume (default 30%) and own switch |
 
-Rules: the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; formats AAC `.m4a` primary (+ `.mp3` fallback), decoded once on first unlock; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
+Rules: no ambience loop ever plays (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri »); the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; formats AAC `.m4a` primary (+ `.mp3` fallback), decoded once on first unlock; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
 
 ---
 
@@ -507,7 +505,7 @@ Rules: the `AudioContext` is created and resumed inside the « Jouer la partie �
 | `Toast` | Transient messages (audio failure, notes copied) | one at a time, 4s, replaced not stacked |
 | `Sheet`, `Dialog` | Réglages, Tapis, Crédits, confirmations | open, closing; focus trap; backdrop tap closes (not for the abandon dialog) |
 | `EndScreen` | Result | win, loss |
-| `SettingsSheet`, `Switch`, `Slider`, `Segmented` | Settings and sound test controls | on/off, disabled, focus |
+| `SettingsSheet`, `Switch`, `Segmented` | Settings and sound test controls (`Slider` removed with the ambience volume, 2026-10-14) | on/off, disabled, focus |
 | `SoundTestScreen`, `SoundRow` | Romain's listening page | idle, playing, decoding, unavailable, rated |
 | `IconButton` | Gear, fast-forward, undo, close | default, pressed (`aria-pressed`), disabled |
 
@@ -534,7 +532,7 @@ Applicable state considerations resolved: 22 covered, 2 backstop, 1 unresolved
 | error | interactive-control: sound rows | ✅ covered | Failed decode shows « Son indisponible » and, when a generated fallback exists, the « Généré » button remains usable |
 | error | interactive-control: audio start | ✅ covered | Toast « Le son n’a pas pu démarrer. La partie reste jouable sans son. » with « Réessayer »; game continues muted |
 | error | form: Réglages | ✅ covered | Unavailable `localStorage` falls back to in-memory settings silently; no blocking error |
-| partial | form: Réglages | ✅ covered | « Ambiance » off disables and dims the volume slider without hiding it; « Son » off dims the other two switches |
+| partial | form: Réglages | ✅ covered | « Son » off dims « Bruitages » (the ambience switch and volume slider were removed on 2026-10-14) |
 | overflow | list-collection: 7 plan rows | ✅ covered | At most 7 micro-moves; the plan list scrolls vertically inside the panel when it exceeds 3 rows |
 | zero-one-many | list-collection: 7 plan rows | ✅ covered | Zero steps shows only the counter « Reste 7 »; one or more steps list « Cheval {A–D} : {n} pas » rows |
 | overflow | list-collection: disambiguation tray | ✅ covered | Maximum 4 chips, each 44 wide, always fits |

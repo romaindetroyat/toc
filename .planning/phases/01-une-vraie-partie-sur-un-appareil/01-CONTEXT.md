@@ -118,8 +118,9 @@ Requirements : RULE-01 à RULE-18, RULE-20, PLAY-01 à PLAY-05, FX-01 à FX-06.
 - **D-24 :** Les cartes reprennent un **jeu classique français** : figures traditionnelles comme sur l'aide-mémoire du plateau.
   - Il faut un visuel libre de droits, du domaine public ou sous licence CC0/CC-BY compatible, à faire valider.
   - Le dos des cartes est assorti au plateau.
-- **D-25 :** Une **ambiance sonore légère** est jouée en fond (campagne ou écurie, discrète), avec son propre réglage de volume.
-  - Elle se coupe séparément des bruitages. Le réglage global « couper le son » et le réglage « réduire les animations » (FX-06) restent disponibles.
+- **D-25 :** ~~Une **ambiance sonore légère** est jouée en fond (campagne ou écurie, discrète), avec son propre réglage de volume.~~
+  - ~~Elle se coupe séparément des bruitages.~~ Le réglage global « couper le son », le réglage « Bruitages » et le réglage « réduire les animations » (FX-06) restent disponibles.
+  - **Révisé par Romain le 2026-10-14 : « Arrête le son d'ambiance, c'est pourri ».** Il n'y a plus d'ambiance sonore : aucune boucle ne joue en fond, le son « ambiance » est retiré du catalogue, de la page `#/sons` et des crédits, et les réglages « Ambiance » et « Volume de l'ambiance » disparaissent. Les anciens réglages enregistrés qui contiennent `ambience` ou `ambienceVolume` sont toujours lus (ces clés sont ignorées). Le jeu garde les bruitages : sabots, hennissements, sons de cartes (D-23).
 
 ### Claude's Discretion
 - La courbe exacte d'accélération des bonds et la durée des prises et des fêtes, dans les repères D-11.
