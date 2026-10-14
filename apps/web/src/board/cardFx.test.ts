@@ -41,8 +41,8 @@ const insideFelt = ([x, y]: readonly [number, number]): boolean =>
 /** The seat that sits on the left of the human (the next seat clockwise) and on his right. */
 const previousColor = (color: Color): Color => PARTNER[nextColor(color)];
 
-describe("seatSlot and seatEdge on board C+", () => {
-  it("a seat's slot is its C+ card place, inside the felt, for every k", () => {
+describe("seatSlot and seatEdge on the landscape galet", () => {
+  it("a seat's slot is its galet card place, inside the felt, for every k", () => {
     for (const k of KS) {
       for (const seat of COLORS) {
         expect(seatSlot(seat, k)).toEqual(seatCard(seat, k).at);
@@ -52,16 +52,16 @@ describe("seatSlot and seatEdge on board C+", () => {
     }
   });
 
-  it("the portrait galet's places: bottom (1000, 1809.4), top (1000, 1190.6), left (750.6, 1500), right (1249.4, 1500)", () => {
+  it("the landscape galet's places: bottom (1600, 914.6), top (1600, 685.4), left (1220, 800), right (1980, 800)", () => {
     const human = bottomOf(0);
     const near = (p: readonly [number, number], q: [number, number]) => {
       expect(p[0]).toBeCloseTo(q[0], 1);
       expect(p[1]).toBeCloseTo(q[1], 1);
     };
-    near(seatSlot(human, 0), [1000, 1809.4]);
-    near(seatSlot(PARTNER[human], 0), [1000, 1190.6]);
-    near(seatSlot(nextColor(human), 0), [750.6, 1500]);
-    near(seatSlot(previousColor(human), 0), [1249.4, 1500]);
+    near(seatSlot(human, 0), [1600, 914.6]);
+    near(seatSlot(PARTNER[human], 0), [1600, 685.4]);
+    near(seatSlot(nextColor(human), 0), [1220, 800]);
+    near(seatSlot(previousColor(human), 0), [1980, 800]);
   });
 
   it("a seat's edge is 120 units past the board's edge on its side, on the axis through the centre", () => {

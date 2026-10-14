@@ -55,25 +55,85 @@ async function centredIn(page: Page, inner: string, outer: string): Promise<bool
 
 /**
  * How far the feet of the preview's ghost (the centre of its ring on the ground) are from the centre
- * of a drawn cell, in steps (the portrait galet's step is 108.37 scene units, the scene 2000 units
- * wide).
+ * of a drawn cell, in steps: the step is measured on the page, as the distance between the centres
+ * of the drawn cells 3 and 4 of the landscape galet.
  */
 async function ghostOffCell(page: Page, cell: number): Promise<number> {
   return page.evaluate((index) => {
+    const centre = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return [r.x + r.width / 2, r.y + r.height / 2] as const;
+    };
     const feet = document.querySelector("[data-ghost] [data-ghost-feet] ellipse");
     const drawn = document.querySelector(`[data-board-art] [data-cell="${index}"]`);
-    const svg = document.querySelector("[data-board] svg");
-    if (!feet || !drawn || !svg) throw new Error(`no ghost, no cell ${index} or no board`);
-    const a = feet.getBoundingClientRect();
-    const b = drawn.getBoundingClientRect();
-    const step = (108.37 * svg.getBoundingClientRect().width) / 2000;
-    return (
-      Math.hypot(
-        a.x + a.width / 2 - (b.x + b.width / 2),
-        a.y + a.height / 2 - (b.y + b.height / 2),
-      ) / step
-    );
+    const c3 = document.querySelector('[data-board-art] [data-cell="3"]');
+    const c4 = document.querySelector('[data-board-art] [data-cell="4"]');
+    if (!feet || !drawn || !c3 || !c4) throw new Error(`no ghost, no cell ${index} or no board`);
+    const a = centre(c3);
+    const b = centre(c4);
+    const step = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const f = centre(feet);
+    const d = centre(drawn);
+    return Math.hypot(f[0] - d[0], f[1] - d[1]) / step;
   }, cell);
+}
+
+type HopRecord = { step: number; best: number; samples: number };
+
+/**
+ * Starts a recorder, one sample per animation frame until bleu0 reads ring:15: the closest the
+ * knight's ground point (the centre of its shadow) comes to the drawn cell 9. The feet stand
+ * KNIGHT.feet x size below the cell centre (the mock-up's top is y − h + 0.28 w) and the shadow lies
+ * a little further, so the ground point is compared with the centre of cell 9 moved by the offset it
+ * has from the centre of cell 3 at rest. The step is the distance between the centres of cells 3
+ * and 4. Read the result with hopRecord().
+ */
+async function recordHop(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const centre = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return [r.x + r.width / 2, r.y + r.height / 2] as const;
+    };
+    const shadow = document.querySelector('[data-pawn="bleu0"] [data-role="shadow"]');
+    const c3 = document.querySelector('[data-board-art] [data-cell="3"]');
+    const c4 = document.querySelector('[data-board-art] [data-cell="4"]');
+    const c9 = document.querySelector('[data-board-art] [data-cell="9"]');
+    if (!shadow || !c3 || !c4 || !c9) throw new Error("no knight, shadow or cell");
+    const rest = centre(shadow);
+    const a = centre(c3);
+    const b = centre(c4);
+    const nine = centre(c9);
+    const offset = [rest[0] - a[0], rest[1] - a[1]] as const;
+    const record = { step: Math.hypot(b[0] - a[0], b[1] - a[1]), best: Infinity, samples: 0 };
+    (window as unknown as { hopRecord: typeof record }).hopRecord = record;
+    // Queried again every frame: a knight the player can act on is drawn as a button, so the node
+    // is replaced when « Jouer » turns it back into a plain picture.
+    const sample = () => {
+      const now = document.querySelector('[data-pawn="bleu0"] [data-role="shadow"]');
+      if (now) {
+        const p = centre(now);
+        const d = Math.hypot(p[0] - offset[0] - nine[0], p[1] - offset[1] - nine[1]);
+        record.best = Math.min(record.best, d);
+        record.samples++;
+      }
+      const place = document.querySelector('[data-pawn="bleu0"]')?.getAttribute("data-place");
+      if (place !== "ring:15") requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
+async function hopRecord(page: Page): Promise<HopRecord> {
+  return page.evaluate(() => (window as unknown as { hopRecord: HopRecord }).hopRecord);
+}
+
+/** The landscape galet, the game's only board: twice as wide as tall (± 1.5 px), 72 drawn cells. */
+async function expectLandscapeGalet(page: Page): Promise<void> {
+  const board = page.locator("[data-board]");
+  const box = await board.boundingBox();
+  if (!box) throw new Error("the board has no bounding box");
+  expect(Math.abs(box.height - box.width / 2)).toBeLessThanOrEqual(1.5);
+  await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
 }
 
 async function openPosition(page: Page, etat: unknown, extra = "") {
@@ -117,6 +177,9 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   await page.goto(SCENARIO);
   await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
 
+  // No parameter: the board is the landscape galet (Romain's « paysage obligatoire »).
+  await expectLandscapeGalet(page);
+
   const knight = page.locator('[data-pawn="bleu0"]');
   await expect(knight).toHaveAttribute("data-place", "ring:3");
   // The knight stands on the drawn cell of its index.
@@ -159,6 +222,8 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   await expect(knight).toHaveAttribute("data-place", "ring:3");
   await expect(play).toBeVisible();
 
+  // From before « Jouer », every animation frame: the knight hops through the landscape cells.
+  await recordHop(page);
   await play.click();
 
   // One animation lasts 400 + 133 x (n - 1) ms.
@@ -170,11 +235,15 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     TOTAL_MS,
   );
   await expect(knight).toHaveAttribute("data-place", "ring:15");
-  // It hopped along the galet ring and landed on the drawn cell 15.
+  // It hopped along the galet ring, its ground point within a quarter step of cell 9 on the way,
+  // and landed on the drawn cell 15.
+  const record = await hopRecord(page);
+  expect(record.samples).toBeGreaterThan(10);
+  expect(record.best).toBeLessThan(record.step / 4);
   await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
 
   // The Dame lies on the felt in front of the human's seat: the centre of the card is inside the
-  // « Sur le tapis » button, in its lower quarter (the human sits at the bottom).
+  // « Sur le tapis » button, below its centre (the human sits at the bottom).
   const played = page.locator('[data-felt-last="bleu"] [data-felt-card]');
   await expect(played).toBeVisible();
   expect(
@@ -183,28 +252,24 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   const cardBox = await played.boundingBox();
   const feltBox = await page.getByRole("button", { name: "Sur le tapis" }).boundingBox();
   if (!cardBox || !feltBox) throw new Error("no box for the played card or the felt");
-  expect(cardBox.y + cardBox.height / 2).toBeGreaterThan(feltBox.y + 0.75 * feltBox.height);
+  expect(cardBox.y + cardBox.height / 2).toBeGreaterThan(feltBox.y + feltBox.height / 2);
 
   const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
   expect(scheduled).toEqual(CLOPS);
 });
 
-test.describe("traceur : le galet en largeur à 1280 × 800", () => {
-  test.skip(({ isMobile }) => isMobile, "the landscape plateau is the computer's");
+test.describe("traceur : le galet en largeur à 1280 × 800, au clavier", () => {
+  test.skip(({ isMobile }) => isMobile, "the keyboard shortcuts are the computer's");
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test("la Dame fait bondir le cavalier de case en case jusqu’à la case 15", async ({ page }) => {
     await page.goto("/");
-    await page.goto(`${SCENARIO}&plateau=largeur`);
+    await page.goto(SCENARIO);
     const board = page.locator("[data-board]");
     await expect(board).toHaveClass(/loaded/);
 
-    // The landscape galet (Romain's « galet partout », the computer in landscape): 2:1, drawn by code.
-    await expect(board).toHaveAttribute("data-board-layout", "landscape");
-    const box = await board.boundingBox();
-    if (!box) throw new Error("the board has no bounding box");
-    expect(Math.abs(box.height - box.width / 2)).toBeLessThanOrEqual(1.5);
-    await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
+    // The landscape galet, the game's only board (Romain's « paysage obligatoire »): 2:1, by code.
+    await expectLandscapeGalet(page);
     // No raster image but Romain's four riders.
     await expect(board.locator("img")).toHaveCount(0);
     await expect(board.locator("image:not([data-rider])")).toHaveCount(0);
@@ -214,39 +279,8 @@ test.describe("traceur : le galet en largeur à 1280 × 800", () => {
     await expect(knight).toHaveAttribute("data-place", "ring:3");
     expect(await offCell(page, "bleu0", 3)).toBeLessThanOrEqual(0.5);
 
-    // A recorder, one sample per animation frame from before the keys until the knight reads
-    // ring:15: the closest the knight's ground point (the centre of its shadow) comes to the drawn
-    // cell 9. The feet stand KNIGHT.feet x size below the cell centre (the mock-up's top is
-    // y − h + 0.28 w) and the shadow lies a little further, so the ground point is compared with the
-    // centre of cell 9 moved by the offset it has from the centre of cell 3 at rest. The step is the
-    // distance between the centres of cells 3 and 4.
-    await page.evaluate(() => {
-      const centre = (el: Element) => {
-        const r = el.getBoundingClientRect();
-        return [r.x + r.width / 2, r.y + r.height / 2] as const;
-      };
-      const shadow = document.querySelector('[data-pawn="bleu0"] [data-role="shadow"]');
-      const pawn = document.querySelector('[data-pawn="bleu0"]');
-      const c3 = document.querySelector('[data-board-art] [data-cell="3"]');
-      const c4 = document.querySelector('[data-board-art] [data-cell="4"]');
-      const c9 = document.querySelector('[data-board-art] [data-cell="9"]');
-      if (!shadow || !pawn || !c3 || !c4 || !c9) throw new Error("no knight, shadow or cell");
-      const rest = centre(shadow);
-      const a = centre(c3);
-      const b = centre(c4);
-      const nine = centre(c9);
-      const offset = [rest[0] - a[0], rest[1] - a[1]] as const;
-      const record = { step: Math.hypot(b[0] - a[0], b[1] - a[1]), best: Infinity, samples: 0 };
-      (window as unknown as { hopRecord: typeof record }).hopRecord = record;
-      const sample = () => {
-        const p = centre(shadow);
-        const d = Math.hypot(p[0] - offset[0] - nine[0], p[1] - offset[1] - nine[1]);
-        record.best = Math.min(record.best, d);
-        record.samples++;
-        if (pawn.getAttribute("data-place") !== "ring:15") requestAnimationFrame(sample);
-      };
-      requestAnimationFrame(sample);
-    });
+    // From before the keys until the knight reads ring:15.
+    await recordHop(page);
 
     // « 1 » picks the Dame, « a » the lit knight, « Entrée » plays it.
     await page.keyboard.press("1");
@@ -255,11 +289,7 @@ test.describe("traceur : le galet en largeur à 1280 × 800", () => {
     await page.keyboard.press("Enter");
 
     await expect(knight).toHaveAttribute("data-place", "ring:15");
-    const record = await page.evaluate(
-      () =>
-        (window as unknown as { hopRecord: { step: number; best: number; samples: number } })
-          .hopRecord,
-    );
+    const record = await hopRecord(page);
     expect(record.samples).toBeGreaterThan(10);
     expect(record.best).toBeLessThan(record.step / 4);
     await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);

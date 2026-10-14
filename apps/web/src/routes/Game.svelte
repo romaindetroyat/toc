@@ -63,15 +63,10 @@
   const hashQuery = new URLSearchParams(location.hash.split("?")[1] ?? "");
   const debugView = DEBUG_VIEWS.find((view) => view === hashQuery.get("debug"));
 
-  // The galet plateau (Romain's choice of 2026-10-14: « galet partout »). Until the screen chooses
-  // it (01-36) the game draws the portrait one; in debug builds only, `plateau=largeur` draws the
-  // landscape one and `plateau=hauteur` the portrait one (an allow-list: anything else is ignored).
-  const PLATEAUX: Record<string, Layout> = { largeur: "landscape", hauteur: "portrait" };
-  const asked = hashQuery.get("plateau");
-  const boardLayout: Layout =
-    __TOC_DEBUG__ && asked !== null && Object.hasOwn(PLATEAUX, asked)
-      ? (PLATEAUX[asked] as Layout)
-      : "portrait";
+  // The landscape galet is the game's only board (Romain, 2026-10-14: « paysage obligatoire »), on a
+  // computer and on a phone alike; no parameter chooses another one. Board, the anchor and the
+  // session still receive this constant until 01-40 removes the layout concept.
+  const boardLayout: Layout = "landscape";
   const boardScene = sceneOf(boardLayout);
 
   // Debug builds only: the overlay is a dynamic import inside a compile-time `DEBUG` branch.
@@ -729,9 +724,10 @@
 <style>
   /*
    * The galet board (Romain's choice of 2026-10-14: « galet partout »): centred, never cropped;
-   * --board-size is its width and --board-ratio its height over its width (0.5 for the landscape
-   * plateau, 1.5 for the portrait one, from sceneOf(layout)). The chrome below the board in portrait
-   * is the info bar (56), the action zone and the hand zone: the action zone has a fixed height
+   * --board-size is its width and --board-ratio its height over its width (0.5: the landscape galet
+   * is the only board, « paysage obligatoire », from sceneOf(layout)). On a screen taller than wide
+   * the chrome below the board is the info bar (56), the action zone and the hand zone (until 01-38
+   * shows « Tourne ton téléphone » there): the action zone has a fixed height
    * (--action) so that a longer prompt, the preview or the tray never pushes the hand down, and the
    * hand zone is the fan plus the room the lifted and turned cards need (--hand). --head-room of the
    * width (sceneOf(layout).headRoom) stays free above the board for the head of a lifted top-row

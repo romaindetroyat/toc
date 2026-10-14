@@ -65,14 +65,15 @@
 </div>
 
 <style>
-  /* The 2:3 board (--board-size wide, 1.5 times as tall), below the head room kept free above it:
-     the plate is centred on the board, over the felt. */
+  /* The board (--board-size wide, --board-ratio times as tall: 0.5 on the landscape galet, the
+     game's only board), below the head room kept free above it: the plate is centred on the board,
+     over the felt. */
   .wrap {
     position: absolute;
     left: 0;
     right: 0;
-    top: calc(var(--board-size, 0px) * var(--head-room, 0.0466));
-    height: calc(var(--board-size, 0px) * 1.5);
+    top: calc(var(--board-size, 0px) * var(--head-room, 0.0217));
+    height: calc(var(--board-size, 0px) * var(--board-ratio, 0.5));
     display: grid;
     place-items: center;
     pointer-events: none;

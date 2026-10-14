@@ -1,5 +1,5 @@
-// The galet board geometry, for its two plateaus (Romain's choice of 2026-10-14: « galet partout »,
-// the computer in landscape, the iPhone in portrait). Pure: no DOM, no clock.
+// The galet board geometry, for its two plateaus (Romain's choice of 2026-10-14: « galet partout »;
+// the game draws only the landscape one, see below). Pure: no DOM, no clock.
 //
 // Ported from renderVals() of design/plateau-galet.dc.html with the mock-up's own numbers: variant
 // pc-galet for « landscape » (1600 x 800, superellipse exponent 3.2, felt ellipse) and tel-galet for
@@ -14,14 +14,17 @@
 // clockwise the left and the previous one the right; the ring indices follow from the bottom seat's
 // start index, as in the mock-up.
 //
-// Every layout parameter defaults to "portrait" for the consumers that do not pass one yet (a
-// transitional default, removed in 01-39 so the typecheck proves that every caller passes it).
+// Romain, 2026-10-14: « paysage obligatoire ». The landscape galet is the only board of the game, on
+// a computer and on a phone held sideways. Every layout parameter therefore defaults to "landscape",
+// so the consumers that never pass one (knights, halos, targets, ghosts, felt cards, particles, the
+// debug view) stand on it; SCENE is the landscape scene. The portrait galet stays in this file,
+// unused by the game, until 01-40 removes it with the layout concept.
 
 import { COLORS, type Color, EXIT, type Place } from "@toc/engine";
 import type { Point } from "./layout.ts";
 import type { ScreenSide } from "./rotate.ts";
 
-/** The two galet plateaus: « landscape » on a computer, « portrait » on a phone. */
+/** The two galet plateaus of the mock-up; the game draws only « landscape » (« paysage obligatoire »). */
 export type Layout = "landscape" | "portrait";
 
 export const LAYOUTS: readonly Layout[] = ["landscape", "portrait"];
@@ -339,15 +342,15 @@ function geometryOf(layout: Layout): Geometry {
 }
 
 /** The scene of a galet plateau (computed once per layout). */
-export function sceneOf(layout: Layout = "portrait"): Scene {
+export function sceneOf(layout: Layout = "landscape"): Scene {
   return geometryOf(layout).scene;
 }
 
-/** Transitional alias of the portrait scene for the consumers converted in 01-34 and 01-35. */
-export const SCENE: Scene = sceneOf("portrait");
+/** The landscape scene, the game's only board (« paysage obligatoire »); alias until 01-40. */
+export const SCENE: Scene = sceneOf("landscape");
 
 /** Sprite-to-scene scale of a knight standing on `place`. */
-export function knightScale(place: Place, layout: Layout = "portrait"): number {
+export function knightScale(place: Place, layout: Layout = "landscape"): number {
   return (KNIGHT_WIDTH[place.z] * sceneOf(layout).step) / KNIGHT.w;
 }
 
@@ -409,7 +412,7 @@ function frame(g: Geometry, q: number, ta: number, na: number): Point {
 }
 
 /** Centre of a colour's stable: the mean of its four stable dots. */
-export function stableCentre(color: Color, k: number, layout: Layout = "portrait"): Point {
+export function stableCentre(color: Color, k: number, layout: Layout = "landscape"): Point {
   const g = geometryOf(layout);
   const q = quarterOf(color, k);
   const dots = STABLE_FRAME.map(([ta, na]) => frame(g, q, ta, na));
@@ -419,7 +422,7 @@ export function stableCentre(color: Color, k: number, layout: Layout = "portrait
 const isSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < 4;
 
 /** Scene point of an engine place for seat k: the cell centre a knight's feet stand on. */
-export function sceneXY(place: Place, k: number, layout: Layout = "portrait"): Point {
+export function sceneXY(place: Place, k: number, layout: Layout = "landscape"): Point {
   const g = geometryOf(layout);
   const startIdx = (EXIT[bottomOf(k)] + RING_CELLS - 1) % RING_CELLS;
   if (place.z === "ring") {
@@ -447,14 +450,14 @@ export function sceneXY(place: Place, k: number, layout: Layout = "portrait"): P
 }
 
 /** The track: every 4th point of the 1440-point ring, closed, from the bottom centre clockwise. */
-export function ringPolyline(layout: Layout = "portrait"): Point[] {
+export function ringPolyline(layout: Layout = "landscape"): Point[] {
   return geometryOf(layout)
     .poly.filter((_, j) => j % 4 === 0)
     .map((p) => [p[0], p[1]] as const);
 }
 
 /** The board's outline (oak) and its walnut outer rim, closed 360-point superellipses. */
-export function boardOutline(layout: Layout = "portrait"): { outline: Point[]; outer: Point[] } {
+export function boardOutline(layout: Layout = "landscape"): { outline: Point[]; outer: Point[] } {
   const g = geometryOf(layout);
   return {
     outline: g.outline.map((p) => [p[0], p[1]] as const),
@@ -466,7 +469,7 @@ export function boardOutline(layout: Layout = "portrait"): { outline: Point[]; o
 export function riderBox(
   color: Color,
   k: number,
-  layout: Layout = "portrait",
+  layout: Layout = "landscape",
 ): { x: number; y: number; w: number; h: number } {
   const g = geometryOf(layout);
   const rider = MOCKUP[layout].rider;
@@ -483,7 +486,7 @@ export function riderBox(
 export function seatCard(
   seat: Color,
   k: number,
-  layout: Layout = "portrait",
+  layout: Layout = "landscape",
 ): { at: Point; angle: 0 | 90 | 180 | 270 } {
   const scene = sceneOf(layout);
   const felt = MOCKUP[layout].felt;

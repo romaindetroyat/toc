@@ -252,7 +252,7 @@ export function createDirector(deps: DirectorDeps): Director {
 
   /** The anchors of the plateau drawn now: read once at the start of a move, used for all of it. */
   const anchors = (): ((place: Place) => Point) => {
-    const layout = deps.layout?.() ?? "portrait";
+    const layout = deps.layout?.() ?? "landscape";
     return (place) => anchorOf(place, deps.quarterTurns, layout);
   };
 

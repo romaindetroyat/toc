@@ -10,9 +10,9 @@ import type { Place } from "@toc/engine";
  * Centre of the drawn cell, home slot or stable hole of a place, in scene units, for seat k at the
  * bottom, on the plateau `layout`. A knight stands on it (its feet KNIGHT.feet x its size below it);
  * the Director's hop points, the overlays and the hit targets use it too. The layout defaults to the
- * portrait plateau until every caller passes it (01-35).
+ * landscape galet, the game's only board (« paysage obligatoire »); 01-40 removes the parameter.
  */
-export function anchorOf(place: Place, k: number, layout: Layout = "portrait"): Point {
+export function anchorOf(place: Place, k: number, layout: Layout = "landscape"): Point {
   return sceneXY(place, k, layout);
 }
 
