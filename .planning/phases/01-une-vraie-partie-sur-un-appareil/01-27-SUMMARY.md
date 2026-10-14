@@ -74,7 +74,7 @@ You can now play the whole turn from the keyboard on a computer. Digits pick the
 
 | Gate | Result |
 |------|--------|
-| `pnpm exec vitest run apps/web/src` | 386 passed (shortcuts 56, turnUi 81 with « back: one step back (Échap) », typography incl. clavier.ts) |
+| `pnpm exec vitest run apps/web/src` | 386 passed (shortcuts 57, turnUi 81 with « back: one step back (Échap) », typography incl. clavier.ts) |
 | `pnpm typecheck` (svelte-check 272 files) | 0 errors, 0 warnings |
 | `pnpm lint` (Biome) | clean |
 | `pnpm test` | 725 passed, 2 skipped (was 656 passed, 2 skipped) |
