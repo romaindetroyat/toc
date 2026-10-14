@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 33/39 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-39: board galet in landscape and portrait, « Compacter l'écran », UAT tests 3 and 4)
+**Plans:** 33/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -119,23 +119,31 @@ Plans:
 **Wave 24** *(gap closure, UAT test 4; blocked on Wave 23 completion)*
 - [x] 01-33-PLAN.md — Les cavaliers de Romain sur les plateaux, les images des règles sur le galet, la licence, le contrat d’interface « Plateau galet » et le journal des décisions
 
+*(Then, the same day, Romain: « Pour la version iphone, oblige à jouer en format paysage, ça permettra d’utiliser le même plateau », « Oui, paysage obligatoire ». One board, the landscape galet, on the computer and on the phone held sideways; 01-34 to 01-41 were replanned for it.)*
+
 **Wave 25** *(gap closure, UAT tests 3 and 4; blocked on Wave 24 completion)*
-- [ ] 01-34-PLAN.md — Les cavaliers, leurs halos, aperçus, marques et cibles sur les deux plateaux galet
+- [ ] 01-34-PLAN.md — Le galet en largeur devient le seul plateau du jeu : les cavaliers, leurs halos, aperçus, marques et cibles dessus
 
 **Wave 26** *(gap closure, UAT test 4; blocked on Wave 25 completion)*
-- [ ] 01-35-PLAN.md — Le tapis et les cartes sur les deux plateaux galet
+- [ ] 01-35-PLAN.md — Le tapis et ses cartes sur le galet en largeur
 
 **Wave 27** *(gap closure, UAT tests 4 and 5; blocked on Wave 26 completion)*
-- [ ] 01-36-PLAN.md — L’écran choisit son plateau, en direct ; sur ordinateur, le plateau en largeur et la barre du bas
+- [ ] 01-36-PLAN.md — Sur ordinateur, le galet en largeur et la barre du bas ; les trois modes d’écran
 
 **Wave 28** *(gap closure, UAT tests 3 and 4, « Compacter l'écran »; blocked on Wave 27 completion)*
-- [ ] 01-37-PLAN.md — Sur téléphone : « Compacter l’écran » en hauteur et la barre compacte en largeur
+- [ ] 01-37-PLAN.md — Sur le téléphone tenu en largeur, la barre compacte
 
-**Wave 29** *(gap closure, UAT test 4; blocked on Wave 28 completion)*
-- [ ] 01-38-PLAN.md — Le plateau image et ses outils quittent le jeu ; la licence du plateau et les documents du projet
+**Wave 29** *(gap closure, UAT test 4, « paysage obligatoire »; blocked on Wave 28 completion)*
+- [ ] 01-38-PLAN.md — « Tourne ton téléphone », et les tests du téléphone tenu en largeur
 
-**Wave 30** *(gap closure, UAT tests 3 and 4; blocked on Wave 29 completion)*
-- [ ] 01-39-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
+**Wave 30** *(gap closure, UAT test 4; blocked on Wave 29 completion)*
+- [ ] 01-39-PLAN.md — Le plateau image et ses outils quittent le jeu ; la licence du plateau et les documents du projet
+
+**Wave 31** *(gap closure, UAT tests 3 and 4; blocked on Wave 30 completion)*
+- [ ] 01-40-PLAN.md — Un seul plateau dans le code, le galet en largeur
+
+**Wave 32** *(gap closure, UAT tests 3 and 4; blocked on Wave 31 completion)*
+- [ ] 01-41-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
 
 **UI hint**: yes
 
@@ -209,7 +217,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 33/39 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 33/41 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
