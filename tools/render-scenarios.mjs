@@ -1,17 +1,22 @@
-// Draws every rules scenario on board C+: docs/regles/<id>.webp, 1200 x 900.
+// Draws every rules scenario on the landscape galet: docs/regles/<id>.webp, 1200 x 1200.
 //
 //   node tools/render-scenarios.mjs
 //
-// Left half = the position before the move, right half = the position after it (expect.after).
-// A scenario with no `after` shows the same position on the right, with the pawns concerned by
-// the action ringed in white, by the moves that must be allowed in green and by the moves that
-// must be refused in red.
-// Each half is 600 x 900: the C+ drawing of packages/board (artSvg(boardArt(k)), rasterised by
-// sharp) with the seat whose turn it is at the bottom, k = quarterTurnsFor(before.turn), as the
-// game's debug scenario view does. Pawns are discs drawn on top at sceneXY(place, k).
-// The script writes nothing outside docs/regles/.
+// Top half = the position before the move, bottom half = the position after it (expect.after).
+// A scenario with no `after` shows the same position below, with the pawns concerned by the
+// action ringed in white, by the moves that must be allowed in green and by the moves that must be
+// refused in red.
+// Plateau: LAYOUT = "landscape", the only plateau of the game since Romain's decision of
+// 2026-10-14 (« oblige à jouer en format paysage », then « Oui, paysage obligatoire »: the phone
+// is held sideways, so the computer and the phone draw the same galet). Two 2:1 boards stacked
+// make a picture close to square, which RULES.md shows at its full width.
+// Each half is 1200 x 600: the galet drawing of packages/board (artSvg(boardArt(k, LAYOUT)) with
+// Romain's four riders from apps/web/src/assets/plateau as data URIs, rasterised by sharp), with
+// the seat whose turn it is at the bottom, k = quarterTurnsFor(before.turn), as the game's debug
+// scenario view does. Pawns are discs drawn on top at sceneXY(place, k, LAYOUT).
+// The script reads only repository files and writes nothing outside docs/regles/.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import sharp from "sharp";
@@ -22,18 +27,29 @@ const outDir = resolve(root, "docs", "regles");
 const { scenarios } = await import(
   pathToFileURL(resolve(root, "packages/engine/scenarios/index.ts")).href
 );
-const { artSvg, boardArt, quarterTurnsFor, SCENE, sceneXY } = await import(
+const { artSvg, boardArt, quarterTurnsFor, sceneOf, sceneXY } = await import(
   pathToFileURL(resolve(root, "packages/board/src/index.ts")).href
 );
 const { COLORS, ringIndex } = await import(
   pathToFileURL(resolve(root, "packages/engine/src/topology.ts")).href
 );
 
-const HALF_W = 600;
-const HALF_H = 900;
+const LAYOUT = "landscape";
+const SCENE = sceneOf(LAYOUT);
+const HALF_W = 1200;
 const SCALE = HALF_W / SCENE.width;
+const HALF_H = Math.round(SCENE.height * SCALE);
 const RADIUS = Math.round(0.46 * SCENE.step * SCALE * 10) / 10;
 const FONT = "DejaVu Sans, Arial, sans-serif";
+// The cell numbers are drawn in Caveat when librsvg finds it, else in the fallback family.
+const HAND = "Caveat, DejaVu Sans, Arial, sans-serif";
+// Romain's riders, one picture per colour, inlined as data URIs (artSvg escapes them).
+const RIDERS = Object.fromEntries(
+  COLORS.map((color) => [
+    color,
+    `data:image/png;base64,${readFileSync(resolve(root, "apps/web/src/assets/plateau", `cav-${color}.png`)).toString("base64")}`,
+  ]),
+);
 const INK = "#2B1D12";
 // Pawn body colours and a letter colour that stays readable on each (UI-SPEC identity table).
 const BODY = { bleu: "#1A22E0", jaune: "#F5D000", rouge: "#D40100", vert: "#019C01" };
@@ -85,7 +101,9 @@ function layerSvg(pawns, halos, label, k) {
   // and must never hide a pawn in play.
   const order = [...pawns].sort((a, b) => (a.spec === "S" ? 0 : 1) - (b.spec === "S" ? 0 : 1));
   for (const pawn of order) {
-    const [x, y] = sceneXY(placeOf(pawn.color, pawn.index, pawn.spec), k).map((v) => v * SCALE);
+    const [x, y] = sceneXY(placeOf(pawn.color, pawn.index, pawn.spec), k, LAYOUT).map(
+      (v) => v * SCALE,
+    );
     const halo = halos.get(pawn.id);
     if (halo) {
       parts.push(
@@ -117,11 +135,17 @@ function afterPosition(scenario) {
 
 mkdirSync(outDir, { recursive: true });
 
-/** The C+ board for seat k, rasterised once per k. */
+/** The landscape galet for seat k, riders included, rasterised once per k. */
 const boards = new Map();
 async function boardFor(k) {
   if (!boards.has(k)) {
-    const svg = artSvg(boardArt(k), { width: HALF_W, height: HALF_H, fontFamily: FONT });
+    const svg = artSvg(boardArt(k, LAYOUT), {
+      width: HALF_W,
+      height: HALF_H,
+      fontFamily: FONT,
+      handFamily: HAND,
+      images: RIDERS,
+    });
     boards.set(k, await sharp(Buffer.from(svg)).png().toBuffer());
   }
   return boards.get(k);
@@ -134,9 +158,9 @@ for (const scenario of scenarios) {
   const board = await boardFor(k);
 
   const beforeHalos = new Map();
-  let right;
+  let below;
   if (scenario.expect.after) {
-    right = layerSvg(afterPosition(scenario), new Map(), "après", k);
+    below = layerSvg(afterPosition(scenario), new Map(), "après", k);
   } else {
     const halos = new Map();
     for (const id of pawnsOfActions(scenario.expect.legalExclude)) halos.set(id, HALO.exclude);
@@ -146,18 +170,18 @@ for (const scenario of scenarios) {
       for (const id of pawnsOfActions([step.action])) concerned.push(id);
     }
     for (const id of concerned) halos.set(id, HALO.action);
-    right = layerSvg(before, halos, "le coup", k);
+    below = layerSvg(before, halos, "le coup", k);
   }
-  const left = layerSvg(before, beforeHalos, "avant", k);
+  const above = layerSvg(before, beforeHalos, "avant", k);
 
   const image = await sharp({
-    create: { width: HALF_W * 2, height: HALF_H, channels: 3, background: "#FFFFFF" },
+    create: { width: HALF_W, height: HALF_H * 2, channels: 3, background: "#FFFFFF" },
   })
     .composite([
       { input: board, left: 0, top: 0 },
-      { input: left, left: 0, top: 0 },
-      { input: board, left: HALF_W, top: 0 },
-      { input: right, left: HALF_W, top: 0 },
+      { input: above, left: 0, top: 0 },
+      { input: board, left: 0, top: HALF_H },
+      { input: below, left: 0, top: HALF_H },
     ])
     .webp({ quality: 70 })
     .toBuffer();
