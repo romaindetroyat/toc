@@ -43,6 +43,16 @@ async function offCell(page: Page, pawn: string, cell: number): Promise<number> 
   );
 }
 
+/** Whether the centre of one element's box lies inside another element's box (screen pixels). */
+async function centredIn(page: Page, inner: string, outer: string): Promise<boolean> {
+  const a = await page.locator(inner).boundingBox();
+  const b = await page.locator(outer).boundingBox();
+  if (!a || !b) throw new Error(`no box for ${a ? outer : inner}`);
+  const x = a.x + a.width / 2;
+  const y = a.y + a.height / 2;
+  return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
+}
+
 async function openPosition(page: Page, etat: unknown, extra = "") {
   const encoded = etatParam(etat);
   await page.goto("/");
@@ -103,6 +113,9 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     `Un seul cheval peut jouer cette carte${NBSP}: touche-le.`,
   );
   await expect(page.getByRole("button", { name: "Changer de carte" })).toBeVisible();
+  // The halo and the hit target are centred on the knight's body at its C+ size (D-16).
+  expect(await centredIn(page, '[data-halo="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
+  expect(await centredIn(page, '[data-hit="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
 
   // Tapping the knight shows the path, the ghost, the badge and « Jouer ».
   await page.locator('[data-hit="bleu0"]').click();

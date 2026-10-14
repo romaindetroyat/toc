@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { rotatePoint } from "@toc/board";
+  import { KNIGHT, knightScale, rotatePoint } from "@toc/board";
   import { type Color, type PawnId, pawnColor, type RenderState } from "@toc/engine";
   import type { Point } from "@toc/board";
   import { knightLetter, type TurnUiState, trayLetters } from "../game/turnUi.ts";
@@ -30,10 +30,8 @@
   const WALNUT = "#2B1D12";
   const CREAM = "#FFF8E1";
   const BRICK = "#A32018";
-  /** Footprint of a knight in board units; the body centre stands 92 units above the feet. */
-  const FOOTPRINT = 110;
-  const BODY = 92;
-  const HALO_R = FOOTPRINT / 2 + 14;
+  /** Halo radius of a knight in sprite units, scaled with the knight of its zone (D-16). */
+  const HALO_R = KNIGHT.w / 2 + 14;
 
   /** Last card slot of each seat on the felt (UI-SPEC Tapis), unrotated board units. */
   const SLOT: Record<Color, Point> = {
@@ -48,6 +46,17 @@
 
   function pawnAt(pawn: PawnId): Point {
     return anchorOf(render.pawns[pawn], k);
+  }
+
+  /** Sprite-to-scene scale of a knight where it stands (ring, home or stable). */
+  function sizeOf(pawn: PawnId): number {
+    return knightScale(render.pawns[pawn]);
+  }
+
+  /** Centre of a knight's body on the board: its anchor (the cell centre) minus the body offset. */
+  function bodyAt(pawn: PawnId): Point {
+    const [x, y] = pawnAt(pawn);
+    return [x, y - KNIGHT.body * sizeOf(pawn)];
   }
 
   const points = $derived.by((): Point[] => {
@@ -108,10 +117,8 @@
   type Arrow = { d: string; tip: Point; angle: number };
   const arrows = $derived.by((): Arrow[] => {
     if (swap === null) return [];
-    const a = pawnAt(swap.a);
-    const b = pawnAt(swap.b);
-    const from: Point = [a[0], a[1] - BODY];
-    const to: Point = [b[0], b[1] - BODY];
+    const from = bodyAt(swap.a);
+    const to = bodyAt(swap.b);
     const dx = to[0] - from[0];
     const dy = to[1] - from[1];
     const length = Math.hypot(dx, dy) || 1;
@@ -200,12 +207,13 @@
     {/if}
 
     {#each candidates as pawn (pawn)}
-      {@const [x, y] = pawnAt(pawn)}
+      {@const [x, y] = bodyAt(pawn)}
+      {@const r = HALO_R * sizeOf(pawn)}
       {#if pawn !== selected && pawn !== target}
-        <g data-halo={pawn} transform={`translate(${x} ${y - BODY})`}>
+        <g data-halo={pawn} transform={`translate(${x} ${y})`}>
           <g class="pulse" class:still>
-            <circle r={HALO_R - 4} fill="none" stroke={WALNUT} stroke-width="4" />
-            <circle r={HALO_R + 2} fill="none" stroke={AMBER} stroke-width="8" />
+            <circle r={r - 4} fill="none" stroke={WALNUT} stroke-width="4" />
+            <circle r={r + 2} fill="none" stroke={AMBER} stroke-width="8" />
           </g>
         </g>
       {/if}
@@ -213,10 +221,11 @@
 
     {#each [selected, target] as chosen, i (i)}
       {#if chosen !== null}
-        {@const [x, y] = pawnAt(chosen)}
-        <g data-selected={chosen} transform={`translate(${x} ${y - BODY})`}>
-          <circle r={HALO_R - 4} fill={AMBER} fill-opacity="0.35" />
-          <circle r={HALO_R + 1} fill="none" stroke={AMBER} stroke-width="10" />
+        {@const [x, y] = bodyAt(chosen)}
+        {@const r = HALO_R * sizeOf(chosen)}
+        <g data-selected={chosen} transform={`translate(${x} ${y})`}>
+          <circle r={r - 4} fill={AMBER} fill-opacity="0.35" />
+          <circle r={r + 1} fill="none" stroke={AMBER} stroke-width="10" />
         </g>
       {/if}
     {/each}

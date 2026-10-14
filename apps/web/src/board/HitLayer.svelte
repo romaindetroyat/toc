@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SCENE } from "@toc/board";
+  import { KNIGHT, knightScale, SCENE } from "@toc/board";
   import type { PawnId, Place, RenderState } from "@toc/engine";
   import { EXIT, pawnColor, RING } from "@toc/engine";
   import { knightLetter } from "../game/turnUi.ts";
@@ -24,13 +24,6 @@
 
   let { px, k, render, candidates, active, onpick, onnear, onmiss }: Props = $props();
 
-  /** Body centre of a knight above its feet, in board units. */
-  const BODY = 92;
-  const FOOTPRINT = 110;
-  // Hit radius = max(22 screen px, footprint / 2).
-  const radius = $derived(Math.max(22 * px, FOOTPRINT / 2));
-  // Knights this close to the tap may be the one meant: with two or more, the tray tells them apart.
-  const near = $derived(Math.max(44 * px, radius));
 
   /** Where a knight stands, in words: the stable, the home, or how far it has come from its exit. */
   function whereOf(pawn: PawnId, place: Place): string {
@@ -40,12 +33,18 @@
     return done === 0 ? game.hand.place.exit : game.hand.place.ring(done);
   }
 
+  // One target per lit knight, on its body at the size of its zone (ring, home, stable): centre =
+  // anchor − KNIGHT.body × size, radius = max(22 screen px, half the knight's width); knights this
+  // close to the tap may be the one meant (max(44 screen px, radius)): with two or more, the tray
+  // tells them apart.
   const targets = $derived(
     candidates.map((pawn) => {
       const place = render.pawns[pawn];
+      const size = knightScale(place);
       const [x, y] = anchorOf(place, k);
       const label = game.hand.pawn(pawnColor(pawn), knightLetter(pawn), whereOf(pawn, place));
-      return { pawn, x, y: y - BODY, label };
+      const radius = Math.max(22 * px, (KNIGHT.w / 2) * size);
+      return { pawn, x, y: y - KNIGHT.body * size, radius, near: Math.max(44 * px, radius), label };
     }),
   );
 
@@ -62,8 +61,8 @@
     const around: { pawn: PawnId; distance: number }[] = [];
     for (const target of targets) {
       const distance = Math.hypot(point.x - target.x, point.y - target.y);
-      if (distance <= radius) hit = true;
-      if (distance <= near) around.push({ pawn: target.pawn, distance });
+      if (distance <= target.radius) hit = true;
+      if (distance <= target.near) around.push({ pawn: target.pawn, distance });
     }
     if (!hit) onmiss();
     else onnear(around.sort((a, b) => a.distance - b.distance).map((entry) => entry.pawn));
@@ -92,8 +91,8 @@
         aria-label={target.label}
         onkeydown={(event) => onkeydown(event, target.pawn)}
       >
-        <circle cx={target.x} cy={target.y} r={radius} fill="transparent" />
-        <circle class="ring" cx={target.x} cy={target.y} r={radius} stroke-width={3 * px} />
+        <circle cx={target.x} cy={target.y} r={target.radius} fill="transparent" />
+        <circle class="ring" cx={target.x} cy={target.y} r={target.radius} stroke-width={3 * px} />
       </g>
     {/each}
   </g>
