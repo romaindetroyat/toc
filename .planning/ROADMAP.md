@@ -140,7 +140,7 @@ Plans:
 - [ ] 01-39-PLAN.md — Le plateau image et ses outils quittent le jeu ; la licence du plateau et les documents du projet
 
 **Wave 31** *(gap closure, UAT tests 3 and 4; blocked on Wave 30 completion)*
-- [ ] 01-40-PLAN.md — Un seul plateau dans le code, le galet en largeur
+- [ ] 01-40-PLAN.md — Un seul plateau dans le code, le galet en largeur, et les numéros des images des règles en Caveat
 
 **Wave 32** *(gap closure, UAT tests 3 and 4; blocked on Wave 31 completion)*
 - [ ] 01-41-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
