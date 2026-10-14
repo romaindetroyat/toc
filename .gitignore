@@ -2,7 +2,6 @@
 .planning/milestone.lock
 node_modules/
 dist/
-apps/web/public/plateau-*.webp
 test-results/
 playwright-report/
 *.tsbuildinfo
