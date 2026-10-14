@@ -17,12 +17,29 @@
 // clockwise the left and the previous one the right; the ring indices follow from the bottom seat's
 // start index, as in the mock-up.
 
-import { COLORS, type Color, EXIT, type Place } from "@toc/engine";
+import { COLORS, type Color, EXIT, nextColor, PARTNER, type Place } from "@toc/engine";
 import type { Point } from "./layout.ts";
-import type { ScreenSide } from "./rotate.ts";
 
 // The art and its tests take Point from here; 01-41 defines it in this file when layout.ts goes.
 export type { Point };
+
+/** Where a seat sits on the screen: the human at the bottom, the partner at the top. */
+export type ScreenSide = "bottom" | "left" | "top" | "right";
+
+/** The human's seat index k, the colour at the bottom of the galet: bleu 0, vert 1, rouge 2, jaune 3. */
+const QUARTER_TURNS: Record<Color, number> = { bleu: 0, vert: 1, rouge: 2, jaune: 3 };
+
+export function quarterTurnsFor(color: Color): number {
+  return QUARTER_TURNS[color];
+}
+
+/** Bottom for the human, left for the next seat clockwise, top for the partner, right for the previous seat. */
+export function screenSideOf(seat: Color, human: Color): ScreenSide {
+  if (seat === human) return "bottom";
+  if (seat === PARTNER[human]) return "top";
+  if (seat === nextColor(human)) return "left";
+  return "right";
+}
 
 /** The mock-up's own frame and constants (renderVals, variant pc-galet). */
 export const MOCKUP = {

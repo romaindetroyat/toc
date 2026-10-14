@@ -296,6 +296,18 @@ describe("seating", () => {
     expect(screenSideOf("rouge", "jaune")).toBe("left");
     expect(screenSideOf("vert", "jaune")).toBe("top");
     expect(screenSideOf("bleu", "jaune")).toBe("right");
+    expect(screenSideOf("bleu", "vert")).toBe("left");
+    expect(screenSideOf("jaune", "vert")).toBe("top");
+    expect(screenSideOf("rouge", "vert")).toBe("right");
+  });
+
+  it("screenSideOf is bottom for the human, top for the partner, left for the next seat, right for the previous", () => {
+    for (const human of COLORS) {
+      expect(screenSideOf(human, human)).toBe("bottom");
+      expect(screenSideOf(PARTNER[human], human)).toBe("top");
+      expect(screenSideOf(nextColor(human), human)).toBe("left");
+      expect(screenSideOf(previousColor(human), human)).toBe("right");
+    }
   });
 
   it("puts each colour's home and stable on the side sceneSideOf names", () => {
