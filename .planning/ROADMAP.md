@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 31/36 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-36: board C+ and « Compacter l'écran », UAT tests 3 and 4)
+**Plans:** 31/39 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-39: board galet in landscape and portrait, « Compacter l'écran », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -111,20 +111,31 @@ Plans:
 **Wave 22** *(gap closure, UAT test 4; blocked on Wave 21 completion)*
 - [x] 01-31-PLAN.md — Halos, aperçus, lettres, marqueurs et cibles sur les cavaliers de C+
 
-**Wave 23** *(gap closure, UAT test 4; blocked on Wave 22 completion)*
-- [ ] 01-32-PLAN.md — Le tapis et les cartes sur C+
+*(01-29 to 01-31 built board C+; Romain rejected it once he saw it in the game, 2026-10-14, and chose the wooden « galet » board: in landscape on the computer, in portrait on the iPhone. The C+ plans 01-32 to 01-36 were dropped; the numbers are reused below.)*
 
-**Wave 24** *(gap closure, UAT tests 3 and 4, « Compacter l'écran »; blocked on Wave 23 completion)*
-- [ ] 01-33-PLAN.md — Compacter l’écran sur téléphone : bandeau fin, boutons sur la ligne de la main, plateau d’au moins 300 px sur iPhone 13
+**Wave 23** *(gap closure, UAT tests 3 and 4, plateau galet; blocked on Wave 22 completion)*
+- [ ] 01-32-PLAN.md — Les deux plateaux galet dans packages/board ; traceur : le galet en largeur dans la vraie partie à 1280 × 800, un cavalier bondit jusqu’à sa case
 
-**Wave 25** *(gap closure, UAT test 4; blocked on Wave 24 completion)*
-- [ ] 01-34-PLAN.md — Le plateau image et ses outils quittent le jeu ; licences et documents du projet
+**Wave 24** *(gap closure, UAT test 4; blocked on Wave 23 completion)*
+- [ ] 01-33-PLAN.md — Les cavaliers de Romain sur les plateaux, les images des règles sur le galet, la licence, le contrat d’interface « Plateau galet » et le journal des décisions
+
+**Wave 25** *(gap closure, UAT tests 3 and 4; blocked on Wave 24 completion)*
+- [ ] 01-34-PLAN.md — Les cavaliers, leurs halos, aperçus, marques et cibles sur les deux plateaux galet
 
 **Wave 26** *(gap closure, UAT test 4; blocked on Wave 25 completion)*
-- [ ] 01-35-PLAN.md — L’ancienne géométrie calibrée quitte packages/board
+- [ ] 01-35-PLAN.md — Le tapis et les cartes sur les deux plateaux galet
 
-**Wave 27** *(gap closure, UAT tests 3 and 4; blocked on Wave 26 completion)*
-- [ ] 01-36-PLAN.md — Les tailles visées partout, les captures, toutes les vérifications, puis le re-test de Romain
+**Wave 27** *(gap closure, UAT tests 4 and 5; blocked on Wave 26 completion)*
+- [ ] 01-36-PLAN.md — L’écran choisit son plateau, en direct ; sur ordinateur, le plateau en largeur et la barre du bas
+
+**Wave 28** *(gap closure, UAT tests 3 and 4, « Compacter l'écran »; blocked on Wave 27 completion)*
+- [ ] 01-37-PLAN.md — Sur téléphone : « Compacter l’écran » en hauteur et la barre compacte en largeur
+
+**Wave 29** *(gap closure, UAT test 4; blocked on Wave 28 completion)*
+- [ ] 01-38-PLAN.md — Le plateau image et ses outils quittent le jeu ; la licence du plateau et les documents du projet
+
+**Wave 30** *(gap closure, UAT tests 3 and 4; blocked on Wave 29 completion)*
+- [ ] 01-39-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
 
 **UI hint**: yes
 
@@ -198,7 +209,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 31/36 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 31/39 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
