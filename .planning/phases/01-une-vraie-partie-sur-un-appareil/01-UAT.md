@@ -81,9 +81,9 @@ blocked: 0
   test: 4
   root_cause: "Le plateau actuel (4 quarts dessinés pour le jeu physique) place les camps aux coins et porte des cadres de règles illisibles à petite taille"
   artifacts: [assets/plateau, packages/board/src/layout.json, tools/build-board.mjs, tools/calibrate-board]
-  missing: ["En attente du nouveau plateau dessiné par Romain, puis recalibrage des 72 cases, des écuries et des maisons ; cavaliers plus grands (test 3)"]
+  missing: ["Remplacer le plateau image par le plateau C+ choisi par Romain le 2026-10-14 (maquette : design/plateau-maquette.dc.html, variante portrait avec idees01 ; artefact https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A) : plateau portrait 2:3 dessiné par le code, 72 cases bord à bord, son camp centré en bas et le partenaire en haut, écuries à l'intérieur, sortie marquée 18, pointillé écurie → sortie, rail de couleur du carré 16 vers la maison, flèches du sens, tapis central ; cavaliers à l'échelle des nouvelles cases (test 3)"]
   debug_session: ""
-  blocked_by: "nouveau plateau de Romain"
+  decision: "Romain, 2026-10-14 : « On part sur le plateau C+ pour le moment »"
 - truth: "Sur ordinateur, on joue sans multiplier les allers-retours de souris : des raccourcis clavier choisissent la carte, le cheval et valident"
   status: failed
   reason: "User reported: un peu trop d'aller-retours de souris sur ordinateur. Des raccourcis claviers seraient les bienvenus"

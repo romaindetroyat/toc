@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Plateau TOC</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#5A3B23}a:hover{color:#3A2414}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+<svg viewBox="{{viewBox}}" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%">
+<polyline points="{{band}}" fill="none" stroke="#D2AF77" stroke-width="{{bandW}}" stroke-linejoin="round" stroke-linecap="round"></polyline>
+<polyline points="{{band}}" fill="none" stroke="#C49C5F" stroke-width="{{bandEdge}}" stroke-linejoin="round" stroke-dasharray="{{dash}}"></polyline>
+</svg>
+<sc-for list="{{felts}}" as="f" hint-placeholder-count="1">
+<div style="{{f.style}}"></div>
+</sc-for>
+<sc-for list="{{lines}}" as="ln" hint-placeholder-count="0">
+<div style="{{ln.style}}"></div>
+</sc-for>
+<sc-for list="{{arrows}}" as="ar" hint-placeholder-count="0">
+<div style="{{ar.style}}"><svg viewBox="0 0 24 24" aria-hidden="true" style="width: 100%; height: 100%; display: block"><path d="M3 12 H19 M13 6 L19 12 L13 18" fill="none" stroke="#7A5634" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+</sc-for>
+<sc-for list="{{stables}}" as="b" hint-placeholder-count="4">
+<div style="{{b.style}}"></div>
+</sc-for>
+<sc-for list="{{holes}}" as="o" hint-placeholder-count="16">
+<div style="{{o.style}}"></div>
+</sc-for>
+<sc-for list="{{lanes}}" as="l" hint-placeholder-count="16">
+<div style="{{l.style}}"></div>
+</sc-for>
+<sc-for list="{{cells}}" as="c" hint-placeholder-count="72">
+<div style="{{c.style}}"><span style="{{c.labelStyle}}">{{c.label}}</span></div>
+</sc-for>
+<sc-for list="{{cards}}" as="k" hint-placeholder-count="4">
+<div style="{{k.style}}"><span style="{{k.rankStyle}}">{{k.rank}}</span><span style="{{k.suitStyle}}">{{k.suit}}</span></div>
+</sc-for>
+<sc-for list="{{backs}}" as="t" hint-placeholder-count="1">
+<div style="{{t.style}}"><div style="{{t.inner}}"></div></div>
+</sc-for>
+<sc-for list="{{plaques}}" as="p" hint-placeholder-count="0">
+<div style="{{p.style}}">{{p.name}}</div>
+</sc-for>
+<sc-for list="{{knights}}" as="n" hint-placeholder-count="16">
+<img src="{{n.src}}" alt="{{n.alt}}" style="{{n.style}}">
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","options":["carre","croix","portrait"],"default":"carre"},"size":{"editor":"int","min":240,"max":2000,"default":1000,"unit":"px"},"maCouleur":{"editor":"enum","options":["bleu","jaune","rouge","vert"],"default":"bleu"},"pions":{"editor":"boolean","default":true},"idees01":{"editor":"boolean","default":false},"$preview":{"width":1000,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const variant = this.props.variant ?? 'carre';
+    const size = Number(this.props.size ?? 1000);
+    const me = this.props.maCouleur ?? 'bleu';
+    const showPawns = this.props.pions ?? true;
+    const ideas = this.props.idees01 ?? false;
+
+    const COLORS = ['bleu', 'jaune', 'rouge', 'vert'];
+    const EXIT = { bleu: 0, jaune: 18, rouge: 36, vert: 54 };
+    const HEX = { bleu: '#2C68B0', jaune: '#D9A20F', rouge: '#C23B2B', vert: '#2F8743' };
+    const TINT = { bleu: '#D3E0F1', jaune: '#F6E4A8', rouge: '#F2CFC7', vert: '#CBE4CE' };
+    const ON = { bleu: '#FFFFFF', jaune: '#3A2414', rouge: '#FFFFFF', vert: '#FFFFFF' };
+    const KNIGHT = {
+      bleu: '/_blob/06a5c7da8578ccd1c371dac63aa231cb',
+      jaune: '/_blob/e170a193583caa5c0e0b68d03ccb00ec',
+      rouge: '/_blob/2c4bcfb6df78eb064a3692958c822069',
+      vert: '/_blob/97db15a8a60b80e3985ceccd517493b7',
+    };
+    const NAMES = ['Toi', 'Comanche', 'Jappeloup', 'Marengo'];
+    const INK = '#4A2F1B';
+    const CREAM = '#FBF5E6';
+    const DISC = 0.88;
+
+    const W = 1000;
+    const H = variant === 'portrait' ? 1500 : 1000;
+    const k = size / W;
+    const px = (v) => (v * k).toFixed(2) + 'px';
+
+    // The ring as a closed polyline, walked clockwise on screen from the bottom seat's anchor.
+    let s = 50;
+    let pts = [];
+    let xL = 0, xR = 0, yT = 0, yB = 0;
+    const cx = W / 2, cy = H / 2;
+    for (let it = 0; it < 6; it++) {
+      const inset = 16 + 0.5 * DISC * s;
+      xL = inset; xR = W - inset; yT = inset; yB = H - inset;
+      pts = [];
+      if (variant === 'croix') {
+        const h = s;
+        pts = [[cx, yB], [cx - h, yB], [cx - h, cy + h], [xL, cy + h], [xL, cy - h], [cx - h, cy - h], [cx - h, yT], [cx + h, yT], [cx + h, cy - h], [xR, cy - h], [xR, cy + h], [cx + h, cy + h], [cx + h, yB], [cx, yB]];
+      } else {
+        const r = s;
+        const arc = (ox, oy, a0, a1) => {
+          for (let j = 0; j <= 24; j++) {
+            const a = ((a0 + ((a1 - a0) * j) / 24) * Math.PI) / 180;
+            pts.push([ox + r * Math.cos(a), oy + r * Math.sin(a)]);
+          }
+        };
+        pts.push([cx, yB], [xL + r, yB]);
+        arc(xL + r, yB - r, 90, 180);
+        pts.push([xL, yT + r]);
+        arc(xL + r, yT + r, 180, 270);
+        pts.push([xR - r, yT]);
+        arc(xR - r, yT + r, 270, 360);
+        pts.push([xR, yB - r]);
+        arc(xR - r, yB - r, 0, 90);
+        pts.push([cx, yB]);
+      }
+      let P = 0;
+      for (let j = 1; j < pts.length; j++) P += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
+      s = P / 72;
+    }
+    const cum = [0];
+    for (let j = 1; j < pts.length; j++) cum.push(cum[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
+    const at = (d) => {
+      for (let j = 1; j < pts.length; j++) {
+        if (d <= cum[j] + 1e-6) {
+          const f = (d - cum[j - 1]) / (cum[j] - cum[j - 1] || 1);
+          return [pts[j - 1][0] + f * (pts[j][0] - pts[j - 1][0]), pts[j - 1][1] + f * (pts[j][1] - pts[j - 1][1])];
+        }
+      }
+      return pts[pts.length - 1];
+    };
+
+    // Seat frames: bottom, left, top, right. t = direction of travel, n = towards the centre.
+    const meIdx = Math.max(0, COLORS.indexOf(me));
+    const seat = [0, 1, 2, 3].map((q) => COLORS[(meIdx + q) % 4]);
+    const T = [[-1, 0], [0, -1], [1, 0], [0, 1]];
+    const N = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    const ROT = [0, 90, 180, 270];
+    const C = [[cx, yB], [xL, cy], [cx, yT], [xR, cy]];
+    const frame = (q, ta, na) => [C[q][0] + T[q][0] * ta * s + N[q][0] * na * s, C[q][1] + T[q][1] * ta * s + N[q][1] * na * s];
+
+    const colorOfExit = (i) => COLORS.find((c) => EXIT[c] === ((i % 72) + 72) % 72);
+    const startIdx = variant === 'croix' ? EXIT[seat[0]] : (EXIT[seat[0]] + 71) % 72;
+    const cellPos = {};
+
+    // Cells
+    const cells = [];
+    for (let j = 0; j < 72; j++) {
+      const i = (startIdx + j) % 72;
+      const [x, y] = at(j * s);
+      cellPos[i] = [x, y];
+      const m = i % 18;
+      let d = DISC * s;
+      let style = '';
+      let label = '';
+      let labelStyle = 'display: none';
+      if (m === 0) {
+        const c = colorOfExit(i);
+        d = 0.76 * s;
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${HEX[c]}; border: ${px(0.08 * s)} solid ${CREAM}; outline: ${px(0.05 * s)} solid ${INK}; transform: rotate(45deg); border-radius: ${px(0.08 * s)}; display: flex; align-items: center; justify-content: center`;
+        if (ideas) {
+          label = '18';
+          labelStyle = `transform: rotate(-45deg); font: 900 ${px(0.36 * s)}/1 Nunito, system-ui, sans-serif; color: ${ON[c]}`;
+        }
+      } else if (m === 16) {
+        const c = colorOfExit(i + 2);
+        d = 0.84 * s;
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${HEX[c]}; border: ${px(0.07 * s)} solid ${INK}; border-radius: ${px(0.14 * s)}; display: flex; align-items: center; justify-content: center`;
+        label = '16';
+        labelStyle = `font: 900 ${px(0.4 * s)}/1 Nunito, system-ui, sans-serif; color: ${ON[c]}`;
+      } else {
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${CREAM}; border: ${px(0.075 * s)} solid ${INK}; border-radius: 50%; display: flex; align-items: center; justify-content: center`;
+        label = String(m);
+        labelStyle = `font: 800 ${px(0.4 * s)}/1 Nunito, system-ui, sans-serif; color: ${INK}`;
+      }
+      cells.push({ style, label, labelStyle });
+    }
+
+    // Home lanes (4 slots from the carré 16, towards the centre) and stables (2 x 2 beside the exit)
+    const lanes = [];
+    const lanePos = {};
+    const stables = [];
+    const holes = [];
+    const holePos = {};
+    for (let q = 0; q < 4; q++) {
+      const c = seat[q];
+      lanePos[c] = [];
+      for (let kk = 1; kk <= 4; kk++) {
+        const p = variant === 'croix' ? frame(q, 0, kk) : frame(q, -1, kk * 1.04);
+        lanePos[c].push(p);
+        const d = 0.82 * s;
+        lanes.push({ style: `position: absolute; box-sizing: border-box; left: ${px(p[0] - d / 2)}; top: ${px(p[1] - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${TINT[c]}; border: ${px(0.09 * s)} solid ${HEX[c]}; border-radius: ${px(0.18 * s)}` });
+      }
+      const sc = variant === 'croix' ? frame(q, 3.5, 1.9) : frame(q, 3.4, 2.1);
+      const bs = 2.45 * s;
+      stables.push({ style: `position: absolute; box-sizing: border-box; left: ${px(sc[0] - bs / 2)}; top: ${px(sc[1] - bs / 2)}; width: ${px(bs)}; height: ${px(bs)}; background: #DCC08D; border: ${px(0.09 * s)} solid ${HEX[c]}; border-radius: ${px(0.42 * s)}; box-shadow: inset 0 ${px(0.06 * s)} 0 rgba(74,47,27,0.25)` });
+      holePos[c] = [];
+      for (const [a, b] of [[-0.56, -0.56], [0.56, -0.56], [-0.56, 0.56], [0.56, 0.56]]) {
+        const hx = sc[0] + T[q][0] * a * s + N[q][0] * b * s;
+        const hy = sc[1] + T[q][1] * a * s + N[q][1] * b * s;
+        holePos[c].push([hx, hy]);
+        const d = 0.8 * s;
+        holes.push({ style: `position: absolute; box-sizing: border-box; left: ${px(hx - d / 2)}; top: ${px(hy - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${TINT[c]}; border: ${px(0.07 * s)} solid ${HEX[c]}; border-radius: 50%` });
+      }
+    }
+
+    // Ideas taken from proposal 01: a dotted link from the stable to the exit, a coloured branch from the
+    // carré 16 into the home, discreet arrows giving the direction of travel.
+    const lines = [];
+    const arrows = [];
+    const line = (a, b, extra) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ang = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+      lines.push({ style: `position: absolute; left: ${px(a[0])}; top: ${px(a[1])}; width: ${px(L)}; height: 0; transform-origin: 0 0; transform: rotate(${ang.toFixed(2)}deg); ${extra}` });
+    };
+    if (ideas) {
+      for (let q = 0; q < 4; q++) {
+        const c = seat[q];
+        const exitP = cellPos[EXIT[c]];
+        const carreP = cellPos[(EXIT[c] + 70) % 72];
+        const sc = variant === 'croix' ? frame(q, 3.5, 1.9) : frame(q, 3.4, 2.1);
+        line(sc, exitP, `border-top: ${px(0.09 * s)} dashed ${HEX[c]}; margin-top: ${px(-0.045 * s)}`);
+        const last = lanePos[c][3];
+        line(carreP, last, `border-top: ${px(0.24 * s)} solid ${HEX[c]}; margin-top: ${px(-0.12 * s)}; border-radius: ${px(0.12 * s)}`);
+      }
+      if (variant !== 'croix') {
+        const a = 1.9 * s;
+        const box = 0.95 * s;
+        for (const [x, y, ang] of [[xL + a, yB - a, -135], [xL + a, yT + a, -45], [xR - a, yT + a, 45], [xR - a, yB - a, 135]]) {
+          arrows.push({ style: `position: absolute; left: ${px(x - box / 2)}; top: ${px(y - box / 2)}; width: ${px(box)}; height: ${px(box)}; transform: rotate(${ang}deg); opacity: 0.75` });
+        }
+      }
+    }
+
+    // The felt with the last card of each seat, the talon and the discard
+    const felts = [];
+    const cards = [];
+    const backs = [];
+    const plaques = [];
+    const SAMPLE = [['7', '♥'], ['R', '♠'], ['4', '♣'], ['V', '♦']];
+    const cw = (variant === 'carre' ? 1.45 : 1.3) * s;
+    const ch = cw * 1.4;
+    const card = (x, y, rot, rank, suit) => {
+      const red = suit === '♥' || suit === '♦';
+      cards.push({
+        style: `position: absolute; box-sizing: border-box; left: ${px(x - cw / 2)}; top: ${px(y - ch / 2)}; width: ${px(cw)}; height: ${px(ch)}; background: #FFFDF7; border: ${px(0.05 * s)} solid #8A6A4A; border-radius: ${px(0.16 * s)}; transform: rotate(${rot}deg); box-shadow: 0 ${px(0.06 * s)} ${px(0.12 * s)} rgba(0,0,0,0.3)`,
+        rank, suit,
+        rankStyle: `position: absolute; left: ${px(0.12 * s)}; top: ${px(0.08 * s)}; font: 900 ${px(0.42 * s)}/1 Nunito, system-ui, sans-serif; color: ${red ? '#B3261E' : '#1E1A16'}`,
+        suitStyle: `position: absolute; left: 0; right: 0; top: ${px(ch * 0.42)}; text-align: center; font: 700 ${px(0.75 * s)}/1 Georgia, serif; color: ${red ? '#B3261E' : '#1E1A16'}`,
+      });
+    };
+    const back = (x, y, w, rot) => {
+      const h = w * 1.4;
+      backs.push({
+        style: `position: absolute; box-sizing: border-box; left: ${px(x - w / 2)}; top: ${px(y - h / 2)}; width: ${px(w)}; height: ${px(h)}; background: #6B4428; border: ${px(0.05 * s)} solid #FFFDF7; border-radius: ${px(0.14 * s)}; transform: rotate(${rot}deg); box-shadow: 0 ${px(0.06 * s)} ${px(0.12 * s)} rgba(0,0,0,0.3)`,
+        inner: `position: absolute; inset: ${px(0.12 * s)}; border: ${px(0.04 * s)} solid #D9B27A; border-radius: ${px(0.08 * s)}`,
+      });
+    };
+    if (variant === 'croix') {
+      for (let q = 0; q < 4; q++) {
+        const p = frame(q, 6.2, 4.4);
+        card(p[0], p[1], ROT[q], SAMPLE[q][0], SAMPLE[q][1]);
+        const pl = frame(q, 5.7, 6.75);
+        const pw = 3.4 * s;
+        const ph = 0.78 * s;
+        plaques.push({
+          name: NAMES[q],
+          style: `position: absolute; box-sizing: border-box; left: ${px(pl[0] - pw / 2)}; top: ${px(pl[1] - ph / 2)}; width: ${px(pw)}; height: ${px(ph)}; transform: rotate(${ROT[q]}deg); background: ${HEX[seat[q]]}; color: ${ON[seat[q]]}; border-radius: ${px(0.39 * s)}; display: flex; align-items: center; justify-content: center; font: 800 ${px(0.42 * s)}/1 Nunito, system-ui, sans-serif; letter-spacing: 0.02em`,
+        });
+      }
+      back(cx, cy, 0.86 * s, 45);
+    } else {
+      const hw = (variant === 'carre' ? 4.25 : 2.45) * s;
+      const hh = (variant === 'carre' ? 4.25 : 6.3) * s;
+      felts.push({ style: `position: absolute; box-sizing: border-box; left: ${px(cx - hw)}; top: ${px(cy - hh)}; width: ${px(2 * hw)}; height: ${px(2 * hh)}; background: #1F5A3B; border: ${px(0.14 * s)} solid #5A3B23; border-radius: ${px(0.7 * s)}; box-shadow: inset 0 0 0 ${px(0.08 * s)} #2E7350` });
+      for (let q = 0; q < 4; q++) {
+        const half = q % 2 === 0 ? hh : hw;
+        const off = half - 1.2 * s;
+        card(cx - N[q][0] * off, cy - N[q][1] * off, ROT[q], SAMPLE[q][0], SAMPLE[q][1]);
+      }
+      if (variant === 'carre') {
+        back(cx - 0.85 * s, cy, cw, 0);
+        card(cx + 0.85 * s, cy, 0, '9', '♠');
+      } else {
+        back(cx, cy - 1.15 * s, cw, 0);
+        card(cx, cy + 1.15 * s, 0, '9', '♠');
+      }
+    }
+
+    // A few knights to judge the scale: one on the ring per seat, two in a home, the rest in the stables
+    const knights = [];
+    const RING_AT = { bleu: 6, jaune: 29, rouge: 50, vert: 63 };
+    const HOME_AT = { bleu: 1, vert: 2 };
+    const knight = (c, x, y, w) => {
+      const h = (w * 570) / 330;
+      knights.push({ y, src: KNIGHT[c], alt: `Cheval ${c}`, style: `position: absolute; left: ${px(x - w / 2)}; top: ${px(y - h + 0.28 * w)}; width: ${px(w)}; height: ${px(h)}; pointer-events: none` });
+    };
+    if (showPawns) {
+      for (const c of COLORS) {
+        let left = 4;
+        const r = cellPos[RING_AT[c]];
+        knight(c, r[0], r[1], 0.92 * s);
+        left--;
+        if (HOME_AT[c] !== undefined) {
+          const h = lanePos[c][HOME_AT[c]];
+          knight(c, h[0], h[1], 0.8 * s);
+          left--;
+        }
+        for (let j = 0; j < left; j++) {
+          const h = holePos[c][j];
+          knight(c, h[0], h[1], 0.72 * s);
+        }
+      }
+      knights.sort((a, b) => a.y - b.y);
+    }
+
+    const band = pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    return {
+      rootStyle: `position: relative; width: ${size}px; height: ${(H * k).toFixed(2)}px; background: #E8D3A6; border-radius: ${px(0.6 * s)}; overflow: hidden; box-shadow: inset 0 0 0 ${px(0.2 * s)} #5A3B23; font-family: Nunito, system-ui, sans-serif`,
+      viewBox: `0 0 ${W} ${H}`,
+      band,
+      bandW: (1.16 * s).toFixed(1),
+      bandEdge: (0.05 * s).toFixed(2),
+      dash: `${(0.25 * s).toFixed(1)} ${(0.25 * s).toFixed(1)}`,
+      cells, lanes, stables, holes, felts, cards, backs, plaques, knights, lines, arrows,
+    };
+  }
+}
+</script>
+</body>
+</html>
