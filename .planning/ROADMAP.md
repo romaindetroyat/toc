@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 32/39 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-39: board galet in landscape and portrait, « Compacter l'écran », UAT tests 3 and 4)
+**Plans:** 33/39 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-39: board galet in landscape and portrait, « Compacter l'écran », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -117,7 +117,7 @@ Plans:
 - [x] 01-32-PLAN.md — Les deux plateaux galet dans packages/board ; traceur : le galet en largeur dans la vraie partie à 1280 × 800, un cavalier bondit jusqu’à sa case
 
 **Wave 24** *(gap closure, UAT test 4; blocked on Wave 23 completion)*
-- [ ] 01-33-PLAN.md — Les cavaliers de Romain sur les plateaux, les images des règles sur le galet, la licence, le contrat d’interface « Plateau galet » et le journal des décisions
+- [x] 01-33-PLAN.md — Les cavaliers de Romain sur les plateaux, les images des règles sur le galet, la licence, le contrat d’interface « Plateau galet » et le journal des décisions
 
 **Wave 25** *(gap closure, UAT tests 3 and 4; blocked on Wave 24 completion)*
 - [ ] 01-34-PLAN.md — Les cavaliers, leurs halos, aperçus, marques et cibles sur les deux plateaux galet
@@ -209,7 +209,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 32/39 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 33/39 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
