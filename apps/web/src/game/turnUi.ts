@@ -135,6 +135,8 @@ export type TurnUiEvent =
   | { t: "cancel" }
   | { t: "changeCard" }
   | { t: "escape" }
+  /** One step back, the keyboard's Échap (UI-SPEC addendum 2026-10-14): never drops more than one choice. */
+  | { t: "back" }
   | { t: "selectGive"; card: CardId }
   | { t: "give" }
   | { t: "pose" };
@@ -556,6 +558,67 @@ function deselect(state: TurnUiState): TurnUiResult {
   return { state };
 }
 
+/** The Valet's targets for his own knight `own`, in the engine's order. */
+function swapTargets(candidates: Action[], own: PawnId): PawnId[] {
+  return candidates.flatMap((a) => (a.t === "swap" && a.pawn === own ? [a.target] : []));
+}
+
+/**
+ * One step back (the keyboard's Échap): the tray to its flow, a preview to the choice it came from, the
+ * Valet's target to his own knight, « Avancer » to the As/Roi question, the 7 to its knight or its last
+ * step, and only then the card. Never submits anything.
+ */
+function back(state: TurnUiState, ctx: TurnCtx): TurnUiResult {
+  switch (state.kind) {
+    case "tray":
+      return { state: state.next };
+    case "preview": {
+      const { action, card, candidates } = state;
+      if (action.t === "swap") {
+        return {
+          state: {
+            kind: "jackTarget",
+            card,
+            candidates,
+            pawn: action.pawn,
+            targets: swapTargets(candidates, action.pawn),
+          },
+        };
+      }
+      if (action.t === "exit") {
+        const question = selectCard(card, ctx);
+        if (question.kind === "modeChoice") return { state: question };
+      }
+      return { state: { kind: "cardSelected", card, candidates } };
+    }
+    case "jackTarget": {
+      const pawns = [...new Set(state.candidates.flatMap((a) => (a.t === "swap" ? [a.pawn] : [])))];
+      return {
+        state: { kind: "jackPick", card: state.card, candidates: state.candidates, pawns },
+      };
+    }
+    case "cardSelected": {
+      const question = selectCard(state.card, ctx);
+      return { state: question.kind === "modeChoice" ? question : IDLE };
+    }
+    case "jackPick":
+    case "modeChoice":
+      return { state: IDLE };
+    case "sevenBuilding": {
+      if (state.selected !== undefined) {
+        const { selected: _, notice: __, ...rest } = state;
+        return { state: rest };
+      }
+      if (state.plan.length > 0) return undoLast(state, ctx);
+      return { state: IDLE };
+    }
+    case "exchange":
+      return state.selected === undefined ? { state } : { state: { kind: "exchange" } };
+    default:
+      return { state };
+  }
+}
+
 function selectGive(state: TurnUiState, card: CardId, ctx: TurnCtx): TurnUiResult {
   if (state.kind !== "exchange" || !ctx.view.hand.includes(card)) return { state };
   return {
@@ -608,6 +671,8 @@ export function reduceTurnUi(state: TurnUiState, event: TurnUiEvent, ctx: TurnCt
     case "changeCard":
     case "escape":
       return deselect(state);
+    case "back":
+      return back(state, ctx);
     case "selectGive":
       return selectGive(state, event.card, ctx);
     case "give":

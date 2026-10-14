@@ -473,6 +473,7 @@
   /**
    * The keyboard shortcuts (UI-SPEC addendum 2026-10-14): read before any other handler (capture
    * phase), turned into reducer events by the pure key map, and sent like the taps they stand for.
+   * Échap is one of them (one step back); with a sheet open it is left to the sheet, which closes.
    */
   function onShortcut(event: KeyboardEvent) {
     const intent = keyIntent(event, {
@@ -492,6 +493,9 @@
     event.stopPropagation();
     for (const each of intent.events) {
       if (each.t === "tapPawn") pickPawn(each.pawn);
+      else if (each.t === "tapAt") pickNear(each.near);
+      else if (each.t === "chooseTrayOption") pickTrayOption(each.pawn);
+      else if (each.t === "chooseExit") chooseExit();
       else send(each);
     }
   }
@@ -500,12 +504,6 @@
     window.addEventListener("keydown", onShortcut, { capture: true });
     return () => window.removeEventListener("keydown", onShortcut, { capture: true });
   });
-
-  function onkeydown(event: KeyboardEvent) {
-    // Échap belongs to the sheet that is open (« Réglages »), not to the card selection behind it.
-    if (document.querySelector("[data-sheet-layer]")) return;
-    if (event.key === "Escape") send({ t: "escape" });
-  }
 
   // --- Sound settings (FX-06, D-25) ---
   // Every change of « Son », « Bruitages », « Ambiance » and its volume reaches the audio buses at once.
@@ -555,7 +553,6 @@
   onMount(() => unlockOnFirstGesture());
 </script>
 
-<svelte:window {onkeydown} />
 <svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
 <main class="game">

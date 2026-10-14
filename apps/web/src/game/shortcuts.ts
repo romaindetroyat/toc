@@ -6,7 +6,7 @@
 // reducer decides, and a move is only submitted by the confirm step the player triggers (D-19).
 
 import { ALL_PAWNS, type CardId, type PawnId, type Place, pawnColor } from "@toc/engine";
-import { knightLetter, type TurnUiEvent, type TurnUiState } from "./turnUi.ts";
+import { knightLetter, type TurnUiEvent, type TurnUiState, trayLetters } from "./turnUi.ts";
 
 /** The parts of a KeyboardEvent the map reads. */
 export type KeyInput = {
@@ -116,7 +116,7 @@ function previewed(ui: Extract<TurnUiState, { kind: "preview" }>, pawn: PawnId):
   return action.t === "move" && action.pawn === pawn;
 }
 
-/** « Entrée » plays only with the focus on nothing, on the chosen card or on the previewed knight. */
+/** Whether the focus lets « Entrée » play: nothing focused, the chosen card or the previewed knight. */
 function enterPlays(ui: Extract<TurnUiState, { kind: "preview" }>, focus: FocusTarget): boolean {
   if (focus.kind === "none") return true;
   if (focus.kind === "card") return focus.card === ui.card;
@@ -124,7 +124,66 @@ function enterPlays(ui: Extract<TurnUiState, { kind: "preview" }>, focus: FocusT
   return false;
 }
 
+/** The states « Échap » steps back from (the 7 and a chosen exchange card included). */
+const BACK_STATES: ReadonlySet<TurnUiState["kind"]> = new Set([
+  "tray",
+  "preview",
+  "jackTarget",
+  "jackPick",
+  "cardSelected",
+  "modeChoice",
+  "sevenBuilding",
+]);
+
 const turn = (...events: TurnUiEvent[]): KeyIntent => ({ kind: "turn", events });
+
+/** « Entrée »: the primary action of the action zone, when it is ready. */
+function enterIntent(ctx: KeyContext): KeyIntent {
+  const { ui, focus } = ctx;
+  switch (ui.kind) {
+    case "preview":
+      return enterPlays(ui, focus) ? turn({ t: "confirm" }) : null;
+    case "sevenBuilding":
+      return ui.remaining === 0 && focus.kind === "none" ? turn({ t: "confirm" }) : null;
+    case "exchange": {
+      if (ui.selected === undefined) return null;
+      const onCard = focus.kind === "card" && focus.card === ui.selected;
+      return focus.kind === "none" || onCard ? turn({ t: "give" }) : null;
+    }
+    case "deadHand":
+      return focus.kind === "none" ? turn({ t: "pose" }) : null;
+    default:
+      return null;
+  }
+}
+
+/** A digit: the 7's steps, the card to pass, or the n-th card of the hand. */
+function digitIntent(n: number, ctx: KeyContext): KeyIntent {
+  const { ui } = ctx;
+  if (ui.kind === "sevenBuilding") return n <= 7 ? turn({ t: "pickSteps", steps: n }) : null;
+  if (ctx.concealed) return null;
+  const card = ctx.hand[n - 1];
+  if (card === undefined) return null;
+  if (ui.kind === "exchange") return turn({ t: "selectGive", card });
+  return CARD_STATES.has(ui.kind) ? turn({ t: "tapCard", card }) : null;
+}
+
+/** « A » to « D »: a tray chip, or the lit knights with that letter (several open the tray). */
+function knightIntent(letter: string, ctx: KeyContext): KeyIntent {
+  const { ui } = ctx;
+  if (ui.kind === "tray") {
+    const index = trayLetters(ui.options).indexOf(letter);
+    const pawn = ui.options[index];
+    return pawn === undefined ? null : turn({ t: "chooseTrayOption", pawn });
+  }
+  if (!KNIGHT_STATES.has(ui.kind)) return null;
+  const matching = ctx.lit.filter((pawn) => knightLetter(pawn) === letter);
+  const only = matching[0];
+  if (only === undefined) return null;
+  return matching.length === 1
+    ? turn({ t: "tapPawn", pawn: only })
+    : turn({ t: "tapAt", near: matching });
+}
 
 /** What a key press means on the game screen, or null when it means nothing there. */
 export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
@@ -135,24 +194,31 @@ export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
   const { ui } = ctx;
 
   const digit = digitOf(input.code);
-  if (digit !== null) {
-    if (!CARD_STATES.has(ui.kind) || ctx.concealed) return null;
-    const card = ctx.hand[digit - 1];
-    return card === undefined ? null : turn({ t: "tapCard", card });
+  if (digit !== null) return digitIntent(digit, ctx);
+
+  switch (input.key) {
+    case "Escape": {
+      const chosen =
+        BACK_STATES.has(ui.kind) || (ui.kind === "exchange" && ui.selected !== undefined);
+      return chosen ? turn({ t: "back" }) : null;
+    }
+    case "Enter":
+      return enterIntent(ctx);
+    case "Backspace":
+      return ui.kind === "sevenBuilding" && ui.plan.length > 0 ? turn({ t: "undoLast" }) : null;
   }
 
-  const key = input.key.toLowerCase();
-  if (key.length === 1 && key >= "a" && key <= "d") {
-    if (!KNIGHT_STATES.has(ui.kind)) return null;
-    const letter = key.toUpperCase();
-    const matching = ctx.lit.filter((pawn) => knightLetter(pawn) === letter);
-    const only = matching[0];
-    return matching.length === 1 && only !== undefined ? turn({ t: "tapPawn", pawn: only }) : null;
+  const key = input.key.length === 1 ? input.key.toLowerCase() : "";
+  if (ui.kind === "modeChoice") {
+    if (key === "s") return turn({ t: "chooseExit" });
+    if (key === "a") return turn({ t: "chooseAdvance" });
+    return null;
   }
-
-  if (input.key === "Enter") {
-    return ui.kind === "preview" && enterPlays(ui, ctx.focus) ? turn({ t: "confirm" }) : null;
+  if (key === "p") {
+    if (ui.kind === "exchange" && ui.selected !== undefined) return turn({ t: "give" });
+    return ui.kind === "deadHand" ? turn({ t: "pose" }) : null;
   }
+  if (key >= "a" && key <= "d") return knightIntent(key.toUpperCase(), ctx);
 
   return null;
 }

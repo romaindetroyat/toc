@@ -1301,3 +1301,187 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
     expect(knightLetter("rouge3")).toBe("D");
   });
 });
+
+describe("back: one step back (Échap)", () => {
+  // One state after the other from the synced position; `back` is then sent once.
+  const stateAfter = (ctx: TurnCtx, ...events: TurnUiEvent[]) => {
+    let state = synced(ctx);
+    for (const event of events) state = reduceTurnUi(state, event, ctx).state;
+    return state;
+  };
+  const back = (state: TurnUiState, ctx: TurnCtx) => reduceTurnUi(state, { t: "back" }, ctx);
+
+  const simple = ctxOf(SINGLE);
+  // As with both modes: an exit and an advance.
+  const ace = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  // As with the exit only (no knight on the ring).
+  const exitOnly = ctxOf(
+    build({
+      pawns: { bleu: ["S", "S", "S", "S"] },
+      hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const jack = ctxOf(
+    build({
+      pawns: {
+        bleu: [{ p: 5 }, { p: 40 }, "S", "S"],
+        vert: [{ p: 30 }, "S", "S", "S"],
+      },
+      hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const seven = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const close = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, { p: 6 }, "S", "S"] },
+      hands: { bleu: ["3S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const exchange = ctxOf(
+    build({
+      phase: "exchange",
+      hands: { bleu: ["2H", "3H", "4H", "5H", "6H"], jaune: ["2S"], rouge: ["2D"], vert: ["2C"] },
+      turn: "jaune",
+      dealer: "bleu",
+    }),
+  );
+
+  it("closes the tray back to its flow", () => {
+    const selected = stateAfter(close, { t: "tapCard", card: "3S" });
+    const tray = reduceTurnUi(selected, { t: "tapAt", near: ["bleu0", "bleu1"] }, close).state;
+    expect(tray.kind).toBe("tray");
+    expect(back(tray, close).state).toEqual(selected);
+  });
+
+  it("takes a move preview back to the card's lit knights", () => {
+    const selected = stateAfter(simple, { t: "tapCard", card: "5H" });
+    const preview = reduceTurnUi(selected, { t: "tapPawn", pawn: "bleu0" }, simple).state;
+    expect(preview.kind).toBe("preview");
+    expect(back(preview, simple).state).toEqual(selected);
+  });
+
+  it("takes an exit chosen with « Sortir » back to the As/Roi question", () => {
+    const question = stateAfter(ace, { t: "tapCard", card: "1S" });
+    expect(question.kind).toBe("modeChoice");
+    const preview = reduceTurnUi(question, { t: "chooseExit" }, ace).state;
+    expect(preview.kind).toBe("preview");
+    expect(back(preview, ace).state).toEqual(question);
+  });
+
+  it("takes an exit preview with no question back to the stable knights", () => {
+    const selected = stateAfter(exitOnly, { t: "tapCard", card: "1S" });
+    expect(selected.kind).toBe("cardSelected");
+    const preview = reduceTurnUi(selected, { t: "tapPawn", pawn: "bleu2" }, exitOnly).state;
+    expect(preview.kind).toBe("preview");
+    expect(back(preview, exitOnly).state).toEqual(selected);
+    expect(back(selected, exitOnly).state).toEqual({ kind: "idle" });
+  });
+
+  it("takes « Avancer » back to the As/Roi question, then the question to nothing selected", () => {
+    const question = stateAfter(ace, { t: "tapCard", card: "1S" });
+    const advance = reduceTurnUi(question, { t: "chooseAdvance" }, ace).state;
+    expect(advance.kind).toBe("cardSelected");
+    expect(back(advance, ace).state).toEqual(question);
+    const preview = reduceTurnUi(advance, { t: "tapPawn", pawn: "bleu0" }, ace).state;
+    expect(back(preview, ace).state).toEqual(advance);
+    expect(back(question, ace).state).toEqual({ kind: "idle" });
+  });
+
+  it("takes the Valet's swap preview to his knight's targets, then to his own knight choice", () => {
+    const pick = stateAfter(jack, { t: "tapCard", card: "11H" });
+    expect(pick.kind).toBe("jackPick");
+    const target = reduceTurnUi(pick, { t: "tapPawn", pawn: "bleu0" }, jack).state;
+    expect(target.kind).toBe("jackTarget");
+    const preview = reduceTurnUi(target, { t: "tapPawn", pawn: "vert0" }, jack).state;
+    expect(preview.kind).toBe("preview");
+    expect(back(preview, jack).state).toEqual(target);
+    expect(back(target, jack).state).toEqual(pick);
+    expect(back(pick, jack).state).toEqual({ kind: "idle" });
+  });
+
+  it("drops a simple card selection", () => {
+    const selected = stateAfter(simple, { t: "tapCard", card: "5H" });
+    expect(back(selected, simple).state).toEqual({ kind: "idle" });
+  });
+
+  it("the 7: unselects the knight, then takes back the last step, then drops the card", () => {
+    const start = stateAfter(seven, { t: "tapCard", card: "7H" });
+    if (start.kind !== "sevenBuilding") throw new Error("no sevenBuilding");
+    const picked = reduceTurnUi(start, { t: "tapPawn", pawn: "bleu0" }, seven).state;
+    expect(picked).toMatchObject({ kind: "sevenBuilding", selected: "bleu0" });
+    expect(back(picked, seven).state).toEqual(start);
+
+    const given = reduceTurnUi(picked, { t: "pickSteps", steps: 3 }, seven).state;
+    expect(given).toMatchObject({ kind: "sevenBuilding", remaining: 4 });
+    expect(back(given, seven).state).toEqual(start);
+
+    // A refused count leaves a notice with the knight: back clears both.
+    const refused = reduceTurnUi(picked, { t: "pickSteps", steps: 8 }, seven).state;
+    expect(refused).toMatchObject({ notice: "stepRefused", selected: "bleu0" });
+    expect(back(refused, seven).state).toEqual(start);
+
+    expect(back(start, seven).state).toEqual({ kind: "idle" });
+  });
+
+  it("the exchange: the chosen card is deselected, nothing else", () => {
+    const chosen = reduceTurnUi({ kind: "exchange" }, { t: "selectGive", card: "3H" }, exchange);
+    expect(back(chosen.state, exchange).state).toEqual({ kind: "exchange" });
+    expect(back({ kind: "exchange" }, exchange).state).toEqual({ kind: "exchange" });
+  });
+
+  it("leaves every other state as it is", () => {
+    for (const state of [
+      { kind: "waiting" },
+      { kind: "idle" },
+      { kind: "finishedPrompt" },
+      { kind: "deadHand" },
+      { kind: "posed" },
+      { kind: "empty" },
+      { kind: "exchangeWaiting", pending: ["rouge"] },
+    ] as TurnUiState[]) {
+      expect(back(state, simple).state).toBe(state);
+    }
+  });
+
+  it("back never submits", () => {
+    const states: [TurnUiState, TurnCtx][] = [
+      [stateAfter(simple, { t: "tapCard", card: "5H" }, { t: "tapPawn", pawn: "bleu0" }), simple],
+      [stateAfter(ace, { t: "tapCard", card: "1S" }, { t: "chooseExit" }), ace],
+      [stateAfter(jack, { t: "tapCard", card: "11H" }, { t: "tapPawn", pawn: "bleu0" }), jack],
+      [
+        stateAfter(
+          seven,
+          { t: "tapCard", card: "7H" },
+          { t: "tapPawn", pawn: "bleu0" },
+          { t: "pickSteps", steps: 7 },
+        ),
+        seven,
+      ],
+      [{ kind: "deadHand" }, simple],
+      [{ kind: "exchange", selected: "3H" }, exchange],
+    ];
+    for (const [state, ctx] of states) {
+      let current = state;
+      for (let i = 0; i < 6; i++) {
+        const result = back(current, ctx);
+        expect(result.submit).toBeUndefined();
+        current = result.state;
+      }
+    }
+  });
+});
