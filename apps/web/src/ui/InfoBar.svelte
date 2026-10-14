@@ -11,11 +11,17 @@
     human: Color;
     /** « toi » for the human, a horse name for each bot. */
     names: Record<Color, string>;
+    /**
+     * « row »: the 56 px bar of the screens taller than wide and of the side panel. « column »: the
+     * info zone at the left of the computer's bottom bar (lines, pills and gear stacked, on the
+     * bar's own band).
+     */
+    form?: "row" | "column";
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
   };
 
-  let { render, human, names, onabandon }: Props = $props();
+  let { render, human, names, form = "row", onabandon }: Props = $props();
 
   let settingsOpen = $state(false);
   let gear = $state<HTMLButtonElement | null>(null);
@@ -37,8 +43,10 @@
 </script>
 
 <!-- Info bar (UI-SPEC, D-07): 56 px, three zones. The bot's name is never truncated; below 360 px the
-     words « Tour de » are hidden visually and stay in the text for screen readers. -->
-<header class="bar" data-info-bar>
+     words « Tour de » are hidden visually and stay in the text for screen readers. In column form (the
+     computer's bottom bar) the same three zones stack: the turn and dealer lines, then the two team
+     pills side by side with the gear. -->
+<header class="bar" class:column={form === "column"} data-info-bar data-form={form}>
   <div class="left">
     <p class="turn" data-turn={playing ? render.turn : ""}>
       {#if playing}
@@ -101,6 +109,38 @@
   .left {
     flex: 1 1 0;
     min-width: 0;
+  }
+
+  /* Column form: no height or background of its own, it stands on the bottom bar's band. The lines
+     on top, then the pills side by side and the gear at the end of their row. */
+  .bar.column {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: var(--space-xs) var(--space-sm);
+    height: auto;
+    padding: 0;
+    background: transparent;
+  }
+
+  .column .left {
+    flex: 1 1 100%;
+  }
+
+  .column .turn {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .column .teams {
+    flex: 1 1 auto;
+    flex-direction: row;
+    gap: var(--space-xs);
+    width: auto;
+  }
+
+  .column .pill {
+    flex: 1 1 0;
+    padding: 0 var(--space-sm);
   }
 
   .left p {

@@ -54,6 +54,7 @@
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
@@ -310,6 +311,9 @@
     location.hash = to;
   }
 
+  /** A computer screen (landscape from 960 x 600): the board across the width, the bar under it. */
+  const bar = $derived(screen.chrome === "bar");
+
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
   /** The end screen is up: the rest of the game screen is inert behind it. */
@@ -560,6 +564,7 @@
 
 <main
   class="game"
+  data-chrome={screen.chrome}
   style:--head-room={boardScene.headRoom}
   style:--board-ratio={boardScene.height / boardScene.width}
 >
@@ -572,7 +577,13 @@
     <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
     <div class="layout" data-layout inert={ended}>
       <div class="info">
-        <InfoBar {render} human={session.human} names={session.names} onabandon={abandon} />
+        <InfoBar
+          {render}
+          human={session.human}
+          names={session.names}
+          form={bar ? "column" : "row"}
+          onabandon={abandon}
+        />
       </div>
 
       <div class="stage">
@@ -667,6 +678,7 @@
         <div class="action">
           <ActionZone
             {ui}
+            {bar}
             {view}
             human={session.human}
             names={session.names}
@@ -725,17 +737,28 @@
   /*
    * The galet board (Romain's choice of 2026-10-14: « galet partout »): centred, never cropped;
    * --board-size is its width and --board-ratio its height over its width (0.5: the landscape galet
-   * is the only board, « paysage obligatoire », from sceneOf(layout)). On a screen taller than wide
-   * the chrome below the board is the info bar (56), the action zone and the hand zone (until 01-38
-   * shows « Tourne ton téléphone » there): the action zone has a fixed height
-   * (--action) so that a longer prompt, the preview or the tray never pushes the hand down, and the
-   * hand zone is the fan plus the room the lifted and turned cards need (--hand). --head-room of the
-   * width (sceneOf(layout).headRoom) stays free above the board for the head of a lifted top-row
-   * knight, so the height a board takes is (board ratio + head room) x its width.
-   * Portrait: min(100vw − 32 px − insets, (100dvh − chrome − insets) / (ratio + head room), 880 / 1.5);
-   * landscape: min((100dvh − 32 px − insets) / (ratio + head room), 100vw − 368 px − insets), the
-   * right panel taking 320 + 48 (a landscape plateau there is width-limited, until the bottom bar of
-   * 01-36). Safe-area insets are subtracted from both axes. The page never scrolls (FX-01).
+   * is the only board, « paysage obligatoire », from sceneOf(layout)). --head-room of the width
+   * (sceneOf(layout).headRoom) stays free above the board for the head of a lifted top-row knight, so
+   * the height a board takes is (board ratio + head room) x its width. Safe-area insets are
+   * subtracted from both axes. The page never scrolls (FX-01).
+   *
+   * Three modes (UI-SPEC addendum « Plateau galet », items 6 and 7, « à confirmer par Romain »), the
+   * media queries being the very strings of ui/screen.svelte.ts (the store gives `data-chrome`):
+   * - « bar », landscape from 960 x 600 (computers): the board across the width,
+   *   min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (ratio + head room), 1600 px), and
+   *   under it one 160 px bar (--bar, the regular fan's box: an 88 x 124 card + 36 px) holding the
+   *   info at the left (240 px), the hand in the middle and the action zone at the right (at least
+   *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
+   *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
+   * - « compact-bar », every other landscape screen: the board at the left and the right panel of
+   *   01-24, min((100dvh − 32 px − insets) / (ratio + head room), 100vw − 368 px − insets), until the
+   *   compact band of 01-37.
+   * - « rotate », every screen taller than wide: the base rules below, the info bar (56), the board,
+   *   the action zone and the hand, min(100vw − 32 px − insets, (100dvh − chrome − insets) /
+   *   (ratio + head room), 880 / 1.5), until « Tourne ton téléphone » of 01-38. The action zone has a
+   *   fixed height (--action) so that a longer prompt, the preview or the tray never pushes the hand
+   *   down, and the hand zone is the fan plus the room the lifted and turned cards need (--hand).
+   * In every mode the DOM order, and so the Tab order, is info, board, actions (or the 7), hand.
    */
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
@@ -821,8 +844,9 @@
     grid-column: action;
   }
 
-  /* Landscape (phones included): the board at the left, the right panel at least 320 wide. */
-  @media (orientation: landscape) {
+  /* « compact-bar », landscape below 960 x 600: the board at the left, the right panel at least 320
+     wide (01-37 replaces it with the compact band). */
+  @media (orientation: landscape) and (max-width: 959.98px), (orientation: landscape) and (max-height: 599.98px) {
     .game {
       --board-size: max(
         0px,
@@ -877,6 +901,75 @@
     .layout {
       min-height: calc(100dvh - var(--inset-y));
       margin: 0 auto;
+    }
+  }
+  /*
+   * « bar », landscape from 960 x 600 (computers): the board centred across the width, then one
+   * walnut band of exactly --bar across the screen with the info, the hand and the action zone.
+   */
+  @media (orientation: landscape) and (min-width: 960px) and (min-height: 600px) {
+    .game {
+      --bar: 160px;
+      --board-size: max(
+        0px,
+        min(
+          100vw - 32px - var(--inset-x),
+          (100dvh - var(--bar) - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
+          1600px
+        )
+      );
+    }
+
+    .layout {
+      max-width: none;
+      width: 100%;
+      height: calc(100dvh - var(--inset-y));
+      margin: 0;
+      padding: 0 var(--space-md);
+      column-gap: var(--space-md);
+      grid-template-columns: 240px minmax(0, 1fr) minmax(320px, 400px);
+      grid-template-areas:
+        "stage stage stage"
+        "info hand action";
+      grid-template-rows: minmax(0, 1fr) var(--bar);
+      align-content: stretch;
+      /* The band: the bar's row, from one edge of the screen to the other. */
+      background: linear-gradient(
+        to top,
+        var(--bois-sombre) var(--bar),
+        transparent var(--bar)
+      );
+    }
+
+    .stage {
+      align-self: center;
+    }
+
+    .info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    /* The zone fills its column; a prompt longer than it scrolls inside. */
+    .action {
+      justify-content: center;
+      min-height: 0;
+      max-height: none;
+    }
+
+    .hand {
+      align-self: end;
+      min-width: 0;
+      padding: 0;
+    }
+
+    .seven {
+      grid-row: hand;
+      grid-column: hand / action;
+      min-width: 0;
+      min-height: 0;
     }
   }
 </style>

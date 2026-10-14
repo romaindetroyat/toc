@@ -40,10 +40,16 @@
     onadvance: () => void;
     ontrayPick: (pawn: PawnId) => void;
     ontrayClose: () => void;
+    /**
+     * In the computer's bottom bar: the zone fills its column (no 72 / 160 px bounds), the prompt on
+     * top (Body 16, up to three lines, then it scrolls) and the buttons right-aligned under it.
+     */
+    bar?: boolean;
   };
 
   let {
     ui,
+    bar = false,
     view,
     human,
     names,
@@ -167,7 +173,7 @@
 </script>
 
 <!-- Action zone (UI-SPEC): one state at a time, an aria-live region, prompt lines never truncated. -->
-<section class="zone" aria-live="polite" data-action-zone data-state={ui.kind}>
+<section class="zone" class:bar aria-live="polite" data-action-zone data-state={ui.kind}>
   {#key key}
     <div class="content" in:fade={{ duration: fadeMs }}>
       {#if lines.length > 0}
@@ -409,6 +415,54 @@
 
   .fast-label {
     display: none;
+  }
+
+  /* The bottom bar (computers): one column, the prompt on top and the buttons under it at the right. */
+  .zone.bar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: var(--space-sm) 0;
+  }
+
+  .bar .content {
+    flex: 0 1 auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  /* Three lines of Body 16 (24 px each), then the text scrolls inside. */
+  .bar .text {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: calc(3 * var(--body-size) * var(--body-line));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .bar .givers {
+    flex: none;
+  }
+
+  .bar .buttons {
+    flex: none;
+    flex-wrap: nowrap;
+    align-self: flex-end;
+    margin-left: 0;
+  }
+
+  .bar .modes {
+    align-self: stretch;
+  }
+
+  .bar .fast {
+    align-self: flex-end;
   }
 
   @media (min-width: 600px) {
