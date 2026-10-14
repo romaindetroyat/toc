@@ -1,5 +1,5 @@
-import { bottomOf, MAX_DEAL_CARDS, SCENE, seatCard } from "@toc/board";
-import { COLORS, type Color, nextColor, PARTNER } from "@toc/engine";
+import { bottomOf, MAX_DEAL_CARDS, type Point, SCENE, seatCard } from "@toc/board";
+import { type CardId, COLORS, type Color, nextColor, PARTNER } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import {
   dealFlights,
@@ -42,6 +42,25 @@ const insideFelt = ([x, y]: readonly [number, number]): boolean => {
   if (feltShape.kind !== "ellipse") throw new Error("the landscape galet's felt is an ellipse");
   return ((x - feltShape.cx) / feltShape.rx) ** 2 + ((y - feltShape.cy) / feltShape.ry) ** 2 <= 1;
 };
+/** The four corners of a card centred on `at`, turned by `degrees` (clockwise on the screen). */
+const cornersOf = (at: readonly [number, number], degrees: number): [number, number][] => {
+  const t = (degrees * Math.PI) / 180;
+  const { w, h } = SCENE.card;
+  return [
+    [-w / 2, -h / 2],
+    [w / 2, -h / 2],
+    [w / 2, h / 2],
+    [-w / 2, h / 2],
+  ].map(([x, y]): [number, number] => [
+    at[0] + (x as number) * Math.cos(t) - (y as number) * Math.sin(t),
+    at[1] + (x as number) * Math.sin(t) + (y as number) * Math.cos(t),
+  ]);
+};
+/** Every tilt tiltOf can give. */
+const TILTS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
+const MODES = ["normal", "fast", "reduced"] as const;
+const firstPose = (keyframes: Keyframe[]): string => (keyframes[0] as Keyframe).transform as string;
+
 /** The seat that sits on the left of the human (the next seat clockwise) and on his right. */
 const previousColor = (color: Color): Color => PARTNER[nextColor(color)];
 
@@ -130,13 +149,29 @@ describe("dealFlights", () => {
     expect(flights.every((f) => f.durationMs === 150 && f.delayMs === 0)).toBe(true);
   });
 
-  it("starts at the talon, beside the felt's centre, for every k", () => {
+  it("starts every card at the talon and ends it at its seat's edge, for every k", () => {
     for (const k of KS) {
-      const [first] = dealFlights(SEATS, k, "normal");
-      const start = translation(
-        ((first as FlightSpec).keyframes[0] as Keyframe).transform as string,
-      );
-      expect(start).toEqual(SCENE.talon);
+      for (const mode of ["normal", "fast"] as const) {
+        const flights = dealFlights(SEATS, k, mode);
+        // Round by round in dealing order: card n goes to the seat n % 4.
+        flights.forEach((flight, n) => {
+          expect(translation(firstPose(flight.keyframes))).toEqual(SCENE.talon);
+          const { seat } = SEATS[n % SEATS.length] as (typeof SEATS)[number];
+          expect(translation(lastPose(flight.keyframes))).toEqual(seatEdge(seat, k));
+        });
+      }
+      for (const flight of dealFlights(SEATS, k, "reduced")) {
+        expect(translation(firstPose(flight.keyframes))).toEqual(SCENE.talon);
+      }
+    }
+  });
+
+  it("never carries a card face, in any mode", () => {
+    for (const k of KS) {
+      for (const mode of MODES) {
+        expect(dealFlights(SEATS, k, mode).every((f) => f.card === null)).toBe(true);
+        expect(exchangeFlights(k, mode).every((f) => f.card === null)).toBe(true);
+      }
     }
   });
 });
@@ -222,6 +257,40 @@ describe("exchangeFlights", () => {
     expect((bx - SCENE.width / 2) * (rx - SCENE.width / 2)).toBeLessThan(0);
   });
 
+  it("moves each seat's card from its place to its partner's, for every k and mode", () => {
+    for (const k of KS) {
+      for (const mode of MODES) {
+        exchangeFlights(k, mode).forEach((flight, i) => {
+          const seat = COLORS[i] as Color;
+          expect(translation(firstPose(flight.keyframes))).toEqual(seatSlot(seat, k));
+          if (mode !== "reduced") {
+            expect(translation(lastPose(flight.keyframes))).toEqual(seatSlot(PARTNER[seat], k));
+          }
+          // It leaves turned like its seat's card.
+          expect(rotation(firstPose(flight.keyframes))).toBe(seatAngle(seat, k));
+        });
+      }
+    }
+  });
+
+  it("both cards of a pair bow to their own left (on the screen, along their way)", () => {
+    for (const k of KS) {
+      exchangeFlights(k, "normal").forEach((flight, i) => {
+        const seat = COLORS[i] as Color;
+        const [fx, fy] = seatSlot(seat, k);
+        const [tx, ty] = seatSlot(PARTNER[seat], k);
+        const middle = translation(
+          (flight.keyframes.find((kf) => kf.offset === 0.5) as Keyframe).transform as string,
+        );
+        const off: [number, number] = [middle[0] - (fx + tx) / 2, middle[1] - (fy + ty) / 2];
+        // y grows downwards: the way's left is where the cross product is negative.
+        const cross = (tx - fx) * off[1] - (ty - fy) * off[0];
+        expect(cross).toBeLessThan(0);
+        expect(Math.hypot(off[0], off[1])).toBeCloseTo(110, 6);
+      });
+    }
+  });
+
   it("is 120 ms in fast mode and 150 ms when motion is reduced", () => {
     expect(exchangeFlights(0, "fast")[0]?.durationMs).toBeCloseTo(120, 9);
     expect(exchangeFlights(0, "reduced").every((f) => f.durationMs === 150)).toBe(true);
@@ -247,6 +316,63 @@ describe("layFlights", () => {
     // Centred on the slot of the seat.
     const [cx, cy] = seatSlot("jaune", 0);
     expect(column[1]).toEqual([cx, cy]);
+  });
+
+  it("fans a dead hand along its seat's side, centred on its place, at most half a card apart, inside the ellipse", () => {
+    for (const k of KS) {
+      for (const seat of COLORS) {
+        const [cx, cy] = seatSlot(seat, k);
+        const angle = seatAngle(seat, k);
+        const row = angle % 180 === 0;
+        for (let count = 1; count <= 5; count++) {
+          const slots = posedSlots(seat, count, k);
+          expect(slots).toHaveLength(count);
+          // Same y for the seats at the bottom and the top, same x for the side seats.
+          for (const [x, y] of slots) expect(row ? y : x).toBe(row ? cy : cx);
+          const along = slots.map(([x, y]) => (row ? x : y));
+          const mean = along.reduce((sum, v) => sum + v, 0) / count;
+          expect(mean).toBeCloseTo(row ? cx : cy, 6);
+          for (let i = 1; i < count; i++) {
+            const gap = Math.abs((along[i] as number) - (along[i - 1] as number));
+            expect(gap).toBeLessThanOrEqual(SCENE.card.w / 2 + 1e-9);
+          }
+          // Every corner of every posed card, whatever its tilt, lies inside the felt's ellipse.
+          for (const at of slots) {
+            for (const tilt of TILTS) {
+              for (const corner of cornersOf(at, angle + tilt)) {
+                expect(insideFelt(corner)).toBe(true);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("the side seats' fans are tighter than those at the bottom and the top", () => {
+    const human = bottomOf(0);
+    const gap = (seat: Color) => {
+      const [a, b] = posedSlots(seat, 5, 0);
+      return Math.hypot((b as Point)[0] - (a as Point)[0], (b as Point)[1] - (a as Point)[1]);
+    };
+    expect(gap(nextColor(human))).toBeLessThan(gap(human));
+    expect(gap(previousColor(human))).toBeLessThan(gap(PARTNER[human]));
+  });
+
+  it("lands each card on its posed place, facing its seat with the card's tilt, for every k", () => {
+    const cards = ["2S", "4S", "11S", "13H", "1D"] as const;
+    for (const k of KS) {
+      for (const seat of COLORS) {
+        const slots = posedSlots(seat, cards.length, k);
+        for (const mode of MODES) {
+          layFlights(seat, cards, k, mode).forEach((flight, i) => {
+            const last = lastPose(flight.keyframes);
+            expect(translation(last)).toEqual(slots[i]);
+            expect(rotation(last)).toBe(seatAngle(seat, k) + tiltOf(cards[i] as CardId));
+          });
+        }
+      }
+    }
   });
 
   it("is a 150 ms fade for every card at once when motion is reduced, 0.4 times when fast", () => {
