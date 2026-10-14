@@ -4,9 +4,9 @@
 // from scene.ts. artSvg() serialises such a list into a standalone SVG document for the tools
 // (the rules pictures); the game renders the same shapes as Svelte markup.
 
-import type { Color } from "@toc/engine";
+import { COLORS, type Color, ENTRY, EXIT, type PawnIndex } from "@toc/engine";
 import type { Point } from "./layout.ts";
-import { PALETTE, ringPolyline, SCENE, sceneXY } from "./scene.ts";
+import { PALETTE, ringPolyline, SCENE, sceneXY, stableCentre } from "./scene.ts";
 
 export type ArtRole =
   | "board"
@@ -61,6 +61,15 @@ export type ArtShape =
     });
 
 const s = SCENE.step;
+const SLOTS: readonly PawnIndex[] = [0, 1, 2, 3];
+
+/** The colour whose exit (losange) is ring cell `cell`. */
+function colorOfExit(cell: number): Color {
+  const i = ((cell % 72) + 72) % 72;
+  const c = COLORS.find((x) => EXIT[x] === i);
+  if (!c) throw new Error(`no exit at cell ${cell}`);
+  return c;
+}
 
 /** The shapes of board C+ for seat k, in painting order. */
 export function boardArt(k: number): ArtShape[] {
@@ -115,21 +124,246 @@ export function boardArt(k: number): ArtShape[] {
     dash: [0.25 * s, 0.25 * s],
   });
 
-  // Tracer: the 72 cells as plain cream discs.
+  // The felt in the middle: walnut border 0.14 s and an inner green line 0.08 s.
+  const f = SCENE.felt;
+  shapes.push({
+    kind: "rect",
+    role: "felt",
+    x: f.x + 0.07 * s,
+    y: f.y + 0.07 * s,
+    w: f.w - 0.14 * s,
+    h: f.h - 0.14 * s,
+    rx: 0.63 * s,
+    fill: PALETTE.felt,
+    stroke: PALETTE.feltBorder,
+    strokeWidth: 0.14 * s,
+  });
+  shapes.push({
+    kind: "rect",
+    role: "felt",
+    detail: true,
+    x: f.x + 0.18 * s,
+    y: f.y + 0.18 * s,
+    w: f.w - 0.36 * s,
+    h: f.h - 0.36 * s,
+    rx: 0.52 * s,
+    fill: "none",
+    stroke: PALETTE.feltLine,
+    strokeWidth: 0.08 * s,
+  });
+
+  // Ideas of proposal 01: a dashed link from each stable to its exit, a rail from the carré 16
+  // into the home, discreet arrows giving the direction of travel.
+  for (const c of COLORS) {
+    shapes.push({
+      kind: "polyline",
+      role: "link",
+      color: c,
+      points: [stableCentre(c, k), sceneXY({ z: "ring", cell: EXIT[c] }, k)],
+      fill: "none",
+      stroke: PALETTE.hex[c],
+      strokeWidth: 0.09 * s,
+      dash: [0.27 * s, 0.18 * s],
+    });
+  }
+  for (const c of COLORS) {
+    shapes.push({
+      kind: "polyline",
+      role: "rail",
+      color: c,
+      points: [
+        sceneXY({ z: "ring", cell: ENTRY[c] }, k),
+        sceneXY({ z: "home", color: c, slot: 3 }, k),
+      ],
+      fill: "none",
+      stroke: PALETTE.hex[c],
+      strokeWidth: 0.24 * s,
+      linecap: "round",
+    });
+  }
+  const { left: xL, right: xR, top: yT, bottom: yB } = SCENE.ring;
+  const a = 1.9 * s;
+  const arrows: [number, number, number][] = [
+    [xL + a, yB - a, -135],
+    [xL + a, yT + a, -45],
+    [xR - a, yT + a, 45],
+    [xR - a, yB - a, 135],
+  ];
+  for (const [x, y, angle] of arrows) {
+    shapes.push({
+      kind: "path",
+      role: "arrow",
+      // The mock-up's « M3 12 H19 M13 6 L19 12 L13 18 » in its 24 x 24 box, centred on the origin.
+      d: "M-9 0 H7 M1 -6 L7 0 L1 6",
+      fill: "none",
+      stroke: PALETTE.arrow,
+      strokeWidth: 2.6,
+      linecap: "round",
+      linejoin: "round",
+      opacity: 0.75,
+      transform: { translate: [x, y], rotate: angle, scale: (0.95 * s) / 24 },
+    });
+  }
+
+  // Stables (box 2.45 s, inner shadow drawn as an inner line) and their four holes.
+  for (const c of COLORS) {
+    const [x, y] = stableCentre(c, k);
+    const half = 1.225 * s;
+    shapes.push({
+      kind: "rect",
+      role: "stable",
+      color: c,
+      x: x - half + 0.045 * s,
+      y: y - half + 0.045 * s,
+      w: 2 * half - 0.09 * s,
+      h: 2 * half - 0.09 * s,
+      rx: 0.375 * s,
+      fill: PALETTE.stable,
+      stroke: PALETTE.hex[c],
+      strokeWidth: 0.09 * s,
+    });
+    shapes.push({
+      kind: "rect",
+      role: "stable",
+      color: c,
+      detail: true,
+      x: x - half + 0.12 * s,
+      y: y - half + 0.12 * s,
+      w: 2 * half - 0.24 * s,
+      h: 2 * half - 0.24 * s,
+      rx: 0.3 * s,
+      fill: "none",
+      stroke: PALETTE.stableShadow,
+      strokeWidth: 0.06 * s,
+    });
+  }
+  for (const c of COLORS) {
+    for (const slot of SLOTS) {
+      const [x, y] = sceneXY({ z: "stable", color: c, slot }, k);
+      shapes.push({
+        kind: "circle",
+        role: "hole",
+        color: c,
+        cx: x,
+        cy: y,
+        r: 0.365 * s,
+        fill: PALETTE.tint[c],
+        stroke: PALETTE.hex[c],
+        strokeWidth: 0.07 * s,
+      });
+    }
+  }
+
+  // Home slots: tinted squares 0.82 s with a border of the colour.
+  for (const c of COLORS) {
+    for (const slot of SLOTS) {
+      const [x, y] = sceneXY({ z: "home", color: c, slot }, k);
+      const half = 0.41 * s;
+      shapes.push({
+        kind: "rect",
+        role: "lane",
+        color: c,
+        x: x - half + 0.045 * s,
+        y: y - half + 0.045 * s,
+        w: 2 * half - 0.09 * s,
+        h: 2 * half - 0.09 * s,
+        rx: 0.135 * s,
+        fill: PALETTE.tint[c],
+        stroke: PALETTE.hex[c],
+        strokeWidth: 0.09 * s,
+      });
+    }
+  }
+
+  // The 72 cells and their printed numerals (board artwork, like the former printed board).
   for (let cell = 0; cell < 72; cell++) {
     const [x, y] = sceneXY({ z: "ring", cell }, k);
-    const d = 0.88 * s;
-    shapes.push({
-      kind: "circle",
-      role: "cell",
-      cell,
-      cx: x,
-      cy: y,
-      r: d / 2 - 0.0375 * s,
-      fill: PALETTE.cream,
-      stroke: PALETTE.ink,
-      strokeWidth: 0.075 * s,
-    });
+    const m = cell % 18;
+    const label = (text: string, size: number, weight: number, fill: string, color?: Color) => {
+      shapes.push({
+        kind: "text",
+        role: "label",
+        cell,
+        ...(color ? { color } : {}),
+        x,
+        y: y + 0.35 * size,
+        text,
+        size,
+        weight,
+        fill,
+      });
+    };
+    if (m === 0) {
+      // Losange « 18 »: a square 0.76 s turned 45°, cream border 0.08 s, ink outline 0.05 s.
+      const c = colorOfExit(cell);
+      const d = 0.76 * s;
+      const transform = { translate: [x, y] as Point, rotate: 45 };
+      shapes.push({
+        kind: "rect",
+        role: "exit",
+        cell,
+        color: c,
+        x: -d / 2 + 0.04 * s,
+        y: -d / 2 + 0.04 * s,
+        w: d - 0.08 * s,
+        h: d - 0.08 * s,
+        rx: 0.04 * s,
+        fill: PALETTE.hex[c],
+        stroke: PALETTE.cream,
+        strokeWidth: 0.08 * s,
+        transform,
+      });
+      shapes.push({
+        kind: "rect",
+        role: "exit",
+        cell,
+        color: c,
+        detail: true,
+        x: -d / 2 - 0.025 * s,
+        y: -d / 2 - 0.025 * s,
+        w: d + 0.05 * s,
+        h: d + 0.05 * s,
+        rx: 0.105 * s,
+        fill: "none",
+        stroke: PALETTE.ink,
+        strokeWidth: 0.05 * s,
+        transform,
+      });
+      label("18", 0.36 * s, 900, PALETTE.on[c], c);
+    } else if (m === 16) {
+      // Carré « 16 » in the colour of the exit two cells further: 0.84 s, ink border 0.07 s.
+      const c = colorOfExit(cell + 2);
+      const d = 0.84 * s;
+      shapes.push({
+        kind: "rect",
+        role: "entry",
+        cell,
+        color: c,
+        x: x - d / 2 + 0.035 * s,
+        y: y - d / 2 + 0.035 * s,
+        w: d - 0.07 * s,
+        h: d - 0.07 * s,
+        rx: 0.105 * s,
+        fill: PALETTE.hex[c],
+        stroke: PALETTE.ink,
+        strokeWidth: 0.07 * s,
+      });
+      label("16", 0.4 * s, 900, PALETTE.on[c], c);
+    } else {
+      // Ordinary cell: a cream disc 0.88 s with an ink border 0.075 s, numbered 1 to 17.
+      shapes.push({
+        kind: "circle",
+        role: "cell",
+        cell,
+        cx: x,
+        cy: y,
+        r: 0.44 * s - 0.0375 * s,
+        fill: PALETTE.cream,
+        stroke: PALETTE.ink,
+        strokeWidth: 0.075 * s,
+      });
+      label(String(m), 0.4 * s, 800, PALETTE.ink);
+    }
   }
   return shapes;
 }

@@ -22,14 +22,8 @@ const outDir = resolve(root, "docs", "regles");
 const { scenarios } = await import(
   pathToFileURL(resolve(root, "packages/engine/scenarios/index.ts")).href
 );
-const { artSvg, boardArt } = await import(
-  pathToFileURL(resolve(root, "packages/board/src/art.ts")).href
-);
-const { SCENE, sceneXY } = await import(
-  pathToFileURL(resolve(root, "packages/board/src/scene.ts")).href
-);
-const { quarterTurnsFor } = await import(
-  pathToFileURL(resolve(root, "packages/board/src/rotate.ts")).href
+const { artSvg, boardArt, quarterTurnsFor, SCENE, sceneXY } = await import(
+  pathToFileURL(resolve(root, "packages/board/src/index.ts")).href
 );
 const { COLORS, ringIndex } = await import(
   pathToFileURL(resolve(root, "packages/engine/src/topology.ts")).href
@@ -84,6 +78,9 @@ function pawnsOfActions(actions = []) {
 function layerSvg(pawns, halos, label, k) {
   const parts = [];
   const pillWidth = 24 + label.length * 8;
+  // The label sits at the top of the felt, where no pawn ever stands.
+  const pillX = HALF_W / 2 - pillWidth / 2;
+  const pillY = Math.round(SCENE.felt.y * SCALE) + 14;
   // Pawns on the ring or in the home first, stable pawns underneath: stable discs are many
   // and must never hide a pawn in play.
   const order = [...pawns].sort((a, b) => (a.spec === "S" ? 0 : 1) - (b.spec === "S" ? 0 : 1));
@@ -102,8 +99,8 @@ function layerSvg(pawns, halos, label, k) {
     );
   }
   parts.push(
-    `<rect x="8" y="8" width="${pillWidth}" height="24" rx="12" fill="#FFF8E1" stroke="${INK}" stroke-width="2"/>`,
-    `<text x="${8 + pillWidth / 2}" y="25" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="700" fill="${INK}">${label}</text>`,
+    `<rect x="${pillX}" y="${pillY}" width="${pillWidth}" height="24" rx="12" fill="#FFF8E1" stroke="${INK}" stroke-width="2"/>`,
+    `<text x="${HALF_W / 2}" y="${pillY + 17}" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="700" fill="${INK}">${label}</text>`,
   );
   return Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${HALF_W}" height="${HALF_H}" viewBox="0 0 ${HALF_W} ${HALF_H}">${parts.join("")}</svg>`,
