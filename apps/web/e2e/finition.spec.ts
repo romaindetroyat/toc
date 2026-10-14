@@ -47,6 +47,16 @@ test.describe("le tapis en grand", () => {
     );
     const card = own.locator(`[data-card="${played}"]`);
     await expect(card).toBeVisible();
+    // Measured once the sheet has stopped sliding in: during its 250 ms slide the box is translated by
+    // a fraction of a pixel, which reads 99.99999 px at the phone's scale factor of 3.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.querySelector("[data-sheet-layer]")?.getAnimations({ subtree: true }).length,
+        ),
+      )
+      .toBe(0);
     const size = await card.boundingBox();
     expect(size?.width).toBeGreaterThanOrEqual(72);
     expect(size?.height).toBeGreaterThanOrEqual(100);

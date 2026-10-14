@@ -67,8 +67,8 @@
   const debugView = DEBUG_VIEWS.find((view) => view === hashQuery.get("debug"));
 
   // The landscape galet is the game's only board (Romain, 2026-10-14: « paysage obligatoire »), on a
-  // computer and on a phone alike; no parameter chooses another one. Board, the anchor and the
-  // session still receive this constant until 01-40 removes the layout concept.
+  // computer and on a phone alike; no parameter chooses another one. Board and the anchor still
+  // receive this constant until 01-40 removes the layout concept (the Director no longer takes one).
   const boardLayout: Layout = "landscape";
   const boardScene = sceneOf(boardLayout);
 
@@ -220,7 +220,6 @@
 
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
   const env: SessionEnv = {
-    layout: () => boardLayout,
     document: visibility,
     hold,
     animator: {
@@ -872,7 +871,7 @@
    * the height a board takes is (board ratio + head room) x its width. Safe-area insets are
    * subtracted from both axes. The page never scrolls (FX-01).
    *
-   * Three modes (UI-SPEC addendum « Plateau galet », items 6 to 9, « à confirmer par Romain »), the
+   * Three modes (UI-SPEC addendum « Plateau galet », items 5 to 9, « à confirmer par Romain »), the
    * media queries being the very strings of ui/screen.svelte.ts (the store gives `data-chrome`):
    * - « bar », landscape from 960 x 600 (computers): the board across the width,
    *   min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (ratio + head room), 1600 px), and
@@ -886,13 +885,13 @@
    *   for the prompt and the buttons over 64 px for the hand). The board is
    *   max(0, min(100vw − 96 px − 12 px − insets, (100dvh − band − insets) / (ratio + head room))),
    *   band = 64 or 120 px: about 533 px wide at 750 x 342, 625 at 844 x 390, 372 at 480 x 320.
-   * - « rotate », every screen taller than wide: the base rules below, the info bar (56), the board,
-   *   the action zone and the hand, min(100vw − 32 px − insets, (100dvh − chrome − insets) /
-   *   (ratio + head room), 880 / 1.5), until « Tourne ton téléphone » of 01-38. The action zone has a
-   *   fixed height (--action) so that a longer prompt, the preview or the tray never pushes the hand
-   *   down, and the hand zone is the fan plus the room the lifted and turned cards need (--hand).
-   * In every mode the DOM order, and so the Tab order, is info, board, actions (or the 7), hand.
+   * - « rotate », every screen taller than wide: only the invitation, « Tourne ton téléphone » (or
+   *   « Élargis la fenêtre » on a computer). The game is kept behind it, mounted but not displayed
+   *   (.play.away), so no layout rule serves a screen taller than wide.
+   * In both landscape modes the DOM order, and so the Tab order, is info, board, actions (or the 7),
+   * hand.
    */
+
   /* The game's wrapper takes no box of its own; behind the invitation it is not displayed at all. */
   .play {
     display: contents;
@@ -905,52 +904,16 @@
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
     --inset-y: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-    --action: 120px;
-    --hand: 136px;
-    --chrome: calc(56px + var(--action) + var(--hand));
-    --board-size: max(
-      0px,
-      min(
-        100vw - var(--inset-x) - 2 * var(--space-md),
-        (100dvh - var(--chrome) - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
-        880px / 1.5
-      )
-    );
-    /* Its own formatting context: the outer margin of the landscape layout stays inside the page. */
+    /* Its own formatting context: the outer margin of a layout stays inside the page. */
     display: flow-root;
     min-height: 100%;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
       env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
 
-  /* Below 360 px the prompt wraps more and the tray stacks its button: the zone is a little taller. */
-  @media (max-width: 359.98px) {
-    .game {
-      --action: 128px;
-    }
-  }
-
-  /* Regular cards (88 x 124): the hand zone is 24 px taller. */
-  @media (min-width: 600px) and (min-height: 600px) {
-    .game {
-      --hand: 160px;
-    }
-  }
-
-  /* Compact and wide portrait: info bar, board, action zone, hand. */
+  /* What both landscape modes share: one grid of the screen's height; each mode places the zones. */
   .layout {
     display: grid;
-    width: 100%;
-    max-width: 880px;
-    margin: 0 auto;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "info"
-      "stage"
-      "action"
-      "hand";
-    grid-template-rows: 56px auto var(--action) auto;
-    align-content: start;
   }
 
   .info {
@@ -964,7 +927,7 @@
     justify-content: center;
   }
 
-  /* A fixed height; the prompt is centred in it, and a prompt that is longer than it scrolls here. */
+  /* The prompt is centred in the zone, and a prompt that is longer than it scrolls here. */
   .action {
     grid-area: action;
     display: flex;
@@ -977,13 +940,6 @@
 
   .hand {
     grid-area: hand;
-    padding: 0 var(--space-md);
-  }
-
-  /* The 7 panel takes the rows of the action zone and of the hand. */
-  .seven {
-    grid-row: action / hand;
-    grid-column: action;
   }
 
   /*

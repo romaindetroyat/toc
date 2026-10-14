@@ -33,10 +33,7 @@ import {
  * `document` is the visibility the Director follows: hidden while the tab is hidden or while the
  * invitation to turn the screen hides the game (plan 01-38). Default: the page's document.
  */
-export type SessionEnv = Pick<
-  DirectorDeps,
-  "animator" | "facingOf" | "commit" | "layout" | "document"
-> & {
+export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit" | "document"> & {
   /** Default: the audio engine of the app. */
   audio?: DirectorDeps["audio"];
   /**
@@ -112,7 +109,6 @@ export function createSession(
     quarterTurns: k,
     facingOf: env.facingOf,
     commit: env.commit,
-    layout: env.layout,
     document: env.document,
     getMode: paceNow,
   });

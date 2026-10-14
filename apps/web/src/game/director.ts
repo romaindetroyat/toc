@@ -2,7 +2,6 @@ import {
   captureBeat,
   type HopTimeline,
   hopTimeline,
-  type Layout,
   MOTION,
   type Mode,
   type Point,
@@ -122,8 +121,6 @@ export type DirectorDeps = {
   };
   /** Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. */
   quarterTurns: number;
-  /** The galet plateau drawn now, read at the start of every move; the portrait one when absent. */
-  layout?: () => Layout;
   /** Where the pawn's head points right now, before the event is played. */
   facingOf(pawn: PawnId): Facing;
   /** Called once an event has been played, to move the pawn's static anchor and facing. */
@@ -250,10 +247,9 @@ export function createDirector(deps: DirectorDeps): Director {
     }
   }
 
-  /** The anchors of the plateau drawn now: read once at the start of a move, used for all of it. */
+  /** The anchors of the board (the landscape galet, the only one): taken at the start of a move. */
   const anchors = (): ((place: Place) => Point) => {
-    const layout = deps.layout?.() ?? "landscape";
-    return (place) => anchorOf(place, deps.quarterTurns, layout);
+    return (place) => anchorOf(place, deps.quarterTurns);
   };
 
   /**

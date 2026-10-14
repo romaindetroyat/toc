@@ -128,28 +128,37 @@ test("table: les cavaliers regardent dans le sens de la marche, tête gardée su
   expect(scale).toBe(facing === "left" ? "scale(-1 1)" : "scale(1 1)");
 });
 
-// Knights at three sizes for the human legibility check (UI-SPEC backstop): the landscape galet is
-// as wide as the viewport (tall viewports, so the whole board and its head room fit), and a ring
-// knight is 0.95 step, about 0.0318 x the board width: about 12, 29 and 67 px wide.
+// Knights at three sizes for the human legibility check (UI-SPEC backstop), on landscape screens
+// only (« paysage obligatoire »; a screen taller than wide shows « Tourne ton téléphone »). A ring
+// knight is 0.95 step, about 0.0318 x the board width:
+// - 844 x 390, the phone held sideways (compact bar): min(844 − 108, (390 − 64) / 0.52166) ≈ 625 px,
+//   a knight about 20 px wide;
+// - 1440 x 900, a computer (bar): min(1440 − 32, (900 − 160) / 0.52166, 1600) = 1408 px, about 45 px;
+// - 3200 x 1900 with the board forced to 3200 px, past the 1600 px cap: about 102 px.
+// The shots keep their names by board width (knights-625.png, knights-1408.png, knights-3200.png).
+const HEIGHT_PER_WIDTH = 0.5 + 0.02166;
+
 test.describe("cavaliers à trois tailles", () => {
   test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project takes the shots");
 
-  for (const [width, height] of [
-    [390, 624],
-    [900, 1440],
-    [2100, 3360],
-  ] as const) {
-    test(`captures du plateau à ${width} px`, async ({ page }) => {
+  for (const { width, height, board: expected, forced } of [
+    { width: 844, height: 390, board: Math.min(844 - 108, (390 - 64) / HEIGHT_PER_WIDTH) },
+    { width: 1440, height: 900, board: Math.min(1440 - 32, (900 - 160) / HEIGHT_PER_WIDTH, 1600) },
+    { width: 3200, height: 1900, board: 3200, forced: true },
+  ]) {
+    test(`captures du plateau à ${Math.round(expected)} px`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await sit(page, "bleu");
-      await page.addStyleTag({
-        content: "html body main.game { --board-size: 100vw !important; }",
-      });
+      if (forced) {
+        await page.addStyleTag({
+          content: `html body main.game { --board-size: ${expected}px !important; }`,
+        });
+      }
       const board = page.locator("[data-board]");
       await expect
-        .poll(async () => Math.round((await board.boundingBox())?.width ?? 0))
-        .toBe(width);
-      await board.screenshot({ path: `test-results/knights-${width}.png` });
+        .poll(async () => Math.abs(((await board.boundingBox())?.width ?? 0) - expected))
+        .toBeLessThanOrEqual(2);
+      await board.screenshot({ path: `test-results/knights-${Math.round(expected)}.png` });
     });
   }
 });
