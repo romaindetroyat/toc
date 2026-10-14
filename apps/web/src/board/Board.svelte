@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-  import { bottomOf, type Layout, sceneOf } from "@toc/board";
+  import { bottomOf, SCENE } from "@toc/board";
   import type { CardId, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { game } from "../i18n/fr/game.ts";
@@ -19,19 +19,18 @@
   import FeltTable from "./FeltTable.svelte";
   import Particles from "./Particles.svelte";
 
-  // The galet board (Romain's choice of 2026-10-14: « galet partout »): the landscape plateau (2:1) on
-  // a computer, the portrait one (2:3) on a phone; `layout` names the one drawn, its scene is
-  // sceneOf(layout). k = the seat at the bottom (bleu 0, vert 1, rouge 2, jaune 3). The drawing never
-  // turns: each colour takes its side, the next seat clockwise on the left and the previous one on the
-  // right (the seating by colour of D-05, « à confirmer par Romain »), and every child is placed at
-  // anchorOf(place, k, layout) = sceneXY(place, k, layout).
+  // The galet board (Romain's choice of 2026-10-14: « galet partout »), the one plateau of the game,
+  // in landscape (2:1) on a computer and on a phone held sideways (« paysage obligatoire »); its scene
+  // is SCENE. k = the seat at the bottom (bleu 0, vert 1, rouge 2, jaune 3). The drawing never turns:
+  // each colour takes its side, the next seat clockwise on the left and the previous one on the right
+  // (the seating by colour of D-05, « à confirmer par Romain »), and every child is placed at
+  // anchorOf(place, k) = sceneXY(place, k).
   // `under` and `over` are drawn behind and in front of the knights (`children`), `hits` on top of
   // all; each receives the number of scene units per screen pixel.
   // With a render state the felt is drawn as a card table under all of them (D-08).
   // `burst` puts the particles of the party above the knights; `flights` the cards that are moving.
   let {
     k = 0,
-    layout = "portrait",
     render,
     discardTop = null,
     burst = null,
@@ -43,8 +42,6 @@
     hits,
   }: {
     k?: number;
-    /** The galet plateau drawn: « landscape » (2:1) or « portrait » (2:3). */
-    layout?: Layout;
     render?: RenderState | null;
     /** The card on top of the défausse, or null when it is empty. */
     discardTop?: CardId | null;
@@ -59,23 +56,20 @@
     hits?: Snippet<[number]>;
   } = $props();
 
-  const scene = $derived(sceneOf(layout));
+  const scene = SCENE;
   let width = $state(0);
   const px = $derived(width > 0 ? scene.width / width : 1);
 
   // The felt button covers the felt's bounding box, as percentages of the scene, and takes the felt's
-  // shape: 50 % for the ellipse, the rounded rectangle's corner radius in percentages of its box.
+  // shape, the ellipse: a 50 % radius.
   const pct = (value: number, of: number) => `${(value / of) * 100}%`;
-  const felt = $derived({
+  const felt = {
     left: pct(scene.felt.x, scene.width),
     top: pct(scene.felt.y, scene.height),
     width: pct(scene.felt.w, scene.width),
     height: pct(scene.felt.h, scene.height),
-    radius:
-      scene.feltShape.kind === "ellipse"
-        ? "50%"
-        : `${pct(scene.feltShape.r, scene.feltShape.w)} / ${pct(scene.feltShape.r, scene.feltShape.h)}`,
-  });
+    radius: "50%",
+  };
 </script>
 
 <!-- The drawing is synchronous: `loaded` is the readiness signal the specs wait for, set at once. -->
@@ -84,7 +78,6 @@
   data-board
   data-k={k}
   data-bottom={bottomOf(k)}
-  data-board-layout={layout}
   bind:clientWidth={width}
   style:--px={px}
   style:aspect-ratio={`${scene.width} / ${scene.height}`}
@@ -96,7 +89,7 @@
     viewBox={`0 0 ${scene.width} ${scene.height}`}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <BoardArt {k} {layout} />
+    <BoardArt {k} />
   </svg>
   <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
@@ -140,15 +133,14 @@
 
 <style>
   .board {
-    /* --board-size is the board's width; its height is the scene's (half of it on the landscape
-       plateau, 1.5 times it on the portrait one: the inline aspect-ratio). The head of a lifted
-       top-row knight rises --head-room of the width above the drawing (sceneOf(layout).headRoom):
-       that room stays free above the board and the svg draws outside its box. No background: the
-       oak galet and its walnut rim are part of the drawing. */
+    /* --board-size is the board's width; its height is the scene's, half of it (the inline
+       aspect-ratio). The head of a lifted top-row knight rises --head-room of the width above the
+       drawing (SCENE.headRoom): that room stays free above the board and the svg draws outside its
+       box. No background: the oak galet and its walnut rim are part of the drawing. */
     --side: var(--board-size, min(100vw, 100dvh / 1.55, 586px));
     position: relative;
     width: var(--side);
-    margin-top: calc(var(--side) * var(--head-room, 0.0354));
+    margin-top: calc(var(--side) * var(--head-room, 0.0217));
     container-type: inline-size;
     flex: none;
   }

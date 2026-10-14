@@ -1,11 +1,5 @@
 <script lang="ts">
-  import {
-    type ArtShape,
-    type ArtTransform,
-    boardArt,
-    bottomOf,
-    type Layout,
-  } from "@toc/board";
+  import { type ArtShape, type ArtTransform, boardArt, bottomOf } from "@toc/board";
   import type { Color } from "@toc/engine";
   import riderBleu from "../assets/plateau/cav-bleu.png";
   import riderJaune from "../assets/plateau/cav-jaune.png";
@@ -13,15 +7,15 @@
   import riderVert from "../assets/plateau/cav-vert.png";
   import { board as t } from "../i18n/fr/board.ts";
 
-  // The galet board (Romain's choice of 2026-10-14: « galet partout », landscape on a computer,
-  // portrait on a phone), drawn from the data of packages/board (boardArt(k, layout)). The defs and
+  // The galet board (Romain's choice of 2026-10-14: « galet partout », always in landscape, « paysage
+  // obligatoire »), drawn from the data of packages/board (boardArt(k)). The defs and
   // every shape are explicit SVG elements with bound attributes: nothing is ever built from a markup
   // string (T-01-50). k = the seat at the bottom (bleu 0, vert 1, rouge 2, jaune 3); the drawing never
-  // turns, the colours take their side (« à confirmer par Romain »). Derived once per k and layout:
+  // turns, the colours take their side (« à confirmer par Romain »). Derived once per k:
   // the animations never touch it (T-01-51). The riders are Romain's ink horseman of his original
   // board, recoloured for each colour (apps/web/src/assets/plateau, copied as they are from the
   // galet mock-up): decoration only, never a target.
-  let { k = 0, layout = "portrait" }: { k?: number; layout?: Layout } = $props();
+  let { k = 0 }: { k?: number } = $props();
 
   /** Romain's rider picture of each colour (bundled files, one href per colour). */
   const RIDERS: Record<Color, string> = {
@@ -31,7 +25,7 @@
     vert: riderVert,
   };
 
-  const art = $derived(boardArt(k, layout));
+  const art = $derived(boardArt(k));
   const bottom = $derived(bottomOf(k));
 
   /** translate, then rotate, then scale: the SVG order of ArtTransform. */
@@ -63,7 +57,7 @@
     points.map((p) => `${p[0]},${p[1]}`).join(" ");
 </script>
 
-<g data-board-art data-bottom={bottom} data-art-layout={layout} role="img" aria-label={t.alt} class="art">
+<g data-board-art data-bottom={bottom} role="img" aria-label={t.alt} class="art">
   <defs>
     {#each art.defs as def (def.id)}
       {#if def.kind === "noise"}

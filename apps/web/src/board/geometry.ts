@@ -1,19 +1,18 @@
-// Pure screen geometry for the galet plateaus (packages/board/src/scene.ts, sceneOf(layout)): where a
-// place appears on a plateau when seat k (bleu 0, vert 1, rouge 2, jaune 3) sits at the bottom. The
-// drawing never turns; the colours take their side. Knights, cards and badges stay upright; only
-// their anchors move.
+// Pure screen geometry for the galet, the game's one board, in landscape (packages/board/src/scene.ts,
+// SCENE; Romain, 2026-10-14: « paysage obligatoire »): where a place appears on it when seat k
+// (bleu 0, vert 1, rouge 2, jaune 3) sits at the bottom. The drawing never turns; the colours take
+// their side. Knights, cards and badges stay upright; only their anchors move.
 
-import { type Layout, type Point, sceneXY } from "@toc/board";
+import { type Point, sceneXY } from "@toc/board";
 import type { Place } from "@toc/engine";
 
 /**
  * Centre of the drawn cell, home slot or stable hole of a place, in scene units, for seat k at the
- * bottom, on the plateau `layout`. A knight stands on it (its feet KNIGHT.feet x its size below it);
- * the Director's hop points, the overlays and the hit targets use it too. The layout defaults to the
- * landscape galet, the game's only board (« paysage obligatoire »); 01-40 removes the parameter.
+ * bottom, on the galet. A knight stands on it (its feet KNIGHT.feet x its size below it); the
+ * Director's hop points, the overlays and the hit targets use it too.
  */
-export function anchorOf(place: Place, k: number, layout: Layout = "landscape"): Point {
-  return sceneXY(place, k, layout);
+export function anchorOf(place: Place, k: number): Point {
+  return sceneXY(place, k);
 }
 
 /** Vector from a to b. */

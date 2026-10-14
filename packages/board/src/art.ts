@@ -188,7 +188,7 @@ function crescent(x: number, y: number, r: number, dy: number): string {
 }
 
 /** The galet drawing of a plateau for seat k, in the mock-up's painting order. */
-export function boardArt(k: number, layout: Layout = "portrait"): Art {
+export function boardArt(k: number, layout: Layout = "landscape"): Art {
   const scene = sceneOf(layout);
   const s = scene.step;
   const W = scene.width;

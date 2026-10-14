@@ -12,7 +12,7 @@
     sortHand,
     teamOf,
   } from "@toc/engine";
-  import { type Layout, MOTION, sceneOf, scaleFor } from "@toc/board";
+  import { MOTION, SCENE, scaleFor } from "@toc/board";
   import {
     type EngineStatus,
     onStatus,
@@ -67,10 +67,8 @@
   const debugView = DEBUG_VIEWS.find((view) => view === hashQuery.get("debug"));
 
   // The landscape galet is the game's only board (Romain, 2026-10-14: « paysage obligatoire »), on a
-  // computer and on a phone alike; no parameter chooses another one. Board and the anchor still
-  // receive this constant until 01-40 removes the layout concept (the Director no longer takes one).
-  const boardLayout: Layout = "landscape";
-  const boardScene = sceneOf(boardLayout);
+  // computer and on a phone alike: SCENE, the one scene of packages/board, gives its ratio and its
+  // head room.
 
   // Debug builds only: the overlay is a dynamic import inside a compile-time `DEBUG` branch.
   let Geometry = $state.raw<Component | undefined>();
@@ -384,7 +382,7 @@
     render === null
       ? []
       : PAWNS.map((pawn) => {
-          const [x, y] = anchorOf(render.pawns[pawn.id] as Place, k, boardLayout);
+          const [x, y] = anchorOf(render.pawns[pawn.id] as Place, k);
           return { ...pawn, x, y };
         }).sort((a, b) => {
           const rankA = moving.indexOf(a.id);
@@ -683,8 +681,8 @@
 <main
   class="game"
   data-chrome={screen.chrome}
-  style:--head-room={boardScene.headRoom}
-  style:--board-ratio={boardScene.height / boardScene.width}
+  style:--head-room={SCENE.headRoom}
+  style:--board-ratio={SCENE.height / SCENE.width}
 >
   {#if startFailure}
     {fail(startFailure)}
@@ -713,7 +711,6 @@
         <div class="stage">
           <Board
             {k}
-            layout={boardLayout}
             {render}
             {discardTop}
             {burst}
@@ -866,8 +863,8 @@
   /*
    * The galet board (Romain's choice of 2026-10-14: « galet partout »): centred, never cropped;
    * --board-size is its width and --board-ratio its height over its width (0.5: the landscape galet
-   * is the only board, « paysage obligatoire », from sceneOf(layout)). --head-room of the width
-   * (sceneOf(layout).headRoom) stays free above the board for the head of a lifted top-row knight, so
+   * is the only board, « paysage obligatoire », from SCENE). --head-room of the width
+   * (SCENE.headRoom) stays free above the board for the head of a lifted top-row knight, so
    * the height a board takes is (board ratio + head room) x its width. Safe-area insets are
    * subtracted from both axes. The page never scrolls (FX-01).
    *
