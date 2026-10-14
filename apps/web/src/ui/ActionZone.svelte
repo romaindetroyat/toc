@@ -229,7 +229,7 @@
           </button>
         </div>
       {:else if ui.kind === "tray"}
-        <PawnTray options={ui.options} onpick={ontrayPick} onclose={ontrayClose} />
+        <PawnTray options={ui.options} {band} onpick={ontrayPick} onclose={ontrayClose} />
       {:else if ui.kind === "cardSelected" || ui.kind === "jackPick" || ui.kind === "jackTarget"}
         <!-- « Changer de carte » and « Annuler ce coup » show no key: they drop the card in one go, while
              Échap only goes back one step (UI-SPEC addendum, key hints). -->

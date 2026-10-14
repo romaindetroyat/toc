@@ -30,11 +30,21 @@
      * chips and the buttons side by side when the width allows, else on two rows.
      */
     bar?: boolean;
+    /**
+     * In the compact bar of a phone held sideways (plan 01-37), in place of the hand and the action
+     * zone: never taller than --band. From 640 px wide one row: at the left a 20 px line (the title,
+     * « Reste n », the prompt and the plan, scrolling sideways) over the step chips (scrolling
+     * sideways when narrower than 332 px), the three buttons at the right. Below 640 px the line
+     * over the plan in the 56 px row, the chips and the buttons in the 64 px row. Its tray takes the
+     * chips' place.
+     */
+    band?: boolean;
   };
 
   let {
     seven,
     bar = false,
+    band = false,
     tray,
     missed,
     onpickSteps,
@@ -81,7 +91,12 @@
 </script>
 
 <!-- 7 splitter panel (UI-SPEC, D-17): it replaces the action zone and the hand fan. -->
-<section class="panel" class:bar data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
+<section
+  class="panel"
+  class:bar
+  class:band
+  class:traying={tray !== null}
+  data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
   <!-- In the bar, one line: the title with « Reste n », then the prompt and the plan. -->
   <div class="top">
     <header class="head">
@@ -112,7 +127,7 @@
 
   {#if tray !== null}
     <div class="tray">
-      <PawnTray options={tray.options} onpick={ontrayPick} onclose={ontrayClose} />
+      <PawnTray options={tray.options} {band} onpick={ontrayPick} onclose={ontrayClose} />
     </div>
   {:else}
     <!-- In the bar, the step chips and the buttons side by side, or on two rows. -->
@@ -351,6 +366,160 @@
   .bar .buttons .btn {
     flex: none;
     padding: 0 var(--space-md);
+  }
+
+  /*
+   * The compact bar (a phone held sideways). One row of --band-row from 640 px wide: a grid whose
+   * left column holds the 20 px line over the 44 px chips, and whose right column holds the three
+   * buttons. The tray needs its 56 px chips: it takes the whole row and the line steps aside.
+   */
+  .panel.band {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 20px var(--touch);
+    align-content: center;
+    gap: 0 var(--space-sm);
+    height: 100%;
+    min-height: 0;
+    max-height: var(--band, 64px);
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .band .top {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+    height: 20px;
+  }
+
+  .band .head {
+    flex: none;
+    min-height: 0;
+    gap: var(--space-xs);
+  }
+
+  .band .mini {
+    display: none;
+  }
+
+  .band .title,
+  .band .counter {
+    flex: none;
+    font-size: var(--label-size);
+    line-height: 20px;
+  }
+
+  .band .region {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+    height: 20px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+
+  .band .prompt,
+  .band .rows {
+    line-height: 20px;
+  }
+
+  .band .rows {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .band .controls {
+    display: contents;
+  }
+
+  .band .chips {
+    grid-column: 1;
+    grid-row: 2;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .band .chips > :global(*) {
+    flex: none;
+  }
+
+  .band .buttons {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    flex-wrap: nowrap;
+    align-self: center;
+  }
+
+  /* Label 14 bold on two lines at most, 48 px high. */
+  .band .buttons .btn {
+    flex: none;
+    width: 88px;
+    padding: 0 var(--space-xs);
+  }
+
+  .band .buttons .undo {
+    width: 96px;
+  }
+
+  .band .buttons .play {
+    width: 72px;
+  }
+
+  .band.traying .top {
+    display: none;
+  }
+
+  .band .tray {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    min-width: 0;
+  }
+
+  /* Below 640 px wide: the line and the plan in the 56 px row, the chips and the buttons in the
+     64 px row under it; the tray takes the 64 px row. */
+  @media (max-width: 639.98px) {
+    .panel.band {
+      grid-template-rows: 56px var(--band-row, 64px);
+      align-content: stretch;
+    }
+
+    .band .top {
+      grid-column: 1 / -1;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: var(--space-xs);
+      height: auto;
+    }
+
+    .band .region {
+      flex: none;
+    }
+
+    .band .chips {
+      align-self: center;
+    }
+
+    .band .buttons {
+      grid-row: 2;
+    }
+
+    .band.traying .top {
+      display: flex;
+    }
+
+    .band .tray {
+      grid-row: 2;
+    }
   }
 
   @media (min-width: 360px) {

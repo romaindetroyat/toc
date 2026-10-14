@@ -1,5 +1,6 @@
 import { devices, expect, type Page, test } from "@playwright/test";
 import { zone } from "./jouer.ts";
+import { etatParam } from "./position.ts";
 
 // The compact bar (UI-SPEC addendum « Plateau galet », items 8 to 10, plan 01-37, « à confirmer par
 // Romain »): on every landscape screen below 960 x 600 (a phone held sideways, a small window) the
@@ -279,3 +280,287 @@ test.describe("sur le téléphone tenu en largeur, la barre compacte", () => {
     await expect(zone(page)).toBeVisible();
   });
 });
+
+// --- Every state of the turn in the compact bar, on one row and on two (Task 2) ---
+
+const SEED = "1234567890abcdef1234567890abcdef";
+
+/** Four hands, so the computer players have cards once the human has played. */
+const HANDS = {
+  jaune: ["2H", "3H", "5H", "6H", "8H"],
+  rouge: ["2C", "3C", "4C", "5C", "6C"],
+  vert: ["7C", "8C", "9C", "10C", "12C"],
+};
+
+const POSITIONS = {
+  /** The As: « Sortir un cheval » or « Avancer de 1 ». */
+  as: { turn: "bleu", pawns: { bleu: [{ p: 10 }, "S", "S", "S"] }, hands: { bleu: ["1S", "13H"] } },
+  /** Two knights on neighbouring cells: the « Lequel ? » tray. */
+  tray: { turn: "bleu", pawns: { bleu: [{ p: 5 }, { p: 6 }, "S", "S"] }, hands: { bleu: ["3S"] } },
+  /** Every knight in its stable and no card to leave it: a dead hand. */
+  dead: {
+    turn: "bleu",
+    dealer: "vert",
+    hands: { bleu: ["2S", "4S", "11S", "5D", "6D"], ...HANDS },
+  },
+  /** A 7 and two knights far apart on the ring (each tap picks its knight). */
+  seven: {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 5 }, { p: 40 }, "S", "S"] },
+    hands: { bleu: ["7H", "12H"] },
+  },
+  /** A Dame to play, then the computer players think and play at their natural pace. */
+  waiting: {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+    hands: { bleu: ["12H", "4S"], ...HANDS },
+  },
+};
+
+async function openPosition(page: Page, etat: unknown, extra = "&vitesse=test") {
+  await page.goto("/");
+  await page.goto(`/#/partie?etat=${etatParam(etat)}${extra}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+  await expect(page.locator("main.game")).toHaveAttribute("data-chrome", "compact-bar");
+}
+
+/**
+ * One state in the compact bar:
+ * - every button and tray chip of the band (and the gear) at least 44 x 44 and inside the screen,
+ *   the band's ones inside the band;
+ * - `primaries` amber buttons visible;
+ * - the band, from its top row to the bottom of the screen, exactly var(--band) high;
+ * - from 640 px wide, every prompt shown whole (three lines at most in the 64 px row);
+ * - no document scroll.
+ */
+async function expectState(page: Page, what: string, primaries: number) {
+  const size = page.viewportSize();
+  if (!size) throw new Error("no viewport");
+  await expect(page.locator("[data-error-screen]"), `${what}: error screen`).toHaveCount(0);
+  // Past the zone's 150 ms fade and the cards' 200 ms rise.
+  await settled(page);
+  const band = await bandPx(page);
+  expect(band, `${what}: --band`).toBe(bandHeight(size.width));
+  const top = size.height - band;
+
+  const controls = await page
+    .locator(
+      "[data-info-bar] button, [data-action-zone] button, [data-seven-panel] button, [data-tray-option]",
+    )
+    .evaluateAll((nodes) =>
+      nodes
+        .map((node) => {
+          const box = node.getBoundingClientRect();
+          return {
+            name: node.getAttribute("aria-label") ?? node.textContent?.trim() ?? "",
+            info: node.closest("[data-info-bar]") !== null,
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height,
+          };
+        })
+        .filter((box) => box.width > 0 && box.height > 0),
+    );
+  // The gear at least.
+  expect(controls.length, `${what}: no control`).toBeGreaterThanOrEqual(1);
+  for (const c of controls) {
+    expect(c.width, `${what}: « ${c.name} » under 44 px wide`).toBeGreaterThanOrEqual(44);
+    expect(c.height, `${what}: « ${c.name} » under 44 px high`).toBeGreaterThanOrEqual(44);
+    expect(c.x, `${what}: « ${c.name} » left of the screen`).toBeGreaterThanOrEqual(-0.5);
+    expect(c.x + c.width, `${what}: « ${c.name} » right of the screen`).toBeLessThanOrEqual(
+      size.width + 0.5,
+    );
+    expect(c.y, `${what}: « ${c.name} » above the screen`).toBeGreaterThanOrEqual(-0.5);
+    expect(c.y + c.height, `${what}: « ${c.name} » below the screen`).toBeLessThanOrEqual(
+      size.height + 0.5,
+    );
+    if (!c.info) {
+      expect(c.y, `${what}: « ${c.name} » above the band`).toBeGreaterThanOrEqual(top - 0.5);
+    }
+  }
+
+  const amber = await page.locator(".btn-primary").evaluateAll(
+    (nodes) =>
+      nodes.filter((node) => {
+        const box = node.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden";
+      }).length,
+  );
+  expect(amber, `${what}: primary buttons`).toBe(primaries);
+
+  // The band's boxes start at its top and end at the bottom of the screen: it never grows.
+  const boxes = await page
+    .locator("[data-action-zone], [data-hand], [data-seven-panel]")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const box = node.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      }),
+    );
+  expect(boxes.length, `${what}: no band`).toBeGreaterThan(0);
+  const first = Math.min(...boxes.map((box) => box.top));
+  const last = Math.max(...boxes.map((box) => box.bottom));
+  expect(Math.abs(first - top), `${what}: the band's top`).toBeLessThanOrEqual(1);
+  expect(last, `${what}: the band below the screen`).toBeLessThanOrEqual(size.height + 0.5);
+  const board = await boxOf(page, "[data-board]");
+  expect(board.y + board.height, `${what}: the board over the band`).toBeLessThanOrEqual(top + 0.5);
+
+  if (size.width >= 640) {
+    // Three lines at most in the 64 px row: the prompt shows whole, nothing to scroll.
+    const prompts = await page
+      // A sentence kept for screen readers only (the exchange's, in the givers' place) is not shown.
+      .locator("[data-action-zone] .text:not(.spoken)")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => ({ scroll: node.scrollHeight, client: node.clientHeight })),
+      );
+    for (const prompt of prompts) {
+      expect(prompt.scroll, `${what}: the prompt is cut`).toBeLessThanOrEqual(prompt.client + 1);
+    }
+  }
+  await expectNoScroll(page, what);
+}
+
+for (const screenSize of [PHONE, { width: 480, height: 320 }]) {
+  const name = `${screenSize.width} × ${screenSize.height}`;
+
+  test.describe(`chaque état du tour dans la barre compacte à ${name}`, () => {
+    test.skip(({ isMobile }) => isMobile, "explicit landscape viewports");
+    test.use({ viewport: screenSize });
+
+    test(`à toi, l’As ou le Roi, le choix de cheval et l’aperçu (${name})`, async ({ page }) => {
+      await openPosition(page, POSITIONS.as);
+      await expect(zone(page)).toHaveAttribute("data-state", "idle");
+      await expectState(page, "à toi de jouer", 0);
+      if (screenSize.width < 640) {
+        // Two rows: --band is 120 px and the board at least 360 px wide (≈ 372 at 480 × 320).
+        await expectBoard(page, "deux rangées", 360);
+      }
+      await page.getByRole("button", { name: "As de pique, jouable" }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+      // « Sortir un cheval » and « Avancer de 1 », the two equal choices of the As (both amber since
+      // 01-18, UI-SPEC « As/Roi mode »; the same count as the computer's bar of 01-36).
+      await expectState(page, "l’As", 2);
+      await page.getByRole("button", { name: "Avancer de 1" }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+      await expectState(page, "l’As, avancer", 0);
+      await page.locator('[data-hit="bleu0"]').click({ force: true });
+      await expect(zone(page)).toHaveAttribute("data-state", "preview");
+      await expectState(page, "l’aperçu", 1);
+      await openPosition(page, POSITIONS.as);
+      await page.getByRole("button", { name: "Roi de cœur, jouable" }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+      await expect(page.getByRole("button", { name: "Avancer de 13" })).toBeVisible();
+      await expectState(page, "le Roi", 2);
+    });
+
+    test(`le choix « Lequel ? » de deux chevaux voisins (${name})`, async ({ page }) => {
+      await openPosition(page, POSITIONS.tray);
+      await page.getByRole("button", { name: "3 de pique, jouable" }).click();
+      await page.locator('[data-hit="bleu0"]').click({ force: true });
+      await expect(zone(page)).toHaveAttribute("data-state", "tray");
+      const chips = page.locator("[data-tray-option]");
+      await expect(chips).toHaveCount(2);
+      const chip = await boxOf(page, "[data-tray-option]");
+      expect(chip.width).toBeGreaterThanOrEqual(44);
+      expect(chip.height).toBeGreaterThanOrEqual(56);
+      // The chips in the prompt's place, « Choisir un autre cheval » in the buttons' place.
+      const other = await boxOf(page, "[data-tray-close]");
+      expect(other.x).toBeGreaterThanOrEqual(chip.x + chip.width);
+      await expectState(page, "« Lequel ? »", 0);
+      await page.getByRole("button", { name: "Cheval B, bleu" }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "preview");
+      await expectState(page, "l’aperçu du cheval B", 1);
+    });
+
+    test(`l’échange, son attente et la main morte (${name})`, async ({ page }) => {
+      // The exchange at its natural pace: once the human has passed his card, the computer players
+      // are still choosing theirs.
+      await page.goto("/");
+      await page.goto(`/#/partie?graine=${SEED}`);
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      await expect(zone(page)).toHaveAttribute("data-state", "exchange");
+      const first = page.locator("[data-hand] [data-card]").first();
+      await expect(first).toBeVisible();
+      await first.click();
+      await page.getByRole("button", { name: "Passer cette carte" }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "exchangeWaiting");
+      // The givers, with their hourglass or check, in the prompt's place.
+      await expect(page.locator("[data-givers] [data-giver]")).toHaveCount(3);
+      const givers = await boxOf(page, "[data-givers]");
+      const action = await boxOf(page, "[data-action-zone]");
+      expect(givers.y).toBeGreaterThanOrEqual(action.y - 0.5);
+      expect(givers.y + givers.height).toBeLessThanOrEqual(action.y + action.height + 0.5);
+      await expectState(page, "l’attente de l’échange", 0);
+
+      // The choice, in test speed: « Passer cette carte » waits for a card.
+      await page.goto("/");
+      await page.goto(`/#/partie?graine=${SEED}&vitesse=test`);
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      await expect(zone(page)).toHaveAttribute("data-state", "exchange");
+      await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
+      await expectState(page, "l’échange", 1);
+      await page.locator("[data-hand] [data-card]").first().click();
+      await expectState(page, "l’échange, carte choisie", 1);
+
+      await openPosition(page, POSITIONS.dead);
+      await expect(zone(page)).toHaveAttribute("data-state", "deadHand");
+      await expect(page.getByRole("button", { name: "Poser mes cartes" })).toBeVisible();
+      await expectState(page, "la main morte", 1);
+    });
+
+    test(`l’attente des joueurs de l’ordinateur et « Avance rapide » (${name})`, async ({
+      page,
+    }) => {
+      await openPosition(page, POSITIONS.waiting, "");
+      await expect(zone(page)).toHaveAttribute("data-state", "idle");
+      await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+      await page.locator('[data-hit="bleu0"]').click({ force: true });
+      await page.getByRole("button", { name: "Jouer", exact: true }).click();
+      await expect(zone(page)).toHaveAttribute("data-state", "waiting");
+      const fast = page.getByRole("button", { name: "Avance rapide" });
+      await expect(fast).toBeVisible();
+      // Its icon and its label, a toggle.
+      await expect(fast).toContainText("Avance rapide");
+      await expect(fast).toHaveAttribute("aria-pressed", "false");
+      await expectState(page, "l’attente", 0);
+    });
+
+    test(`l’assistant du 7 tient dans la barre, à sa place la plus remplie (${name})`, async ({
+      page,
+    }) => {
+      await openPosition(page, POSITIONS.seven);
+      await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+      const panel = page.locator("[data-seven-panel]");
+      await expect(panel).toBeVisible();
+      await expect(page.locator("[data-hand]")).toHaveCount(0);
+      await expect(page.locator("[data-action-zone]")).toHaveCount(0);
+
+      /** The assistant takes the band, never taller than var(--band). */
+      const expectPanel = async (what: string) => {
+        const size = page.viewportSize();
+        if (!size) throw new Error("no viewport");
+        const box = await boxOf(page, "[data-seven-panel]");
+        expect(
+          Math.abs(box.height - bandHeight(size.width)),
+          `${what}: the assistant is not the band's height`,
+        ).toBeLessThanOrEqual(1);
+        await expectState(page, what, 1);
+      };
+
+      await expectPanel("le 7, rien de réparti");
+      // A knight chosen: the seven step chips, all 44 x 44 (they scroll sideways when narrower).
+      await page.locator('[data-hit="bleu0"]').click({ force: true });
+      await expect(page.locator("[data-seven-chips] [data-step]")).toHaveCount(7);
+      await expectPanel("le 7, sept pastilles");
+      await page.getByRole("button", { name: "4 pas" }).click();
+      await page.locator('[data-hit="bleu1"]').click({ force: true });
+      await expectPanel("le 7, un cheval et ses pas");
+      await page.getByRole("button", { name: "3 pas" }).click();
+      await expect(page.locator("[data-remaining]")).toHaveText("Tout est réparti.");
+      await expect(page.locator("[data-seven-row]")).toHaveCount(2);
+      await expectPanel("le 7, tout réparti");
+      await expect(page.getByRole("button", { name: "Jouer", exact: true })).toBeEnabled();
+    });
+  });
+}

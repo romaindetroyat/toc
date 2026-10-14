@@ -10,9 +10,14 @@
     options: readonly PawnId[];
     onpick: (pawn: PawnId) => void;
     onclose: () => void;
+    /**
+     * The compact bar of a phone held sideways (plan 01-37): the chips on one line in the prompt's
+     * place, « Choisir un autre cheval » in the buttons' area (--band-buttons) at the right.
+     */
+    band?: boolean;
   };
 
-  let { options, onpick, onclose }: Props = $props();
+  let { options, onpick, onclose, band = false }: Props = $props();
 
   const letters = $derived(trayLetters(options));
 </script>
@@ -20,7 +25,7 @@
 <!-- Disambiguation tray (UI-SPEC): one chip per knight, 44 wide x 56 high, with the same letter as the
      badge drawn over the knight on the board. It replaces the prompt; « Choisir un autre cheval »
      closes it and the card stays selected. -->
-<div class="tray" data-tray>
+<div class="tray" class:band data-tray>
   <ul class="chips">
     {#each options as pawn, i (pawn)}
       <li>
@@ -102,5 +107,30 @@
   .other {
     position: relative;
     margin-left: auto;
+  }
+
+  /* In the band: the same two columns as the action zone's, the chips at the left on one line, the
+     button filling the buttons' area, Label 14 bold on two lines at most. */
+  .tray.band {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--band-buttons, 184px);
+    column-gap: var(--space-sm);
+    align-items: center;
+    width: 100%;
+  }
+
+  .band .chips {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .band .other {
+    width: 100%;
+    margin-left: 0;
+    padding: 0 var(--space-sm);
+    font-size: var(--label-size);
+    line-height: 1.2;
+    text-align: center;
   }
 </style>

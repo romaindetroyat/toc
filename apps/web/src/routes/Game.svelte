@@ -667,6 +667,7 @@
           <SevenPanel
             seven={flow}
             {bar}
+            {band}
             tray={ui.kind === "tray" ? ui : null}
             {missed}
             onpickSteps={(steps) => send({ t: "pickSteps", steps })}
