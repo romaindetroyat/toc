@@ -1030,6 +1030,40 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
     expect(state.steps).toEqual(nextSteps(ctx.view, "bleu", "7H", state.plan));
   });
 
+  it("the preview marks no capture for a partner knight it passes, and one for a partner knight it stops on (G15)", () => {
+    // bleu0 on cell 5 plays the whole 7 (cells 6 to 12); rouge0 at 45 is on cell 9, at 48 on cell 12.
+    const partnerAt = (progress: number) =>
+      ctxOf(
+        build({
+          pawns: { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: progress }, "S", "S", "S"] },
+          hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+          turn: "bleu",
+        }),
+      );
+    const passing = partnerAt(45);
+    const passed = build7(passing, ["bleu0", 7]);
+    expect(passed.remaining).toBe(0);
+    expect(passed.preview.moves[0]?.path).toHaveLength(7);
+    expect(passed.preview.captures).toEqual([]);
+
+    const landing = partnerAt(48);
+    const eaten = build7(landing, ["bleu0", 7]);
+    expect(eaten.preview.captures).toEqual([
+      { by: "bleu0", victim: "rouge0", at: { z: "ring", cell: 12 }, move: 0, atStep: 6 },
+    ]);
+    // Exactly the engine's captures: the preview reads previewPlan's events and nothing else.
+    for (const ctx of [passing, landing]) {
+      const plan: SevenPlan = [{ pawn: "bleu0", steps: 7 }];
+      const played = previewPlan(ctx.view, "bleu", "7H", plan);
+      expect(played.ok).toBe(true);
+      const engineCaptures = played.ok
+        ? played.events.filter((e) => e.t === "pawnCaptured").map((e) => e.victim)
+        : [];
+      const shown = build7(ctx, ["bleu0", 7]).preview.captures.map((c) => c.victim);
+      expect(shown).toEqual(engineCaptures);
+    }
+  });
+
   it("splits the 7 over two knights, one row per micro-move, and confirms once at Reste 0", () => {
     const ctx = ctxOf(WITH_CAPTURE);
     const state = build7(ctx, ["bleu0", 3], ["bleu1", 4]);

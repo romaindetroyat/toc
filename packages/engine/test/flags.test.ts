@@ -2,7 +2,14 @@
 // (« Décisions de Romain »). Single movement path: movesForCard() and swapEnds() from moves.ts.
 
 import { describe, expect, it } from "vitest";
-import { type Action, controlledPawns, movesForCard, type PawnId, swapEnds } from "../src/index.ts";
+import {
+  type Action,
+  applyPlan,
+  controlledPawns,
+  movesForCard,
+  type PawnId,
+  swapEnds,
+} from "../src/index.ts";
 import { board, playState } from "./helpers.ts";
 
 const BLEU_HOME: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }] = [
@@ -280,5 +287,75 @@ describe("G14 ENTRY_WITHOUT_FULL_LAP", () => {
     );
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.walk?.end).toEqual({ zone: "home", slot: 0 });
+  });
+});
+
+describe("G15 SEVEN_EATS_PASSED_PARTNER", () => {
+  // bleu0 at 5 plays the whole 7 (cells 6 to 12); rouge0 at 45 is on cell 9 (passed), at 48 on cell 12.
+  const seven = (rougeAt: number, value: boolean) =>
+    applyPlan(
+      playState(
+        { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: rougeAt }, "S", "S", "S"] },
+        { bleu: ["7S"] },
+        "bleu",
+        { SEVEN_EATS_PASSED_PARTNER: value },
+      ),
+      "bleu",
+      "7S",
+      [{ pawn: "bleu0", steps: 7 }],
+    );
+
+  it("false (default): the 7 passes the partner's pawn without eating it (R-10.6)", () => {
+    const r = seven(45, false);
+    expect(r.ok && r.captured).toEqual([]);
+    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 45 });
+  });
+
+  it("true: the rule of 2026-10-13 (Q23), the passed partner's pawn is eaten", () => {
+    const r = seven(45, true);
+    expect(r.ok && r.captured).toEqual(["rouge0"]);
+  });
+
+  it("both values: a step that stops on the partner's pawn eats it (R-10.14, R-11)", () => {
+    for (const value of [false, true]) {
+      const r = seven(48, value);
+      expect(r.ok && r.captured).toEqual(["rouge0"]);
+    }
+  });
+
+  // bleu has finished and plays rouge0 (cell 46) over rouge1 (progress 14, cell 50).
+  const finished = (g7: boolean, g15: boolean) =>
+    applyPlan(
+      playState(
+        { bleu: BLEU_HOME, rouge: [{ p: 10 }, { p: 14 }, "S", "S"] },
+        { bleu: ["7S"] },
+        "bleu",
+        { FINISHED_PARTNER_PAWNS_ARE_OWN: g7, SEVEN_EATS_PASSED_PARTNER: g15 },
+      ),
+      "bleu",
+      "7S",
+      [{ pawn: "rouge0", steps: 7 }],
+    );
+
+  it("finished player, G7 true: rouge1 is own and passed (R-15.10), whatever G15", () => {
+    for (const g15 of [false, true]) {
+      const r = finished(true, g15);
+      expect(r.ok).toBe(true);
+      expect(r.ok && r.captured).toEqual([]);
+      expect(r.ok && r.pawns.rouge1).toEqual({ zone: "ring", progress: 14 });
+    }
+  });
+
+  it("finished player, G7 false: the plan is still accepted and the team is spared (G15)", () => {
+    const r = finished(false, false);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.captured).toEqual([]);
+    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 17 });
+  });
+
+  it("finished player, G7 false and SEVEN_EATS_PASSED_PARTNER true: rouge1 is eaten (old rule)", () => {
+    const r = finished(false, true);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.captured).toEqual(["rouge1"]);
   });
 });

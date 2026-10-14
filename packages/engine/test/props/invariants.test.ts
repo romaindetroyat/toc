@@ -1,8 +1,8 @@
 // Engine invariants over random games (fast-check, fixed seeds). Every seat of every game is driven by the
 // level-1 bot, which sees only its own view. After every action: the 52 cards are all accounted for, no two
 // pawns share a cell, legal actions apply, mutated actions are refused, the 7 generator and the 7 validator
-// agree, deals end, every home entry goes forward through the colour's carré 16 (G14), and the same seed
-// and actions give the same JSON.
+// agree, deals end, every home entry goes forward through the colour's carré 16 (G14), no knight of the
+// mover's team is eaten in passing (G15), and the same seed and actions give the same JSON.
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -32,6 +32,7 @@ import {
   ringIndex,
   type SevenPlan,
   sevenPlans,
+  teamOf,
   viewFor,
 } from "../../src/index.ts";
 
@@ -60,6 +61,8 @@ const seen = {
   entries: 0,
   /** Entries crossing the carré 16 below progress 70: refused by the rule of 2026-10-13, allowed by G14. */
   entriesWithoutLap: 0,
+  /** 7 actions whose path crossed a knight of the mover's partner colour that stayed on its cell (G15). */
+  teamPassedBySeven: 0,
 };
 
 function check(condition: boolean, message: string): void {
@@ -141,6 +144,61 @@ function checkEntries(before: GameState, events: readonly GameEvent[]): void {
       if (from + ringPlaces.length < RING - 2) seen.entriesWithoutLap++;
     }
   }
+}
+
+const colorOf = (id: PawnId): Color => id.slice(0, -1) as Color;
+
+/**
+ * G15: a pawnCaptured whose victim is of the capturer's team happens only on the last cell of the
+ * capturer's move (landing), never in passing. For a 7, counts in seen.teamPassedBySeven the actions
+ * where a micro-move crossed (before its last place) a ring cell held in `before` by a knight of the
+ * mover's partner colour that is still on that cell after the action.
+ */
+function checkTeamCaptures(
+  before: GameState,
+  after: GameState,
+  action: Action,
+  events: readonly GameEvent[],
+): void {
+  let mover: PawnId | null = null;
+  let pathLength = 0;
+  const crossed: { mover: PawnId; cell: number }[] = [];
+  for (const event of events) {
+    if (event.t === "pawnMoved" || event.t === "pawnEnteredHome") {
+      mover = event.pawn;
+      pathLength = event.path.length;
+      for (const place of event.path.slice(0, -1)) {
+        if (place.z === "ring") crossed.push({ mover: event.pawn, cell: place.cell });
+      }
+    } else if (event.t === "pawnExited") {
+      mover = event.pawn;
+      pathLength = 1;
+    } else if (event.t === "pawnCaptured") {
+      check(event.by === mover, `${event.victim} captured by ${event.by}, not the pawn that moved`);
+      if (teamOf(colorOf(event.victim)) === teamOf(colorOf(event.by))) {
+        check(
+          event.atStep === pathLength - 1,
+          `${event.by} ate ${event.victim} of its own team in passing (step ${event.atStep} of ${pathLength})`,
+        );
+      }
+    }
+  }
+  if (action.t !== "seven") return;
+  const passed = crossed.some(({ mover: id, cell }) =>
+    ALL_PAWNS.some((other) => {
+      const color = colorOf(other);
+      if (color !== PARTNER[colorOf(id)]) return false;
+      const was = before.pawns[other];
+      const is = after.pawns[other];
+      return (
+        was.zone === "ring" &&
+        ringIndex(color, was.progress) === cell &&
+        is.zone === "ring" &&
+        ringIndex(color, is.progress) === cell
+      );
+    }),
+  );
+  if (passed) seen.teamPassedBySeven++;
 }
 
 const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -328,6 +386,7 @@ function playChecked(
     checkCards(state);
     checkPawns(state);
     checkEntries(before, result.events);
+    checkTeamCaptures(before, state, action, result.events);
 
     // every deal ends within DEAL_CAP actions (RULE-16)
     if (state.dealsPlayed !== before.dealsPlayed) dealActions = 0;
@@ -379,6 +438,7 @@ describe("engine invariants over 200 random games driven by the level-1 bot", ()
     expect(seen.sevenPlansChecked).toBeGreaterThan(100);
     expect(seen.entries).toBeGreaterThanOrEqual(GAMES * 8);
     expect(seen.entriesWithoutLap).toBeGreaterThan(0);
+    expect(seen.teamPassedBySeven).toBeGreaterThan(0);
   });
 });
 

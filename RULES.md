@@ -145,7 +145,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 **Cas limites**
 - Le 5 est une règle maison : il ne fait pas avancer les chevaux des autres joueurs, partenaire compris (acté). Aucune autre carte ne déplace un cheval qui n’est pas à soi, sauf l’échange du Valet (G10, validé).
-- S’arrêter sur un cheval adverse ou du partenaire le mange (R-11) ; passer par-dessus ne mange rien, sauf pour le 7 (R-10).
+- S’arrêter sur un cheval adverse ou du partenaire le mange (R-11) ; passer par-dessus ne mange rien, sauf un cheval adverse dépassé par le 7 (R-10).
 - Un cheval peut passer par-dessus d’autres chevaux, les siens compris, avec les cartes ordinaires : seul un cheval protégé sur son losange est infranchissable (R-12). Cette précision n’était pas dans la recherche ; Romain l’a validée (G11).
 - Les chevaux entrent dans la maison au compte exact ; le détail est en R-13.
 
@@ -227,7 +227,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 **Cas limites**
 - Dépasser ses propres chevaux sans les manger, jouer le 7 en entier ou pas du tout : c’est acté (D-04).
-- Le 7 mange aussi le cheval du partenaire (Q23, acté par RULE-11).
+- Le 7 ne mange pas le cheval du partenaire qu’il dépasse ; il ne le mange que s’il s’arrête sur lui, sans choix possible (G15, décision du 2026-10-14, qui remplace Q23 pour le passage ; R-10.6, R-10.14).
 - Les captures se font pas à pas : un cheval mangé retourne tout de suite à son écurie et sa case est libre pour la suite du plan. L’ordre des pas compte (R-10.11).
 - Un plan est accepté ou refusé en entier : s’il est invalide, rien ne bouge (R-10.12).
 - Le même cheval peut revenir plus d’une fois dans un plan, à des moments différents ; deux pas de suite du même cheval n’en font qu’un (G5, validé).
@@ -266,10 +266,10 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-11 Prise
 
-**Règle** — Un cheval qui s’arrête sur un cheval adverse ou sur celui de son partenaire le mange : le cheval mangé retourne à son écurie et perd tous ses tours. Un cheval ne peut jamais s’arrêter sur un de ses propres chevaux. Passer par-dessus un cheval ne le mange pas, sauf avec le 7 (R-10).
+**Règle** — Un cheval qui s’arrête sur un cheval adverse ou sur celui de son partenaire le mange : le cheval mangé retourne à son écurie et perd tous ses tours. Un cheval ne peut jamais s’arrêter sur un de ses propres chevaux. Passer par-dessus un cheval ne le mange pas, sauf un cheval adverse dépassé par le 7 (R-10).
 
 **Cas limites**
-- Le cheval du partenaire se mange comme un cheval adverse (Q23, acté par RULE-11 et RULE-12).
+- Le cheval du partenaire se mange comme un cheval adverse quand on s’arrête sur lui, y compris avec le 7 (Q23, RULE-12) ; le 7 qui le dépasse ne le mange pas (G15).
 - Reculer de 4 et s’arrêter sur un cheval le mange aussi (R-08.2).
 - Sortir de l’écurie sur un losange occupé par un cheval d’une autre couleur le mange (R-06, R-12).
 - Un cheval protégé sur sa sortie ne se mange pas (R-12).
@@ -406,6 +406,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 - Pour le Valet, le cheval du partenaire est « à soi » : la cible est donc un cheval adverse (G7, validé).
 - Un joueur qui a fini garde sa place : il reçoit sa main, échange une carte avec son partenaire (Q6), et pose sa main si elle est injouable (R-14).
 - Quand le 7 rentre le dernier cheval d’un joueur au milieu du plan, les pas qui restent peuvent se jouer avec les chevaux de son partenaire (G12, validé). L’autre choix possible, jouer tout le 7 avec les seuls chevaux contrôlés au début du tour, est dessiné en R-15.9.
+- Avec le 7, un joueur qui a fini dépasse les chevaux de son partenaire sans les manger, comme ses propres chevaux : aucun cheval de l’équipe n’est mangé au passage (G15, R-15.10).
 - Si tous les chevaux du partenaire sont aussi rentrés, l’équipe a gagné (R-16).
 
 **Scénarios**
@@ -427,6 +428,8 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-15.8](docs/regles/R-15.8.webp)
 - R-15.9 — Autre choix possible : le 7 se joue entièrement avec les pions d’avant le tour (alternative de G12)
   ![R-15.9](docs/regles/R-15.9.webp)
+- R-15.10 — Quand j’ai fini, le 7 dépasse les pions de mon partenaire sans les manger
+  ![R-15.10](docs/regles/R-15.10.webp)
 
 ### R-16 Fin de partie
 

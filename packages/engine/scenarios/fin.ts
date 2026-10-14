@@ -296,6 +296,32 @@ export const r15: Scenario[] = [
     },
     flags: ["G12", "alt"],
   },
+  {
+    id: "R-15.10",
+    rule: "R-15",
+    title: "Quand j’ai fini, le 7 dépasse les pions de mon partenaire sans les manger",
+    before: {
+      pawns: {
+        bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+        rouge: [{ p: 10 }, { p: 14 }, "S", "S"],
+      },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: { t: "seven", card: "7S", plan: [{ pawn: "rouge0", steps: 7 }] },
+    expect: {
+      legal: true,
+      captured: [],
+      after: {
+        pawns: {
+          bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+          rouge: [{ p: 17 }, { p: 14 }, "S", "S"],
+        },
+      },
+      events: ["cardPlayed", "pawnMoved", "turn"],
+    },
+    flags: ["G7", "G15"],
+  },
 ];
 
 export const r16: Scenario[] = [
