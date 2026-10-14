@@ -271,6 +271,90 @@ describe("bots: think delay and view-only play (D-18)", () => {
     game.dispose();
   });
 
+  // The invitation to turn the screen (plan 01-38) holds the director's idle(): a bot whose think
+  // delay is already running waits for it again before it plays, so nothing is played behind it.
+  describe("a second wait after the think delay", () => {
+    /** Holds the fake director's idle() until the returned release is called. */
+    function holdIdle(director: FakeDirector): () => void {
+      let release: () => void = () => {};
+      director.hold = new Promise<void>((resolve) => {
+        release = () => {
+          director.hold = undefined;
+          resolve();
+        };
+      });
+      return () => release();
+    }
+
+    const playedBy = (director: FakeDirector, seat: Color) =>
+      director.events.filter(
+        (e) => (e.t === "cardPlayed" || e.t === "handDiscarded") && e.seat === seat,
+      ).length;
+
+    it("keeps a thinking bot from playing while idle() is held, then it plays once, at once", async () => {
+      const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] };
+      const { game, director } = scenarioGame(play(hands as never), "fast");
+      game.start();
+      game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+      await vi.advanceTimersByTimeAsync(10);
+      // The think delay has started: jaune is thinking when the hold comes.
+      expect(game.thinking()).toBe("jaune");
+      const release = holdIdle(director);
+      const before = game.view();
+      const calls = director.calls;
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(playedBy(director, "jaune")).toBe(0);
+      expect(director.calls).toBe(calls);
+      expect(game.view()).toEqual(before);
+
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(playedBy(director, "jaune")).toBe(1);
+      expect(sizes(game.view()).jaune).toBe(0);
+      // Only jaune: rouge has its own think delay to come.
+      expect(playedBy(director, "rouge")).toBe(0);
+      game.dispose();
+    });
+
+    it("reads the bot due after the second wait: a give made meanwhile counts", async () => {
+      const { game, director } = newGameFor("normal");
+      game.start();
+      for (let i = 0; i < 200 && game.thinking() !== "vert"; i++) {
+        await vi.advanceTimersByTimeAsync(50);
+      }
+      expect(game.thinking()).toBe("vert");
+      expect(game.view().hasGiven).toMatchObject({ jaune: true, rouge: true, vert: false });
+      const release = holdIdle(director);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(game.view().hasGiven.vert).toBe(false);
+      // The human gives while vert waits: vert's give then completes the exchange.
+      expect(game.submit({ t: "give", card: game.view().hand[0] as CardId })).toEqual({ ok: true });
+      expect(game.view().phase).toBe("exchange");
+
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(director.events.map((e) => e.t)).toContain("cardsExchanged");
+      expect(game.view().phase).toBe("play");
+      game.dispose();
+    });
+
+    it("plays nothing once released if the game was disposed meanwhile", async () => {
+      const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] };
+      const { game, director } = scenarioGame(play(hands as never), "fast");
+      game.start();
+      game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+      await vi.advanceTimersByTimeAsync(10);
+      const release = holdIdle(director);
+      await vi.advanceTimersByTimeAsync(1000);
+      game.dispose();
+      release();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(playedBy(director, "jaune")).toBe(0);
+    });
+  });
+
   it("stops when disposed", async () => {
     const { game } = newGameFor("fast");
     game.start();
