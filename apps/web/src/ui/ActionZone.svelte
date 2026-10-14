@@ -13,9 +13,11 @@
   import type { BotPlay } from "../game/session.svelte.ts";
   import type { TurnUiState } from "../game/turnUi.ts";
   import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
+  import { clavier } from "../i18n/fr/clavier.ts";
   import { botLine, game } from "../i18n/fr/game.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
+  import KeyHint from "./KeyHint.svelte";
   import PawnTray from "./PawnTray.svelte";
 
   type Props = {
@@ -187,16 +189,34 @@
         </ul>
       {:else if ui.kind === "modeChoice"}
         <div class="buttons modes">
-          <button type="button" class="btn btn-primary" data-mode="exit" onclick={onexit}>
+          <button
+            type="button"
+            class="btn btn-primary hinted"
+            data-mode="exit"
+            aria-label={game.turn.exitButton}
+            aria-keyshortcuts="S"
+            onclick={onexit}
+          >
             {game.turn.exitButton}
+            <KeyHint label={clavier.keys.exit} />
           </button>
-          <button type="button" class="btn btn-primary" data-mode="advance" onclick={onadvance}>
+          <button
+            type="button"
+            class="btn btn-primary hinted"
+            data-mode="advance"
+            aria-label={game.turn.advanceButton(rankOf(ui.card))}
+            aria-keyshortcuts="A"
+            onclick={onadvance}
+          >
             {game.turn.advanceButton(rankOf(ui.card))}
+            <KeyHint label={clavier.keys.advance} />
           </button>
         </div>
       {:else if ui.kind === "tray"}
         <PawnTray options={ui.options} onpick={ontrayPick} onclose={ontrayClose} />
       {:else if ui.kind === "cardSelected" || ui.kind === "jackPick" || ui.kind === "jackTarget"}
+        <!-- « Changer de carte » and « Annuler ce coup » show no key: they drop the card in one go, while
+             Échap only goes back one step (UI-SPEC addendum, key hints). -->
         <div class="buttons">
           <button type="button" class="btn btn-secondary" onclick={onchangeCard}>
             {game.buttons.changeCard}
@@ -207,25 +227,42 @@
           <button type="button" class="btn btn-secondary" onclick={oncancel}>
             {game.buttons.cancel}
           </button>
-          <button type="button" class="btn btn-primary play" onclick={onconfirm}>
+          <button
+            type="button"
+            class="btn btn-primary play hinted"
+            aria-label={ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
+            aria-keyshortcuts="Enter"
+            onclick={onconfirm}
+          >
             {ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
+            <KeyHint label={clavier.keys.enter} />
           </button>
         </div>
       {:else if ui.kind === "exchange"}
         <div class="buttons">
           <button
             type="button"
-            class="btn btn-primary play"
+            class="btn btn-primary play hinted"
             disabled={ui.selected === undefined}
+            aria-label={game.exchange.pass}
+            aria-keyshortcuts="Enter P"
             onclick={ongive}
           >
             {game.exchange.pass}
+            <KeyHint label={clavier.keys.enter} />
           </button>
         </div>
       {:else if ui.kind === "deadHand"}
         <div class="buttons">
-          <button type="button" class="btn btn-primary play" onclick={onpose}>
+          <button
+            type="button"
+            class="btn btn-primary play hinted"
+            aria-label={game.dead.pose}
+            aria-keyshortcuts="P Enter"
+            onclick={onpose}
+          >
             {game.dead.pose}
+            <KeyHint label={clavier.keys.pass} />
           </button>
         </div>
       {/if}
@@ -324,6 +361,11 @@
 
   .play {
     min-width: 120px;
+  }
+
+  /* A button with a key hint: the badge is placed from its edges, the button keeps its size. */
+  .hinted {
+    position: relative;
   }
 
   /* « Sortir un cheval » and « Avancer de n » side by side, each 48 px high. */

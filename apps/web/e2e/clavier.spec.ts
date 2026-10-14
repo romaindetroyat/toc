@@ -332,4 +332,210 @@ test.describe("les touches se voient sur ordinateur", () => {
     );
     expect(seen).toEqual(["1", "2", "3"]);
   });
+
+  test("les boutons d’action et le 7 montrent leur touche, sur ordinateur seulement", async ({
+    page,
+    isMobile,
+  }) => {
+    // Reached with taps, so the phone project goes through the very same states.
+    const hintsOf = (button: ReturnType<Page["getByRole"]>) => button.locator("[data-key-hint]");
+    const expectHint = async (button: ReturnType<Page["getByRole"]>, label: string) => {
+      if (isMobile) await expect(hintsOf(button)).toBeHidden();
+      else {
+        await expect(hintsOf(button)).toBeVisible();
+        await expect(hintsOf(button)).toHaveText(label);
+      }
+    };
+
+    // The Dame's preview: « Jouer » shows « Entrée », keeps its name and its size.
+    await openPosition(page, QUEEN_HAND);
+    await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+    const change = page.getByRole("button", { name: "Changer de carte" });
+    await expect(change).toBeVisible();
+    await expect(hintsOf(change)).toHaveCount(0);
+    await page.locator('[data-hit="bleu0"]').click({ force: true });
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    const play = page.getByRole("button", { name: "Jouer", exact: true });
+    await expect(play).toHaveCount(1);
+    await expectHint(play, "Entrée");
+    await expect(hintsOf(page.getByRole("button", { name: "Annuler ce coup" }))).toHaveCount(0);
+    await expect(visibleHints(page)).toHaveCount(isMobile ? 0 : 1 + 3);
+    const shown = await play.boundingBox();
+    await page.addStyleTag({ content: "[data-key-hint]{display:none!important}" });
+    await expect(hintsOf(play)).toBeHidden();
+    expect(await play.boundingBox()).toEqual(shown);
+
+    // The As/Roi question: « S » and « A ».
+    await openPosition(page, ACE);
+    await page.getByRole("button", { name: "As de pique, jouable" }).click();
+    await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+    await expectHint(page.getByRole("button", { name: "Sortir un cheval" }), "S");
+    await expectHint(page.getByRole("button", { name: "Avancer de 1" }), "A");
+
+    // The 7: « Entrée » on « Jouer », « ⌫ » on « Retirer le dernier pas », nothing on « Tout annuler ».
+    await openPosition(page, SEVEN);
+    await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+    await expect(seven(page)).toBeVisible();
+    await page.locator('[data-hit="bleu0"]').click({ force: true });
+    await page.locator('[data-step="3"]').click();
+    await expectHint(page.getByRole("button", { name: "Jouer", exact: true }), "Entrée");
+    await expectHint(page.getByRole("button", { name: "Retirer le dernier pas" }), "⌫");
+    await expect(hintsOf(page.getByRole("button", { name: "Tout annuler" }))).toHaveCount(0);
+    if (isMobile) await expect(visibleHints(page)).toHaveCount(0);
+  });
+
+  test("chaque touche affichée fait ce que fait son bouton", async ({ context, isMobile }) => {
+    test.skip(isMobile, "keyboard shortcuts are for computers");
+
+    /** What a key or a click leaves on screen, once the bots have settled. */
+    async function snapshot(page: Page) {
+      const read = () =>
+        page.evaluate(() => ({
+          state: document.querySelector("[data-action-zone]")?.getAttribute("data-state") ?? null,
+          remaining:
+            document
+              .querySelector("[data-seven-panel] [data-remaining]")
+              ?.getAttribute("data-remaining") ?? null,
+          places: [...document.querySelectorAll("[data-pawn]")]
+            .map((each) => `${each.getAttribute("data-pawn")}@${each.getAttribute("data-place")}`)
+            .sort(),
+        }));
+      let last = JSON.stringify(await read());
+      for (let i = 0; i < 100; i++) {
+        await page.waitForTimeout(150);
+        const now = JSON.stringify(await read());
+        if (now === last) return JSON.parse(now) as unknown;
+        last = now;
+      }
+      throw new Error("the screen never settled");
+    }
+
+    /**
+     * Opens `etat` (or `query`) on a fresh page, reaches the state with `keys`, then either clicks the
+     * button or presses its key, and returns what is left on screen.
+     */
+    async function run(
+      open: { etat?: unknown; query?: string; state: string },
+      keys: string[],
+      act: (page: Page) => Promise<void>,
+    ) {
+      const page = await context.newPage();
+      if (open.etat !== undefined) await openPosition(page, open.etat, open.state);
+      else {
+        await page.goto("/");
+        await page.goto(`/#/partie?${open.query}&vitesse=test`);
+        await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+        await expect(zone(page)).toHaveAttribute("data-state", open.state);
+      }
+      for (const key of keys) await page.keyboard.press(key);
+      const before = await snapshot(page);
+      await act(page);
+      const after = await snapshot(page);
+      await page.close();
+      // Both ways must do something: two no-ops would compare equal too.
+      expect(after, "the click or the key changed nothing").not.toEqual(before);
+      return after;
+    }
+
+    const button =
+      (name: string | RegExp, exact = true) =>
+      (page: Page) =>
+        page.getByRole("button", { name, exact }).click();
+    const press = (key: string) => (page: Page) => page.keyboard.press(key);
+    const tray = (page: Page) => page.locator("[data-tray-close]").click();
+    const sevenPlay = (page: Page) => page.locator("[data-seven-play]").click();
+    const sevenUndo = (page: Page) => page.locator("[data-seven-undo]").click();
+
+    const QUEEN = {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    };
+    const JACK_TRAY = {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 40 }, "S", "S", "S"] },
+      hands: { bleu: ["11H"] },
+    };
+    const DEAD = { turn: "bleu", pawns: { bleu: ["S", "S", "S", "S"] }, hands: { bleu: ["2S"] } };
+    const EXCHANGE = { query: `graine=1234567890abcdef1234567890abcdef`, state: "exchange" };
+
+    const cases: {
+      name: string;
+      open: { etat?: unknown; query?: string; state: string };
+      keys: string[];
+      click: (page: Page) => Promise<void>;
+      key: string;
+    }[] = [
+      {
+        name: "« Jouer » / Entrée",
+        open: { etat: QUEEN, state: "idle" },
+        keys: ["1", "a"],
+        click: button("Jouer"),
+        key: "Enter",
+      },
+      {
+        name: "« Sortir un cheval » / S",
+        open: { etat: ACE, state: "idle" },
+        keys: ["1"],
+        click: button("Sortir un cheval"),
+        key: "s",
+      },
+      {
+        name: "« Avancer de 1 » / A",
+        open: { etat: ACE, state: "idle" },
+        keys: ["1"],
+        click: button("Avancer de 1"),
+        key: "a",
+      },
+      {
+        name: "« Passer cette carte » / Entrée",
+        open: EXCHANGE,
+        keys: ["1"],
+        click: button("Passer cette carte"),
+        key: "Enter",
+      },
+      {
+        name: "« Passer cette carte » / P",
+        open: EXCHANGE,
+        keys: ["1"],
+        click: button("Passer cette carte"),
+        key: "p",
+      },
+      {
+        name: "« Poser mes cartes » / P",
+        open: { etat: DEAD, state: "deadHand" },
+        keys: [],
+        click: button("Poser mes cartes"),
+        key: "p",
+      },
+      {
+        name: "« Choisir un autre cheval » / Échap",
+        open: { etat: JACK_TRAY, state: "idle" },
+        keys: ["1", "a", "a"],
+        click: tray,
+        key: "Escape",
+      },
+      {
+        name: "le 7, « Jouer » / Entrée",
+        open: { etat: SEVEN, state: "idle" },
+        keys: ["1", "a", "3", "b", "4"],
+        click: sevenPlay,
+        key: "Enter",
+      },
+      {
+        name: "le 7, « Retirer le dernier pas » / ⌫",
+        open: { etat: SEVEN, state: "idle" },
+        keys: ["1", "a", "3"],
+        click: sevenUndo,
+        key: "Backspace",
+      },
+    ];
+
+    for (const each of cases) {
+      const clicked = await run(each.open, each.keys, each.click);
+      const pressed = await run(each.open, each.keys, press(each.key));
+      expect(pressed, each.name).toEqual(clicked);
+    }
+  });
 });

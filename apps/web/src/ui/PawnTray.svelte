@@ -1,7 +1,9 @@
 <script lang="ts">
   import { type PawnId, pawnColor } from "@toc/engine";
   import { trayLetters } from "../game/turnUi.ts";
+  import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
+  import KeyHint from "./KeyHint.svelte";
 
   type Props = {
     /** 2 to 4 knights too close to tell apart on the board. */
@@ -37,8 +39,17 @@
       </li>
     {/each}
   </ul>
-  <button type="button" class="btn btn-secondary other" data-tray-close onclick={onclose}>
+  <!-- Échap does what this button does: closeTray and back both return to the tray's flow. -->
+  <button
+    type="button"
+    class="btn btn-secondary other"
+    data-tray-close
+    aria-label={game.buttons.otherHorse}
+    aria-keyshortcuts="Escape"
+    onclick={onclose}
+  >
     {game.buttons.otherHorse}
+    <KeyHint label={clavier.keys.escape} />
   </button>
 </div>
 
@@ -89,6 +100,7 @@
   }
 
   .other {
+    position: relative;
     margin-left: auto;
   }
 </style>

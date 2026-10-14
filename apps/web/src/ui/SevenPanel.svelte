@@ -3,7 +3,9 @@
   import { cardFace } from "../cards/faces.ts";
   import { knightLetter, type TurnUiState } from "../game/turnUi.ts";
   import { cardName } from "../i18n/fr/cards.ts";
+  import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
+  import KeyHint from "./KeyHint.svelte";
   import PawnTray from "./PawnTray.svelte";
   import StepChip from "./StepChip.svelte";
 
@@ -111,9 +113,12 @@
         class="btn btn-secondary undo"
         data-seven-undo
         disabled={seven.plan.length === 0}
+        aria-label={game.seven.undo}
+        aria-keyshortcuts="Backspace"
         onclick={onundo}
       >
         {game.seven.undo}
+        <KeyHint label={clavier.keys.backspace} />
       </button>
       <button type="button" class="btn btn-secondary reset" data-seven-reset onclick={oncancelAll}>
         {game.seven.reset}
@@ -123,9 +128,12 @@
         class="btn btn-primary play"
         data-seven-play
         disabled={!done}
+        aria-label={game.seven.play}
+        aria-keyshortcuts="Enter"
         onclick={onconfirm}
       >
         {game.seven.play}
+        <KeyHint label={clavier.keys.enter} />
       </button>
     </div>
   {/if}
@@ -233,6 +241,7 @@
 
   /* Long labels wrap inside their 48 px button; the row stacks when they do not fit side by side. */
   .buttons .btn {
+    position: relative;
     flex: 1 1 76px;
     min-width: 0;
     padding: 0 var(--space-xs);
