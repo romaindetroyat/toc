@@ -4,23 +4,24 @@ import {
   type Mode,
   type Point,
   REDUCED,
-  rotatePoint,
   SCENE,
   type ScreenSide,
   scaleFor,
   sceneSideOf,
   seatCard,
-  TALON,
 } from "@toc/board";
 import { type CardId, COLORS, type Color, PARTNER } from "@toc/engine";
 import { animateNow } from "./frameClock.ts";
 
 // The cards that move over the board: the deal, a played card, the exchange and a dead hand laid on
 // the felt. Each motion is a list of FlightSpec, one per card: where it goes (in the scene units of
-// board C+, whose drawing never turns: the human's seat is at the bottom), how it is turned, when it
-// starts and how long it takes. The specs are
-// pure data: CardFlights.svelte draws a card per spec and runs it with the Web Animations API, on
-// transform and opacity only. Durations and staggers come from MOTION and REDUCED (motion.ts).
+// the landscape galet, the game's only board, whose drawing never turns: the human's seat is at the
+// bottom), how it is turned, when it starts and how long it takes. The felt is the galet's green
+// ellipse: each seat's card lies on it in front of its seat and faces it, the talon and the défausse
+// lie on either side of its centre (« à confirmer par Romain », item 4 of the « Plateau galet »
+// addendum). The specs are pure data: CardFlights.svelte draws a card per spec and runs it with the
+// Web Animations API through animateNow() (frameClock.ts), on transform and opacity only. Durations
+// and staggers come from MOTION and REDUCED (motion.ts).
 
 /** One card on its way: `card` is null for a face-down card. */
 export type FlightSpec = {
@@ -58,17 +59,20 @@ export function tiltOf(card: CardId): number {
 /** The edge of the board in front of a seat, where its hand is: below the board for the human. */
 export const seatEdge = (seat: Color, k: number): Point => EDGE[sceneSideOf(seat, k)];
 
-/** The felt slot of a seat's last card (board C+: in front of its seat, inside the felt). */
+/** The felt place of a seat's last card: in front of its seat, inside the galet's ellipse. */
 export const seatSlot = (seat: Color, k: number): Point => seatCard(seat, k).at;
 
 /**
  * How a card lying in front of a seat is turned: it faces its seat (0 at the bottom, 90 on the left,
- * 180 at the top, 270 on the right), as on the approved C+ mock-up (« à confirmer par Romain »).
+ * 180 at the top, 270 on the right), as on the galet mock-up (« à confirmer par Romain »).
  */
 export const seatAngle = (seat: Color, k: number): number => seatCard(seat, k).angle;
 
-/** The talon. */
-export const talonAt = (k: number): Point => rotatePoint(TALON, k);
+/**
+ * The talon: left of the felt's centre on every seat's screen (the drawing never turns, so `k` only
+ * keeps the signature of the other places).
+ */
+export const talonAt = (_k: number): Point => SCENE.talon;
 
 /**
  * Where the `count` cards of a dead hand lie in front of their seat: a row for the seats at the top

@@ -222,6 +222,30 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   await expect(knight).toHaveAttribute("data-place", "ring:3");
   await expect(play).toBeVisible();
 
+  // The felt of the galet: the talon left of its centre, the défausse (or its outline) right of it,
+  // both inside the « Sur le tapis » button; the amber ring of the human's turn surrounds his card
+  // place, in the felt's lower half on its vertical axis.
+  const feltButton = await page.locator("[data-felt-button]").boundingBox();
+  const talonBox = await page.locator("[data-talon]").boundingBox();
+  const discardBox = await page.locator("[data-discard]").boundingBox();
+  const ringBox = await page.locator('[data-turn-ring="bleu"]').boundingBox();
+  if (!feltButton || !talonBox || !discardBox || !ringBox) {
+    throw new Error("no box for the felt, the talon, the défausse or the turn ring");
+  }
+  const feltMidX = feltButton.x + feltButton.width / 2;
+  const feltMidY = feltButton.y + feltButton.height / 2;
+  for (const pile of [talonBox, discardBox]) {
+    expect(pile.x).toBeGreaterThanOrEqual(feltButton.x);
+    expect(pile.y).toBeGreaterThanOrEqual(feltButton.y);
+    expect(pile.x + pile.width).toBeLessThanOrEqual(feltButton.x + feltButton.width);
+    expect(pile.y + pile.height).toBeLessThanOrEqual(feltButton.y + feltButton.height);
+  }
+  expect(talonBox.x + talonBox.width / 2).toBeLessThan(feltMidX);
+  expect(discardBox.x + discardBox.width / 2).toBeGreaterThan(feltMidX);
+  expect(Math.abs(ringBox.x + ringBox.width / 2 - feltMidX)).toBeLessThanOrEqual(2);
+  expect(ringBox.y + ringBox.height / 2).toBeGreaterThan(feltMidY);
+  expect(ringBox.y + ringBox.height / 2).toBeLessThanOrEqual(feltButton.y + feltButton.height);
+
   // From before « Jouer », every animation frame: the knight hops through the landscape cells.
   await recordHop(page);
   await play.click();
@@ -253,6 +277,13 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   const feltBox = await page.getByRole("button", { name: "Sur le tapis" }).boundingBox();
   if (!cardBox || !feltBox) throw new Error("no box for the played card or the felt");
   expect(cardBox.y + cardBox.height / 2).toBeGreaterThan(feltBox.y + feltBox.height / 2);
+  // It lies where the turn ring stood before « Jouer »: the human's card place.
+  const cardX = cardBox.x + cardBox.width / 2;
+  const cardY = cardBox.y + cardBox.height / 2;
+  expect(cardX).toBeGreaterThanOrEqual(ringBox.x);
+  expect(cardX).toBeLessThanOrEqual(ringBox.x + ringBox.width);
+  expect(cardY).toBeGreaterThanOrEqual(ringBox.y);
+  expect(cardY).toBeLessThanOrEqual(ringBox.y + ringBox.height);
 
   const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
   expect(scheduled).toEqual(CLOPS);

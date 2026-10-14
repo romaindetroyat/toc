@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { KNIGHT, knightScale, rotatePoint, stableCentre } from "@toc/board";
+  import { KNIGHT, knightScale, SCENE, seatCard, stableCentre } from "@toc/board";
   import { type Color, type PawnId, pawnColor, type Place, type RenderState } from "@toc/engine";
   import type { Point } from "@toc/board";
   import { knightLetter, type TurnUiState, trayLetters } from "../game/turnUi.ts";
@@ -43,13 +43,10 @@
   const CAPTURE_UP = KNIGHT.head + 10;
   const LETTER_UP = KNIGHT.head + 22;
 
-  /** Last card slot of each seat on the felt (UI-SPEC Tapis), unrotated board units. */
-  const SLOT: Record<Color, Point> = {
-    bleu: [1280, 1570],
-    jaune: [990, 1280],
-    rouge: [1280, 990],
-    vert: [1570, 1280],
-  };
+  /** The ring around the active seat's card place: the galet card plus this margin on every side. */
+  const RING_MARGIN = 10;
+  const RING_W = SCENE.card.w + 2 * RING_MARGIN;
+  const RING_H = SCENE.card.h + 2 * RING_MARGIN;
 
   const still = $derived(settings.reduceMotion);
   const preview = $derived(ui.kind === "preview" ? ui : null);
@@ -192,10 +189,11 @@
       : [],
   );
 
-  // The seat whose turn it is: a glow on its stable and a ring around its felt slot.
+  // The seat whose turn it is: a glow on its stable and a ring around its card place on the felt,
+  // turned like the card (it faces its seat).
   const turnSeat = $derived(render.phase === "play" ? render.turn : null);
   const glow = $derived(turnSeat === null ? null : stableCentre(turnSeat, k));
-  const seatSlot = $derived(turnSeat === null ? null : rotatePoint(SLOT[turnSeat], k));
+  const seatPlace = $derived(turnSeat === null ? null : seatCard(turnSeat, k));
 </script>
 
 <!-- A ghost knight drawn like Pawn: the sprite at its feet (KNIGHT.feet x size below the anchor) at
@@ -237,16 +235,18 @@
     {#if glow !== null && turnSeat !== null}
       <circle data-active-seat={turnSeat} cx={glow[0]} cy={glow[1]} r="260" fill="url(#seat-glow)" />
     {/if}
-    {#if seatSlot !== null}
+    {#if seatPlace !== null && turnSeat !== null}
       <rect
-        x={seatSlot[0] - 80}
-        y={seatSlot[1] - 112}
-        width="160"
-        height="224"
-        rx="12"
+        data-turn-ring={turnSeat}
+        x={seatPlace.at[0] - RING_W / 2}
+        y={seatPlace.at[1] - RING_H / 2}
+        width={RING_W}
+        height={RING_H}
+        rx="16"
         fill="none"
         stroke={AMBER}
         stroke-width={4 * px}
+        transform={`rotate(${seatPlace.angle} ${seatPlace.at[0]} ${seatPlace.at[1]})`}
       />
     {/if}
 

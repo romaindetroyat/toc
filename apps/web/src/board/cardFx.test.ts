@@ -11,6 +11,7 @@ import {
   seatAngle,
   seatEdge,
   seatSlot,
+  talonAt,
   tiltOf,
 } from "./cardFx.ts";
 
@@ -35,14 +36,17 @@ const rotation = (transform: string): number => {
   return Number(found?.[1]);
 };
 const KS = [0, 1, 2, 3] as const;
-const { felt } = SCENE;
-const insideFelt = ([x, y]: readonly [number, number]): boolean =>
-  x >= felt.x && x <= felt.x + felt.w && y >= felt.y && y <= felt.y + felt.h;
+const { feltShape } = SCENE;
+/** Inside the galet's green ellipse (the landscape felt). */
+const insideFelt = ([x, y]: readonly [number, number]): boolean => {
+  if (feltShape.kind !== "ellipse") throw new Error("the landscape galet's felt is an ellipse");
+  return ((x - feltShape.cx) / feltShape.rx) ** 2 + ((y - feltShape.cy) / feltShape.ry) ** 2 <= 1;
+};
 /** The seat that sits on the left of the human (the next seat clockwise) and on his right. */
 const previousColor = (color: Color): Color => PARTNER[nextColor(color)];
 
 describe("seatSlot and seatEdge on the landscape galet", () => {
-  it("a seat's slot is its galet card place, inside the felt, for every k", () => {
+  it("a seat's slot is its galet card place, inside the felt's ellipse, for every k", () => {
     for (const k of KS) {
       for (const seat of COLORS) {
         expect(seatSlot(seat, k)).toEqual(seatCard(seat, k).at);
@@ -62,6 +66,15 @@ describe("seatSlot and seatEdge on the landscape galet", () => {
     near(seatSlot(PARTNER[human], 0), [1600, 685.4]);
     near(seatSlot(nextColor(human), 0), [1220, 800]);
     near(seatSlot(previousColor(human), 0), [1980, 800]);
+  });
+
+  it("the talon lies left of the felt's centre, at SCENE.talon, for every k", () => {
+    for (const k of KS) {
+      expect(talonAt(k)).toEqual(SCENE.talon);
+      expect(insideFelt(talonAt(k))).toBe(true);
+    }
+    expect(SCENE.talon[0]).toBeLessThan(SCENE.centre[0]);
+    expect(SCENE.defausse[0]).toBeGreaterThan(SCENE.centre[0]);
   });
 
   it("a seat's edge is 120 units past the board's edge on its side, on the axis through the centre", () => {
@@ -117,11 +130,14 @@ describe("dealFlights", () => {
     expect(flights.every((f) => f.durationMs === 150 && f.delayMs === 0)).toBe(true);
   });
 
-  it("starts at the talon, turned with the board", () => {
-    const [first] = dealFlights(SEATS, 1, "normal");
-    const start = translation(((first as FlightSpec).keyframes[0] as Keyframe).transform as string);
-    // k = 1: (1180, 1280) -> (2560 - 1280, 1180).
-    expect(start).toEqual([1280, 1180]);
+  it("starts at the talon, beside the felt's centre, for every k", () => {
+    for (const k of KS) {
+      const [first] = dealFlights(SEATS, k, "normal");
+      const start = translation(
+        ((first as FlightSpec).keyframes[0] as Keyframe).transform as string,
+      );
+      expect(start).toEqual(SCENE.talon);
+    }
   });
 });
 

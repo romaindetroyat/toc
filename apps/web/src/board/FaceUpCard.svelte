@@ -17,14 +17,17 @@
     px: number;
     /** Marks the card as lying on the felt (a card in flight is not part of the felt). */
     felt?: boolean;
+    /** A fraction of the galet's card: 1 on a seat's place, SCENE.pile on the défausse. */
+    scale?: number;
   };
 
-  let { card, x = 0, y = 0, tilt = 0, angle = 0, px, felt = true }: Props = $props();
+  let { card, x = 0, y = 0, tilt = 0, angle = 0, px, felt = true, scale = 1 }: Props = $props();
 
   const WALNUT = "#2B1D12";
-  const { w: CW, h: CH } = SCENE.card;
-  /** The face was drawn for a 160-unit card: its corners and pip scale with the C+ card. */
-  const U = CW / 160;
+  const CW = $derived(SCENE.card.w * scale);
+  const CH = $derived(SCENE.card.h * scale);
+  /** The face was drawn for a 160-unit card: its corners, pip and offsets scale with the galet card. */
+  const U = $derived(CW / 160);
   const face = $derived(cardFace(card));
 </script>
 
@@ -49,7 +52,7 @@
   </text>
 {/snippet}
 
-<!-- A card lying face up, facing its seat (angle) and tilted a few degrees (D-08, board C+). -->
+<!-- A card lying face up on the galet's felt, facing its seat (angle) and tilted a few degrees (D-08). -->
 <g transform={`translate(${x} ${y}) rotate(${angle + tilt})`} data-felt-card={felt ? card : undefined}>
   <title>{cardName(card)}</title>
   <rect
@@ -57,7 +60,7 @@
     y={-CH / 2}
     width={CW}
     height={CH}
-    rx="12"
+    rx={12 * U}
     fill="#FFFDF6"
     stroke={WALNUT}
     stroke-opacity="0.45"

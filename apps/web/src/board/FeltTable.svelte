@@ -1,12 +1,11 @@
 <script lang="ts">
   import {
     CARD_SIZE,
-    DEFAUSSE,
     LAST_CARD_SLOT,
     type Point,
     rotatePoint,
+    SCENE,
     seatCard,
-    TALON,
   } from "@toc/board";
   import { type CardId, COLORS, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
@@ -32,6 +31,15 @@
 
   const at = (point: Point): Point => rotatePoint(point, k);
 
+  /** The talon and the défausse: on either side of the felt's centre, at SCENE.pile of a card. */
+  const PW = SCENE.card.w * SCENE.pile;
+  const PH = SCENE.card.h * SCENE.pile;
+  const PR = 12 * (PW / 160);
+  /** How far each thickness level of the talon stands out, up and to the left. */
+  const DEPTH = 7 * (PW / 160);
+  const talon = SCENE.talon;
+  const discard = SCENE.defausse;
+
   /** The talon stack: three thickness levels by count, nothing when it is empty. */
   const layers = $derived(
     render.talonSize > 26 ? 3 : render.talonSize > 8 ? 2 : render.talonSize > 0 ? 1 : 0,
@@ -56,22 +64,20 @@
   );
 
   const dealerAt = $derived(at(LAST_CARD_SLOT[render.dealer]));
-  const talon = at(TALON);
-  const discard = at(DEFAUSSE);
 </script>
 
 <!-- The felt as a card table (UI-SPEC « Tapis »): the cards are upright on the screen, only their
      positions follow the board's rotation. Public information only (T-01-30). -->
 <g role="group" aria-label={game.tapis.title} data-felt pointer-events="none">
-  <!-- Talon: a face-down stack. -->
+  <!-- Talon: a face-down stack, left of the felt's centre. -->
   <g data-talon={render.talonSize} aria-label={game.tapis.talon(render.talonSize)}>
     {#if layers === 0}
       <rect
-        x={talon[0] - CW / 2}
-        y={talon[1] - CH / 2}
-        width={CW}
-        height={CH}
-        rx="12"
+        x={talon[0] - PW / 2}
+        y={talon[1] - PH / 2}
+        width={PW}
+        height={PH}
+        rx={PR}
         fill="none"
         stroke={CREAM}
         stroke-opacity="0.5"
@@ -81,30 +87,30 @@
     {:else}
       {#each Array.from({ length: layers - 1 }, (_, i) => layers - 1 - i) as depth (depth)}
         <rect
-          x={talon[0] - CW / 2 - depth * 7}
-          y={talon[1] - CH / 2 - depth * 7}
-          width={CW}
-          height={CH}
-          rx="12"
+          x={talon[0] - PW / 2 - depth * DEPTH}
+          y={talon[1] - PH / 2 - depth * DEPTH}
+          width={PW}
+          height={PH}
+          rx={PR}
           fill="#D8C6B0"
           stroke={WALNUT}
           stroke-opacity="0.6"
           stroke-width={px}
         />
       {/each}
-      <CardBack x={talon[0]} y={talon[1]} {px} />
+      <CardBack x={talon[0]} y={talon[1]} w={PW} h={PH} {px} />
     {/if}
   </g>
 
-  <!-- Défausse: its top card face up, or an empty outline. -->
+  <!-- Défausse: its top card face up, or an empty outline, right of the felt's centre. -->
   <g data-discard={render.discardSize} aria-label={game.tapis.discard(render.discardSize)}>
     {#if discardTop === null}
       <rect
-        x={discard[0] - CW / 2}
-        y={discard[1] - CH / 2}
-        width={CW}
-        height={CH}
-        rx="12"
+        x={discard[0] - PW / 2}
+        y={discard[1] - PH / 2}
+        width={PW}
+        height={PH}
+        rx={PR}
         fill="none"
         stroke={CREAM}
         stroke-opacity="0.5"
@@ -112,7 +118,14 @@
         stroke-dasharray={`${6 * px} ${4 * px}`}
       />
     {:else}
-      <FaceUpCard card={discardTop} x={discard[0]} y={discard[1]} tilt={tiltOf(discardTop)} {px} />
+      <FaceUpCard
+        card={discardTop}
+        x={discard[0]}
+        y={discard[1]}
+        tilt={tiltOf(discardTop)}
+        scale={SCENE.pile}
+        {px}
+      />
     {/if}
   </g>
 
