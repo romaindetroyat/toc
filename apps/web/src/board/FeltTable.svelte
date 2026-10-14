@@ -1,12 +1,5 @@
 <script lang="ts">
-  import {
-    CARD_SIZE,
-    LAST_CARD_SLOT,
-    type Point,
-    rotatePoint,
-    SCENE,
-    seatCard,
-  } from "@toc/board";
+  import { type Point, SCENE, seatCard } from "@toc/board";
   import { type CardId, COLORS, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
   import CardBack from "../ui/CardBack.svelte";
@@ -17,7 +10,7 @@
     render: RenderState;
     /** The card on top of the défausse (public: every discarded card was played face up), or null. */
     discardTop: CardId | null;
-    /** Clockwise quarter turns of the board toward the human. */
+    /** The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet. */
     k: number;
     /** Board units per screen pixel. */
     px: number;
@@ -27,9 +20,7 @@
 
   const WALNUT = "#2B1D12";
   const CREAM = "#FFF8E1";
-  const { w: CW, h: CH } = CARD_SIZE;
-
-  const at = (point: Point): Point => rotatePoint(point, k);
+  const { w: CW, h: CH } = SCENE.card;
 
   /** The talon and the défausse: on either side of the felt's centre, at SCENE.pile of a card. */
   const PW = SCENE.card.w * SCENE.pile;
@@ -59,15 +50,26 @@
       const cards = render.posed[color];
       if (cards.length === 0) return [];
       const places = posedSlots(color, cards.length, k);
-      return [{ color, cards: cards.map((card, i) => ({ card, at: places[i] as Point })) }];
+      const { angle } = seatCard(color, k);
+      return [{ color, angle, cards: cards.map((card, i) => ({ card, at: places[i] as Point })) }];
     }),
   );
 
-  const dealerAt = $derived(at(LAST_CARD_SLOT[render.dealer]));
+  /**
+   * The « D » disc: at the top-right corner, on the screen, of the dealer's card place (a card box of
+   * w x h for the seats at the bottom and the top, h x w for the side seats, which it faces).
+   */
+  const dealerAt = $derived.by((): Point => {
+    const { at, angle } = seatCard(render.dealer, k);
+    const [bw, bh] = angle % 180 === 0 ? [CW, CH] : [CH, CW];
+    return [at[0] + bw / 2, at[1] - bh / 2];
+  });
 </script>
 
-<!-- The felt as a card table (UI-SPEC « Tapis »): the cards are upright on the screen, only their
-     positions follow the board's rotation. Public information only (T-01-30). -->
+<!-- The galet's felt as a card table (UI-SPEC « Plateau galet », item 4): each seat's cards lie on
+     the green ellipse in front of it and face it, the talon and the défausse on either side of the
+     centre. The drawing never turns: the colours take their sides. Public information only
+     (T-01-30, T-01-57). -->
 <g role="group" aria-label={game.tapis.title} data-felt pointer-events="none">
   <!-- Talon: a face-down stack, left of the felt's centre. -->
   <g data-talon={render.talonSize} aria-label={game.tapis.talon(render.talonSize)}>
@@ -145,7 +147,7 @@
     {/if}
   {/each}
 
-  <!-- Dead hands, over the last-card slot. -->
+  <!-- Dead hands, fanned along their seat's side over its last card, facing it. -->
   {#each posed as hand (hand.color)}
     <g data-felt-posed={hand.color}>
       {#each hand.cards as item (item.card)}
@@ -153,6 +155,7 @@
           card={item.card}
           x={item.at[0]}
           y={item.at[1]}
+          angle={hand.angle}
           tilt={tiltOf(item.card)}
           {px}
         />
@@ -160,13 +163,13 @@
     </g>
   {/each}
 
-  <!-- The dealer disc « D », at the top-right corner of the dealer's slot. -->
+  <!-- The dealer disc « D », at the top-right corner (on the screen) of the dealer's card place. -->
   <g data-dealer={render.dealer}>
-    <circle cx={dealerAt[0] + CW / 2} cy={dealerAt[1] - CH / 2} r={12 * px} fill={CREAM} />
+    <circle cx={dealerAt[0]} cy={dealerAt[1]} r={12 * px} fill={CREAM} />
     <text
       class="disc"
-      x={dealerAt[0] + CW / 2}
-      y={dealerAt[1] - CH / 2}
+      x={dealerAt[0]}
+      y={dealerAt[1]}
       font-size={15 * px}
       text-anchor="middle"
       dominant-baseline="central"

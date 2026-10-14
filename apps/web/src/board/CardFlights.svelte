@@ -6,12 +6,13 @@
 </script>
 
 <script lang="ts">
+  import { SCENE } from "@toc/board";
   import CardBack from "../ui/CardBack.svelte";
   import { cancelFlight, runFlight } from "./cardFx.ts";
   import FaceUpCard from "./FaceUpCard.svelte";
 
-  // The cards that move over the board (D-23): the deal, a played card, the exchange, a dead hand
-  // laid down. Each is a <g> at the origin of the board's SVG, moved by one Web Animation on
+  // The cards that move over the galet (D-23): the deal, a played card, the exchange, a dead hand
+  // laid down, all at the galet's card size (SCENE.card) like the cards lying on its felt. Each is a <g> at the origin of the board's SVG, moved by one Web Animation on
   // transform and opacity only. The cards hold their last pose until the screen takes them away, in
   // the same task in which the felt shows them. Public information only: a card in flight is either a
   // back or a card that was played face up.
@@ -39,7 +40,7 @@
   {#each flights as flight (flight.id)}
     <g data-flight={flight.spec.kind} data-flight-card={flight.spec.card ?? "back"} use:fly={flight}>
       {#if flight.spec.card === null}
-        <CardBack x={0} y={0} {px} plain />
+        <CardBack x={0} y={0} w={SCENE.card.w} h={SCENE.card.h} {px} plain />
       {:else}
         <FaceUpCard card={flight.spec.card} {px} felt={false} />
       {/if}

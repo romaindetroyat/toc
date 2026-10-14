@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import {
   dealFlights,
   exchangeFlights,
-  type FlightSpec,
   layFlights,
   playFlight,
   posedSlots,

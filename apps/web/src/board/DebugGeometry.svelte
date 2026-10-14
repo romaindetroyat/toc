@@ -3,12 +3,13 @@
   import { COLORS, type Color, ENTRY, EXIT, type PawnIndex } from "@toc/engine";
   import { anchorOf } from "./geometry.ts";
 
-  // Same k as Board.svelte: every point is drawn at its C+ scene anchor for that seat.
+  // Same k as Board.svelte: every point is drawn at its galet scene anchor for that seat.
   let { k = 0 }: { k?: number } = $props();
 
-  // Debug-only overlay (plan 01-02, redrawn on board C+ in 01-31): the 72 ring centres with their
-  // index, the stable and home slots, the exits and carrés, the felt, each seat's card slot
-  // (turned to face its seat), the talon and the défausse, drawn over the board.
+  // Debug-only overlay (plan 01-02, redrawn on the landscape galet in 01-35): the 72 ring centres
+  // with their index, the stable and home slots, the exits and carrés, the felt (its ellipse and its
+  // bounding box), each seat's card place (turned to face its seat), the talon and the défausse (at
+  // SCENE.pile of a card), drawn over the board.
   // Sizes are in screen pixels through --px (board units per screen pixel, set by Board.svelte).
   const FILL: Record<Color, string> = {
     bleu: "#0100d6",
@@ -33,6 +34,8 @@
   const ring = $derived(RING.map((cell) => anchorOf({ z: "ring", cell }, k)));
   const card = SCENE.card;
   const felt = SCENE.felt;
+  const shape = SCENE.feltShape;
+  const pile = { w: card.w * SCENE.pile, h: card.h * SCENE.pile };
   const piles = [
     { name: "talon", at: SCENE.talon },
     { name: "défausse", at: SCENE.defausse },
@@ -40,7 +43,27 @@
 </script>
 
 <g data-debug-geometry class="debug">
-  <rect class="felt" data-debug-felt x={felt.x} y={felt.y} width={felt.w} height={felt.h} />
+  {#if shape.kind === "ellipse"}
+    <ellipse class="felt" data-debug-felt cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} />
+  {:else}
+    <rect
+      class="felt"
+      data-debug-felt
+      x={shape.x}
+      y={shape.y}
+      width={shape.w}
+      height={shape.h}
+      rx={shape.r}
+    />
+  {/if}
+  <rect
+    class="felt box"
+    data-debug-felt-box
+    x={felt.x}
+    y={felt.y}
+    width={felt.w}
+    height={felt.h}
+  />
 
   {#each ring as [x, y], i (i)}
     <circle class="ring-dot" cx={x} cy={y} />
@@ -83,16 +106,16 @@
     {/each}
   {/each}
 
-  {#each piles as pile (pile.name)}
+  {#each piles as p (p.name)}
     <rect
       class="card"
-      data-debug-pile={pile.name}
-      x={pile.at[0] - card.w / 2}
-      y={pile.at[1] - card.h / 2}
-      width={card.w}
-      height={card.h}
+      data-debug-pile={p.name}
+      x={p.at[0] - pile.w / 2}
+      y={p.at[1] - pile.h / 2}
+      width={pile.w}
+      height={pile.h}
     />
-    <text class="label slot" x={pile.at[0]} y={pile.at[1]}>{pile.name}</text>
+    <text class="label slot" x={p.at[0]} y={p.at[1]}>{p.name}</text>
   {/each}
 </g>
 
@@ -105,6 +128,11 @@
     fill: none;
     stroke: #ff00ff;
     stroke-width: calc(2px * var(--px));
+  }
+
+  .box {
+    stroke-dasharray: calc(8px * var(--px)) calc(6px * var(--px));
+    stroke-opacity: 0.6;
   }
 
   .card {

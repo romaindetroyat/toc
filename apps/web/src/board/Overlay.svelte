@@ -12,7 +12,7 @@
     layer: "under" | "over";
     /** Board units per screen pixel: text and badges are sized in screen pixels. */
     px: number;
-    /** Clockwise quarter turns of the board toward the human. */
+    /** The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet. */
     k: number;
     render: RenderState;
     ui: TurnUiState;

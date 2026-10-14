@@ -142,6 +142,34 @@ test.describe(() => {
     await expect(overlay.locator("[data-debug-felt]")).toHaveCount(1);
     await expect(overlay.locator("[data-debug-card]")).toHaveCount(4);
     await expect(overlay.locator("[data-debug-pile]")).toHaveCount(2);
+
+    // The felt is drawn as the galet's green ellipse, filling the « Sur le tapis » button's box, and
+    // the talon and the défausse lie inside that box, on either side of its centre.
+    await expect(overlay.locator("ellipse[data-debug-felt]")).toHaveCount(1);
+    const button = await page.locator("[data-felt-button]").boundingBox();
+    const ellipse = await overlay.locator("[data-debug-felt]").boundingBox();
+    if (!button || !ellipse) throw new Error("no box for the felt button or the debug felt");
+    for (const [a, b] of [
+      [ellipse.x, button.x],
+      [ellipse.y, button.y],
+      [ellipse.x + ellipse.width, button.x + button.width],
+      [ellipse.y + ellipse.height, button.y + button.height],
+    ] as const) {
+      expect(Math.abs(a - b)).toBeLessThanOrEqual(2);
+    }
+    const middle = button.x + button.width / 2;
+    for (const [name, side] of [
+      ["talon", -1],
+      ["défausse", 1],
+    ] as const) {
+      const pile = await overlay.locator(`[data-debug-pile="${name}"]`).boundingBox();
+      if (!pile) throw new Error(`no box for the debug ${name}`);
+      expect(pile.x).toBeGreaterThanOrEqual(button.x);
+      expect(pile.y).toBeGreaterThanOrEqual(button.y);
+      expect(pile.x + pile.width).toBeLessThanOrEqual(button.x + button.width);
+      expect(pile.y + pile.height).toBeLessThanOrEqual(button.y + button.height);
+      expect(Math.sign(pile.x + pile.width / 2 - middle)).toBe(side);
+    }
   });
 
   test("sans paramètre debug, aucun overlay", async ({ page }) => {

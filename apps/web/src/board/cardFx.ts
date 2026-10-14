@@ -74,18 +74,73 @@ export const seatAngle = (seat: Color, k: number): number => seatCard(seat, k).a
  */
 export const talonAt = (_k: number): Point => SCENE.talon;
 
+/** Every tilt tiltOf can give: a posed card must fit the felt whichever it gets. */
+const TILTS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
+
+/** Whether a card centred on `at`, turned by `degrees`, lies inside the felt with all four corners. */
+function cardInsideFelt(at: Point, degrees: number): boolean {
+  const shape = SCENE.feltShape;
+  if (shape.kind !== "ellipse") return true;
+  const t = (degrees * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(t), Math.sin(t)];
+  for (const [x, y] of [
+    [-CW / 2, -CH / 2],
+    [CW / 2, -CH / 2],
+    [CW / 2, CH / 2],
+    [-CW / 2, CH / 2],
+  ] as const) {
+    const px = at[0] + x * cos - y * sin;
+    const py = at[1] + x * sin + y * cos;
+    if (((px - shape.cx) / shape.rx) ** 2 + ((py - shape.cy) / shape.ry) ** 2 > 1) return false;
+  }
+  return true;
+}
+
+/** The slots of a fan of `count` cards centred on `centre`, `step` apart along x (row) or y. */
+const fanOf = (centre: Point, count: number, step: number, row: boolean): Point[] =>
+  Array.from({ length: count }, (_, i): Point => {
+    const shift = (i - (count - 1) / 2) * step;
+    return row ? [centre[0] + shift, centre[1]] : [centre[0], centre[1] + shift];
+  });
+
+const fanSteps = new Map<string, number>();
+
 /**
- * Where the `count` cards of a dead hand lie in front of their seat: a row for the seats at the top
- * and the bottom of the screen, a column for the seats at the sides, 50 % overlap.
+ * The step of a dead hand's fan: half a card at most (50 % overlap), less where the ellipse is too
+ * narrow, so that every card of the fan lies inside it whatever its tilt (the side seats, where the
+ * ellipse is lowest, get a tighter fan). Whole scene units, found by bisection.
+ */
+function fanStep(centre: Point, count: number, angle: number, row: boolean): number {
+  const key = `${centre[0]},${centre[1]},${count},${angle}`;
+  const known = fanSteps.get(key);
+  if (known !== undefined) return known;
+  const fits = (step: number) =>
+    fanOf(centre, count, step, row).every((at) =>
+      TILTS.every((tilt) => cardInsideFelt(at, angle + tilt)),
+    );
+  let step = CW / 2;
+  if (count > 1 && !fits(step)) {
+    let [low, high] = [0, step];
+    for (let i = 0; i < 40; i++) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) low = mid;
+      else high = mid;
+    }
+    step = Math.floor(low);
+  }
+  fanSteps.set(key, step);
+  return step;
+}
+
+/**
+ * Where the `count` cards of a dead hand lie in front of their seat, facing it like its last card:
+ * along the seat's side (a row for the seats at the bottom and the top of the screen, a column for
+ * the side seats), centred on the seat's place, at most half a card apart and inside the ellipse.
  */
 export function posedSlots(seat: Color, count: number, k: number): Point[] {
-  const [cx, cy] = seatSlot(seat, k);
-  const horizontal = Math.abs(cy - MID_Y) > Math.abs(cx - MID_X);
-  const step = horizontal ? CW / 2 : CH / 2;
-  return Array.from({ length: count }, (_, i): Point => {
-    const shift = (i - (count - 1) / 2) * step;
-    return horizontal ? [cx + shift, cy] : [cx, cy + shift];
-  });
+  const { at, angle } = seatCard(seat, k);
+  const row = angle % 180 === 0;
+  return fanOf(at, count, fanStep(at, count, angle, row), row);
 }
 
 const pose = (point: Point, tilt = 0, scale = 1): string =>
@@ -102,7 +157,10 @@ function offsetToward(from: Point, toward: Point, distance: number): Point {
   return towards(from, toward, distance / length);
 }
 
-/** The deal: `seats` in dealing order, each with the number of cards it gets, dealt round by round. */
+/**
+ * The deal: `seats` in dealing order, each with the number of cards it gets, dealt round by round,
+ * face down from the talon (drawn at SCENE.pile of a card) to the edge of each seat.
+ */
 export function dealFlights(
   seats: readonly { seat: Color; count: number }[],
   k: number,
@@ -143,7 +201,7 @@ export function dealFlights(
         kind: "deal",
         card: null,
         keyframes: [
-          { transform: pose(talon, 0, 1), opacity: 1 },
+          { transform: pose(talon, 0, SCENE.pile), opacity: 1 },
           { transform: pose(towards(talon, edge, 0.75), spin * 0.8, 0.9), opacity: 1, offset: 0.7 },
           { transform: pose(edge, spin, 0.7), opacity: 0 },
         ],
@@ -197,21 +255,24 @@ export function playFlight(seat: Color, card: CardId, k: number, mode: Mode): Fl
 }
 
 /**
- * The exchange: the card each seat hands over crosses the felt, face down, to its partner. The two
- * cards of a pair bow to their own left, so they pass on either side of each other.
+ * The exchange: the card each seat hands over crosses the felt, face down, from its place to its
+ * partner's. The two cards of a pair bow to their own left, so they pass on either side of each other.
  */
 export function exchangeFlights(k: number, mode: Mode): FlightSpec[] {
   return COLORS.map((seat): FlightSpec => {
     const from = seatSlot(seat, k);
     const to = seatSlot(PARTNER[seat], k);
+    // Turned like its seat's card the whole way: the partner's place is the same box (0 and 180,
+    // 90 and 270), and a back reads the same either way up.
+    const angle = seatAngle(seat, k);
     if (mode === "reduced") {
       return {
         kind: "exchange",
         card: null,
         keyframes: [
-          { transform: pose(from), opacity: 0 },
-          { transform: pose(towards(from, to, 0.12)), opacity: 1, offset: 0.4 },
-          { transform: pose(towards(from, to, 0.25)), opacity: 0 },
+          { transform: pose(from, angle), opacity: 0 },
+          { transform: pose(towards(from, to, 0.12), angle), opacity: 1, offset: 0.4 },
+          { transform: pose(towards(from, to, 0.25), angle), opacity: 0 },
         ],
         delayMs: 0,
         durationMs: REDUCED.cards,
@@ -222,19 +283,21 @@ export function exchangeFlights(k: number, mode: Mode): FlightSpec[] {
     const dy = to[1] - from[1];
     const distance = Math.hypot(dx, dy) || 1;
     const bow = 110;
+    // The left of the way on the screen (y grows downwards): the direction turned a quarter
+    // anticlockwise, (dy, -dx).
     const middle: Point = [
-      (from[0] + to[0]) / 2 + (-dy / distance) * bow,
-      (from[1] + to[1]) / 2 + (dx / distance) * bow,
+      (from[0] + to[0]) / 2 + (dy / distance) * bow,
+      (from[1] + to[1]) / 2 + (-dx / distance) * bow,
     ];
     return {
       kind: "exchange",
       card: null,
       keyframes: [
-        { transform: pose(from, 0, 0.85), opacity: 0 },
-        { transform: pose(towards(from, middle, 0.3), 0, 0.95), opacity: 1, offset: 0.15 },
-        { transform: pose(middle, 0, 1), opacity: 1, offset: 0.5 },
-        { transform: pose(towards(middle, to, 0.7), 0, 0.95), opacity: 1, offset: 0.85 },
-        { transform: pose(to, 0, 0.85), opacity: 0 },
+        { transform: pose(from, angle, 0.85), opacity: 0 },
+        { transform: pose(towards(from, middle, 0.3), angle, 0.95), opacity: 1, offset: 0.15 },
+        { transform: pose(middle, angle, 1), opacity: 1, offset: 0.5 },
+        { transform: pose(towards(middle, to, 0.7), angle, 0.95), opacity: 1, offset: 0.85 },
+        { transform: pose(to, angle, 0.85), opacity: 0 },
       ],
       delayMs: 0,
       durationMs: MOTION.exchangeCross * scaleFor(mode),
@@ -243,7 +306,10 @@ export function exchangeFlights(k: number, mode: Mode): FlightSpec[] {
   });
 }
 
-/** A dead hand laid face up in front of its seat, card by card (350 ms each, 60 ms apart). */
+/**
+ * A dead hand laid face up in front of its seat, card by card (350 ms each, 60 ms apart): each card
+ * leaves the seat's edge facing its seat and lands on its posed place with its tilt.
+ */
 export function layFlights(
   seat: Color,
   cards: readonly CardId[],
@@ -252,6 +318,7 @@ export function layFlights(
 ): FlightSpec[] {
   const edge = seatEdge(seat, k);
   const slots = posedSlots(seat, cards.length, k);
+  const angle = seatAngle(seat, k);
   const scale = scaleFor(mode);
   return cards.map((card, i): FlightSpec => {
     const to = slots[i] as Point;
@@ -261,8 +328,8 @@ export function layFlights(
         kind: "lay",
         card,
         keyframes: [
-          { transform: pose(offsetToward(to, edge, SLIDE), tilt), opacity: 0 },
-          { transform: pose(to, tilt), opacity: 1 },
+          { transform: pose(offsetToward(to, edge, SLIDE), angle + tilt), opacity: 0 },
+          { transform: pose(to, angle + tilt), opacity: 1 },
         ],
         delayMs: 0,
         durationMs: REDUCED.cards,
@@ -273,9 +340,13 @@ export function layFlights(
       kind: "lay",
       card,
       keyframes: [
-        { transform: pose(edge, 0, 0.9), opacity: 0 },
-        { transform: pose(towards(edge, to, 0.25), tilt * 0.5, 0.95), opacity: 1, offset: 0.2 },
-        { transform: pose(to, tilt, 1), opacity: 1 },
+        { transform: pose(edge, angle, 0.9), opacity: 0 },
+        {
+          transform: pose(towards(edge, to, 0.25), angle + tilt * 0.5, 0.95),
+          opacity: 1,
+          offset: 0.2,
+        },
+        { transform: pose(to, angle + tilt, 1), opacity: 1 },
       ],
       delayMs: i * MOTION.deadStagger * scale,
       durationMs: MOTION.deadCard * scale,
