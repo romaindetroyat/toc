@@ -52,16 +52,16 @@ describe("seatSlot and seatEdge on board C+", () => {
     }
   });
 
-  it("the C+ places: bottom (1000, 2143.4), top (1000, 856.6), left (842.3, 1500), right (1157.7, 1500)", () => {
+  it("the portrait galet's places: bottom (1000, 1809.4), top (1000, 1190.6), left (750.6, 1500), right (1249.4, 1500)", () => {
     const human = bottomOf(0);
     const near = (p: readonly [number, number], q: [number, number]) => {
       expect(p[0]).toBeCloseTo(q[0], 1);
       expect(p[1]).toBeCloseTo(q[1], 1);
     };
-    near(seatSlot(human, 0), [1000, 2143.4]);
-    near(seatSlot(PARTNER[human], 0), [1000, 856.6]);
-    near(seatSlot(nextColor(human), 0), [842.3, 1500]);
-    near(seatSlot(previousColor(human), 0), [1157.7, 1500]);
+    near(seatSlot(human, 0), [1000, 1809.4]);
+    near(seatSlot(PARTNER[human], 0), [1000, 1190.6]);
+    near(seatSlot(nextColor(human), 0), [750.6, 1500]);
+    near(seatSlot(previousColor(human), 0), [1249.4, 1500]);
   });
 
   it("a seat's edge is 120 units past the board's edge on its side, on the axis through the centre", () => {

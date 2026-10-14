@@ -1,103 +1,74 @@
-// Board C+ geometry (D-05, revised by Romain on 2026-10-14). Pure: no DOM, no clock.
+// The galet board geometry, for its two plateaus (Romain's choice of 2026-10-14: « galet partout »,
+// the computer in landscape, the iPhone in portrait). Pure: no DOM, no clock.
 //
-// Ported from renderVals() of design/plateau-maquette.dc.html, variant « portrait » with idees01,
-// with the mock-up's own numbers. The ring is computed in mock-up units (1000 x 1500) exactly as the
-// mock-up does, then every export is given in scene units = mock-up units x SCENE.scale (2), so the
-// scene is 2000 x 3000 and one step (the distance between two ring cells) is about 126.156 units.
+// Ported from renderVals() of design/plateau-galet.dc.html with the mock-up's own numbers: variant
+// pc-galet for « landscape » (1600 x 800, superellipse exponent 3.2, felt ellipse) and tel-galet for
+// « portrait » (1000 x 1500, exponent 2.8, felt rounded rectangle), both without wave. The ring is
+// computed in mock-up units exactly as the mock-up does (shape, the six iterations of the step, at,
+// cellPos, the frame origins C and frame), then every export is given in scene units = mock-up units
+// x 2: the landscape scene is 3200 x 1600 (step about 107.05), the portrait one 2000 x 3000 (step
+// about 108.37), so a knight keeps about the 110 x 190 sprite footprint the overlays were tuned for.
 //
-// Seating (consequence of C+, to be confirmed by Romain): the drawing never turns. The colour of
-// seat k (bleu 0, vert 1, rouge 2, jaune 3) takes the bottom side, its partner the top, the next
-// seat clockwise the left and the previous one the right; the ring indices follow from the bottom
-// seat's start index, as in the mock-up.
+// Seating (« à confirmer par Romain », kept from D-05): the drawing never turns. The colour of seat k
+// (bleu 0, vert 1, rouge 2, jaune 3) takes the bottom side, its partner the top, the next seat
+// clockwise the left and the previous one the right; the ring indices follow from the bottom seat's
+// start index, as in the mock-up.
+//
+// Every layout parameter defaults to "portrait" for the consumers that do not pass one yet (a
+// transitional default, removed in 01-39 so the typecheck proves that every caller passes it).
 
 import { COLORS, type Color, EXIT, type Place } from "@toc/engine";
 import type { Point } from "./layout.ts";
 import type { ScreenSide } from "./rotate.ts";
 
-/** The mock-up's own frame and constants (renderVals, portrait). */
-export const MOCKUP = { width: 1000, height: 1500, pad: 16, disc: 0.88 } as const;
+/** The two galet plateaus: « landscape » on a computer, « portrait » on a phone. */
+export type Layout = "landscape" | "portrait";
+
+export const LAYOUTS: readonly Layout[] = ["landscape", "portrait"];
+
+/** The mock-up's own frames and constants (renderVals, variants pc-galet and tel-galet). */
+export const MOCKUP = {
+  pad: 22,
+  disc: 0.84,
+  landscape: {
+    variant: "pc-galet",
+    width: 1600,
+    height: 800,
+    n: 3.2,
+    wave: 0,
+    felt: { kind: "ellipse", rx: 300, ry: 112, stitch: { rx: 286, ry: 98 } },
+    grain: [0.0028, 0.075],
+    rider: { f: 0.6, h: 2.6 },
+    /** Talon and défausse beside the centre, at 0.95 of a card. */
+    pile: { dx: 75, dy: 0, scale: 0.95 },
+  },
+  portrait: {
+    variant: "tel-galet",
+    width: 1000,
+    height: 1500,
+    n: 2.8,
+    wave: 0,
+    felt: { kind: "rect", hw: 180, hh: 210, r: 44, stitch: { hw: 166, hh: 196, r: 34 } },
+    grain: [0.0045, 0.085],
+    rider: { f: 0.66, h: 2.5 },
+    /** Talon and défausse above and below the centre (0.55 of a card's height), at 0.82 of a card. */
+    pile: { dx: 0, dy: 0.55, scale: 0.82 },
+  },
+} as const;
 
 const SCALE = 2;
 const RING_CELLS = 72;
+/** Points of the ring polyline (the mock-up's shape(ringA, ringB, 1440)). */
+const RING_STEPS = 1440;
+/** Points of the board's outline and outer rim (shape(…, 360)). */
+const RIM_STEPS = 360;
+/** The rider picture's own size (design/assets/cav-<colour>.png). */
+const RIDER_PICTURE = { w: 157, h: 209 } as const;
 
 type XY = [number, number];
 
-/** The ring polyline and its step, computed verbatim in mock-up units. */
-function mockupRing() {
-  const W = MOCKUP.width;
-  const H = MOCKUP.height;
-  const cx = W / 2;
-  const cy = H / 2;
-  let s = 50;
-  let pts: XY[] = [];
-  let xL = 0;
-  let xR = 0;
-  let yT = 0;
-  let yB = 0;
-  for (let it = 0; it < 6; it++) {
-    const inset = MOCKUP.pad + 0.5 * MOCKUP.disc * s;
-    xL = inset;
-    xR = W - inset;
-    yT = inset;
-    yB = H - inset;
-    const r = s;
-    const next: XY[] = [];
-    const arc = (ox: number, oy: number, a0: number, a1: number) => {
-      for (let j = 0; j <= 24; j++) {
-        const a = ((a0 + ((a1 - a0) * j) / 24) * Math.PI) / 180;
-        next.push([ox + r * Math.cos(a), oy + r * Math.sin(a)]);
-      }
-    };
-    next.push([cx, yB], [xL + r, yB]);
-    arc(xL + r, yB - r, 90, 180);
-    next.push([xL, yT + r]);
-    arc(xL + r, yT + r, 180, 270);
-    next.push([xR - r, yT]);
-    arc(xR - r, yT + r, 270, 360);
-    next.push([xR, yB - r]);
-    arc(xR - r, yB - r, 0, 90);
-    next.push([cx, yB]);
-    pts = next;
-    let P = 0;
-    for (let j = 1; j < pts.length; j++) {
-      const a = pts[j - 1] as XY;
-      const b = pts[j] as XY;
-      P += Math.hypot(b[0] - a[0], b[1] - a[1]);
-    }
-    s = P / RING_CELLS;
-  }
-  return { s, pts, xL, xR, yT, yB, cx, cy };
-}
-
-const M = mockupRing();
-const STEP = M.s * SCALE;
-const CX = M.cx * SCALE;
-const CY = M.cy * SCALE;
-const XL = M.xL * SCALE;
-const XR = M.xR * SCALE;
-const YT = M.yT * SCALE;
-const YB = M.yB * SCALE;
-const POLY: readonly Point[] = M.pts.map(([x, y]) => [x * SCALE, y * SCALE] as const);
-const CUM: number[] = [0];
-for (let j = 1; j < POLY.length; j++) {
-  const a = POLY[j - 1] as Point;
-  const b = POLY[j] as Point;
-  CUM.push((CUM[j - 1] as number) + Math.hypot(b[0] - a[0], b[1] - a[1]));
-}
-
-/** The point at length `d` along the ring polyline (the mock-up's at(), scene units). */
-function at(d: number): Point {
-  for (let j = 1; j < POLY.length; j++) {
-    if (d <= (CUM[j] as number) + 1e-6) {
-      const a = POLY[j - 1] as Point;
-      const b = POLY[j] as Point;
-      const c0 = CUM[j - 1] as number;
-      const f = (d - c0) / ((CUM[j] as number) - c0 || 1);
-      return [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])];
-    }
-  }
-  return POLY[POLY.length - 1] as Point;
-}
+/** sign(v) |v|^e, the superellipse's power. */
+const sp = (v: number, e: number) => Math.sign(v) * Math.abs(v) ** e;
 
 // Seat frames, q = 0 bottom, 1 left, 2 top, 3 right.
 // T = direction of travel, N = towards the centre, ROT = the angle a seat's card is turned by.
@@ -114,25 +85,18 @@ const N: readonly Point[] = [
   [-1, 0],
 ];
 const ROT = [0, 90, 180, 270] as const;
-const SIDE_CENTRE: readonly Point[] = [
-  [CX, YB],
-  [XL, CY],
-  [CX, YT],
-  [XR, CY],
-];
 const SIDES: readonly ScreenSide[] = ["bottom", "left", "top", "right"];
-
-/** C[q] + T[q] ta step + N[q] na step (the mock-up's frame()). */
-function frame(q: number, ta: number, na: number): Point {
-  const c = SIDE_CENTRE[q] as Point;
-  const t = T[q] as Point;
-  const n = N[q] as Point;
-  return [c[0] + t[0] * ta * STEP + n[0] * na * STEP, c[1] + t[1] * ta * STEP + n[1] * na * STEP];
-}
-
-const FELT_HALF_W = 2.45 * STEP;
-const FELT_HALF_H = 6.3 * STEP;
-const CARD_W = 1.3 * STEP;
+/** Where each seat's rider stands: the corner of the side its colour sets off towards (degrees). */
+const CORNER_TH = [135, 225, 315, 45] as const;
+/** The stable dots of a seat, frame(q, ta, na); slot 0 is the nearest the exit. */
+const STABLE_FRAME: readonly Point[] = [
+  [2.4, 2.0],
+  [3.5, 2.0],
+  [2.4, 3.1],
+  [3.5, 3.1],
+];
+/** Home dots leave the carré along normalize(2N - T), one every 1.05 step. */
+const HOME_PITCH = 1.05;
 
 /** Knight sprite metrics, in the units of the existing 110 x 190 knight sprite. */
 export const KNIGHT = {
@@ -148,56 +112,272 @@ export const KNIGHT = {
   lift: 12,
 } as const;
 
-/** Knight width as a fraction of the step, per zone (mock-up: 0.92 ring, 0.8 home, 0.72 stable). */
-const KNIGHT_WIDTH = { ring: 0.92, home: 0.8, stable: 0.72 } as const;
+/**
+ * Knight width as a fraction of the step, per zone: the galet mock-up's 0.95 on the ring, 0.82 in a
+ * home and 0.78 in a stable (« à confirmer par Romain »).
+ */
+const KNIGHT_WIDTH = { ring: 0.95, home: 0.82, stable: 0.78 } as const;
 
-/** Sprite-to-scene scale of a knight standing on `place`. */
-export function knightScale(place: Place): number {
-  return (KNIGHT_WIDTH[place.z] * STEP) / KNIGHT.w;
+/** The felt's outline in scene units: an ellipse (landscape) or a rounded rectangle (portrait). */
+export type FeltShape =
+  | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number }
+  | { kind: "rect"; x: number; y: number; w: number; h: number; r: number };
+
+/** A plateau: viewBox 0 0 width height, its step, its ring, its felt and the cards on it (scene units). */
+export type Scene = {
+  layout: Layout;
+  scale: number;
+  width: number;
+  height: number;
+  /** The distance between two ring cells along the ring. */
+  step: number;
+  centre: Point;
+  /** The ring's superellipse: centre ± (a sp(cos θ, 2 / n), b sp(sin θ, 2 / n)). */
+  ring: { a: number; b: number; n: number };
+  /** The felt's bounding box. */
+  felt: { x: number; y: number; w: number; h: number };
+  feltShape: FeltShape;
+  /** The cream stitch inside the felt. */
+  stitch: FeltShape;
+  talon: Point;
+  defausse: Point;
+  /** The talon and the défausse are drawn at this fraction of a card. */
+  pile: number;
+  card: { w: number; h: number };
+  /** How far a lifted top-row ring knight's head rises above the board, as a fraction of the width. */
+  headRoom: number;
+};
+
+type Geometry = {
+  scene: Scene;
+  /** at(j step) for j = 0..71, from the bottom centre clockwise on screen (scene units). */
+  cells: Point[];
+  /** The 1441-point ring polyline (scene units). */
+  poly: Point[];
+  /** The frame origins C[q] (scene units). */
+  origins: Point[];
+  outline: Point[];
+  outer: Point[];
+  /** Mock-up corner points of the ring for the riders (scene units). */
+  corners: Point[];
+};
+
+/** The plateau computed verbatim in mock-up units, then given in scene units. */
+function compute(layout: Layout): Geometry {
+  const cfg = MOCKUP[layout];
+  const W = cfg.width;
+  const H = cfg.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const e = 2 / cfg.n;
+
+  // The ring: a superellipse walked clockwise on screen from the bottom centre (wave 0).
+  const shape = (a: number, b: number, steps: number): XY[] => {
+    const out: XY[] = [];
+    for (let j = 0; j <= steps; j++) {
+      const th = ((90 + (360 * j) / steps) * Math.PI) / 180;
+      out.push([cx + a * sp(Math.cos(th), e), cy + b * sp(Math.sin(th), e)]);
+    }
+    return out;
+  };
+  const perimeter = (pts: XY[]) => {
+    let P = 0;
+    for (let j = 1; j < pts.length; j++) {
+      const p = pts[j - 1] as XY;
+      const q = pts[j] as XY;
+      P += Math.hypot(q[0] - p[0], q[1] - p[1]);
+    }
+    return P;
+  };
+
+  let s = 50;
+  let pts: XY[] = [];
+  let ringA = 0;
+  let ringB = 0;
+  for (let it = 0; it < 6; it++) {
+    const m = MOCKUP.pad + 0.5 * MOCKUP.disc * s;
+    ringA = cx - m;
+    ringB = cy - m;
+    pts = shape(ringA, ringB, RING_STEPS);
+    s = perimeter(pts) / RING_CELLS;
+  }
+  const cum: number[] = [0];
+  for (let j = 1; j < pts.length; j++) {
+    const p = pts[j - 1] as XY;
+    const q = pts[j] as XY;
+    cum.push((cum[j - 1] as number) + Math.hypot(q[0] - p[0], q[1] - p[1]));
+  }
+  const at = (d: number): XY => {
+    for (let j = 1; j < pts.length; j++) {
+      if (d <= (cum[j] as number) + 1e-6) {
+        const p = pts[j - 1] as XY;
+        const q = pts[j] as XY;
+        const c0 = cum[j - 1] as number;
+        const f = (d - c0) / ((cum[j] as number) - c0 || 1);
+        return [p[0] + f * (q[0] - p[0]), p[1] + f * (q[1] - p[1])];
+      }
+    }
+    return pts[pts.length - 1] as XY;
+  };
+  const cells: XY[] = Array.from({ length: RING_CELLS }, (_, j) => at(j * s));
+
+  // Frame origins: the bottom and top on the centre line at the height of their exit, the sides on
+  // the middle line at the abscissa of theirs. The exit of seat q is cell j = 18 q + 1.
+  const exitOf = (q: number) => cells[18 * q + 1] as XY;
+  const origins: XY[] = [
+    [cx, exitOf(0)[1]],
+    [exitOf(1)[0], cy],
+    [cx, exitOf(2)[1]],
+    [exitOf(3)[0], cy],
+  ];
+
+  const rim = 0.5 * MOCKUP.disc * s;
+  const outline = shape(ringA + rim + 20, ringB + rim + 20, RIM_STEPS);
+  const outer = shape(ringA + rim + 21.5, ringB + rim + 21.5, RIM_STEPS);
+  const corners: XY[] = CORNER_TH.map((deg) => {
+    const th = (deg * Math.PI) / 180;
+    return [cx + ringA * sp(Math.cos(th), e), cy + ringB * sp(Math.sin(th), e)];
+  });
+
+  // The felt and its stitch.
+  let feltShape: FeltShape;
+  let stitch: FeltShape;
+  let felt: Scene["felt"];
+  const f = cfg.felt;
+  if (f.kind === "ellipse") {
+    feltShape = {
+      kind: "ellipse",
+      cx: cx * SCALE,
+      cy: cy * SCALE,
+      rx: f.rx * SCALE,
+      ry: f.ry * SCALE,
+    };
+    stitch = {
+      kind: "ellipse",
+      cx: cx * SCALE,
+      cy: cy * SCALE,
+      rx: f.stitch.rx * SCALE,
+      ry: f.stitch.ry * SCALE,
+    };
+    felt = {
+      x: (cx - f.rx) * SCALE,
+      y: (cy - f.ry) * SCALE,
+      w: 2 * f.rx * SCALE,
+      h: 2 * f.ry * SCALE,
+    };
+  } else {
+    const rect = (hw: number, hh: number, r: number): FeltShape => ({
+      kind: "rect",
+      x: (cx - hw) * SCALE,
+      y: (cy - hh) * SCALE,
+      w: 2 * hw * SCALE,
+      h: 2 * hh * SCALE,
+      r: r * SCALE,
+    });
+    feltShape = rect(f.hw, f.hh, f.r);
+    stitch = rect(f.stitch.hw, f.stitch.hh, f.stitch.r);
+    felt = {
+      x: (cx - f.hw) * SCALE,
+      y: (cy - f.hh) * SCALE,
+      w: 2 * f.hw * SCALE,
+      h: 2 * f.hh * SCALE,
+    };
+  }
+
+  const step = s * SCALE;
+  const card = { w: 1.3 * step, h: 1.3 * step * 1.4 };
+  const pile = cfg.pile;
+  const talon: Point = [cx * SCALE - pile.dx * SCALE, cy * SCALE - pile.dy * card.h];
+  const defausse: Point = [cx * SCALE + pile.dx * SCALE, cy * SCALE + pile.dy * card.h];
+
+  const scaled = (p: XY): Point => [p[0] * SCALE, p[1] * SCALE];
+  const sceneCells = cells.map(scaled);
+  // headRoom = ((KNIGHT.head + KNIGHT.lift) x knightScale(ring place, layout) − the smallest y of the
+  // 72 ring cells) / width = ((159.2 + 12) x 0.95 x step / 110 − 2 x (22 + 0.42 s)) / width: about
+  // 0.02166 on the landscape plateau and 0.03536 on the portrait one. A board with its head room is
+  // therefore (height / width + headRoom) times as tall as it is wide.
+  const ringTop = Math.min(...sceneCells.map((p) => p[1]));
+  const ringScale = (KNIGHT_WIDTH.ring * step) / KNIGHT.w;
+  const headRoom = Math.max(0, (KNIGHT.head + KNIGHT.lift) * ringScale - ringTop) / (W * SCALE);
+
+  return {
+    scene: {
+      layout,
+      scale: SCALE,
+      width: W * SCALE,
+      height: H * SCALE,
+      step,
+      centre: [cx * SCALE, cy * SCALE],
+      ring: { a: ringA * SCALE, b: ringB * SCALE, n: cfg.n },
+      felt,
+      feltShape,
+      stitch,
+      talon,
+      defausse,
+      pile: pile.scale,
+      card,
+      headRoom,
+    },
+    cells: sceneCells,
+    poly: pts.map(scaled),
+    origins: origins.map(scaled),
+    outline: outline.map(scaled),
+    outer: outer.map(scaled),
+    corners: corners.map(scaled),
+  };
 }
 
-/** The C+ colours and the board's paints (mock-up constants). */
+const GEOMETRY: Record<Layout, Geometry> = {
+  landscape: compute("landscape"),
+  portrait: compute("portrait"),
+};
+
+function geometryOf(layout: Layout): Geometry {
+  const g = GEOMETRY[layout];
+  if (!g) throw new Error(`unknown layout ${String(layout)}`);
+  return g;
+}
+
+/** The scene of a galet plateau (computed once per layout). */
+export function sceneOf(layout: Layout = "portrait"): Scene {
+  return geometryOf(layout).scene;
+}
+
+/** Transitional alias of the portrait scene for the consumers converted in 01-34 and 01-35. */
+export const SCENE: Scene = sceneOf("portrait");
+
+/** Sprite-to-scene scale of a knight standing on `place`. */
+export function knightScale(place: Place, layout: Layout = "portrait"): number {
+  return (KNIGHT_WIDTH[place.z] * sceneOf(layout).step) / KNIGHT.w;
+}
+
+/** The galet colours and the board's paints (mock-up constants). */
 export const PALETTE = {
-  hex: { bleu: "#2C68B0", jaune: "#D9A20F", rouge: "#C23B2B", vert: "#2F8743" },
-  tint: { bleu: "#D3E0F1", jaune: "#F6E4A8", rouge: "#F2CFC7", vert: "#CBE4CE" },
-  on: { bleu: "#FFFFFF", jaune: "#3A2414", rouge: "#FFFFFF", vert: "#FFFFFF" },
-  ink: "#4A2F1B",
-  cream: "#FBF5E6",
-  board: "#E8D3A6",
-  rim: "#5A3B23",
-  band: "#D2AF77",
-  bandEdge: "#C49C5F",
-  felt: "#1F5A3B",
-  feltBorder: "#5A3B23",
-  feltLine: "#2E7350",
-  stable: "#DCC08D",
-  stableShadow: "rgba(74,47,27,0.25)",
-  arrow: "#7A5634",
+  hex: { bleu: "#1F4FA8", jaune: "#E3A90C", rouge: "#C3271D", vert: "#1F8A3C" },
+  light: { bleu: "#5C86D4", jaune: "#F7D35A", rouge: "#EE6B5E", vert: "#5CC27A" },
+  on: { bleu: "#FFFFFF", jaune: "#2A1A0E", rouge: "#FFFFFF", vert: "#FFFFFF" },
+  ink: "#2A1A0E",
+  cream: "#FBF4E2",
+  /** The oak of the board. */
+  board: "#E9D5AE",
+  /** The walnut outer rim. */
+  rim: "#4A2E18",
+  /** The fine line along the board's outline. */
+  outlineLine: "#7A5634",
+  track: "#5B3A20",
+  feltLight: "#2E7A4E",
+  feltDark: "#174A2F",
+  feltRim: "#4A2E18",
+  stitch: "#E9D5AE",
+  /** The cells' drop shadow and the cells' inner shadow (the mock-up's box-shadows). */
+  shadow: "#2A1A0E",
+  inset: "#785028",
 } as const satisfies {
   hex: Record<Color, string>;
-  tint: Record<Color, string>;
+  light: Record<Color, string>;
   on: Record<Color, string>;
   [key: string]: unknown;
 };
-
-const ringTopKnightHead = (KNIGHT.head + KNIGHT.lift) * ((KNIGHT_WIDTH.ring * STEP) / KNIGHT.w);
-
-/** The scene: viewBox 0 0 width height, its step, the felt and the cards on it (scene units). */
-export const SCENE = {
-  scale: SCALE,
-  width: MOCKUP.width * SCALE,
-  height: MOCKUP.height * SCALE,
-  step: STEP,
-  centre: [CX, CY] as Point,
-  /** The ring's straight sides: x of the left and right columns, y of the top and bottom rows. */
-  ring: { left: XL, right: XR, top: YT, bottom: YB, radius: STEP },
-  felt: { x: CX - FELT_HALF_W, y: CY - FELT_HALF_H, w: 2 * FELT_HALF_W, h: 2 * FELT_HALF_H },
-  talon: [CX, CY - 1.15 * STEP] as Point,
-  defausse: [CX, CY + 1.15 * STEP] as Point,
-  card: { w: CARD_W, h: CARD_W * 1.4 },
-  /** How far a lifted top-row ring knight's head rises above the board, as a fraction of the width. */
-  headRoom: Math.max(0, ringTopKnightHead - YT) / (MOCKUP.width * SCALE),
-} as const;
 
 /** The colour at the bottom for seat k (bleu 0, vert 1, rouge 2, jaune 3, as quarterTurnsFor). */
 const BOTTOM: readonly Color[] = ["bleu", "vert", "rouge", "jaune"];
@@ -219,54 +399,103 @@ export function sceneSideOf(color: Color, k: number): ScreenSide {
   return SIDES[quarterOf(color, k)] as ScreenSide;
 }
 
-/** Stable holes around the stable centre, (along T, along N) in steps; hole 0 is the nearest the exit. */
-const HOLES: readonly Point[] = [
-  [-0.56, -0.56],
-  [0.56, -0.56],
-  [-0.56, 0.56],
-  [0.56, 0.56],
-];
+/** C[q] + T[q] ta step + N[q] na step (the mock-up's frame()). */
+function frame(g: Geometry, q: number, ta: number, na: number): Point {
+  const c = g.origins[q] as Point;
+  const t = T[q] as Point;
+  const n = N[q] as Point;
+  const s = g.scene.step;
+  return [c[0] + t[0] * ta * s + n[0] * na * s, c[1] + t[1] * ta * s + n[1] * na * s];
+}
 
-/** Centre of a colour's stable box. */
-export function stableCentre(color: Color, k: number): Point {
-  return frame(quarterOf(color, k), 3.4, 2.1);
+/** Centre of a colour's stable: the mean of its four stable dots. */
+export function stableCentre(color: Color, k: number, layout: Layout = "portrait"): Point {
+  const g = geometryOf(layout);
+  const q = quarterOf(color, k);
+  const dots = STABLE_FRAME.map(([ta, na]) => frame(g, q, ta, na));
+  return [dots.reduce((sum, p) => sum + p[0], 0) / 4, dots.reduce((sum, p) => sum + p[1], 0) / 4];
 }
 
 const isSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < 4;
 
 /** Scene point of an engine place for seat k: the cell centre a knight's feet stand on. */
-export function sceneXY(place: Place, k: number): Point {
+export function sceneXY(place: Place, k: number, layout: Layout = "portrait"): Point {
+  const g = geometryOf(layout);
+  const startIdx = (EXIT[bottomOf(k)] + RING_CELLS - 1) % RING_CELLS;
   if (place.z === "ring") {
     const cell = place.cell;
     if (!Number.isInteger(cell) || cell < 0 || cell >= RING_CELLS) {
       throw new Error(`no anchor for place ${JSON.stringify(place)}`);
     }
-    const startIdx = (EXIT[bottomOf(k)] + RING_CELLS - 1) % RING_CELLS;
-    const j = (cell - startIdx + RING_CELLS) % RING_CELLS;
-    return at(j * STEP);
+    return g.cells[(cell - startIdx + RING_CELLS) % RING_CELLS] as Point;
   }
   if (!COLORS.includes(place.color) || !isSlot(place.slot)) {
     throw new Error(`no anchor for place ${JSON.stringify(place)}`);
   }
   const q = quarterOf(place.color, k);
-  if (place.z === "home") return frame(q, -1, (place.slot + 1) * 1.04);
-  const c = frame(q, 3.4, 2.1);
-  const [a, b] = HOLES[place.slot] as Point;
+  if (place.z === "stable") {
+    const [ta, na] = STABLE_FRAME[place.slot] as Point;
+    return frame(g, q, ta, na);
+  }
+  // Home: from the carré 16 (two cells before the exit) towards the centre, a little askew.
+  const carre = g.cells[(EXIT[place.color] + 70 - startIdx + 2 * RING_CELLS) % RING_CELLS] as Point;
   const t = T[q] as Point;
   const n = N[q] as Point;
-  return [c[0] + t[0] * a * STEP + n[0] * b * STEP, c[1] + t[1] * a * STEP + n[1] * b * STEP];
+  const dir: Point = [(2 * n[0] - t[0]) / Math.sqrt(5), (2 * n[1] - t[1]) / Math.sqrt(5)];
+  const d = (place.slot + 1) * HOME_PITCH * g.scene.step;
+  return [carre[0] + dir[0] * d, carre[1] + dir[1] * d];
 }
 
-/** The ring band as a closed polyline (scene units), from the bottom-side centre, clockwise on screen. */
-export function ringPolyline(): Point[] {
-  return POLY.map((p) => [p[0], p[1]] as const);
+/** The track: every 4th point of the 1440-point ring, closed, from the bottom centre clockwise. */
+export function ringPolyline(layout: Layout = "portrait"): Point[] {
+  return geometryOf(layout)
+    .poly.filter((_, j) => j % 4 === 0)
+    .map((p) => [p[0], p[1]] as const);
+}
+
+/** The board's outline (oak) and its walnut outer rim, closed 360-point superellipses. */
+export function boardOutline(layout: Layout = "portrait"): { outline: Point[]; outer: Point[] } {
+  const g = geometryOf(layout);
+  return {
+    outline: g.outline.map((p) => [p[0], p[1]] as const),
+    outer: g.outer.map((p) => [p[0], p[1]] as const),
+  };
+}
+
+/** The box of a colour's rider picture: in the corner of the side its colour sets off towards. */
+export function riderBox(
+  color: Color,
+  k: number,
+  layout: Layout = "portrait",
+): { x: number; y: number; w: number; h: number } {
+  const g = geometryOf(layout);
+  const rider = MOCKUP[layout].rider;
+  const corner = g.corners[quarterOf(color, k)] as Point;
+  const [cx, cy] = g.scene.centre;
+  const x = cx + rider.f * (corner[0] - cx);
+  const y = cy + rider.f * (corner[1] - cy);
+  const h = rider.h * g.scene.step;
+  const w = (h * RIDER_PICTURE.w) / RIDER_PICTURE.h;
+  return { x: x - w / 2, y: y - h / 2, w, h };
 }
 
 /** Where a seat's last card lies on the felt and how it is turned to face its seat. */
-export function seatCard(seat: Color, k: number): { at: Point; angle: 0 | 90 | 180 | 270 } {
+export function seatCard(
+  seat: Color,
+  k: number,
+  layout: Layout = "portrait",
+): { at: Point; angle: 0 | 90 | 180 | 270 } {
+  const scene = sceneOf(layout);
+  const felt = MOCKUP[layout].felt;
   const q = quarterOf(seat, k);
-  const half = q % 2 === 0 ? FELT_HALF_H : FELT_HALF_W;
-  const off = half - 1.2 * STEP;
+  // In mock-up units, as renderVals: the side seats of the ellipse sit fw − 110 from the centre,
+  // the others half − 0.5 h − 6 (half = fh for the bottom and the top, fw for the sides).
+  const fw = felt.kind === "ellipse" ? felt.rx : felt.hw;
+  const fh = felt.kind === "ellipse" ? felt.ry : felt.hh;
+  const ch = scene.card.h / SCALE;
+  const half = q % 2 === 0 ? fh : fw;
+  const off = (q % 2 === 1 && felt.kind === "ellipse" ? fw - 110 : half - 0.5 * ch - 6) * SCALE;
   const n = N[q] as Point;
-  return { at: [CX - n[0] * off, CY - n[1] * off], angle: ROT[q] as 0 | 90 | 180 | 270 };
+  const [cx, cy] = scene.centre;
+  return { at: [cx - n[0] * off, cy - n[1] * off], angle: ROT[q] as 0 | 90 | 180 | 270 };
 }

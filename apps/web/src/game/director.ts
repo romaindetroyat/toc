@@ -2,6 +2,7 @@ import {
   captureBeat,
   type HopTimeline,
   hopTimeline,
+  type Layout,
   MOTION,
   type Mode,
   type Point,
@@ -121,6 +122,8 @@ export type DirectorDeps = {
   };
   /** Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. */
   quarterTurns: number;
+  /** The galet plateau drawn now, read at the start of every move; the portrait one when absent. */
+  layout?: () => Layout;
   /** Where the pawn's head points right now, before the event is played. */
   facingOf(pawn: PawnId): Facing;
   /** Called once an event has been played, to move the pawn's static anchor and facing. */
@@ -247,8 +250,11 @@ export function createDirector(deps: DirectorDeps): Director {
     }
   }
 
-  /** The anchor on the screen of a place, for the pawn that stands there now. */
-  const anchor = (place: Place): Point => anchorOf(place, deps.quarterTurns);
+  /** The anchors of the plateau drawn now: read once at the start of a move, used for all of it. */
+  const anchors = (): ((place: Place) => Point) => {
+    const layout = deps.layout?.() ?? "portrait";
+    return (place) => anchorOf(place, deps.quarterTurns, layout);
+  };
 
   /**
    * A knight leaves the stable, walks, or enters its home, with the knights it eats. One t0 serves the
@@ -266,6 +272,7 @@ export function createDirector(deps: DirectorDeps): Director {
     }
     const from = event.t === "pawnMoved" ? event.from : (render?.pawns[event.pawn] ?? null);
 
+    const anchor = anchors();
     const pace = mode();
     const m: Mode = pace === "test" ? "normal" : pace;
     const reduced = m === "reduced";
@@ -405,6 +412,7 @@ export function createDirector(deps: DirectorDeps): Director {
 
   /** The Valet: two knights cross; each lands on the other's place. */
   async function playSwap(event: Extract<GameEvent, { t: "pawnsSwapped" }>): Promise<void> {
+    const anchor = anchors();
     const pace = mode();
     const m: Mode = pace === "test" ? "normal" : pace;
     const generationAtStart = generation;

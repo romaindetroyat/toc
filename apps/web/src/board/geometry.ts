@@ -1,17 +1,19 @@
-// Pure screen geometry for the board C+ scene (packages/board/src/scene.ts): where a place appears
-// when seat k (bleu 0, vert 1, rouge 2, jaune 3) sits at the bottom. The drawing never turns; the
-// colours take their side. Knights, cards and badges stay upright; only their anchors move.
+// Pure screen geometry for the galet plateaus (packages/board/src/scene.ts, sceneOf(layout)): where a
+// place appears on a plateau when seat k (bleu 0, vert 1, rouge 2, jaune 3) sits at the bottom. The
+// drawing never turns; the colours take their side. Knights, cards and badges stay upright; only
+// their anchors move.
 
-import { type Point, sceneXY } from "@toc/board";
+import { type Layout, type Point, sceneXY } from "@toc/board";
 import type { Place } from "@toc/engine";
 
 /**
  * Centre of the drawn cell, home slot or stable hole of a place, in scene units, for seat k at the
- * bottom. A knight stands on it (its feet KNIGHT.feet x its size below it); the Director's hop
- * points, the overlays and the hit targets use it too.
+ * bottom, on the plateau `layout`. A knight stands on it (its feet KNIGHT.feet x its size below it);
+ * the Director's hop points, the overlays and the hit targets use it too. The layout defaults to the
+ * portrait plateau until every caller passes it (01-35).
  */
-export function anchorOf(place: Place, k: number): Point {
-  return sceneXY(place, k);
+export function anchorOf(place: Place, k: number, layout: Layout = "portrait"): Point {
+  return sceneXY(place, k, layout);
 }
 
 /** Vector from a to b. */

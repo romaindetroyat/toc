@@ -29,7 +29,7 @@ import {
 } from "./turnUi.ts";
 
 /** What the game screen provides: it owns the SVG nodes, so it moves and animates the pawns. */
-export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit"> & {
+export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit" | "layout"> & {
   /** Default: the audio engine of the app. */
   audio?: DirectorDeps["audio"];
 };
@@ -100,6 +100,7 @@ export function createSession(
     quarterTurns: k,
     facingOf: env.facingOf,
     commit: env.commit,
+    layout: env.layout,
     getMode: paceNow,
   });
   // The controller hands every play to the Director; the session listens in to word the bots' plays.

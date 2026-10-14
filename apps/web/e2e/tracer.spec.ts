@@ -55,7 +55,8 @@ async function centredIn(page: Page, inner: string, outer: string): Promise<bool
 
 /**
  * How far the feet of the preview's ghost (the centre of its ring on the ground) are from the centre
- * of a drawn cell, in steps (the C+ step is 126.156 scene units, the scene 2000 units wide).
+ * of a drawn cell, in steps (the portrait galet's step is 108.37 scene units, the scene 2000 units
+ * wide).
  */
 async function ghostOffCell(page: Page, cell: number): Promise<number> {
   return page.evaluate((index) => {
@@ -65,7 +66,7 @@ async function ghostOffCell(page: Page, cell: number): Promise<number> {
     if (!feet || !drawn || !svg) throw new Error(`no ghost, no cell ${index} or no board`);
     const a = feet.getBoundingClientRect();
     const b = drawn.getBoundingClientRect();
-    const step = (126.156 * svg.getBoundingClientRect().width) / 2000;
+    const step = (108.37 * svg.getBoundingClientRect().width) / 2000;
     return (
       Math.hypot(
         a.x + a.width / 2 - (b.x + b.width / 2),
@@ -87,7 +88,7 @@ test("tracer: Jouer la partie -> plateau -> la main du joueur et l’échange", 
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
 
-  // The board is the C+ drawing (D-05, D-07): drawn by code, 72 ring cells, no raster image.
+  // The board is the galet drawing: drawn by code, 72 ring cells, no raster image.
   await expect(page.locator("[data-board-art]")).toBeVisible();
   await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
   await expect(page.locator("[data-board] img")).toHaveCount(0);
@@ -135,7 +136,7 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     `Un seul cheval peut jouer cette carte${NBSP}: touche-le.`,
   );
   await expect(page.getByRole("button", { name: "Changer de carte" })).toBeVisible();
-  // The halo and the hit target are centred on the knight's body at its C+ size (D-16).
+  // The halo and the hit target are centred on the knight's body at its size (D-16).
   expect(await centredIn(page, '[data-halo="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
   expect(await centredIn(page, '[data-hit="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
 
@@ -169,10 +170,10 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     TOTAL_MS,
   );
   await expect(knight).toHaveAttribute("data-place", "ring:15");
-  // It hopped along the C+ ring and landed on the drawn cell 15.
+  // It hopped along the galet ring and landed on the drawn cell 15.
   await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
 
-  // The Dame lies on the C+ felt in front of the human's seat: the centre of the card is inside the
+  // The Dame lies on the felt in front of the human's seat: the centre of the card is inside the
   // « Sur le tapis » button, in its lower quarter (the human sits at the bottom).
   const played = page.locator('[data-felt-last="bleu"] [data-felt-card]');
   await expect(played).toBeVisible();
@@ -186,6 +187,80 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
 
   const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
   expect(scheduled).toEqual(CLOPS);
+});
+
+test.describe("traceur : le galet en largeur à 1280 × 800", () => {
+  test.skip(({ isMobile }) => isMobile, "the landscape plateau is the computer's");
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("la Dame fait bondir le cavalier de case en case jusqu’à la case 15", async ({ page }) => {
+    await page.goto("/");
+    await page.goto(`${SCENARIO}&plateau=largeur`);
+    const board = page.locator("[data-board]");
+    await expect(board).toHaveClass(/loaded/);
+
+    // The landscape galet (Romain's « galet partout », the computer in landscape): 2:1, drawn by code.
+    await expect(board).toHaveAttribute("data-board-layout", "landscape");
+    const box = await board.boundingBox();
+    if (!box) throw new Error("the board has no bounding box");
+    expect(Math.abs(box.height - box.width / 2)).toBeLessThanOrEqual(1.5);
+    await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
+    await expect(board.locator("image, img")).toHaveCount(0);
+
+    const knight = page.locator('[data-pawn="bleu0"]');
+    await expect(knight).toHaveAttribute("data-place", "ring:3");
+    expect(await offCell(page, "bleu0", 3)).toBeLessThanOrEqual(0.5);
+
+    // A recorder, one sample per animation frame from before the keys until the knight reads
+    // ring:15: the closest the knight's ground point (the centre of its shadow) comes to the drawn
+    // cell 9. The feet stand KNIGHT.feet x size below the cell centre (the mock-up's top is
+    // y − h + 0.28 w) and the shadow lies a little further, so the ground point is compared with the
+    // centre of cell 9 moved by the offset it has from the centre of cell 3 at rest. The step is the
+    // distance between the centres of cells 3 and 4.
+    await page.evaluate(() => {
+      const centre = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return [r.x + r.width / 2, r.y + r.height / 2] as const;
+      };
+      const shadow = document.querySelector('[data-pawn="bleu0"] [data-role="shadow"]');
+      const pawn = document.querySelector('[data-pawn="bleu0"]');
+      const c3 = document.querySelector('[data-board-art] [data-cell="3"]');
+      const c4 = document.querySelector('[data-board-art] [data-cell="4"]');
+      const c9 = document.querySelector('[data-board-art] [data-cell="9"]');
+      if (!shadow || !pawn || !c3 || !c4 || !c9) throw new Error("no knight, shadow or cell");
+      const rest = centre(shadow);
+      const a = centre(c3);
+      const b = centre(c4);
+      const nine = centre(c9);
+      const offset = [rest[0] - a[0], rest[1] - a[1]] as const;
+      const record = { step: Math.hypot(b[0] - a[0], b[1] - a[1]), best: Infinity, samples: 0 };
+      (window as unknown as { hopRecord: typeof record }).hopRecord = record;
+      const sample = () => {
+        const p = centre(shadow);
+        const d = Math.hypot(p[0] - offset[0] - nine[0], p[1] - offset[1] - nine[1]);
+        record.best = Math.min(record.best, d);
+        record.samples++;
+        if (pawn.getAttribute("data-place") !== "ring:15") requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+
+    // « 1 » picks the Dame, « a » the lit knight, « Entrée » plays it.
+    await page.keyboard.press("1");
+    await page.keyboard.press("a");
+    await expect(page.locator("[data-ghost]")).toBeVisible();
+    await page.keyboard.press("Enter");
+
+    await expect(knight).toHaveAttribute("data-place", "ring:15");
+    const record = await page.evaluate(
+      () =>
+        (window as unknown as { hopRecord: { step: number; best: number; samples: number } })
+          .hopRecord,
+    );
+    expect(record.samples).toBeGreaterThan(10);
+    expect(record.best).toBeLessThan(record.step / 4);
+    await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
+  });
 });
 
 test("tracer: « Annuler ce coup » et « Changer de carte » reviennent en arrière", async ({

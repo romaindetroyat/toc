@@ -12,7 +12,7 @@
     sortHand,
     teamOf,
   } from "@toc/engine";
-  import { MOTION, SCENE, scaleFor } from "@toc/board";
+  import { type Layout, MOTION, sceneOf, scaleFor } from "@toc/board";
   import {
     type EngineStatus,
     onStatus,
@@ -60,9 +60,19 @@
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
-  const debugView = DEBUG_VIEWS.find(
-    (view) => view === new URLSearchParams(location.hash.split("?")[1] ?? "").get("debug"),
-  );
+  const hashQuery = new URLSearchParams(location.hash.split("?")[1] ?? "");
+  const debugView = DEBUG_VIEWS.find((view) => view === hashQuery.get("debug"));
+
+  // The galet plateau (Romain's choice of 2026-10-14: « galet partout »). Until the screen chooses
+  // it (01-36) the game draws the portrait one; in debug builds only, `plateau=largeur` draws the
+  // landscape one and `plateau=hauteur` the portrait one (an allow-list: anything else is ignored).
+  const PLATEAUX: Record<string, Layout> = { largeur: "landscape", hauteur: "portrait" };
+  const asked = hashQuery.get("plateau");
+  const boardLayout: Layout =
+    __TOC_DEBUG__ && asked !== null && Object.hasOwn(PLATEAUX, asked)
+      ? (PLATEAUX[asked] as Layout)
+      : "portrait";
+  const boardScene = sceneOf(boardLayout);
 
   // Debug builds only: the overlay is a dynamic import inside a compile-time `DEBUG` branch.
   let Geometry = $state.raw<Component | undefined>();
@@ -160,6 +170,7 @@
 
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
   const env: SessionEnv = {
+    layout: () => boardLayout,
     animator: {
       begin: raise,
       hop(pawn, points, timeline, leadMs, pawnFacings, mode) {
@@ -316,7 +327,7 @@
     render === null
       ? []
       : PAWNS.map((pawn) => {
-          const [x, y] = anchorOf(render.pawns[pawn.id] as Place, k);
+          const [x, y] = anchorOf(render.pawns[pawn.id] as Place, k, boardLayout);
           return { ...pawn, x, y };
         }).sort((a, b) => {
           const rankA = moving.indexOf(a.id);
@@ -552,7 +563,11 @@
   onMount(() => unlockOnFirstGesture());
 </script>
 
-<main class="game" style:--head-room={SCENE.headRoom}>
+<main
+  class="game"
+  style:--head-room={boardScene.headRoom}
+  style:--board-ratio={boardScene.height / boardScene.width}
+>
   {#if startFailure}
     {fail(startFailure)}
   {:else if session?.failure}
@@ -566,7 +581,15 @@
       </div>
 
       <div class="stage">
-        <Board {k} {render} {discardTop} {burst} {flights} ontapis={() => (tapisOpen = true)}>
+        <Board
+          {k}
+          layout={boardLayout}
+          {render}
+          {discardTop}
+          {burst}
+          {flights}
+          ontapis={() => (tapisOpen = true)}
+        >
           {#snippet under(px)}
             <Overlay
               layer="under"
@@ -705,17 +728,18 @@
 
 <style>
   /*
-   * Board C+ (D-07: the portrait board decided by Romain, UI-SPEC addendum « Plateau C+ »): a 2:3
-   * board, centred, never cropped; --board-size is its width and its height is 1.5 times that. The
-   * chrome below the board in portrait is the info bar (56), the action zone and the hand zone: the
-   * action zone has a fixed height (--action) so that a longer prompt, the preview or the tray never
-   * pushes the hand down, and the hand zone is the fan plus the room the lifted and turned cards need
-   * (--hand). --head-room of the width (SCENE.headRoom) stays free above the board for the head of a
-   * lifted top-row knight, so the height a board takes is (1.5 + head room) x its width.
-   * Portrait: min(100vw − 32 px − insets, (100dvh − chrome − insets) / (1.5 + head room), 880 / 1.5);
-   * landscape: min((100dvh − 32 px − insets) / (1.5 + head room), 100vw − 368 px − insets), the
-   * right panel taking 320 + 48. Safe-area insets are subtracted from both axes. The page never
-   * scrolls (FX-01).
+   * The galet board (Romain's choice of 2026-10-14: « galet partout »): centred, never cropped;
+   * --board-size is its width and --board-ratio its height over its width (0.5 for the landscape
+   * plateau, 1.5 for the portrait one, from sceneOf(layout)). The chrome below the board in portrait
+   * is the info bar (56), the action zone and the hand zone: the action zone has a fixed height
+   * (--action) so that a longer prompt, the preview or the tray never pushes the hand down, and the
+   * hand zone is the fan plus the room the lifted and turned cards need (--hand). --head-room of the
+   * width (sceneOf(layout).headRoom) stays free above the board for the head of a lifted top-row
+   * knight, so the height a board takes is (board ratio + head room) x its width.
+   * Portrait: min(100vw − 32 px − insets, (100dvh − chrome − insets) / (ratio + head room), 880 / 1.5);
+   * landscape: min((100dvh − 32 px − insets) / (ratio + head room), 100vw − 368 px − insets), the
+   * right panel taking 320 + 48 (a landscape plateau there is width-limited, until the bottom bar of
+   * 01-36). Safe-area insets are subtracted from both axes. The page never scrolls (FX-01).
    */
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
@@ -727,7 +751,7 @@
       0px,
       min(
         100vw - var(--inset-x) - 2 * var(--space-md),
-        (100dvh - var(--chrome) - var(--inset-y)) / (1.5 + var(--head-room)),
+        (100dvh - var(--chrome) - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
         880px / 1.5
       )
     );
@@ -807,7 +831,7 @@
       --board-size: max(
         0px,
         min(
-          (100dvh - 32px - var(--inset-y)) / (1.5 + var(--head-room)),
+          (100dvh - 32px - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
           100vw - 368px - var(--inset-x)
         )
       );
@@ -848,7 +872,7 @@
       --board-size: max(
         0px,
         min(
-          (100dvh - var(--inset-y)) / (1.5 + var(--head-room)),
+          (100dvh - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
           100vw - 368px - var(--inset-x)
         )
       );
