@@ -29,6 +29,7 @@ type Cue = { id: string; at: number; requestedAt: number };
 type TocWindow = Window & {
   __anims: Rec[];
   __paused: Animation[];
+  __armed?: Promise<void>;
   __tocDebug?: { audio: { cues?: Cue[]; scheduled: number[]; history: number[][] } };
 };
 
@@ -164,6 +165,59 @@ async function shoot(
       }),
     [at, selector, minimum] as const,
   );
+  const project = test.info().project.name;
+  await page.screenshot({ path: `test-results/anim-${name}-${project}.png` });
+  await page.evaluate(() => {
+    for (const animation of (window as unknown as TocWindow).__paused) animation.play();
+  });
+}
+
+/**
+ * Like `shoot`, for animations that are all running together only briefly (the deal: 250 ms): before the
+ * page loads, `Element.animate` is wrapped so that `minimum` animations of the selector are frozen at
+ * `at` in the very task that starts the last of them, however late the test or the frames come.
+ * `shootArmed` then takes the screenshot and lets them run on.
+ */
+async function armShot(page: Page, selector: string, minimum: number, at: number) {
+  await page.addInitScript(
+    ([only, count, time]) => {
+      const w = window as unknown as TocWindow;
+      const original = Element.prototype.animate;
+      w.__armed = new Promise<void>((resolve) => {
+        let done = false;
+        Element.prototype.animate = function (this: Element, ...args) {
+          const animation = original.apply(this, args);
+          if (!done && this.closest(only as string) !== null) {
+            queueMicrotask(() => {
+              if (done) return;
+              const running = document.getAnimations().filter((a) => {
+                const target = a.effect && (a.effect as KeyframeEffect).target;
+                return (
+                  target instanceof Element &&
+                  target.closest(only as string) !== null &&
+                  a.playState === "running"
+                );
+              });
+              if (running.length < (count as number)) return;
+              done = true;
+              w.__paused = running;
+              for (const a of running) {
+                a.pause();
+                a.currentTime = time as number;
+              }
+              resolve();
+            });
+          }
+          return animation;
+        } as typeof Element.prototype.animate;
+      });
+    },
+    [selector, minimum, at] as const,
+  );
+}
+
+async function shootArmed(page: Page, name: string) {
+  await page.evaluate(() => (window as unknown as TocWindow).__armed);
   const project = test.info().project.name;
   await page.screenshot({ path: `test-results/anim-${name}-${project}.png` });
   await page.evaluate(() => {
@@ -535,17 +589,22 @@ function bannerWatch() {
 test("la donne : 20 cartes de 250 ms à 40 ms d’intervalle avec le bruit de la donne, puis la main se retourne", async ({
   page,
 }) => {
+  // The 20 cards are all in flight together for only 250 ms, until the first one lands: the freeze is
+  // armed before the page loads, so a slow poll or frame cannot miss that moment.
+  await armShot(page, "[data-flight]", 20, LEAD + 300);
   await openSeeded(page);
+  await shootArmed(page, "donne");
   await expect
     .poll(async () => flightsOf(await records(page), "deal").length, { timeout: 10_000 })
     .toBe(20);
-  const deal = flightsOf(await records(page), "deal");
+  // The freeze for the screenshot shifts the start of the cards the recorder saw only after it, so the
+  // 40 ms interval is read from each card's own delay, in dealing order.
+  const deal = flightsOf(await records(page), "deal").sort((a, b) => a.delay - b.delay);
   for (const [i, flight] of deal.entries()) {
     near(flight.duration, 250, 1);
-    near(flight.begins - (deal[0] as Rec).begins, i * 40, 6);
+    near(flight.delay - (deal[0] as Rec).delay, i * 40, 1);
     expect(flight.card).toBe("back");
   }
-  await shoot(page, "donne", LEAD + 300, "[data-flight]", 20);
 
   const riffle = (await cues(page)).filter((c) => c.id === "carte-donne");
   expect(riffle).toHaveLength(1);
