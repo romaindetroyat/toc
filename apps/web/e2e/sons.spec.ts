@@ -297,8 +297,16 @@ test.describe("crédits et licences", () => {
     // The court figures name their author and their licence.
     await expect(dialog.getByText("Figures des cartes (Valet, Dame, Roi)")).toBeVisible();
     await expect(dialog.getByText(/David Bellot.*LGPL-2\.1/)).toBeVisible();
+    // Romain's board and his riders of the galet plateaus share the « Plateau » group.
+    const plateau = dialog.locator('[data-credits-group="Plateau"] li[data-credit]');
+    await expect(plateau).toHaveCount(2);
+    await expect(plateau.nth(1)).toHaveAttribute("data-credit", "plateau-cavaliers");
+    await expect(plateau.nth(1).getByText("Cavaliers du plateau", { exact: true })).toBeVisible();
+    await expect(
+      plateau.nth(1).getByText(/Romain · Utilisés avec l’accord de l’auteur/),
+    ).toBeVisible();
     // One entry per row of the manifest, shown as text (the ambience row went with the ambience).
-    await expect(dialog.locator("li[data-credit]")).toHaveCount(16);
+    await expect(dialog.locator("li[data-credit]")).toHaveCount(17);
     await expect(dialog.getByText("Ambiance", { exact: true })).toHaveCount(0);
     await expect(dialog.locator("a")).toHaveCount(0);
   });

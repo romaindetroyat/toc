@@ -205,7 +205,10 @@ test.describe("traceur : le galet en largeur à 1280 × 800", () => {
     if (!box) throw new Error("the board has no bounding box");
     expect(Math.abs(box.height - box.width / 2)).toBeLessThanOrEqual(1.5);
     await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
-    await expect(board.locator("image, img")).toHaveCount(0);
+    // No raster image but Romain's four riders.
+    await expect(board.locator("img")).toHaveCount(0);
+    await expect(board.locator("image:not([data-rider])")).toHaveCount(0);
+    await expect(board.locator("image[data-rider]")).toHaveCount(4);
 
     const knight = page.locator('[data-pawn="bleu0"]');
     await expect(knight).toHaveAttribute("data-place", "ring:3");

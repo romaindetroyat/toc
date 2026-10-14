@@ -6,6 +6,11 @@
     bottomOf,
     type Layout,
   } from "@toc/board";
+  import type { Color } from "@toc/engine";
+  import riderBleu from "../assets/plateau/cav-bleu.png";
+  import riderJaune from "../assets/plateau/cav-jaune.png";
+  import riderRouge from "../assets/plateau/cav-rouge.png";
+  import riderVert from "../assets/plateau/cav-vert.png";
   import { board as t } from "../i18n/fr/board.ts";
 
   // The galet board (Romain's choice of 2026-10-14: « galet partout », landscape on a computer,
@@ -13,9 +18,18 @@
   // every shape are explicit SVG elements with bound attributes: nothing is ever built from a markup
   // string (T-01-50). k = the seat at the bottom (bleu 0, vert 1, rouge 2, jaune 3); the drawing never
   // turns, the colours take their side (« à confirmer par Romain »). Derived once per k and layout:
-  // the animations never touch it (T-01-51). The rider pictures arrive in 01-33: until then their
-  // image shapes are skipped.
+  // the animations never touch it (T-01-51). The riders are Romain's ink horseman of his original
+  // board, recoloured for each colour (apps/web/src/assets/plateau, copied as they are from the
+  // galet mock-up): decoration only, never a target.
   let { k = 0, layout = "portrait" }: { k?: number; layout?: Layout } = $props();
+
+  /** Romain's rider picture of each colour (bundled files, one href per colour). */
+  const RIDERS: Record<Color, string> = {
+    bleu: riderBleu,
+    jaune: riderJaune,
+    rouge: riderRouge,
+    vert: riderVert,
+  };
 
   const art = $derived(boardArt(k, layout));
   const bottom = $derived(bottomOf(k));
@@ -157,6 +171,20 @@
         stroke-linejoin={shape.linejoin}
         opacity={shape.opacity}
         transform={transformOf(shape.transform)}
+      />
+    {:else if shape.kind === "image"}
+      <!-- The box already has the picture's 157:209 ratio, hence preserveAspectRatio none. -->
+      <image
+        href={RIDERS[shape.color]}
+        x={shape.x}
+        y={shape.y}
+        width={shape.w}
+        height={shape.h}
+        preserveAspectRatio="none"
+        opacity={shape.opacity}
+        data-rider={shape.color}
+        aria-hidden="true"
+        pointer-events="none"
       />
     {:else if shape.kind === "text"}
       <!-- A handwritten number of the drawing (typography exception of the addendum): not read out. -->

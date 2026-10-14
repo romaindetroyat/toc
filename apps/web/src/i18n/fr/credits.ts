@@ -38,6 +38,7 @@ export const credits = {
     caveat: "Caveat",
     lucide: "Lucide",
     plateau: "Plateau de jeu",
+    "plateau-cavaliers": "Cavaliers du plateau",
     cavaliers: "Cavaliers",
     cartes: "Figures des cartes (Valet, Dame, Roi)",
   } as Record<string, string>,
