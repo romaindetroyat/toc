@@ -43,19 +43,7 @@
 </script>
 
 <g data-debug-geometry class="debug">
-  {#if shape.kind === "ellipse"}
-    <ellipse class="felt" data-debug-felt cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} />
-  {:else}
-    <rect
-      class="felt"
-      data-debug-felt
-      x={shape.x}
-      y={shape.y}
-      width={shape.w}
-      height={shape.h}
-      rx={shape.r}
-    />
-  {/if}
+  <ellipse class="felt" data-debug-felt cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} />
   <rect
     class="felt box"
     data-debug-felt-box

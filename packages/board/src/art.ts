@@ -1,23 +1,23 @@
-// The galet board's drawing as plain data, for its two plateaus. Pure: no DOM, no clock.
+// The galet board's drawing as plain data: the one board of the game, in landscape (« paysage
+// obligatoire »). Pure: no DOM, no clock.
 //
-// boardArt(k, layout) lists the definitions (noise filters, gradients, clip paths) and the shapes of
-// design/plateau-galet.dc.html for that plateau, in the mock-up's painting order; every position
-// comes from scene.ts, read through sceneOf(layout) and the layout passed to every geometry call.
+// boardArt(k) lists the definitions (noise filters, gradients, clip paths) and the shapes of
+// design/plateau-galet.dc.html, in the mock-up's painting order; every position comes from scene.ts
+// (SCENE and its geometry functions).
 // artSvg() serialises such a drawing into a standalone SVG document for the tools (the rules
 // pictures); the game renders the same data as Svelte markup.
 
 import { COLORS, type Color, EXIT, type PawnIndex } from "@toc/engine";
-import type { Point } from "./layout.ts";
 import {
   boardOutline,
   bottomOf,
   type FeltShape,
-  type Layout,
   MOCKUP,
   PALETTE,
+  type Point,
   riderBox,
   ringPolyline,
-  sceneOf,
+  SCENE,
   sceneXY,
 } from "./scene.ts";
 
@@ -112,9 +112,8 @@ export type ArtShape =
   /** A picture; its href is supplied by the renderer (by colour). */
   | (Common & { kind: "image"; color: Color; x: number; y: number; w: number; h: number });
 
-/** A plateau's drawing: its scene size, its definitions and its shapes in painting order. */
+/** The galet's drawing: its scene size, its definitions and its shapes in painting order. */
 export type Art = {
-  layout: Layout;
   width: number;
   height: number;
   defs: ArtDef[];
@@ -137,26 +136,14 @@ function pathOf(points: readonly Point[]): string {
   return `M${points.map((p) => `${f1(p[0])} ${f1(p[1])}`).join(" L")} Z`;
 }
 
-/** The felt's outline as a path: a 96-point ellipse or a rectangle with quadratic corners. */
+/** The felt's outline as a path: a 96-point ellipse. */
 export function feltPath(shape: FeltShape): string {
-  if (shape.kind === "ellipse") {
-    const pts: Point[] = [];
-    for (let j = 0; j < 96; j++) {
-      const a = (2 * Math.PI * j) / 96;
-      pts.push([shape.cx + shape.rx * Math.cos(a), shape.cy + shape.ry * Math.sin(a)]);
-    }
-    return pathOf(pts);
+  const pts: Point[] = [];
+  for (let j = 0; j < 96; j++) {
+    const a = (2 * Math.PI * j) / 96;
+    pts.push([shape.cx + shape.rx * Math.cos(a), shape.cy + shape.ry * Math.sin(a)]);
   }
-  const { x, y, w, h, r } = shape;
-  const L = x;
-  const R = x + w;
-  const Tp = y;
-  const B = y + h;
-  return (
-    `M${f1(L + r)} ${f1(Tp)} H${f1(R - r)} Q${f1(R)} ${f1(Tp)} ${f1(R)} ${f1(Tp + r)} ` +
-    `V${f1(B - r)} Q${f1(R)} ${f1(B)} ${f1(R - r)} ${f1(B)} H${f1(L + r)} ` +
-    `Q${f1(L)} ${f1(B)} ${f1(L)} ${f1(B - r)} V${f1(Tp + r)} Q${f1(L)} ${f1(Tp)} ${f1(L + r)} ${f1(Tp)} Z`
-  );
+  return pathOf(pts);
 }
 
 /** The mock-up's « 0 0 0 0 r  0 0 0 0 g  0 0 0 0 b  0 0 0 a o » matrices of the two noises. */
@@ -187,14 +174,14 @@ function crescent(x: number, y: number, r: number, dy: number): string {
   );
 }
 
-/** The galet drawing of a plateau for seat k, in the mock-up's painting order. */
-export function boardArt(k: number, layout: Layout = "landscape"): Art {
-  const scene = sceneOf(layout);
+/** The galet drawing for seat k, in the mock-up's painting order. */
+export function boardArt(k: number): Art {
+  const scene = SCENE;
   const s = scene.step;
   const W = scene.width;
   const H = scene.height;
-  const grain = MOCKUP[layout].grain;
-  const { outline, outer } = boardOutline(layout);
+  const grain = MOCKUP.grain;
+  const { outline, outer } = boardOutline();
   const felt = feltPath(scene.feltShape);
 
   // The noise frequencies are per user unit: the scene is the mock-up x 2, so they are halved.
@@ -272,7 +259,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
   shapes.push({
     kind: "polyline",
     role: "track",
-    points: ringPolyline(layout),
+    points: ringPolyline(),
     fill: "none",
     stroke: PALETTE.track,
     strokeOpacity: 0.28,
@@ -319,7 +306,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
       kind: "image",
       role: "rider",
       color: c,
-      ...riderBox(c, k, layout),
+      ...riderBox(c, k),
       opacity: 0.85,
     });
   }
@@ -343,7 +330,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
   const seats = [0, 1, 2, 3].map((q) => COLORS[(COLORS.indexOf(b) + q) % 4] as Color);
   for (const c of seats) {
     for (const slot of SLOTS) {
-      const [x, y] = sceneXY({ z: "home", color: c, slot }, k, layout);
+      const [x, y] = sceneXY({ z: "home", color: c, slot }, k);
       const r = 0.4 * s;
       const border = 0.1 * s;
       dotShadow("lane", c, x, y, r);
@@ -360,7 +347,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
       });
     }
     for (const slot of SLOTS) {
-      const [x, y] = sceneXY({ z: "stable", color: c, slot }, k, layout);
+      const [x, y] = sceneXY({ z: "stable", color: c, slot }, k);
       const r = 0.42 * s;
       const border = 0.05 * s;
       dotShadow("hole", c, x, y, r);
@@ -380,7 +367,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
 
   // The 72 cells and their handwritten numbers, each cell over its drop shadow.
   for (let cell = 0; cell < 72; cell++) {
-    const [x, y] = sceneXY({ z: "ring", cell }, k, layout);
+    const [x, y] = sceneXY({ z: "ring", cell }, k);
     const m = cell % 18;
     const tilt = ((cell * 37) % 13) - 6;
     const label = (
@@ -517,7 +504,7 @@ export function boardArt(k: number, layout: Layout = "landscape"): Art {
       label(String(m), 0.58 * s, PALETTE.ink, tilt, -0.02 * s);
     }
   }
-  return { layout, width: W, height: H, defs, shapes };
+  return { width: W, height: H, defs, shapes };
 }
 
 /** A number for an SVG attribute: finite, at most four decimals. */

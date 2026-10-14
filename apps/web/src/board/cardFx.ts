@@ -80,7 +80,6 @@ const TILTS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
 /** Whether a card centred on `at`, turned by `degrees`, lies inside the felt with all four corners. */
 function cardInsideFelt(at: Point, degrees: number): boolean {
   const shape = SCENE.feltShape;
-  if (shape.kind !== "ellipse") return true;
   const t = (degrees * Math.PI) / 180;
   const [cos, sin] = [Math.cos(t), Math.sin(t)];
   for (const [x, y] of [

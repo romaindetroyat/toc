@@ -1,62 +1,43 @@
-// The galet board geometry, for its two plateaus (Romain's choice of 2026-10-14: « galet partout »;
-// the game draws only the landscape one, see below). Pure: no DOM, no clock.
+// The galet board geometry (Romain's choice of 2026-10-14: « galet partout »). Pure: no DOM, no clock.
 //
-// Ported from renderVals() of design/plateau-galet.dc.html with the mock-up's own numbers: variant
-// pc-galet for « landscape » (1600 x 800, superellipse exponent 3.2, felt ellipse) and tel-galet for
-// « portrait » (1000 x 1500, exponent 2.8, felt rounded rectangle), both without wave. The ring is
-// computed in mock-up units exactly as the mock-up does (shape, the six iterations of the step, at,
-// cellPos, the frame origins C and frame), then every export is given in scene units = mock-up units
-// x 2: the landscape scene is 3200 x 1600 (step about 107.05), the portrait one 2000 x 3000 (step
-// about 108.37), so a knight keeps about the 110 x 190 sprite footprint the overlays were tuned for.
+// Romain, 2026-10-14: « Pour la version iphone, oblige à jouer en format paysage, ça permettra
+// d'utiliser le même plateau » and « Oui, paysage obligatoire ». The game has one board, the galet in
+// landscape, on a computer and on a phone held sideways alike: this file holds that one plateau and
+// SCENE is its scene. No function takes a layout.
+//
+// Ported from renderVals() of design/plateau-galet.dc.html with the mock-up's own numbers, variant
+// pc-galet (1600 x 800, superellipse exponent 3.2, felt ellipse, no wave). The ring is computed in
+// mock-up units exactly as the mock-up does (shape, the six iterations of the step, at, cellPos, the
+// frame origins C and frame), then every export is given in scene units = mock-up units x 2: the
+// scene is 3200 x 1600 (step about 107.05), so a knight keeps about the 110 x 190 sprite footprint
+// the overlays were tuned for.
 //
 // Seating (« à confirmer par Romain », kept from D-05): the drawing never turns. The colour of seat k
 // (bleu 0, vert 1, rouge 2, jaune 3) takes the bottom side, its partner the top, the next seat
 // clockwise the left and the previous one the right; the ring indices follow from the bottom seat's
 // start index, as in the mock-up.
-//
-// Romain, 2026-10-14: « paysage obligatoire ». The landscape galet is the only board of the game, on
-// a computer and on a phone held sideways. Every layout parameter therefore defaults to "landscape",
-// so the consumers that never pass one (knights, halos, targets, ghosts, felt cards, particles, the
-// debug view) stand on it; SCENE is the landscape scene. The portrait galet stays in this file,
-// unused by the game, until 01-40 removes it with the layout concept.
 
 import { COLORS, type Color, EXIT, type Place } from "@toc/engine";
 import type { Point } from "./layout.ts";
 import type { ScreenSide } from "./rotate.ts";
 
-/** The two galet plateaus of the mock-up; the game draws only « landscape » (« paysage obligatoire »). */
-export type Layout = "landscape" | "portrait";
+// The art and its tests take Point from here; 01-41 defines it in this file when layout.ts goes.
+export type { Point };
 
-export const LAYOUTS: readonly Layout[] = ["landscape", "portrait"];
-
-/** The mock-up's own frames and constants (renderVals, variants pc-galet and tel-galet). */
+/** The mock-up's own frame and constants (renderVals, variant pc-galet). */
 export const MOCKUP = {
   pad: 22,
   disc: 0.84,
-  landscape: {
-    variant: "pc-galet",
-    width: 1600,
-    height: 800,
-    n: 3.2,
-    wave: 0,
-    felt: { kind: "ellipse", rx: 300, ry: 112, stitch: { rx: 286, ry: 98 } },
-    grain: [0.0028, 0.075],
-    rider: { f: 0.6, h: 2.6 },
-    /** Talon and défausse beside the centre, at 0.95 of a card. */
-    pile: { dx: 75, dy: 0, scale: 0.95 },
-  },
-  portrait: {
-    variant: "tel-galet",
-    width: 1000,
-    height: 1500,
-    n: 2.8,
-    wave: 0,
-    felt: { kind: "rect", hw: 180, hh: 210, r: 44, stitch: { hw: 166, hh: 196, r: 34 } },
-    grain: [0.0045, 0.085],
-    rider: { f: 0.66, h: 2.5 },
-    /** Talon and défausse above and below the centre (0.55 of a card's height), at 0.82 of a card. */
-    pile: { dx: 0, dy: 0.55, scale: 0.82 },
-  },
+  variant: "pc-galet",
+  width: 1600,
+  height: 800,
+  n: 3.2,
+  wave: 0,
+  felt: { rx: 300, ry: 112, stitch: { rx: 286, ry: 98 } },
+  grain: [0.0028, 0.075],
+  rider: { f: 0.6, h: 2.6 },
+  /** Talon and défausse beside the centre, at 0.95 of a card. */
+  pile: { dx: 75, dy: 0, scale: 0.95 },
 } as const;
 
 const SCALE = 2;
@@ -121,14 +102,11 @@ export const KNIGHT = {
  */
 const KNIGHT_WIDTH = { ring: 0.95, home: 0.82, stable: 0.78 } as const;
 
-/** The felt's outline in scene units: an ellipse (landscape) or a rounded rectangle (portrait). */
-export type FeltShape =
-  | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number }
-  | { kind: "rect"; x: number; y: number; w: number; h: number; r: number };
+/** The felt's outline in scene units: an ellipse. */
+export type FeltShape = { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
 
-/** A plateau: viewBox 0 0 width height, its step, its ring, its felt and the cards on it (scene units). */
+/** The galet: viewBox 0 0 width height, its step, its ring, its felt and the cards on it (scene units). */
 export type Scene = {
-  layout: Layout;
   scale: number;
   width: number;
   height: number;
@@ -165,9 +143,9 @@ type Geometry = {
   corners: Point[];
 };
 
-/** The plateau computed verbatim in mock-up units, then given in scene units. */
-function compute(layout: Layout): Geometry {
-  const cfg = MOCKUP[layout];
+/** The galet computed verbatim in mock-up units, then given in scene units. */
+function compute(): Geometry {
+  const cfg = MOCKUP;
   const W = cfg.width;
   const H = cfg.height;
   const cx = W / 2;
@@ -243,49 +221,27 @@ function compute(layout: Layout): Geometry {
   });
 
   // The felt and its stitch.
-  let feltShape: FeltShape;
-  let stitch: FeltShape;
-  let felt: Scene["felt"];
   const f = cfg.felt;
-  if (f.kind === "ellipse") {
-    feltShape = {
-      kind: "ellipse",
-      cx: cx * SCALE,
-      cy: cy * SCALE,
-      rx: f.rx * SCALE,
-      ry: f.ry * SCALE,
-    };
-    stitch = {
-      kind: "ellipse",
-      cx: cx * SCALE,
-      cy: cy * SCALE,
-      rx: f.stitch.rx * SCALE,
-      ry: f.stitch.ry * SCALE,
-    };
-    felt = {
-      x: (cx - f.rx) * SCALE,
-      y: (cy - f.ry) * SCALE,
-      w: 2 * f.rx * SCALE,
-      h: 2 * f.ry * SCALE,
-    };
-  } else {
-    const rect = (hw: number, hh: number, r: number): FeltShape => ({
-      kind: "rect",
-      x: (cx - hw) * SCALE,
-      y: (cy - hh) * SCALE,
-      w: 2 * hw * SCALE,
-      h: 2 * hh * SCALE,
-      r: r * SCALE,
-    });
-    feltShape = rect(f.hw, f.hh, f.r);
-    stitch = rect(f.stitch.hw, f.stitch.hh, f.stitch.r);
-    felt = {
-      x: (cx - f.hw) * SCALE,
-      y: (cy - f.hh) * SCALE,
-      w: 2 * f.hw * SCALE,
-      h: 2 * f.hh * SCALE,
-    };
-  }
+  const feltShape: FeltShape = {
+    kind: "ellipse",
+    cx: cx * SCALE,
+    cy: cy * SCALE,
+    rx: f.rx * SCALE,
+    ry: f.ry * SCALE,
+  };
+  const stitch: FeltShape = {
+    kind: "ellipse",
+    cx: cx * SCALE,
+    cy: cy * SCALE,
+    rx: f.stitch.rx * SCALE,
+    ry: f.stitch.ry * SCALE,
+  };
+  const felt: Scene["felt"] = {
+    x: (cx - f.rx) * SCALE,
+    y: (cy - f.ry) * SCALE,
+    w: 2 * f.rx * SCALE,
+    h: 2 * f.ry * SCALE,
+  };
 
   const step = s * SCALE;
   const card = { w: 1.3 * step, h: 1.3 * step * 1.4 };
@@ -295,17 +251,15 @@ function compute(layout: Layout): Geometry {
 
   const scaled = (p: XY): Point => [p[0] * SCALE, p[1] * SCALE];
   const sceneCells = cells.map(scaled);
-  // headRoom = ((KNIGHT.head + KNIGHT.lift) x knightScale(ring place, layout) − the smallest y of the
-  // 72 ring cells) / width = ((159.2 + 12) x 0.95 x step / 110 − 2 x (22 + 0.42 s)) / width: about
-  // 0.02166 on the landscape plateau and 0.03536 on the portrait one. A board with its head room is
-  // therefore (height / width + headRoom) times as tall as it is wide.
+  // headRoom = ((KNIGHT.head + KNIGHT.lift) x knightScale(ring place) − the smallest y of the 72 ring
+  // cells) / width = ((159.2 + 12) x 0.95 x step / 110 − 2 x (22 + 0.42 s)) / width: about 0.02166.
+  // A board with its head room is therefore (height / width + headRoom) times as tall as it is wide.
   const ringTop = Math.min(...sceneCells.map((p) => p[1]));
   const ringScale = (KNIGHT_WIDTH.ring * step) / KNIGHT.w;
   const headRoom = Math.max(0, (KNIGHT.head + KNIGHT.lift) * ringScale - ringTop) / (W * SCALE);
 
   return {
     scene: {
-      layout,
       scale: SCALE,
       width: W * SCALE,
       height: H * SCALE,
@@ -330,28 +284,15 @@ function compute(layout: Layout): Geometry {
   };
 }
 
-const GEOMETRY: Record<Layout, Geometry> = {
-  landscape: compute("landscape"),
-  portrait: compute("portrait"),
-};
+/** The galet, computed once. */
+const GEOMETRY: Geometry = compute();
 
-function geometryOf(layout: Layout): Geometry {
-  const g = GEOMETRY[layout];
-  if (!g) throw new Error(`unknown layout ${String(layout)}`);
-  return g;
-}
-
-/** The scene of a galet plateau (computed once per layout). */
-export function sceneOf(layout: Layout = "landscape"): Scene {
-  return geometryOf(layout).scene;
-}
-
-/** The landscape scene, the game's only board (« paysage obligatoire »); alias until 01-40. */
-export const SCENE: Scene = sceneOf("landscape");
+/** The galet's scene, the game's one board (« paysage obligatoire »). */
+export const SCENE: Scene = GEOMETRY.scene;
 
 /** Sprite-to-scene scale of a knight standing on `place`. */
-export function knightScale(place: Place, layout: Layout = "landscape"): number {
-  return (KNIGHT_WIDTH[place.z] * sceneOf(layout).step) / KNIGHT.w;
+export function knightScale(place: Place): number {
+  return (KNIGHT_WIDTH[place.z] * SCENE.step) / KNIGHT.w;
 }
 
 /** The galet colours and the board's paints (mock-up constants). */
@@ -412,8 +353,8 @@ function frame(g: Geometry, q: number, ta: number, na: number): Point {
 }
 
 /** Centre of a colour's stable: the mean of its four stable dots. */
-export function stableCentre(color: Color, k: number, layout: Layout = "landscape"): Point {
-  const g = geometryOf(layout);
+export function stableCentre(color: Color, k: number): Point {
+  const g = GEOMETRY;
   const q = quarterOf(color, k);
   const dots = STABLE_FRAME.map(([ta, na]) => frame(g, q, ta, na));
   return [dots.reduce((sum, p) => sum + p[0], 0) / 4, dots.reduce((sum, p) => sum + p[1], 0) / 4];
@@ -422,8 +363,8 @@ export function stableCentre(color: Color, k: number, layout: Layout = "landscap
 const isSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < 4;
 
 /** Scene point of an engine place for seat k: the cell centre a knight's feet stand on. */
-export function sceneXY(place: Place, k: number, layout: Layout = "landscape"): Point {
-  const g = geometryOf(layout);
+export function sceneXY(place: Place, k: number): Point {
+  const g = GEOMETRY;
   const startIdx = (EXIT[bottomOf(k)] + RING_CELLS - 1) % RING_CELLS;
   if (place.z === "ring") {
     const cell = place.cell;
@@ -450,15 +391,13 @@ export function sceneXY(place: Place, k: number, layout: Layout = "landscape"): 
 }
 
 /** The track: every 4th point of the 1440-point ring, closed, from the bottom centre clockwise. */
-export function ringPolyline(layout: Layout = "landscape"): Point[] {
-  return geometryOf(layout)
-    .poly.filter((_, j) => j % 4 === 0)
-    .map((p) => [p[0], p[1]] as const);
+export function ringPolyline(): Point[] {
+  return GEOMETRY.poly.filter((_, j) => j % 4 === 0).map((p) => [p[0], p[1]] as const);
 }
 
 /** The board's outline (oak) and its walnut outer rim, closed 360-point superellipses. */
-export function boardOutline(layout: Layout = "landscape"): { outline: Point[]; outer: Point[] } {
-  const g = geometryOf(layout);
+export function boardOutline(): { outline: Point[]; outer: Point[] } {
+  const g = GEOMETRY;
   return {
     outline: g.outline.map((p) => [p[0], p[1]] as const),
     outer: g.outer.map((p) => [p[0], p[1]] as const),
@@ -466,13 +405,9 @@ export function boardOutline(layout: Layout = "landscape"): { outline: Point[]; 
 }
 
 /** The box of a colour's rider picture: in the corner of the side its colour sets off towards. */
-export function riderBox(
-  color: Color,
-  k: number,
-  layout: Layout = "landscape",
-): { x: number; y: number; w: number; h: number } {
-  const g = geometryOf(layout);
-  const rider = MOCKUP[layout].rider;
+export function riderBox(color: Color, k: number): { x: number; y: number; w: number; h: number } {
+  const g = GEOMETRY;
+  const rider = MOCKUP.rider;
   const corner = g.corners[quarterOf(color, k)] as Point;
   const [cx, cy] = g.scene.centre;
   const x = cx + rider.f * (corner[0] - cx);
@@ -483,21 +418,16 @@ export function riderBox(
 }
 
 /** Where a seat's last card lies on the felt and how it is turned to face its seat. */
-export function seatCard(
-  seat: Color,
-  k: number,
-  layout: Layout = "landscape",
-): { at: Point; angle: 0 | 90 | 180 | 270 } {
-  const scene = sceneOf(layout);
-  const felt = MOCKUP[layout].felt;
+export function seatCard(seat: Color, k: number): { at: Point; angle: 0 | 90 | 180 | 270 } {
+  const scene = SCENE;
+  const felt = MOCKUP.felt;
   const q = quarterOf(seat, k);
   // In mock-up units, as renderVals: the side seats of the ellipse sit fw − 110 from the centre,
-  // the others half − 0.5 h − 6 (half = fh for the bottom and the top, fw for the sides).
-  const fw = felt.kind === "ellipse" ? felt.rx : felt.hw;
-  const fh = felt.kind === "ellipse" ? felt.ry : felt.hh;
+  // the bottom and the top fh − 0.5 h − 6.
+  const fw = felt.rx;
+  const fh = felt.ry;
   const ch = scene.card.h / SCALE;
-  const half = q % 2 === 0 ? fh : fw;
-  const off = (q % 2 === 1 && felt.kind === "ellipse" ? fw - 110 : half - 0.5 * ch - 6) * SCALE;
+  const off = (q % 2 === 1 ? fw - 110 : fh - 0.5 * ch - 6) * SCALE;
   const n = N[q] as Point;
   const [cx, cy] = scene.centre;
   return { at: [cx - n[0] * off, cy - n[1] * off], angle: ROT[q] as 0 | 90 | 180 | 270 };

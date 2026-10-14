@@ -6,14 +6,14 @@
 // A scenario with no `after` shows the same position below, with the pawns concerned by the
 // action ringed in white, by the moves that must be allowed in green and by the moves that must be
 // refused in red.
-// Plateau: LAYOUT = "landscape", the only plateau of the game since Romain's decision of
-// 2026-10-14 (« oblige à jouer en format paysage », then « Oui, paysage obligatoire »: the phone
-// is held sideways, so the computer and the phone draw the same galet). Two 2:1 boards stacked
-// make a picture close to square, which RULES.md shows at its full width.
-// Each half is 1200 x 600: the galet drawing of packages/board (artSvg(boardArt(k, LAYOUT)) with
-// Romain's four riders from apps/web/src/assets/plateau as data URIs, rasterised by sharp), with
-// the seat whose turn it is at the bottom, k = quarterTurnsFor(before.turn), as the game's debug
-// scenario view does. Pawns are discs drawn on top at sceneXY(place, k, LAYOUT).
+// Plateau: the galet in landscape, the one board of the game since Romain's decision of 2026-10-14
+// (« oblige à jouer en format paysage », then « Oui, paysage obligatoire »: the phone is held
+// sideways, so the computer and the phone draw the same galet), SCENE of packages/board. Two 2:1
+// boards stacked make a square picture, which RULES.md shows at its full width.
+// Each half is 1200 x 600: the galet drawing of packages/board (artSvg(boardArt(k)) with Romain's
+// four riders from apps/web/src/assets/plateau as data URIs, rasterised by sharp), with the seat
+// whose turn it is at the bottom, k = quarterTurnsFor(before.turn), as the game's debug scenario
+// view does. Pawns are discs drawn on top at sceneXY(place, k).
 // The script reads only repository files and writes nothing outside docs/regles/.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -27,15 +27,13 @@ const outDir = resolve(root, "docs", "regles");
 const { scenarios } = await import(
   pathToFileURL(resolve(root, "packages/engine/scenarios/index.ts")).href
 );
-const { artSvg, boardArt, quarterTurnsFor, sceneOf, sceneXY } = await import(
+const { artSvg, boardArt, quarterTurnsFor, SCENE, sceneXY } = await import(
   pathToFileURL(resolve(root, "packages/board/src/index.ts")).href
 );
 const { COLORS, ringIndex } = await import(
   pathToFileURL(resolve(root, "packages/engine/src/topology.ts")).href
 );
 
-const LAYOUT = "landscape";
-const SCENE = sceneOf(LAYOUT);
 const HALF_W = 1200;
 const SCALE = HALF_W / SCENE.width;
 const HALF_H = Math.round(SCENE.height * SCALE);
@@ -101,9 +99,7 @@ function layerSvg(pawns, halos, label, k) {
   // and must never hide a pawn in play.
   const order = [...pawns].sort((a, b) => (a.spec === "S" ? 0 : 1) - (b.spec === "S" ? 0 : 1));
   for (const pawn of order) {
-    const [x, y] = sceneXY(placeOf(pawn.color, pawn.index, pawn.spec), k, LAYOUT).map(
-      (v) => v * SCALE,
-    );
+    const [x, y] = sceneXY(placeOf(pawn.color, pawn.index, pawn.spec), k).map((v) => v * SCALE);
     const halo = halos.get(pawn.id);
     if (halo) {
       parts.push(
@@ -139,7 +135,7 @@ mkdirSync(outDir, { recursive: true });
 const boards = new Map();
 async function boardFor(k) {
   if (!boards.has(k)) {
-    const svg = artSvg(boardArt(k, LAYOUT), {
+    const svg = artSvg(boardArt(k), {
       width: HALF_W,
       height: HALF_H,
       fontFamily: FONT,
