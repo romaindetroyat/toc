@@ -81,6 +81,12 @@ describe("assets/audio/LICENSES.md", () => {
     }
   });
 
+  it("lists no sound outside the catalogue (the ambience was removed on 2026-10-14)", () => {
+    const sounds = rows.filter((row) => row.type === "son").map((row) => row.id);
+    expect([...sounds].sort()).toEqual([...SOUND_IDS].sort());
+    expect(sounds).not.toContain("ambiance");
+  });
+
   it("has no two rows with the same id", () => {
     const ids = rows.map((row) => row.id);
     expect(new Set(ids).size).toBe(ids.length);

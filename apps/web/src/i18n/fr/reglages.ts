@@ -12,10 +12,6 @@ export const reglages = {
   soundHelper:
     "Pas de son sur iPhone ? Vérifie que l’interrupteur de sonnerie, sur le côté, n’est pas en mode silencieux.",
   sfx: "Bruitages",
-  ambience: "Ambiance",
-  ambienceVolume: "Volume de l’ambiance",
-  /** Spoken value of the volume slider. */
-  percent: (value: number) => `${value} %`,
   reduceMotion: "Réduire les animations",
   reduceMotionHelper: "Les déplacements sont instantanés, sans bonds, ruades ni effets.",
 

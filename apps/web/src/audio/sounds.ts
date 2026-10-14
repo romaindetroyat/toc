@@ -12,11 +12,10 @@ export type SoundId =
   | "hennissement-surpris"
   | "carte-donne"
   | "carte-pose"
-  | "carte-echange"
-  | "ambiance";
+  | "carte-echange";
 
-/** Mix bus a sound plays on (the master bus sits above both). */
-export type SoundBus = "sfx" | "ambience";
+/** Mix bus a sound plays on (the master bus sits above it). */
+export type SoundBus = "sfx";
 
 /** Name of the synthesis recipe in synth.ts that renders the sound. */
 export type SynthRecipe =
@@ -29,8 +28,7 @@ export type SynthRecipe =
   | "neigh-surpris"
   | "card-donne"
   | "card-pose"
-  | "card-echange"
-  | "ambience";
+  | "card-echange";
 
 export type SoundDef = {
   bus: SoundBus;
@@ -52,7 +50,6 @@ export const SOUNDS: Record<SoundId, SoundDef> = {
   "carte-donne": { bus: "sfx", synth: "card-donne", variants: 1, files: [] },
   "carte-pose": { bus: "sfx", synth: "card-pose", variants: 1, files: [] },
   "carte-echange": { bus: "sfx", synth: "card-echange", variants: 1, files: [] },
-  ambiance: { bus: "ambience", synth: "ambience", variants: 1, files: [] },
 };
 
 export const SOUND_IDS = Object.keys(SOUNDS) as SoundId[];

@@ -118,8 +118,6 @@ export type DirectorDeps = {
     scheduleClops(offsetsMs: number[], t0: number): void;
     /** The neighs and the card sounds, on the audio clock like the clops. */
     cue?(id: SoundId, at?: number): void;
-    pauseAmbience?(): void;
-    resumeAmbience?(): void;
   };
   /** Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. */
   quarterTurns: number;
@@ -584,14 +582,8 @@ export function createDirector(deps: DirectorDeps): Director {
 
   function onVisibility(): void {
     if (doc === undefined) return;
-    if (doc.hidden) {
-      hidden = true;
-      void snapToEnd();
-      deps.audio.pauseAmbience?.();
-    } else {
-      hidden = false;
-      deps.audio.resumeAmbience?.();
-    }
+    hidden = doc.hidden;
+    if (hidden) void snapToEnd();
   }
   doc?.addEventListener("visibilitychange", onVisibility);
 

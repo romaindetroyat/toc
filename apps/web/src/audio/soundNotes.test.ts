@@ -17,12 +17,12 @@ describe("parseNotes", () => {
       parseNotes({
         "hennissement-sortie": "bon",
         "sabot-13": "a-changer",
-        ambiance: "a-ecouter",
+        "carte-echange": "a-ecouter",
       }),
     ).toEqual({
       "hennissement-sortie": "bon",
       "sabot-13": "a-changer",
-      ambiance: "a-ecouter",
+      "carte-echange": "a-ecouter",
     });
   });
 
@@ -32,14 +32,15 @@ describe("parseNotes", () => {
       "carte-pose": 3,
       "carte-donne": null,
       "son-inconnu": "bon",
-      ambiance: "bon",
+      ambiance: "bon", // the ambience was removed on 2026-10-14: an old rating of it is dropped
       sabot: "bon", // the hoof sound is rated per distance, never as a whole
+      "carte-echange": "bon",
     });
-    expect(notes).toEqual({ ambiance: "bon" });
+    expect(notes).toEqual({ "carte-echange": "bon" });
   });
 
   it("ignores hostile keys and inherited properties", () => {
-    const hostile = JSON.parse('{"__proto__": {"ambiance": "bon"}, "constructor": "bon"}');
+    const hostile = JSON.parse('{"__proto__": {"carte-pose": "bon"}, "constructor": "bon"}');
     expect(parseNotes(hostile)).toEqual({});
     expect(Object.getPrototypeOf(parseNotes(hostile))).toBe(Object.prototype);
   });
@@ -75,25 +76,28 @@ describe("loadNotes and saveNotes", () => {
       },
     };
     expect(loadNotes(throwing)).toEqual({});
-    expect(saveNotes(throwing, { ambiance: "bon" })).toBe(false);
-    expect(saveNotes(null, { ambiance: "bon" })).toBe(false);
+    expect(saveNotes(throwing, { "carte-pose": "bon" })).toBe(false);
+    expect(saveNotes(null, { "carte-pose": "bon" })).toBe(false);
   });
 
   it("filters what a hand-edited storage holds", () => {
     const storage = {
-      getItem: () => JSON.stringify({ ambiance: "bon", pirate: "bon", "carte-pose": "?" }),
+      getItem: () =>
+        JSON.stringify({ "carte-donne": "bon", ambiance: "bon", pirate: "bon", "carte-pose": "?" }),
       setItem: () => {},
     };
-    expect(loadNotes(storage)).toEqual({ ambiance: "bon" });
+    expect(loadNotes(storage)).toEqual({ "carte-donne": "bon" });
   });
 });
 
 describe("NOTE_KEYS", () => {
   it("has one key per row: the hoof sound split by distance, every other sound once", () => {
-    expect(NOTE_KEYS).toHaveLength(14);
+    expect(NOTE_KEYS).toHaveLength(13);
     expect(NOTE_KEYS).toContain("sabot-1");
     expect(NOTE_KEYS).toContain("sabot-13");
     expect(NOTE_KEYS).not.toContain("sabot");
+    // The ambience row went with the ambience (2026-10-14).
+    expect(NOTE_KEYS as readonly string[]).not.toContain("ambiance");
     expect(new Set(NOTE_KEYS).size).toBe(NOTE_KEYS.length);
   });
 });
@@ -121,7 +125,7 @@ describe("notesAsText", () => {
 
   it("rates a sound that was never touched « À écouter »", () => {
     const text = notesAsText({}, names, ratings);
-    expect(text.split("\n")).toContain(`Nom ambiance${NBSP}: À écouter`);
+    expect(text.split("\n")).toContain(`Nom carte-echange${NBSP}: À écouter`);
   });
 
   it("follows the order of the page and ends without a trailing newline", () => {

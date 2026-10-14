@@ -15,7 +15,7 @@ test("audio: tous les sons synthétisés sont rendus, audibles et de la bonne du
     .poll(() =>
       page.evaluate(() => Object.keys((window as TocWindow).__tocDebug?.audio.sounds ?? {}).length),
     )
-    .toBe(13); // 3 hoof variants + 6 neighs + 3 card sounds + 1 ambience
+    .toBe(12); // 3 hoof variants + 6 neighs + 3 card sounds; no ambience since 2026-10-14
   const sounds = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.sounds ?? {});
 
   for (const [key, { peak }] of Object.entries(sounds)) {
@@ -28,7 +28,7 @@ test("audio: tous les sons synthétisés sont rendus, audibles et de la bonne du
   expect(seconds("neigh-ruade#0")).toBeLessThan(0.4);
   expect(seconds("neigh-fete#0")).toBeGreaterThan(seconds("neigh-joyeux#0"));
   expect(seconds("card-donne#0")).toBeGreaterThan(seconds("card-pose#0"));
-  expect(seconds("ambience#0")).toBeCloseTo(8, 2);
+  expect(Object.keys(sounds).filter((key) => key.startsWith("ambience"))).toEqual([]);
 });
 
 // A reload or a PWA relaunch lands on #/partie without the launch screen's « Jouer la partie » tap:

@@ -50,7 +50,7 @@ export async function renderHoof(variant: number, sampleRate = 44100): Promise<A
   return ctx.startRendering();
 }
 
-// --- Normalisation and seamless loops (pure, tested in Node) ---
+// --- Normalisation (pure, tested in Node) ---
 
 /** Scale `data` in place so its largest absolute sample equals `peak` (silence stays silence). */
 export function normalize(data: Float32Array, peak: number): void {
@@ -59,24 +59,6 @@ export function normalize(data: Float32Array, peak: number): void {
   if (max === 0) return;
   const factor = peak / max;
   for (let i = 0; i < data.length; i++) data[i] = (data[i] as number) * factor;
-}
-
-/**
- * Turn `source` (at least loopLength + fade samples of a steady sound) into a loop of exactly
- * `loopLength` samples whose last sample is followed by its natural continuation: the first
- * `fade` samples are an equal-power crossfade from the material after the loop end into the
- * start. There is no seam, whatever the filters were doing when the render began.
- */
-export function makeLoopable(source: Float32Array, loopLength: number, fade: number): Float32Array {
-  if (source.length < loopLength + fade) throw new RangeError("source is shorter than loop + fade");
-  const out = source.slice(0, loopLength);
-  for (let i = 0; i < fade; i++) {
-    const theta = (i / fade) * (Math.PI / 2);
-    out[i] =
-      (source[i] as number) * Math.sin(theta) +
-      (source[loopLength + i] as number) * Math.cos(theta);
-  }
-  return out;
 }
 
 async function renderToBuffer(
@@ -358,57 +340,5 @@ export async function renderCard(kind: CardKind, sampleRate = 44100): Promise<Au
     }
   });
   normalize(buffer.getChannelData(0), CARD_PEAK);
-  return buffer;
-}
-
-// --- Ambience ---
-
-/** Loop length in seconds: a multiple of both LFO periods (8 s and 4 s), so the swell repeats exactly. */
-export const AMBIENCE_SECONDS = 8;
-const AMBIENCE_FADE_SECONDS = 1;
-const AMBIENCE_PEAK = 0.35;
-
-/**
- * A light countryside/stable bed: low wind-like noise swelling slowly (0.125 Hz) under a faint
- * airy rustle (0.25 Hz). Rendered a second longer and folded back (makeLoopable) so it loops
- * without a seam.
- */
-export async function renderAmbience(sampleRate = 44100): Promise<AudioBuffer> {
-  const loop = Math.round(AMBIENCE_SECONDS * sampleRate);
-  const fade = Math.round(AMBIENCE_FADE_SECONDS * sampleRate);
-  const raw = await renderToBuffer(loop + fade, sampleRate, (ctx) => {
-    const total = AMBIENCE_SECONDS + AMBIENCE_FADE_SECONDS;
-    const layer = (
-      type: BiquadFilterType,
-      freq: number,
-      q: number,
-      base: number,
-      lfoHz: number,
-      lfoDepth: number,
-    ) => {
-      const source = ctx.createBufferSource();
-      source.buffer = noiseBuffer(ctx, total);
-      const filter = ctx.createBiquadFilter();
-      filter.type = type;
-      filter.frequency.value = freq;
-      filter.Q.value = q;
-      const level = ctx.createGain();
-      level.gain.value = base;
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = lfoHz;
-      const depth = ctx.createGain();
-      depth.gain.value = lfoDepth;
-      lfo.connect(depth).connect(level.gain);
-      source.connect(filter).connect(level).connect(ctx.destination);
-      source.start(0);
-      lfo.start(0);
-    };
-    layer("lowpass", 480, 0.5, 0.7, 1 / AMBIENCE_SECONDS, 0.25);
-    layer("bandpass", 2300, 1.8, 0.05, 2 / AMBIENCE_SECONDS, 0.04);
-  });
-  const looped = makeLoopable(raw.getChannelData(0), loop, fade);
-  normalize(looped, AMBIENCE_PEAK);
-  const buffer = new AudioBuffer({ length: loop, sampleRate, numberOfChannels: 1 });
-  buffer.getChannelData(0).set(looped);
   return buffer;
 }

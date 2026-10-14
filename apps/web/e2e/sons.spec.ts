@@ -5,26 +5,27 @@ type TocWindow = Window & { __tocDebug?: { audio: { scheduled: number[] } } };
 const NBSP = " ";
 
 test.describe("page de test des sons", () => {
-  test("sons: la page liste les quatre sections, chaque ligne a un bouton d’au moins 44 x 44", async ({
+  test("sons: la page liste les trois sections, chaque ligne a un bouton d’au moins 44 x 44", async ({
     page,
   }) => {
     await page.goto("/#/sons");
     await expect(page.getByRole("heading", { name: "Test des sons", level: 1 })).toBeVisible();
-    for (const section of ["Sabots", "Hennissements", "Cartes", "Ambiance"]) {
+    for (const section of ["Sabots", "Hennissements", "Cartes"]) {
       await expect(page.getByRole("heading", { name: section, level: 2 })).toBeVisible();
     }
+    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(3);
     await expect(page.getByText("Écoute chaque son et note-le.")).toBeVisible();
     await expect(page.getByText("Pas de son sur iPhone")).toBeVisible();
 
-    // 4 hoof rows + the distance row + 6 neighs + 3 cards + the ambience.
-    await expect(page.locator("li.row")).toHaveCount(15);
-    // 14 rated rows, each with the three ratings.
-    await expect(page.getByRole("radiogroup")).toHaveCount(14);
-    await expect(page.getByRole("radio", { name: "À écouter" })).toHaveCount(14);
+    // 4 hoof rows + the distance row + 6 neighs + 3 cards (no ambience since 2026-10-14).
+    await expect(page.locator("li.row")).toHaveCount(14);
+    // 13 rated rows, each with the three ratings.
+    await expect(page.getByRole("radiogroup")).toHaveCount(13);
+    await expect(page.getByRole("radio", { name: "À écouter" })).toHaveCount(13);
 
     const buttons = page.locator("button.play");
     const count = await buttons.count();
-    expect(count).toBe(15);
+    expect(count).toBe(14);
     for (let i = 0; i < count; i++) {
       const box = await buttons.nth(i).boundingBox();
       expect(box?.width, `play button ${i} width`).toBeGreaterThanOrEqual(44);
@@ -120,7 +121,12 @@ test.describe("page de test des sons", () => {
     await page.addInitScript(() => {
       localStorage.setItem(
         "toc.soundnotes.v1",
-        JSON.stringify({ "carte-pose": "excellent", pirate: "bon", ambiance: "bon" }),
+        JSON.stringify({
+          "carte-pose": "excellent",
+          pirate: "bon",
+          ambiance: "bon",
+          "carte-donne": "bon",
+        }),
       );
     });
     await page.goto("/#/sons");
@@ -130,44 +136,47 @@ test.describe("page de test des sons", () => {
       }),
     ).toHaveAttribute("aria-checked", "true");
     await expect(
-      page.getByRole("radiogroup", { name: /Ambiance \(boucle\)/ }).getByRole("radio", {
-        name: "Bon",
-      }),
+      page.getByRole("radiogroup", { name: /Donne/ }).getByRole("radio", { name: "Bon" }),
     ).toHaveAttribute("aria-checked", "true");
+    // An old rating of the removed ambience is dropped: it has no row to show on.
+    await expect(page.getByRole("radiogroup", { name: /Ambiance/ })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test("sons: l’ambiance se lance, s’arrête et son volume suit le curseur", async ({ page }) => {
+  test("sons: il n’y a plus d’ambiance, ni ligne, ni bouton, ni volume", async ({ page }) => {
     await page.goto("/#/sons");
-    const play = page.getByRole("button", { name: "Écouter Ambiance (boucle)" });
-    await play.click();
+    await page.getByText("Écoute chaque son et note-le.").click();
     await expect(page.getByText("Son prêt")).toBeVisible();
-    const stop = page.getByRole("button", { name: "Arrêter Ambiance (boucle)" });
-    await expect(stop).toBeVisible();
-    await expect(stop).toHaveAttribute("aria-pressed", "true");
-
-    const slider = page.getByRole("slider", { name: "Volume de l’ambiance" });
-    await slider.fill("55");
-    const stored = await page.evaluate(() => localStorage.getItem("toc.settings.v1"));
-    expect(JSON.parse(stored ?? "{}").ambienceVolume).toBe(55);
-
-    await stop.click();
-    await expect(page.getByRole("button", { name: "Écouter Ambiance (boucle)" })).toBeVisible();
+    await expect(page.getByText(/ambiance/i)).toHaveCount(0);
+    await expect(page.locator('[data-sound="ambiance"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Ambiance/ })).toHaveCount(0);
+    // The only slider left is the hoof distance.
+    await expect(page.getByRole("slider")).toHaveCount(1);
+    await expect(page.getByRole("slider", { name: "Distance en cases" })).toBeVisible();
+    // Nothing is rendered for an ambience either.
+    const rendered = await page.evaluate(() =>
+      Object.keys(
+        (window as unknown as { __tocDebug?: { audio: { sounds?: object } } }).__tocDebug?.audio
+          .sounds ?? {},
+      ),
+    );
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.filter((id) => id.startsWith("ambience"))).toEqual([]);
   });
 
   test("sons: chaque ligne dit sa source, ici des sons générés par le code", async ({ page }) => {
     await page.goto("/#/sons");
     await page.getByText("Écoute chaque son et note-le.").click();
     await expect(page.getByText("Son prêt")).toBeVisible();
-    await expect(page.getByText("Généré par le code")).toHaveCount(14);
+    await expect(page.getByText("Généré par le code")).toHaveCount(13);
     await expect(page.getByText("Son indisponible")).toHaveCount(0);
   });
 
   test("sons: chaque ligne montre l’auteur et la licence du registre", async ({ page }) => {
     await page.goto("/#/sons");
-    await expect(page.locator("li.row[data-sound] .licence")).toHaveCount(14);
+    await expect(page.locator("li.row[data-sound] .licence")).toHaveCount(13);
     await expect(page.getByText("Jeu TOC (synthèse Web Audio) · Aucune œuvre tierce")).toHaveCount(
-      14,
+      13,
     );
     await expect(page.getByText("Licence non renseignée")).toHaveCount(0);
   });
@@ -206,7 +215,8 @@ test.describe("copier mes notes", () => {
 
     const clipboard = await page.evaluate(() => navigator.clipboard.readText());
     const lines = clipboard.split("\n");
-    expect(lines).toHaveLength(14);
+    expect(lines).toHaveLength(13);
+    expect(clipboard).not.toContain("Ambiance");
     expect(lines).toContain(`Sortie de l’écurie${NBSP}: Bon`);
     expect(lines).toContain(`Sabots, 13 cases${NBSP}: À changer`);
     expect(lines).toContain(`Donne${NBSP}: À écouter`);
@@ -287,8 +297,9 @@ test.describe("crédits et licences", () => {
     // The court figures name their author and their licence.
     await expect(dialog.getByText("Figures des cartes (Valet, Dame, Roi)")).toBeVisible();
     await expect(dialog.getByText(/David Bellot.*LGPL-2\.1/)).toBeVisible();
-    // One entry per row of the manifest, shown as text.
-    await expect(dialog.locator("li[data-credit]")).toHaveCount(17);
+    // One entry per row of the manifest, shown as text (the ambience row went with the ambience).
+    await expect(dialog.locator("li[data-credit]")).toHaveCount(16);
+    await expect(dialog.getByText("Ambiance", { exact: true })).toHaveCount(0);
     await expect(dialog.locator("a")).toHaveCount(0);
   });
 

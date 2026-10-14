@@ -16,12 +16,9 @@
   import {
     type EngineStatus,
     onStatus,
-    pauseAmbience,
     retryUnlock,
     setMix,
-    startAmbience,
     status,
-    stopAmbience,
     unlockOnFirstGesture,
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
@@ -39,7 +36,7 @@
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
   import Pawn from "../board/Pawn.svelte";
-  import { mixFromSettings, shouldPlayAmbience } from "../game/audioSettings.ts";
+  import { mixFromSettings } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
   import { game as copy } from "../i18n/fr/game.ts";
   import {
@@ -520,12 +517,12 @@
   });
 
   // --- Sound settings (FX-06, D-25) ---
-  // Every change of « Son », « Bruitages », « Ambiance » and its volume reaches the audio buses at once.
+  // Every change of « Son » and « Bruitages » reaches the audio buses at once. There is no ambience
+  // loop (Romain removed it on 2026-10-14).
   $effect(() => {
     setMix(mixFromSettings(settings));
   });
 
-  let pageVisible = $state(!document.hidden);
   let audioStatus = $state<EngineStatus>(status());
   $effect(() => onStatus((next) => (audioStatus = next)));
 
@@ -550,24 +547,10 @@
     if (audioStatus === "failed") warnAudioFailed();
   });
 
-  // The light ambience plays while the sound and the ambience are on, the audio is ready and the page
-  // is visible (it fades in over 1.5 s once started); it stops for good when « Son » or « Ambiance »
-  // goes off, and only pauses with the tab.
-  $effect(() => {
-    if (!settings.sound || !settings.ambience) stopAmbience();
-    else if (shouldPlayAmbience(settings, pageVisible, audioStatus === "ready")) startAmbience();
-    else if (!pageVisible) pauseAmbience();
-  });
-
-  // The ambience belongs to the game screen: it stops when the player leaves it.
-  onMount(() => stopAmbience);
-
   // Opened without the launch screen's tap (a reload, a PWA relaunch, a bookmark): the first tap or key
   // on the game screen starts the sound.
   onMount(() => unlockOnFirstGesture());
 </script>
-
-<svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
 <main class="game" style:--head-room={SCENE.headRoom}>
   {#if startFailure}

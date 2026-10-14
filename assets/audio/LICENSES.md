@@ -21,7 +21,6 @@ Règles pour ajouter une ligne :
 | carte-donne | — | son | Généré par le code | Jeu TOC (synthèse Web Audio) | Aucune œuvre tierce | — |
 | carte-pose | — | son | Généré par le code | Jeu TOC (synthèse Web Audio) | Aucune œuvre tierce | — |
 | carte-echange | — | son | Généré par le code | Jeu TOC (synthèse Web Audio) | Aucune œuvre tierce | — |
-| ambiance | — | son | Généré par le code | Jeu TOC (synthèse Web Audio) | Aucune œuvre tierce | — |
 | nunito | nunito-latin.woff2, nunito-latin-ext.woff2 | police | Nunito, paquet @fontsource-variable/nunito 5.3.0 | The Nunito Project Authors | OFL-1.1 (SIL Open Font License 1.1) | https://github.com/googlefonts/nunito |
 | caveat | caveat-latin.woff2, caveat-latin-ext.woff2 | police | Caveat, paquet @fontsource-variable/caveat 5.3.0 | The Caveat Project Authors | OFL-1.1 (SIL Open Font License 1.1) | https://github.com/googlefonts/caveat |
 | lucide | apps/web/src/ui/icons.ts | icônes | Lucide, paquet lucide-static 1.56.0 | Lucide Contributors | ISC (certaines icônes viennent de Feather : MIT) | https://lucide.dev |

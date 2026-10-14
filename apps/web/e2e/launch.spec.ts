@@ -59,7 +59,8 @@ test("lancement: JSON abîmé, valeurs hors limites ou stockage qui lève, aucun
 }) => {
   for (const init of [
     `localStorage.setItem(${JSON.stringify(KEY)}, "{pas du json");`,
-    `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify({ lastColor: "pourpre", ambienceVolume: 999 }))});`,
+    // Out-of-range values, and the keys of the ambience removed on 2026-10-14 (ignored).
+    `localStorage.setItem(${JSON.stringify(KEY)}, ${JSON.stringify(JSON.stringify({ lastColor: "pourpre", sound: 3, ambience: "oui", ambienceVolume: 999 }))});`,
     `Storage.prototype.getItem = () => { throw new Error("SecurityError"); };
      Storage.prototype.setItem = () => { throw new Error("QuotaExceededError"); };`,
   ]) {

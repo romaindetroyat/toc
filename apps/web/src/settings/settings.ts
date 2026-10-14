@@ -11,10 +11,6 @@ export type Settings = {
   sound: boolean;
   /** Sound effects (hooves, neighs, cards). */
   sfx: boolean;
-  /** Looping ambience. */
-  ambience: boolean;
-  /** Ambience volume, an integer from 0 to 100. */
-  ambienceVolume: number;
   reduceMotion: boolean;
   /** Fast-forward the bots. */
   fast: boolean;
@@ -24,8 +20,6 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
   sound: true,
   sfx: true,
-  ambience: true,
-  ambienceVolume: 30,
   reduceMotion: false,
   fast: false,
   lastColor: "bleu",
@@ -40,18 +34,15 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function volume(value: unknown, fallback: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.min(100, Math.max(0, Math.round(value)));
-}
-
 function colour(value: unknown, fallback: Color): Color {
   return COLORS.find((color) => color === value) ?? fallback;
 }
 
 /**
  * Settings from an untrusted value. A missing (or mistyped) `reduceMotion` takes the system
- * preference, so the preference initialises it and an explicit user choice then wins.
+ * preference, so the preference initialises it and an explicit user choice then wins. Keys that are
+ * no longer settings (`ambience` and `ambienceVolume`, from before the ambience was removed on
+ * 2026-10-14) are ignored, and the next save drops them.
  */
 export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Settings {
   const source: Record<string, unknown> =
@@ -64,8 +55,6 @@ export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Sett
   return {
     sound: bool(own("sound"), DEFAULT_SETTINGS.sound),
     sfx: bool(own("sfx"), DEFAULT_SETTINGS.sfx),
-    ambience: bool(own("ambience"), DEFAULT_SETTINGS.ambience),
-    ambienceVolume: volume(own("ambienceVolume"), DEFAULT_SETTINGS.ambienceVolume),
     reduceMotion: bool(own("reduceMotion"), prefersReducedMotion),
     fast: bool(own("fast"), DEFAULT_SETTINGS.fast),
     lastColor: colour(own("lastColor"), DEFAULT_SETTINGS.lastColor),

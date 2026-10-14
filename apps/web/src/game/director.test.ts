@@ -75,8 +75,6 @@ function harness(options: Options = {}) {
   const audio = {
     now: () => 10,
     scheduleClops: (offsets: number[], t0: number) => clops.push({ offsets, t0 }),
-    pauseAmbience: vi.fn(),
-    resumeAmbience: vi.fn(),
   };
   const director = createDirector({
     animator: {
@@ -339,7 +337,7 @@ describe("Director: snapToEnd and hidden tabs (Pitfall 11)", () => {
     expect(h.hops).toHaveLength(1);
   });
 
-  it("a hidden tab finishes the running move, pauses the ambience and plays the rest silently", async () => {
+  it("a hidden tab finishes the running move and plays the rest silently", async () => {
     const doc = fakeDocument();
     const h = harness({ hold: true, initial: viewFor(smallState(), "bleu"), document: doc });
     h.director.enqueue([moved("bleu0", 5, 3), moved("bleu1", 10, 2)]);
@@ -349,7 +347,6 @@ describe("Director: snapToEnd and hidden tabs (Pitfall 11)", () => {
     doc.fire();
     await h.director.idle();
     expect(h.finished).toEqual(["bleu0"]);
-    expect(h.audio.pauseAmbience).toHaveBeenCalledTimes(1);
     expect(h.hops).toHaveLength(1);
     expect(h.director.renderState?.pawns.bleu1).toEqual(cell(12));
 
@@ -362,7 +359,6 @@ describe("Director: snapToEnd and hidden tabs (Pitfall 11)", () => {
 
     doc.hidden = false;
     doc.fire();
-    expect(h.audio.resumeAmbience).toHaveBeenCalledTimes(1);
     h.director.enqueue([moved("bleu1", 14, 2)]);
     await tick();
     expect(h.hops).toHaveLength(2);
@@ -393,6 +389,8 @@ describe("Director: snapToEnd and hidden tabs (Pitfall 11)", () => {
     doc.hidden = true;
     doc.fire();
     const before = backend.plays.length;
+    // There is no ambience (removed on 2026-10-14): nothing played on unlock nor with the tab.
+    expect(before).toBe(0);
     director.enqueue([moved("bleu0", 5, 5), moved("bleu1", 10, 5)]);
     await director.idle();
     expect(backend.plays.length).toBe(before);
@@ -404,16 +402,23 @@ describe("Director: snapToEnd and hidden tabs (Pitfall 11)", () => {
     director.enqueue([moved("bleu0", 10, 3)]);
     await director.idle();
     expect(backend.plays.length).toBeGreaterThan(before);
+    // Only effects: the hooves, on the effect bus.
+    expect(backend.plays.every((play) => play.bus === "sfx")).toBe(true);
     director.dispose();
   });
 
-  it("stops listening to the document once disposed", () => {
+  it("stops listening to the document once disposed", async () => {
     const doc = fakeDocument();
-    const h = harness({ document: doc });
+    const h = harness({ hold: true, initial: viewFor(smallState(), "bleu"), document: doc });
+    h.director.enqueue([moved("bleu0", 5, 3)]);
+    await tick();
+    expect(h.hops).toHaveLength(1);
     h.director.dispose();
     doc.hidden = true;
     doc.fire();
-    expect(h.audio.pauseAmbience).not.toHaveBeenCalled();
+    await tick();
+    // A hidden tab would have jumped the running move to its end; a disposed director does not hear it.
+    expect(h.finished).toEqual([]);
   });
 });
 

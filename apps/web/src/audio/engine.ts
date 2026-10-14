@@ -7,7 +7,7 @@ import {
   WebAudioBackend,
 } from "./backend.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId, type SynthRecipe } from "./sounds.ts";
-import { renderAmbience, renderCard, renderHoof, renderNeigh } from "./synth.ts";
+import { renderCard, renderHoof, renderNeigh } from "./synth.ts";
 
 // The audio engine. Everything is fire-and-forget: no function here returns a promise the game
 // loop has to await, and every start time is on the AudioContext clock (no setTimeout, no
@@ -21,38 +21,25 @@ const MAX_SCHEDULED = 64;
 const RATE_JITTER = 0.04; // +-4 %
 const GAIN_JITTER_DB = 1.5; // +-1.5 dB
 const MIX_RAMP_S = 0.03;
-const AMBIENCE_FADE_IN_S = 1.5;
-const AMBIENCE_FADE_OUT_S = 0.4;
-const DEFAULT_AMBIENCE_VOLUME = 30;
 
 export type Mix = {
   /** Master switch: off silences everything. */
   sound: boolean;
   /** Bruitages: off silences the effects only. */
   sfx: boolean;
-  /** Ambiance: off silences the ambience only. */
-  ambience: boolean;
-  /** Ambience volume, 0 to 100. */
-  ambienceVolume: number;
 };
 
-/** The three bus gains a mix asks for: master and effects are on or off, the ambience follows its volume. */
-export function busGainsFor(mix: Mix): { master: number; sfx: number; ambience: number } {
-  const volume = Number.isFinite(mix.ambienceVolume)
-    ? Math.min(100, Math.max(0, mix.ambienceVolume))
-    : DEFAULT_AMBIENCE_VOLUME;
+/** The two bus gains a mix asks for: master and effects are on or off. */
+export function busGainsFor(mix: Mix): { master: number; sfx: number } {
   return {
     master: mix.sound ? 1 : 0,
     sfx: mix.sfx ? 1 : 0,
-    ambience: mix.ambience ? volume / 100 : 0,
   };
 }
 
 export const DEFAULT_MIX: Mix = {
   sound: true,
   sfx: true,
-  ambience: true,
-  ambienceVolume: DEFAULT_AMBIENCE_VOLUME,
 };
 
 export type EngineStatus = "pending" | "ready" | "failed";
@@ -95,11 +82,6 @@ export interface AudioEngine {
   cue(id: SoundId, at?: number, opts?: CueOptions): void;
   scheduleClops(offsetsMs: number[], t0: number): void;
   setMix(mix: Mix): void;
-  startAmbience(): void;
-  pauseAmbience(): void;
-  resumeAmbience(): void;
-  /** Stops the ambience for good: a later tab switch does not bring it back (startAmbience does). */
-  stopAmbience(): void;
   loadRecordings(decode?: Decoder): Promise<void>;
   recordings(): Record<SoundId, RecordingInfo>;
   availability(id: SoundId): Availability;
@@ -139,10 +121,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
 
   let voices: Voice[] = [];
   let mix: Mix = { ...DEFAULT_MIX };
-
-  let ambienceWanted = false;
-  let ambiencePaused = false;
-  let ambienceVoices: VoiceHandle[] = [];
 
   let resolveReady: () => void = () => {};
   const ready = new Promise<void>((resolve) => {
@@ -186,7 +164,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     const gains = busGainsFor(mix);
     backend.setBusGain("master", gains.master, undefined, rampSeconds);
     backend.setBusGain("sfx", gains.sfx, undefined, rampSeconds);
-    backend.setBusGain("ambience", gains.ambience, undefined, rampSeconds);
   }
 
   function bufferFor(id: SoundId, prefer?: "file" | "synth"): AudioBufferLike | undefined {
@@ -245,52 +222,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     }
   }
 
-  function tryStartAmbience(): void {
-    if (!ambienceWanted || ambiencePaused || ambienceVoices.length > 0 || !unlocked) return;
-    const buffer = bufferFor("ambiance");
-    if (!buffer) return;
-    // Two looped sources half a loop apart, each at equal-power level: whatever happens at one
-    // source's loop point (an encoder gap in a recording) is covered by the other.
-    const at = backend.now();
-    const level = -3;
-    for (const offsetS of [0, buffer.duration / 2]) {
-      ambienceVoices.push(
-        backend.play(buffer, at, {
-          rate: 1,
-          gainDb: level,
-          bus: "ambience",
-          loop: true,
-          offsetS,
-          fadeInS: AMBIENCE_FADE_IN_S,
-        }),
-      );
-    }
-  }
-
-  function startAmbience(): void {
-    ambienceWanted = true;
-    ambiencePaused = false;
-    tryStartAmbience();
-  }
-
-  function pauseAmbience(): void {
-    ambiencePaused = true;
-    const t = backend.now();
-    for (const handle of ambienceVoices) backend.stop(handle, t, AMBIENCE_FADE_OUT_S);
-    ambienceVoices = [];
-  }
-
-  function stopAmbience(): void {
-    ambienceWanted = false;
-    pauseAmbience();
-  }
-
-  function resumeAmbience(): void {
-    if (!ambienceWanted) return;
-    ambiencePaused = false;
-    tryStartAmbience();
-  }
-
   async function renderAll(): Promise<void> {
     await Promise.all(
       SOUND_IDS.map(async (id) => {
@@ -307,7 +238,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     rendered = true;
     updateStatus();
     resolveReady();
-    tryStartAmbience();
   }
 
   async function loadRecordings(decode?: Decoder): Promise<void> {
@@ -336,7 +266,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
         info[id] = { source: "synth", recordingUnavailable: true };
       }),
     );
-    tryStartAmbience();
   }
 
   return {
@@ -355,10 +284,6 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
       mix = { ...next };
       if (unlocked) applyMix(MIX_RAMP_S);
     },
-    startAmbience,
-    pauseAmbience,
-    resumeAmbience,
-    stopAmbience,
     loadRecordings,
     recordings: () => ({ ...info }),
     availability: (id) => ({
@@ -405,8 +330,6 @@ function renderSynth(
       return renderCard("pose", sampleRate);
     case "card-echange":
       return renderCard("echange", sampleRate);
-    case "ambience":
-      return renderAmbience(sampleRate);
   }
 }
 
@@ -438,7 +361,6 @@ const ACTIVATION_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const
 let backend: WebAudioBackend | undefined;
 let createFailed = false;
 let pendingMix: Mix | undefined;
-let pendingAmbience = false;
 /** The resume the last unlock() asked for; settled (never rejects). */
 let resuming: Promise<void> = Promise.resolve();
 const shellListeners = new Set<(status: EngineStatus) => void>();
@@ -474,13 +396,7 @@ export function unlock(): AudioContext | undefined {
       for (const type of ACTIVATION_EVENTS) {
         document.addEventListener(type, retry, { passive: true });
       }
-      // The ambience stops with the page and comes back with it.
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden) made.pauseAmbience();
-        else made.resumeAmbience();
-      });
       if (pendingMix) made.setMix(pendingMix);
-      if (pendingAmbience) made.startAmbience();
     } catch {
       createFailed = true;
       emit("failed");
@@ -566,41 +482,6 @@ export function setMix(mix: Mix): void {
   }
   pendingMix = { ...mix };
   engine?.setMix(mix);
-}
-
-/**
- * Debug builds: whether the ambience is wanted (`on`), wanted but paused with the tab (`paused`) or
- * not wanted (`off`), for the e2e specs. A pause or a resume changes nothing for an ambience that is off.
- */
-function noteAmbience(state: "on" | "paused" | "off"): void {
-  if (!DEBUG || !window.__tocDebug) return;
-  const audio = window.__tocDebug.audio;
-  if (state === "paused" && audio.ambience !== "on") return;
-  if (state === "on" && audio.ambience === "off") return;
-  audio.ambience = state;
-}
-
-export function startAmbience(): void {
-  if (DEBUG && window.__tocDebug) window.__tocDebug.audio.ambience = "on";
-  pendingAmbience = true;
-  engine?.startAmbience();
-}
-
-export function pauseAmbience(): void {
-  noteAmbience("paused");
-  engine?.pauseAmbience();
-}
-
-export function resumeAmbience(): void {
-  noteAmbience("on");
-  engine?.resumeAmbience();
-}
-
-/** Stops the ambience and forgets that it was wanted (the sound test page's « stop »). */
-export function stopAmbience(): void {
-  noteAmbience("off");
-  pendingAmbience = false;
-  engine?.stopAmbience();
 }
 
 /** Try the recorded files of every sound ([.m4a, .mp3]); a sound whose decode fails stays synthesized. */

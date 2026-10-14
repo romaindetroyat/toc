@@ -3,26 +3,40 @@ import { exchange, playSimpleMove, untilOwnTurn, zone } from "./jouer.ts";
 import { etatParam } from "./position.ts";
 
 // « Réglages » (plan 01-23): opened from the launch screen and from the gear of the game, switches
-// for « Son », « Bruitages », « Ambiance » (with its volume) and « Réduire les animations », all applied
-// at once and kept in toc.settings.v1. The bus gains and the ambience request are read through
+// for « Son », « Bruitages » and « Réduire les animations », all applied at once and kept in
+// toc.settings.v1. There is no ambience any more (Romain, 2026-10-14: « Arrête le son d’ambiance,
+// c’est pourri »). The bus gains, the rendered sounds and the cues are read through
 // window.__tocDebug.audio (debug builds only).
 
-type Gains = { master: number; sfx: number; ambience: number };
+type Gains = { master: number; sfx: number };
 type TocWindow = Window & {
-  __tocDebug?: { audio: { gains?: Gains; ambience?: "on" | "paused" | "off" } };
+  __tocDebug?: {
+    audio: {
+      gains?: Gains;
+      sounds?: Record<string, { duration: number; peak: number }>;
+      cues?: { id: string }[];
+    };
+  };
   __anims: { pawn: string | null; role: string; duration: number }[];
 };
 
 const KEY = "toc.settings.v1";
-const NBSP = " ";
 const SEED = "1234567890abcdef1234567890abcdef";
 
 const dialog = (page: Page, name: string) => page.getByRole("dialog", { name });
 const sw = (page: Page, name: string) => page.getByRole("switch", { name, exact: true });
 const gains = (page: Page) =>
   page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.gains);
-const ambience = (page: Page) =>
-  page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.ambience);
+/** What the audio engine rendered and was asked to play: no ambience may appear in either. */
+const audioTrace = (page: Page) =>
+  page.evaluate(() => {
+    const audio = (window as unknown as TocWindow).__tocDebug?.audio;
+    return {
+      sounds: Object.keys(audio?.sounds ?? {}),
+      cues: (audio?.cues ?? []).map((c) => c.id),
+      gains: Object.keys(audio?.gains ?? {}),
+    };
+  });
 const stored = async (page: Page) =>
   JSON.parse((await page.evaluate((key) => localStorage.getItem(key), KEY)) ?? "{}");
 
@@ -44,18 +58,19 @@ async function openFromGame(page: Page) {
 }
 
 test.describe("depuis l’écran de lancement", () => {
-  test("réglages: la feuille propose les cinq réglages, aux valeurs par défaut", async ({
+  test("réglages: la feuille propose les trois réglages, aux valeurs par défaut, sans ambiance", async ({
     page,
   }) => {
     await openFromLaunch(page);
     const sheet = dialog(page, "Réglages");
-    for (const name of ["Son", "Bruitages", "Ambiance"]) {
+    for (const name of ["Son", "Bruitages"]) {
       await expect(sw(page, name)).toHaveAttribute("aria-checked", "true");
     }
     await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "false");
-    const volume = page.getByRole("slider", { name: "Volume de l’ambiance" });
-    await expect(volume).toHaveValue("30");
-    await expect(volume).toHaveAttribute("aria-valuetext", `30${NBSP}%`);
+    // The ambience is gone: no « Ambiance » switch, no « Volume de l’ambiance » slider.
+    await expect(sheet.getByRole("switch")).toHaveCount(3);
+    await expect(sheet.getByRole("slider")).toHaveCount(0);
+    await expect(sheet.getByText(/ambiance/i)).toHaveCount(0);
     await expect(sheet.getByText("Pas de son sur iPhone")).toBeVisible();
     await expect(
       sheet.getByText("Les déplacements sont instantanés, sans bonds, ruades ni effets."),
@@ -68,9 +83,7 @@ test.describe("depuis l’écran de lancement", () => {
     for (const target of [
       sw(page, "Son"),
       sw(page, "Bruitages"),
-      sw(page, "Ambiance"),
       sw(page, "Réduire les animations"),
-      volume,
     ]) {
       const box = await target.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(43.99);
@@ -84,64 +97,65 @@ test.describe("depuis l’écran de lancement", () => {
     await openFromLaunch(page);
     await sw(page, "Son").click();
     await sw(page, "Bruitages").click();
-    await sw(page, "Ambiance").click();
     await sw(page, "Réduire les animations").click();
     await expect(sw(page, "Son")).toHaveAttribute("aria-checked", "false");
     await expect(sw(page, "Bruitages")).toHaveAttribute("aria-checked", "false");
-    await expect(sw(page, "Ambiance")).toHaveAttribute("aria-checked", "false");
     await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "true");
-    // « Ambiance » off: the volume is disabled but still there.
-    const volume = page.getByRole("slider", { name: "Volume de l’ambiance" });
-    await expect(volume).toBeDisabled();
-    await expect(volume).toBeVisible();
 
-    await sw(page, "Ambiance").click();
-    await expect(volume).toBeEnabled();
-    await volume.fill("65");
-    await expect(volume).toHaveAttribute("aria-valuetext", `65${NBSP}%`);
-
-    expect(await stored(page)).toMatchObject({
-      sound: false,
-      sfx: false,
-      ambience: true,
-      ambienceVolume: 65,
-      reduceMotion: true,
-    });
+    const kept = await stored(page);
+    expect(kept).toMatchObject({ sound: false, sfx: false, reduceMotion: true });
+    expect(kept).not.toHaveProperty("ambience");
+    expect(kept).not.toHaveProperty("ambienceVolume");
 
     await page.reload();
     await page.getByRole("button", { name: "Réglages", exact: true }).click();
     await expect(sw(page, "Son")).toHaveAttribute("aria-checked", "false");
     await expect(sw(page, "Bruitages")).toHaveAttribute("aria-checked", "false");
-    await expect(sw(page, "Ambiance")).toHaveAttribute("aria-checked", "true");
     await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("slider", { name: "Volume de l’ambiance" })).toHaveValue("65");
   });
 
-  test("réglages: « Son » coupe tout, « Bruitages » les effets, « Ambiance » et son volume l’ambiance", async ({
+  test("réglages: d’anciens réglages avec l’ambiance se chargent, et l’ambiance disparaît au prochain changement", async ({
     page,
   }) => {
+    await page.goto("/");
+    await page.evaluate(
+      (key) =>
+        localStorage.setItem(
+          key,
+          JSON.stringify({ sound: true, sfx: false, ambience: true, ambienceVolume: 65 }),
+        ),
+      KEY,
+    );
+    await page.reload();
+    await page.getByRole("button", { name: "Réglages", exact: true }).click();
+    await expect(sw(page, "Son")).toHaveAttribute("aria-checked", "true");
+    await expect(sw(page, "Bruitages")).toHaveAttribute("aria-checked", "false");
+    await expect(dialog(page, "Réglages").getByRole("slider")).toHaveCount(0);
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 0 });
+
+    await sw(page, "Réduire les animations").click();
+    await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "true");
+    const kept = await stored(page);
+    expect(kept).toMatchObject({ sound: true, sfx: false, reduceMotion: true });
+    expect(kept).not.toHaveProperty("ambience");
+    expect(kept).not.toHaveProperty("ambienceVolume");
+  });
+
+  test("réglages: « Son » coupe tout, « Bruitages » les effets", async ({ page }) => {
     await openFromLaunch(page);
-    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1, ambience: 0.3 });
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1 });
 
     await sw(page, "Son").click();
-    await expect.poll(() => gains(page)).toEqual({ master: 0, sfx: 1, ambience: 0.3 });
-    // « Son » off dims the other two switches and the volume, which stay usable.
-    await expect(page.locator("[data-settings] .row.dimmed")).toHaveCount(2);
-    await expect(page.locator("[data-settings] .slider.dimmed")).toHaveCount(1);
+    await expect.poll(() => gains(page)).toEqual({ master: 0, sfx: 1 });
+    // « Son » off dims « Bruitages », which stays usable.
+    await expect(page.locator("[data-settings] .row.dimmed")).toHaveCount(1);
     await sw(page, "Son").click();
     await expect(page.locator("[data-settings] .dimmed")).toHaveCount(0);
 
     await sw(page, "Bruitages").click();
-    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 0, ambience: 0.3 });
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 0 });
     await sw(page, "Bruitages").click();
-
-    await page.getByRole("slider", { name: "Volume de l’ambiance" }).fill("80");
-    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1, ambience: 0.8 });
-
-    await sw(page, "Ambiance").click();
-    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1, ambience: 0 });
-    await expect(page.getByRole("slider", { name: "Volume de l’ambiance" })).toBeDisabled();
-    await expect(page.locator("[data-settings] .slider.dimmed")).toHaveCount(1);
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1 });
   });
 
   test("réglages: « Tester les sons » ouvre la page de test des sons", async ({ page }) => {
@@ -215,7 +229,7 @@ test.describe("en pleine partie", () => {
     page,
   }) => {
     await openGame(page);
-    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1, ambience: 0.3 });
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1 });
     await openFromGame(page);
     await sw(page, "Son").click();
     await expect.poll(() => gains(page)).toMatchObject({ master: 0 });
@@ -225,39 +239,39 @@ test.describe("en pleine partie", () => {
     await expect.poll(() => gains(page)).toMatchObject({ master: 1, sfx: 0 });
   });
 
-  test("réglages: l’ambiance démarre dans la partie, se met en pause avec la page et s’arrête quand on la coupe", async ({
+  test("réglages: aucune ambiance ne démarre dans la partie, ni au retour de la page", async ({
     page,
   }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Jouer la partie" }).click();
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
-    await expect.poll(() => ambience(page)).toBe("on");
+    // The sounds are rendered (the hooves among them), and the ambience is not one of them.
+    await expect.poll(async () => (await audioTrace(page)).sounds).toContain("hoof#0");
+    const noAmbience = async () => {
+      const trace = await audioTrace(page);
+      expect(trace.sounds.filter((id) => id.startsWith("ambience"))).toEqual([]);
+      expect(trace.cues).not.toContain("ambiance");
+      expect(trace.gains.sort()).toEqual(["master", "sfx"]);
+    };
+    await noAmbience();
 
-    // The page goes to the background: the ambience pauses; it comes back with the page.
+    // The page goes to the background and comes back: still nothing starts.
     const hide = (hidden: boolean) =>
       page.evaluate((value) => {
         Object.defineProperty(document, "hidden", { configurable: true, get: () => value });
         document.dispatchEvent(new Event("visibilitychange"));
       }, hidden);
     await hide(true);
-    await expect.poll(() => ambience(page)).toBe("paused");
     await hide(false);
-    await expect.poll(() => ambience(page)).toBe("on");
+    await noAmbience();
 
-    // « Ambiance » off stops it for good, « Ambiance » on starts it again.
+    // « Son » off then on: no ambience either.
     await openFromGame(page);
-    await sw(page, "Ambiance").click();
-    await expect.poll(() => ambience(page)).toBe("off");
-    await hide(true);
-    await hide(false);
-    await expect.poll(() => ambience(page)).toBe("off");
-    await sw(page, "Ambiance").click();
-    await expect.poll(() => ambience(page)).toBe("on");
-
-    // « Son » off stops it as well.
     await sw(page, "Son").click();
-    await expect.poll(() => ambience(page)).toBe("off");
+    await sw(page, "Son").click();
+    await expect.poll(() => gains(page)).toEqual({ master: 1, sfx: 1 });
+    await noAmbience();
   });
 
   test("réglages: « Réduire les animations » fait du coup suivant un seul glissement de 180 ms", async ({

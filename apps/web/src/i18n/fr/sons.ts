@@ -16,7 +16,6 @@ export const sons = {
     sabots: "Sabots",
     hennissements: "Hennissements",
     cartes: "Cartes",
-    ambiance: "Ambiance",
   },
 
   /** Row names, in page order. */
@@ -34,7 +33,6 @@ export const sons = {
     "carte-donne": "Donne",
     "carte-pose": "Poser une carte",
     "carte-echange": "Échange de carte",
-    ambiance: "Ambiance (boucle)",
   } satisfies Record<NoteKey, string>,
 
   /** Names used in the copied notes: the hoof rows say which sound they are. */
@@ -52,7 +50,6 @@ export const sons = {
     "carte-donne": "Donne",
     "carte-pose": "Poser une carte",
     "carte-echange": "Échange de carte",
-    ambiance: "Ambiance (boucle)",
   } satisfies Record<NoteKey, string>,
 
   ratingGroup: (name: string) => `Note pour ${name}`,
@@ -63,7 +60,6 @@ export const sons = {
   } satisfies Record<Rating, string>,
 
   play: (name: string) => `Écouter ${name}`,
-  stop: (name: string) => `Arrêter ${name}`,
   playFile: (name: string) => `Écouter ${name}, version fichier`,
   playGenerated: (name: string) => `Écouter ${name}, version générée`,
   fileButton: "Fichier",
@@ -80,9 +76,6 @@ export const sons = {
   distanceSlider: "Distance en cases",
   distancePlay: "Écouter la distance choisie",
   distanceValue: (cells: number) => (cells === 1 ? "1 case" : `${cells} cases`),
-
-  ambienceVolume: "Volume de l’ambiance",
-  percent: (value: number) => `${value} %`,
 
   copy: "Copier mes notes",
   copied: "Notes copiées.",

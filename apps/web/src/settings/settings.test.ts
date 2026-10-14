@@ -32,8 +32,6 @@ describe("parseSettings", () => {
     const valid: Settings = {
       sound: false,
       sfx: true,
-      ambience: false,
-      ambienceVolume: 80,
       reduceMotion: true,
       fast: true,
       lastColor: "vert",
@@ -47,19 +45,37 @@ describe("parseSettings", () => {
     }
   });
 
-  it("rounds and clamps the ambience volume to an integer between 0 and 100", () => {
-    expect(parseSettings({ ambienceVolume: -5 }, false).ambienceVolume).toBe(0);
-    expect(parseSettings({ ambienceVolume: 250 }, false).ambienceVolume).toBe(100);
-    expect(parseSettings({ ambienceVolume: 42.7 }, false).ambienceVolume).toBe(43);
-    expect(parseSettings({ ambienceVolume: Number.NaN }, false).ambienceVolume).toBe(
-      DEFAULT_SETTINGS.ambienceVolume,
-    );
-    expect(parseSettings({ ambienceVolume: Number.POSITIVE_INFINITY }, false).ambienceVolume).toBe(
-      DEFAULT_SETTINGS.ambienceVolume,
-    );
-    expect(parseSettings({ ambienceVolume: "50" }, false).ambienceVolume).toBe(
-      DEFAULT_SETTINGS.ambienceVolume,
-    );
+  it("has no ambience settings any more (removed on 2026-10-14)", () => {
+    expect(Object.keys(DEFAULT_SETTINGS)).not.toContain("ambience");
+    expect(Object.keys(DEFAULT_SETTINGS)).not.toContain("ambienceVolume");
+  });
+
+  it("accepts an object stored before the ambience was removed and ignores its ambience keys", () => {
+    const old = {
+      sound: false,
+      sfx: false,
+      ambience: false,
+      ambienceVolume: 80,
+      reduceMotion: true,
+      fast: true,
+      lastColor: "jaune",
+    };
+    const parsed = parseSettings(JSON.parse(JSON.stringify(old)), false);
+    expect(parsed).toEqual({
+      sound: false,
+      sfx: false,
+      reduceMotion: true,
+      fast: true,
+      lastColor: "jaune",
+    });
+    expect(Object.hasOwn(parsed, "ambience")).toBe(false);
+    expect(Object.hasOwn(parsed, "ambienceVolume")).toBe(false);
+    // The ambience keys, whatever their value, change nothing else.
+    for (const ambience of [true, false, "oui", null]) {
+      for (const ambienceVolume of [0, 30, 100, -5, "50", Number.NaN]) {
+        expect(parseSettings({ ambience, ambienceVolume }, false)).toEqual(DEFAULT_SETTINGS);
+      }
+    }
   });
 
   it("turns an unknown colour into bleu and keeps the four real ones", () => {
@@ -141,8 +157,19 @@ describe("saveSettings", () => {
 
   it("survives a save then a load", () => {
     const storage = fakeStorage();
-    const chosen: Settings = { ...DEFAULT_SETTINGS, lastColor: "vert", ambienceVolume: 12 };
+    const chosen: Settings = { ...DEFAULT_SETTINGS, lastColor: "vert", sfx: false };
     saveSettings(storage, chosen);
     expect(loadSettings(storage, false)).toEqual(chosen);
+  });
+
+  it("drops the old ambience keys at the next save once an old value has been loaded", () => {
+    const storage = fakeStorage({
+      [STORAGE_KEY]: JSON.stringify({ sound: true, ambience: true, ambienceVolume: 30 }),
+    });
+    const loaded = loadSettings(storage, false);
+    expect(loaded).toEqual(DEFAULT_SETTINGS);
+    saveSettings(storage, loaded);
+    const stored = JSON.parse(storage.data.get(STORAGE_KEY) ?? "null") as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
   });
 });

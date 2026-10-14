@@ -13,9 +13,7 @@
     recordings,
     scheduleClops,
     setMix,
-    startAmbience,
     status,
-    stopAmbience,
     unlock,
   } from "../audio/engine.ts";
   import { SOUND_IDS, SOUNDS, type SoundId } from "../audio/sounds.ts";
@@ -29,10 +27,11 @@
     notesAsText,
     saveNotes,
   } from "../audio/soundNotes.ts";
+  import { mixFromSettings } from "../game/audioSettings.ts";
   import { credits } from "../i18n/fr/credits.ts";
   import { sons } from "../i18n/fr/sons.ts";
   import { licenceOf } from "../licences/licences.ts";
-  import { settings, updateSettings } from "../settings/store.svelte.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import CreditsSheet from "../ui/CreditsSheet.svelte";
   import Icon from "../ui/Icon.svelte";
   import Segmented from "../ui/Segmented.svelte";
@@ -112,8 +111,6 @@
     return "idle";
   }
 
-  const ambienceState = $derived(stateOf("ambiance"));
-
   const stateLine = $derived(
     engineStatus === "failed"
       ? sons.stateFailed
@@ -122,11 +119,8 @@
         : sons.statePending,
   );
 
-  // The page plays at the ambience volume of the settings, everything else on; the real mix comes
-  // back when the page closes.
-  $effect(() => {
-    setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: settings.ambienceVolume });
-  });
+  // The page plays with everything on; the real mix comes back when the page closes.
+  setMix({ sound: true, sfx: true });
 
   // --- Playing ---
   let playing = $state<string | undefined>();
@@ -159,28 +153,9 @@
 
   let distance = $state(6);
 
-  let ambiencePlaying = $state(false);
-  function toggleAmbience() {
-    if (ambiencePlaying) {
-      stopAmbience();
-      ambiencePlaying = false;
-      return;
-    }
-    whenReady(() => {
-      startAmbience();
-      ambiencePlaying = true;
-    });
-  }
-
   onDestroy(() => {
     if (playingTimer !== undefined) clearTimeout(playingTimer);
-    if (ambiencePlaying) stopAmbience();
-    setMix({
-      sound: settings.sound,
-      sfx: settings.sfx,
-      ambience: settings.ambience,
-      ambienceVolume: settings.ambienceVolume,
-    });
+    setMix(mixFromSettings(settings));
   });
 
   // --- Ratings ---
@@ -361,56 +336,6 @@
     </ul>
   </section>
 
-  <section aria-labelledby="sec-ambiance">
-    <h2 id="sec-ambiance" class="t-heading">{sons.sections.ambiance}</h2>
-    <ul class="rows">
-      <li class="row" data-sound="ambiance" data-state={ambienceState}>
-        <div class="main">
-          <button
-            type="button"
-            class="play"
-            class:on={ambiencePlaying}
-            aria-pressed={ambiencePlaying}
-            aria-label={ambiencePlaying
-              ? sons.stop(sons.rows.ambiance)
-              : sons.play(sons.rows.ambiance)}
-            disabled={ambienceState !== "idle"}
-            onclick={toggleAmbience}
-          >
-            <Icon name={ambiencePlaying ? "volume-x" : "play"} />
-          </button>
-          <div class="text">
-            <span class="name">{sons.rows.ambiance}</span>
-            <span class="tag">
-              {#if ambienceState === "decoding"}
-                {sons.decoding}
-              {:else if ambienceState === "unavailable"}
-                {sons.unavailable}
-              {:else}
-                {tagOf("ambiance")}
-              {/if}
-            </span>
-            <span class="tag licence">{licenceLine("ambiance")}</span>
-          </div>
-        </div>
-        <div class="volume">
-          <label for="ambience-volume" class="name">{sons.ambienceVolume}</label>
-          <span class="tag tabular">{sons.percent(settings.ambienceVolume)}</span>
-        </div>
-        <input
-          id="ambience-volume"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={settings.ambienceVolume}
-          oninput={(event) => updateSettings({ ambienceVolume: Number(event.currentTarget.value) })}
-        />
-        {@render rating("ambiance")}
-      </li>
-    </ul>
-  </section>
-
   <footer>
     <button type="button" class="btn btn-primary copy" onclick={copyNotes}>
       <Icon name="copy" />
@@ -524,13 +449,6 @@
   .name {
     font-size: var(--body-size);
     line-height: var(--body-line);
-  }
-
-  .volume {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-sm);
   }
 
   .play {

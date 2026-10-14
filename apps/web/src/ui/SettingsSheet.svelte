@@ -9,10 +9,9 @@
   import CreditsSheet from "./CreditsSheet.svelte";
   import Sheet from "./Sheet.svelte";
   import ShortcutsSheet from "./ShortcutsSheet.svelte";
-  import Slider from "./Slider.svelte";
   import Switch from "./Switch.svelte";
 
-  // « Réglages » (UI-SPEC): sound, effects, ambience and its volume, reduced animations, and the links
+  // « Réglages » (UI-SPEC): sound, effects, reduced animations, and the links
   // to the sound test and the credits. Every change is applied at once and kept (no Save button): the
   // store writes it to localStorage, and the mix below reaches the audio buses.
   type Props = {
@@ -60,7 +59,7 @@
     askAbandon("#/sons", soundsLink);
   }
 
-  // « Son » off dims the other two switches; « Ambiance » off dims and disables the volume.
+  // « Son » off dims « Bruitages ».
   const muted = $derived(!settings.sound);
 </script>
 
@@ -78,22 +77,6 @@
       dimmed={muted}
       onchange={(sfx) => updateSettings({ sfx })}
     />
-    <div class="group">
-      <Switch
-        label={reglages.ambience}
-        checked={settings.ambience}
-        dimmed={muted}
-        onchange={(ambience) => updateSettings({ ambience })}
-      />
-      <Slider
-        label={reglages.ambienceVolume}
-        value={settings.ambienceVolume}
-        valueText={reglages.percent}
-        disabled={!settings.ambience}
-        dimmed={muted}
-        onchange={(ambienceVolume) => updateSettings({ ambienceVolume })}
-      />
-    </div>
     <Switch
       label={reglages.reduceMotion}
       helper={reglages.reduceMotionHelper}
@@ -163,12 +146,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-lg);
-  }
-
-  .group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
   }
 
   /* The destructive text button (cream, underlined: the red fill is for the confirmation), at the bottom. */

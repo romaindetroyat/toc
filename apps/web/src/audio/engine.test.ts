@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type AudioBufferLike, FakeBackend } from "./backend.ts";
 import { createAudioEngine, MAX_VOICES } from "./engine.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId } from "./sounds.ts";
-import { makeLoopable, normalize } from "./synth.ts";
+import { normalize } from "./synth.ts";
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -41,10 +41,9 @@ async function setup(
 }
 
 describe("catalogue", () => {
-  it("holds the eleven Phase 1 sounds, ambience on its own bus", () => {
+  it("holds the ten Phase 1 sounds, all effects: no ambience (removed on 2026-10-14)", () => {
     expect([...SOUND_IDS].sort()).toEqual(
       [
-        "ambiance",
         "carte-donne",
         "carte-echange",
         "carte-pose",
@@ -57,8 +56,8 @@ describe("catalogue", () => {
         "sabot",
       ].sort(),
     );
-    expect(SOUNDS.ambiance.bus).toBe("ambience");
-    for (const id of SOUND_IDS) if (id !== "ambiance") expect(SOUNDS[id].bus).toBe("sfx");
+    for (const id of SOUND_IDS) expect(SOUNDS[id].bus).toBe("sfx");
+    expect(Object.values(SOUNDS).map((def) => def.synth)).not.toContain("ambience");
   });
 });
 
@@ -203,42 +202,23 @@ describe("jitter", () => {
 describe("mix", () => {
   it("sound off silences the master bus", async () => {
     const { backend, engine } = await setup();
-    engine.setMix({ sound: false, sfx: true, ambience: true, ambienceVolume: 30 });
+    engine.setMix({ sound: false, sfx: true });
     expect(backend.gains.master).toBe(0);
-    engine.setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: 30 });
+    engine.setMix({ sound: true, sfx: true });
     expect(backend.gains.master).toBe(1);
   });
 
   it("Bruitages off silences effects only", async () => {
     const { backend, engine } = await setup();
-    engine.setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: 30 });
-    const ambienceBefore = backend.gains.ambience;
-    engine.setMix({ sound: true, sfx: false, ambience: true, ambienceVolume: 30 });
+    engine.setMix({ sound: true, sfx: false });
     expect(backend.gains.sfx).toBe(0);
     expect(backend.gains.master).toBe(1);
-    expect(backend.gains.ambience).toBe(ambienceBefore);
-    expect(backend.gains.ambience).toBeCloseTo(0.3, 9);
   });
 
-  it("Ambiance off or its volume drives the ambience bus only", async () => {
-    const { backend, engine } = await setup();
-    engine.setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: 70 });
-    expect(backend.gains.ambience).toBeCloseTo(0.7, 9);
-    expect(backend.gains.sfx).toBe(1);
-    engine.setMix({ sound: true, sfx: true, ambience: false, ambienceVolume: 70 });
-    expect(backend.gains.ambience).toBe(0);
-    expect(backend.gains.sfx).toBe(1);
-    engine.setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: 250 });
-    expect(backend.gains.ambience).toBe(1);
-    engine.setMix({ sound: true, sfx: true, ambience: true, ambienceVolume: Number.NaN });
-    expect(backend.gains.ambience).toBeCloseTo(0.3, 9);
-  });
-
-  it("defaults to everything on with the ambience at 30 %", async () => {
+  it("defaults to everything on, with only the master and effect buses", async () => {
     const { backend } = await setup();
-    expect(backend.gains.master).toBe(1);
-    expect(backend.gains.sfx).toBe(1);
-    expect(backend.gains.ambience).toBeCloseTo(0.3, 9);
+    expect(backend.gains).toEqual({ master: 1, sfx: 1 });
+    expect(new Set(backend.gainCalls.map((call) => call.bus))).toEqual(new Set(["master", "sfx"]));
   });
 });
 
@@ -367,70 +347,29 @@ describe("status and resume", () => {
   });
 });
 
-describe("ambience", () => {
-  it("waits for the render, then plays two offset looped sources on the ambience bus", async () => {
-    const backend = new FakeBackend();
-    const engine = createAudioEngine({
-      backend,
-      render: async (recipe, variant) => ({
-        ...(await fakeRender(recipe, variant)),
-        duration: recipe === "ambience" ? 8 : 0.12,
-      }),
-      random: () => 0.5,
-    });
-    engine.startAmbience(); // before unlock: remembered
-    engine.unlock();
-    expect(backend.plays).toHaveLength(0);
-    await engine.whenReady();
-    expect(backend.plays).toHaveLength(2);
-    const [a, b] = backend.plays;
-    expect(a?.bus).toBe("ambience");
-    expect(a?.loop && b?.loop).toBe(true);
-    expect(a?.fadeInS).toBeCloseTo(1.5, 9);
-    expect(a?.offsetS).toBe(0);
-    expect(b?.offsetS).toBeCloseTo(4, 9);
+describe("no ambience (removed on 2026-10-14)", () => {
+  it("has no ambience controls on the engine", async () => {
+    const { engine } = await setup();
+    for (const name of ["startAmbience", "pauseAmbience", "resumeAmbience", "stopAmbience"]) {
+      expect(name in engine, name).toBe(false);
+    }
   });
 
-  it("pauses with a fade-out and resumes once, never twice", async () => {
+  it("never starts a voice by itself: unlock, render and recordings play nothing", async () => {
     const { backend, engine } = await setup();
-    engine.startAmbience();
-    engine.startAmbience(); // idempotent
-    expect(backend.plays).toHaveLength(2);
-    engine.pauseAmbience();
-    expect(backend.plays.every((p) => p.stoppedAt !== undefined && (p.fadeOutS ?? 0) > 0)).toBe(
-      true,
-    );
-    engine.resumeAmbience();
-    engine.resumeAmbience();
-    expect(backend.plays).toHaveLength(4);
-    expect(backend.notStopped()).toHaveLength(2);
-  });
-
-  it("does not come back after a pause it did not start, and ignores resume without start", async () => {
-    const { backend, engine } = await setup();
-    engine.resumeAmbience();
+    await engine.loadRecordings(async () => ({ duration: 8 }));
+    backend.setState("suspended");
+    engine.retryResume();
+    await Promise.resolve();
     expect(backend.plays).toHaveLength(0);
   });
 
-  it("stopAmbience fades out and stays stopped: a later resume does not bring it back", async () => {
+  it("plays every cued sound once, on the effect bus, never looped", async () => {
     const { backend, engine } = await setup();
-    engine.startAmbience();
-    expect(backend.plays).toHaveLength(2);
-    engine.stopAmbience();
-    expect(backend.notStopped()).toHaveLength(0);
-    engine.resumeAmbience(); // the tab becomes visible again
-    expect(backend.plays).toHaveLength(2);
-    engine.startAmbience(); // a new explicit start does play again
-    expect(backend.notStopped()).toHaveLength(2);
-  });
-
-  it("is not counted in the sound-effect voice pool", async () => {
-    const { backend, engine } = await setup();
-    engine.startAmbience();
-    for (let i = 0; i < MAX_VOICES; i++) engine.cue("sabot", 0);
-    expect(
-      backend.plays.filter((p) => p.bus === "ambience" && p.stoppedAt !== undefined),
-    ).toHaveLength(0);
+    for (const id of SOUND_IDS) engine.cue(id);
+    expect(backend.plays).toHaveLength(SOUND_IDS.length);
+    expect(backend.plays.every((play) => play.bus === "sfx")).toBe(true);
+    expect(backend.plays.every((play) => !("loop" in play))).toBe(true);
   });
 });
 
@@ -474,25 +413,5 @@ describe("synthesis helpers", () => {
     const silence = new Float32Array(4);
     normalize(silence, 0.5);
     expect([...silence]).toEqual([0, 0, 0, 0]);
-  });
-
-  it("makeLoopable continues the last sample into the first like the original signal does", () => {
-    const loop = 1000;
-    const fade = 200;
-    // A steady tone that is not periodic in the loop length: a naive loop would click.
-    const tone = Float32Array.from({ length: loop + fade }, (_, i) => Math.sin(i * 0.37));
-    const out = makeLoopable(tone, loop, fade);
-    expect(out).toHaveLength(loop);
-    // The sample after the loop end in the original is tone[loop]; the loop restarts on it.
-    expect(out[0]).toBeCloseTo(tone[loop] as number, 6);
-    // Past the fade the loop is the untouched source.
-    expect(out[fade]).toBeCloseTo(tone[fade] as number, 6);
-    expect(out[loop - 1]).toBeCloseTo(tone[loop - 1] as number, 6);
-    // No jump across the seam bigger than the tone's own sample-to-sample step.
-    expect(Math.abs((out[0] as number) - (out[loop - 1] as number))).toBeLessThan(0.37 + 1e-6);
-  });
-
-  it("makeLoopable rejects a source that is too short", () => {
-    expect(() => makeLoopable(new Float32Array(10), 10, 5)).toThrow(RangeError);
   });
 });

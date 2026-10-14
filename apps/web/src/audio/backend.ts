@@ -2,8 +2,8 @@
 // browser. WebAudioBackend wraps one AudioContext; FakeBackend records every call so the engine's
 // timing rules are testable in plain Node.
 
-export type Bus = "master" | "sfx" | "ambience";
-export type VoiceBus = "sfx" | "ambience";
+export type Bus = "master" | "sfx";
+export type VoiceBus = "sfx";
 export type BackendState = "running" | "suspended" | "closed" | "none";
 
 /** What the engine needs to know about a decoded or rendered sound. An AudioBuffer satisfies it. */
@@ -15,11 +15,6 @@ export type PlayOptions = {
   /** Gain offset in dB applied to this voice. */
   gainDb: number;
   bus: VoiceBus;
-  loop?: boolean;
-  /** Start position inside the buffer, in seconds. */
-  offsetS?: number;
-  /** Linear fade-in from silence, in seconds. */
-  fadeInS?: number;
 };
 
 export type VoiceHandle = { readonly id: number };
@@ -34,8 +29,8 @@ export interface AudioBackend {
   decode(data: ArrayBuffer): Promise<AudioBufferLike>;
   /** Start a voice at audio-clock time `at`. Never blocks and never throws on a bad time. */
   play(buffer: AudioBufferLike, at: number, opts: PlayOptions): VoiceHandle;
-  /** Stop a voice at audio-clock time `at`, optionally fading out first. */
-  stop(voice: VoiceHandle, at: number, fadeOutS?: number): void;
+  /** Stop a voice at audio-clock time `at`. */
+  stop(voice: VoiceHandle, at: number): void;
   setBusGain(bus: Bus, gain: number, at?: number, rampSeconds?: number): void;
 }
 
@@ -56,9 +51,7 @@ export class WebAudioBackend implements AudioBackend {
     master.connect(context.destination);
     const sfx = context.createGain();
     sfx.connect(master);
-    const ambience = context.createGain();
-    ambience.connect(master);
-    this.buses = { master, sfx, ambience };
+    this.buses = { master, sfx };
   }
 
   now(): number {
@@ -90,35 +83,22 @@ export class WebAudioBackend implements AudioBackend {
     const source = context.createBufferSource();
     source.buffer = buffer as AudioBuffer;
     source.playbackRate.value = opts.rate;
-    source.loop = opts.loop === true;
     const gain = context.createGain();
-    const level = 10 ** (opts.gainDb / 20);
-    if (opts.fadeInS && opts.fadeInS > 0) {
-      gain.gain.setValueAtTime(0, at);
-      gain.gain.linearRampToValueAtTime(level, at + opts.fadeInS);
-    } else {
-      gain.gain.value = level;
-    }
+    gain.gain.value = 10 ** (opts.gainDb / 20);
     source.connect(gain).connect(this.buses[opts.bus]);
     source.addEventListener("ended", () => {
       source.disconnect();
       gain.disconnect();
     });
-    source.start(at, opts.offsetS ?? 0);
+    source.start(at);
     const voice: WebVoice = { id: this.nextId++, source, gain };
     return voice;
   }
 
-  stop(voice: VoiceHandle, at: number, fadeOutS = 0): void {
-    const { source, gain } = voice as WebVoice;
+  stop(voice: VoiceHandle, at: number): void {
+    const { source } = voice as WebVoice;
     try {
-      if (fadeOutS > 0) {
-        gain.gain.setValueAtTime(gain.gain.value, at);
-        gain.gain.linearRampToValueAtTime(0, at + fadeOutS);
-        source.stop(at + fadeOutS);
-      } else {
-        source.stop(at);
-      }
+      source.stop(at);
     } catch {
       // Already stopped or never started: nothing left to silence.
     }
@@ -141,12 +121,8 @@ export type FakePlay = {
   rate: number;
   gainDb: number;
   bus: VoiceBus;
-  loop: boolean;
-  offsetS: number;
-  fadeInS: number;
   /** Audio-clock time at which stop() was requested, if any. */
   stoppedAt?: number;
-  fadeOutS?: number;
 };
 
 /** Test double: records every call and lets the test drive the clock and the context state. */
@@ -154,7 +130,7 @@ export class FakeBackend implements AudioBackend {
   sampleRate = 44100;
   time = 0;
   plays: FakePlay[] = [];
-  gains: Record<Bus, number> = { master: 1, sfx: 1, ambience: 1 };
+  gains: Record<Bus, number> = { master: 1, sfx: 1 };
   gainCalls: { bus: Bus; gain: number; at?: number; rampSeconds?: number }[] = [];
   resumeCalls = 0;
   /** When set, resume() rejects with this error (a context the browser refuses to start). */
@@ -199,19 +175,13 @@ export class FakeBackend implements AudioBackend {
       rate: opts.rate,
       gainDb: opts.gainDb,
       bus: opts.bus,
-      loop: opts.loop === true,
-      offsetS: opts.offsetS ?? 0,
-      fadeInS: opts.fadeInS ?? 0,
     });
     return voice;
   }
 
-  stop(voice: VoiceHandle, at: number, fadeOutS = 0): void {
+  stop(voice: VoiceHandle, at: number): void {
     const play = this.plays.find((p) => p.voice === voice);
-    if (play && play.stoppedAt === undefined) {
-      play.stoppedAt = at;
-      play.fadeOutS = fadeOutS;
-    }
+    if (play && play.stoppedAt === undefined) play.stoppedAt = at;
   }
 
   setBusGain(bus: Bus, gain: number, at?: number, rampSeconds?: number): void {

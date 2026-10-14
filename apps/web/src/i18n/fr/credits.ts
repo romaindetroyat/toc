@@ -34,7 +34,6 @@ export const credits = {
     "carte-donne": "Carte, donne",
     "carte-pose": "Carte, pose",
     "carte-echange": "Carte, échange",
-    ambiance: "Ambiance",
     nunito: "Nunito",
     caveat: "Caveat",
     lucide: "Lucide",
