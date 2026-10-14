@@ -389,6 +389,17 @@ async function expectState(page: Page, what: string, primaries: number) {
   );
   expect(amber, `${what}: primary buttons`).toBe(primaries);
 
+  // The key hints stay corner badges of 20 px (computers only): none takes its host's size.
+  const hints = await page.locator("[data-key-hint]").evaluateAll((nodes) =>
+    nodes
+      .map((node) => node.getBoundingClientRect())
+      .filter((box) => box.width > 0 && box.height > 0)
+      .map((box) => box.height),
+  );
+  for (const height of hints) {
+    expect(height, `${what}: a key hint is ${height} px high`).toBeLessThanOrEqual(24);
+  }
+
   // The band's boxes start at its top and end at the bottom of the screen: it never grows.
   const boxes = await page
     .locator("[data-action-zone], [data-hand], [data-seven-panel]")

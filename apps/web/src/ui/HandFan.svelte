@@ -355,19 +355,19 @@
   }
 
   /* The card follows its slot's height as it changes (the custom property itself does not animate). */
-  .band .slot :global(.card) {
+  .band .slot :global(.card[data-card]) {
     height: 100%;
     border-bottom: 0;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
 
-  .band .slot :global(.card .middle) {
+  .band .slot :global(.card[data-card] .middle) {
     bottom: auto;
     height: var(--band-card-h);
   }
 
-  .band .slot :global(.card .corner.bottom) {
+  .band .slot :global(.card[data-card] .corner.bottom) {
     display: none;
   }
 
