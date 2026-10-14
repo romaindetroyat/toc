@@ -63,6 +63,18 @@
   let width = $state(0);
   let active = $state(0);
 
+  // The band's row is laid out from its measured width: until that width has been applied, the slots
+  // take their places without the 200 ms slide (else a card would slide in from the row's centre and
+  // a slice would briefly be narrower than 44 px).
+  let placed = $state(false);
+  $effect(() => {
+    if (!band || width === 0 || placed) return;
+    const frame = requestAnimationFrame(() => {
+      placed = true;
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
   const cards = $derived(sortHand(hand));
   const size = $derived(band ? BAND_CARD : cardSize(viewportWidth, viewportHeight));
   // The turned outer cards stay inside the screen: on a 320 px phone the fan spreads a little less.
@@ -180,6 +192,7 @@
 <div
   class="fan"
   class:band
+  class:placed
   class:still={settings.reduceMotion}
   class:concealed
   role="toolbar"
@@ -336,11 +349,14 @@
       height 200ms ease-out;
   }
 
-  .band.still .slot {
+  .band.still .slot,
+  .band:not(.placed) .slot {
     transition: none;
   }
 
+  /* The card follows its slot's height as it changes (the custom property itself does not animate). */
   .band .slot :global(.card) {
+    height: 100%;
     border-bottom: 0;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
