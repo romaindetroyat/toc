@@ -494,8 +494,11 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
+    // The key is handled: no native action (a focused card or button is not also activated). It is
+    // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
+    // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
+    // handled keys (defaultPrevented).
     event.preventDefault();
-    event.stopPropagation();
     if (intent.kind === "help") {
       const active = document.activeElement;
       shortcutsOpener = active instanceof HTMLElement && active !== document.body ? active : null;

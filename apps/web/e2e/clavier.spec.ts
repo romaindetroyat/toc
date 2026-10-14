@@ -52,6 +52,33 @@ test.describe("au clavier seul", () => {
     await expect(pawn(page, "bleu0")).toHaveAttribute("data-place", "ring:22");
   });
 
+  test("Entrée joue depuis le cheval montré, mais garde son sens sur « Annuler ce coup »", async ({
+    page,
+  }) => {
+    const QUEEN = {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    };
+    // The focus on a button: Entrée presses that button, the move is not played.
+    await openPosition(page, QUEEN);
+    await page.keyboard.press("1");
+    await page.keyboard.press("a");
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await page.getByRole("button", { name: "Annuler ce coup" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(zone(page)).toHaveAttribute("data-state", "idle");
+    await expect(pawn(page, "bleu0")).toHaveAttribute("data-place", "ring:10");
+
+    // The focus on the previewed knight (reached with Tab in real play): Entrée plays, once.
+    await page.keyboard.press("1");
+    await page.keyboard.press("a");
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await page.locator('[data-hit="bleu0"]').focus();
+    await page.keyboard.press("Enter");
+    await expect(pawn(page, "bleu0")).toHaveAttribute("data-place", "ring:22");
+  });
+
   test("cinq tours au clavier", async ({ page }) => {
     // The other seats hold no card: Bleu plays five turns in a row, then the next deal starts.
     await openPosition(page, {
@@ -203,6 +230,17 @@ test.describe("au clavier seul", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "&", code: "Digit1" })),
     );
     await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+  });
+
+  test("le premier raccourci démarre aussi le son d’une partie ouverte directement", async ({
+    page,
+  }) => {
+    // A reload on #/partie has no launch-screen tap: the first key, a shortcut too, unlocks the audio.
+    await openPosition(page, ACE);
+    await expect(page.locator("body")).not.toHaveAttribute("data-audio", /.*/);
+    await page.keyboard.press("1");
+    await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+    await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
   });
 
   test("rien ne bouge derrière une feuille", async ({ page }) => {

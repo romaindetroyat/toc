@@ -69,6 +69,8 @@
   }
 
   function onkeydown(event: KeyboardEvent, pawn: PawnId) {
+    // A keyboard shortcut of the game screen already handled this key (« Entrée » plays the preview).
+    if (event.defaultPrevented) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     event.stopPropagation();
