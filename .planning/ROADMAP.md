@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 28/36 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-36: board C+ and « Compacter l'écran », UAT tests 3 and 4)
+**Plans:** 29/36 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-36: board C+ and « Compacter l'écran », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -103,7 +103,7 @@ Plans:
 - [x] 01-28-PLAN.md — Les raccourcis se voient sur ordinateur, jamais sur téléphone
 
 **Wave 20** *(gap closure, UAT test 4, plateau C+; blocked on Wave 19 completion)*
-- [ ] 01-29-PLAN.md — La géométrie du plateau C+ et les images des règles ; le contrat d’interface et ce que Romain a décidé
+- [x] 01-29-PLAN.md — La géométrie du plateau C+ et les images des règles ; le contrat d’interface et ce que Romain a décidé
 
 **Wave 21** *(gap closure, UAT tests 3 and 4; blocked on Wave 20 completion)*
 - [ ] 01-30-PLAN.md — Le plateau C+ dans la partie : un plateau 2:3 dessiné, chaque cavalier à sa place
@@ -198,7 +198,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 28/36 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 29/36 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
