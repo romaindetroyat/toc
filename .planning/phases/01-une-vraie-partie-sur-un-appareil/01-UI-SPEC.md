@@ -674,6 +674,8 @@ Source: 01-UAT.md test 5 (Romain: « La jouabilité : OK en version iphone, un p
 
 ## Addendum 2026-10-14 — Plateau C+
 
+Remplacé par l’addendum « Plateau galet » ci-dessous (Romain, 2026-10-14). Sa section « Écran compact » reste la référence des détails que la barre compacte du téléphone tenu en largeur reprend du dock (rangée de la main, cartes compactes, colonne des boutons).
+
 Source : recette, test 4 (01-UAT.md). Romain : « La visibilité en version iphone n’est pas très bonne. On va changer le plateau de jeu pour avoir son propre camp centré en bas, le camp du partenaire centré en haut, les rappels de règles (petits cadres entre les camps) sont inutiles car impossibles à voir. » Puis, le 2026-10-14 : « On part sur le plateau C+ pour le moment ». Le C+ est la planche « C+ · Portrait avec les idées du 01 » de https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A ; sa source est `design/plateau-maquette.dc.html` (`renderVals()`, variante « portrait », `idees01` vrai).
 
 Cet addendum est le contrat des plans 01-30 à 01-36. La géométrie et le dessin de C+ sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-29). Les images de RULES.md (`docs/regles/`) sont déjà dessinées sur C+.
@@ -772,3 +774,95 @@ Appareils réels, calculés et laissés à la recette de Romain (non vérifiés 
 | long-text | static-content: numéros des cases | ✅ covered | Un ou deux chiffres par case ; exception typographique du dessin ci-dessus |
 | long-text | interactive-control: consigne dans la rangée de 56 px | ✅ covered | Trois lignes au plus, puis le texte défile à l’intérieur |
 | populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain dans 01-UAT à la fin de la phase (plan 01-36) : C+ sur iPhone, les places par couleur, la taille des cavaliers, les cartes du tapis et l’écran compact |
+
+## Addendum 2026-10-14 — Plateau galet
+
+Source : recette, test 4 (01-UAT.md, la ligne « decision »), puis le message de Romain du 2026-10-14 sur le téléphone en largeur. Maquette : `design/plateau-galet.dc.html` ; artefact https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A, page « Plateaux en bois », planches « Ordinateur · galet », « iPhone · galet » et « Sur les écrans ».
+
+Cet addendum remplace l’addendum « Plateau C+ ». Il est le contrat des plans qui suivent 01-33 (01-34 à 01-39, replanifiés après la décision du paysage obligatoire). La géométrie et le dessin des deux plateaux galet sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-32). Les cavaliers de Romain sont livrés dans `apps/web/src/assets/plateau/` et les images de RULES.md sont dessinées sur le galet en largeur (plan 01-33).
+
+### Décidé par Romain (Révisé par Romain le 2026-10-14)
+
+Seuls ses mots, tels que 01-UAT.md et son message les rapportent.
+
+- **Le C+ est abandonné**, après l’avoir vu dans le jeu : « Bon, ben ça ne marche pas ce plateau, c’est trop laid. » Ses reproches : « trop plat, sans charme » et « la forme ». Et : « Il faut une version iphone et une version ordinateur, mais avec des graphismes adaptés. Là, on ne voit rien sur ordi ».
+- **Le plateau galet en bois** de `design/plateau-galet.dc.html` : « J’aime bien le galet », dit après la « correction des transparences du tapis ». Puis « galet partout », noté alors comme l’ordinateur en largeur (planche « Ordinateur · galet ») et l’iPhone en hauteur (planche « iPhone · galet »).
+- **Le paysage obligatoire**, le même jour : « Pour la version iphone, oblige à jouer en format paysage, ça permettra d’utiliser le même plateau », puis « Oui, paysage obligatoire ». Il n’y a donc plus qu’un plateau, le galet en largeur, sur l’ordinateur comme sur le téléphone. Le galet en hauteur ne sert plus au jeu.
+- **Toujours valables**, de ses mots précédents :
+  - son propre camp centré en bas, celui de son partenaire centré en haut ;
+  - aucun cadre de rappel des règles sur le plateau ;
+  - « Compacter l’écran » sur le téléphone ;
+  - pas d’ambiance sonore.
+
+### Dérivé de la maquette ou du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-39).
+
+1. **Le tapis : sa texture et sa forme.** La texture de bruit du tapis est coupée au tapis seul : c’est ainsi qu’est lue la « correction des transparences du tapis » de la maquette. Le tapis est l’ellipse verte de la planche « Ordinateur · galet ». Le rectangle arrondi de la planche « iPhone · galet » ne sert plus au jeu.
+2. **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut son partenaire, à droite le précédent. Aucune rotation : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k, layout)`, k = `quarterTurnsFor(couleur du joueur)`).
+3. **La taille des cavaliers du galet.** 0,95 pas sur l’anneau, 0,82 dans une maison, 0,78 dans une écurie. Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier).
+4. **Les cartes du tapis et les piles.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon et la défausse sont de part et d’autre du centre, à l’échelle 0,95. Les cartes font 1,3 × 1,82 pas. Tout le tapis est le bouton « Sur le tapis », dans la forme du tapis.
+5. **L’écran plus haut que large.** Safari ne sait pas bloquer l’orientation : en portrait, le téléphone montre une invitation à le tourner, « Tourne ton téléphone », à la place du plateau. Le passage se fait en direct, sans recharger : les mouvements en cours sautent à leur fin, la partie est gardée telle quelle et reprend dès que l’écran est de nouveau en largeur. Pendant ce temps, les joueurs de l’ordinateur attendent. Une fenêtre d’ordinateur plus haute que large montre la même invitation, avec « Élargis la fenêtre ».
+6. **Les modes d’écran et leurs seuils.** Le plateau est en largeur partout. « barre » : en largeur à partir de 960 × 600. « barre compacte » : les autres écrans en largeur (téléphone tenu en largeur, petite fenêtre). « tourner » : tout écran plus haut que large (point 5). Le galet en hauteur, le « dock » en portrait de l’addendum C+ et la pile de 01-24 ne servent plus au jeu.
+7. **La barre du bas sur ordinateur.** Le plateau prend la largeur. Dessous, une barre de 160 px :
+   - à gauche, les infos, environ 240 px : la ligne du tour, la ligne du donneur, les pastilles d’équipe et la roue des réglages ;
+   - au milieu, la main en cartes normales de 88 × 124 ;
+   - à droite, la zone d’action, au moins 320 px ;
+   - l’assistant du 7 prend la place de la main et de la zone d’action.
+
+   Largeur du plateau = min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (0,5 + head room), 1600 px). Cela donne environ 1227 px à 1280 × 800, au lieu des 1280 de la planche « Sur les écrans » : il faut garder la place des têtes des cavaliers de la rangée du haut et celle de la barre de 160 px.
+8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur. Une rangée du haut de 44 px : la barre d’infos de 44 px à gauche, la consigne à droite (Label 14, deux lignes au plus). Dessous, la rangée de la main de 92 px. Largeur du plateau = min(100vw − insets, (100dvh − 136 px − insets) / (0,5 + head room)). L’assistant du 7 tient dans les 136 px, et les infos restent visibles.
+9. **Ce que la barre compacte garde du dock.** La rangée de la main de 92 px de la section « Écran compact » de l’addendum C+ : l’éventail à gauche, les boutons de l’état en colonne à droite (au moins 44 px de haut, Label 14 gras sur deux lignes au plus, un seul bouton principal en bas), les cartes compactes de 64 × 90 dont le bas passe sous le bord de l’écran, et l’assistant du 7 à hauteur fixe. Les textes, l’ordre du focus, les raccourcis clavier et les cibles de 44 px ne changent pas.
+10. **Les objectifs de taille et les appareils réels** (section « Objectifs de taille » ci-dessous).
+11. **Les images des règles sur le galet en largeur.** Les 112 images de RULES.md (`docs/regles/<id>.webp`) montrent le plateau du jeu, le galet en largeur, cavaliers compris. « avant » est au-dessus de « après » : deux plateaux 2:1 empilés font une image carrée de 1200 × 1200, chaque moitié de 1200 × 600, la place dont c’est le tour en bas.
+12. **Les ombres sans flou.** Les ombres CSS de la maquette sont dessinées comme des copies décalées, sans filtre de flou.
+
+### Faits techniques (sans confirmation)
+
+- **Scènes** = la maquette × 2, citées de `scene.ts` :
+  - en largeur (le plateau du jeu) : 3200 × 1600, pas ≈ 107,05, head room ≈ 0,0217 de la largeur ;
+  - en hauteur : 2000 × 3000, pas ≈ 108,37, head room ≈ 0,0354. Cette géométrie reste dans le code pour l’instant, sans servir au jeu ; un plan suivant la retire.
+- **Couleurs du galet** = la palette de la maquette (`PALETTE`) : HEX bleu `#1F4FA8`, jaune `#E3A90C`, rouge `#C3271D`, vert `#1F8A3C` ; LIGHT `#5C86D4`, `#F7D35A`, `#EE6B5E`, `#5CC27A` ; ON blanc, sauf l’encre sur le jaune ; INK `#2A1A0E` ; CREAM `#FBF4E2`. Les sprites des cavaliers et les pastilles des places ne changent pas.
+- **Le tapis** en largeur : une ellipse de demi-axes 600 et 224 (boîte de 1200 × 448, centrée en (1600 ; 800)). Talon (1450 ; 800), défausse (1750 ; 800), cartes de 139,2 × 194,8. En hauteur, il reste le rectangle arrondi de 720 × 840, de rayon 88.
+- **Le dessin** est dans sa propre couche svg (`will-change: transform`) ; les animations ne le touchent jamais.
+- **Les cavaliers de Romain** (`apps/web/src/assets/plateau/cav-<couleur>.png`, 157 × 209, copiés tels quels de la maquette) : un par couleur, dans le coin du côté vers lequel sa couleur part, à 0,6 du chemin vers le coin de la superellipse, haut de 2,6 pas, opacité 0,85, jamais une cible. Leur ligne de licence est `plateau-cavaliers`.
+- **Ce que l’addendum remplace** :
+  - la scène, la palette, les liens, les rails, les flèches et la bande du C+ ;
+  - le panneau latéral de la mise en page en paysage ;
+  - la règle responsive du C+ ;
+  - pour le jeu, le galet en hauteur et les mises en page en portrait (le « dock » et la pile de 01-24).
+- **Typographie, exception.** Les numéros des cases sont un élément du dessin, en Caveat 700 de 0,52 à 0,58 pas (`aria-hidden`). Ils échappent au minimum de 14 px et à la règle des deux graisses. Le texte d’interface posé dans la scène (badges, lettres, « D ») garde 14 px et plus.
+- **Clavier.** L’addendum « Raccourcis clavier » ne change pas. Sur ordinateur, les infos sont dans la zone gauche de la barre, et aucun bouton n’y est ajouté.
+
+### Objectifs de taille
+
+À vérifier en e2e dans l’émulation Chromium de Playwright (insets à 0). Hauteur du plateau = (0,5 + head room) × largeur, avec head room ≈ 0,0217, soit 0,5217 × largeur.
+
+| Fenêtre | Mode | Calcul | Largeur du plateau attendue |
+|---------|------|--------|-----------------------------|
+| 480 × 320 | barre compacte | (320 − 136) / 0,5217 ≈ 353 px | au moins 340 px |
+| 844 × 390 (iPhone 13 émulé, tenu en largeur) | barre compacte | (390 − 136) / 0,5217 ≈ 487 px | au moins 470 px |
+| 1024 × 640 | barre | (640 − 160) / 0,5217 ≈ 920 px | au moins 900 px |
+| 1280 × 800 | barre | (800 − 160) / 0,5217 ≈ 1227 px | au moins 1200 px |
+| 1440 × 900 | barre | limitée par la largeur : 1440 − 32 = 1408 px | au moins 1390 px |
+| 390 × 844, 375 × 667, 320 × 480 (portrait) | tourner | aucun plateau : l’invitation à tourner l’écran | — |
+
+Pas et cavaliers de l’anneau (0,95 pas) :
+- 480 × 320 : pas ≈ 11,8 px, cavaliers ≈ 11,2 px ;
+- 844 × 390 : pas ≈ 16,3 px, cavaliers ≈ 15,5 px ;
+- 1280 × 800 : pas ≈ 41 px, cavaliers ≈ 39 px.
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- iPhone 13 en app installée, tenu en largeur (844 × 390, encoche de 47 px de chaque côté, inset du bas de 21 px) : (390 − 136 − 21) / 0,5217 ≈ 447 px, sous la limite de largeur de 750 px ; pas ≈ 15 px.
+- Dans Safari en largeur, la hauteur visible dépend des barres de Safari. Elle n’est pas connue ici : à mesurer sur l’iPhone pendant la recette. Avec 340 px de haut, par exemple, le plateau ferait (340 − 136) / 0,5217 ≈ 391 px de large.
+
+Comparaison honnête, pour la recette de Romain. Le galet en hauteur aurait donné, sur l’iPhone 13 en portrait dans Safari (390 × 664), un plateau d’environ 307 px de large, un pas d’environ 16,7 px et des cavaliers d’environ 15,8 px. Le galet en largeur à 844 × 390 donne un pas de 16,3 px et des cavaliers de 15,5 px : à peu près la même taille (2 % de moins), mais le même plateau que sur l’ordinateur. Sur un petit téléphone tenu en largeur (480 × 320), tout est plus petit : un pas de 11,8 px.
+
+### UI Considerations (addendum galet)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| loading, error | media: board drawing | ✅ covered | Écartés : le plateau est du code. Les cavaliers de Romain sont quatre petits fichiers livrés avec l’app ; le plateau est dessiné sans eux le temps qu’ils arrivent (décor, jamais une cible) |
+| long-text | interactive-control: consigne dans la rangée de 44 px de la barre compacte | ✅ covered | Deux lignes au plus, puis le texte défile à l’intérieur |
+| empty | static-content: écran plus haut que large | ✅ covered | L’invitation à tourner l’écran remplace le plateau ; la partie est gardée telle quelle |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain à la fin de la phase (plan 01-39) : les douze points dérivés ci-dessus, le galet en largeur sur l’iPhone et sur l’ordinateur, la taille des cavaliers |
