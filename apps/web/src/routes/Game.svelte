@@ -57,6 +57,7 @@
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
 
@@ -291,6 +292,10 @@
   /** « Sur le tapis »: the felt read in large form (D-08). */
   let tapisOpen = $state(false);
 
+  /** « Raccourcis clavier », opened with « ? »; the focus goes back to where it was on close. */
+  let shortcutsOpen = $state(false);
+  let shortcutsOpener = $state.raw<HTMLElement | null>(null);
+
   /**
    * « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back (or
    * the sound test, when « Tester les sons » was asked for in the game).
@@ -491,6 +496,12 @@
     if (intent === null) return;
     event.preventDefault();
     event.stopPropagation();
+    if (intent.kind === "help") {
+      const active = document.activeElement;
+      shortcutsOpener = active instanceof HTMLElement && active !== document.body ? active : null;
+      shortcutsOpen = true;
+      return;
+    }
     for (const each of intent.events) {
       if (each.t === "tapPawn") pickPawn(each.pawn);
       else if (each.t === "tapAt") pickNear(each.near);
@@ -688,6 +699,10 @@
 
     {#if tapisOpen}
       <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
+    {/if}
+
+    {#if shortcutsOpen}
+      <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
     {/if}
 
     {#if ended && render.winner !== null}

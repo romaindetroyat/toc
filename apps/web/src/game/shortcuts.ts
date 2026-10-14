@@ -40,7 +40,8 @@ export type KeyContext = {
   blocked: boolean;
 };
 
-export type KeyIntent = { kind: "turn"; events: TurnUiEvent[] } | null;
+/** Reducer events to send, or the help sheet to open (« ? »), or nothing. */
+export type KeyIntent = { kind: "turn"; events: TurnUiEvent[] } | { kind: "help" } | null;
 
 /**
  * The knights lit for the flow (the state under the tray): the 7's knights that may still be given
@@ -191,6 +192,8 @@ export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
   if (input.ctrlKey || input.metaKey || input.altKey || input.repeat || input.isComposing) {
     return null;
   }
+  // « ? » (typed with Shift on most layouts) opens the help sheet, whatever the turn.
+  if (input.key === "?") return { kind: "help" };
   const { ui } = ctx;
 
   const digit = digitOf(input.code);

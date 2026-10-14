@@ -720,3 +720,36 @@ describe("keyIntent: round trips through the reducer", () => {
     expect(play(DEAD, reach(DEAD), "p").submitted).toEqual([{ t: "discard" }]);
   });
 });
+
+describe("keyIntent: « ? » opens the help", () => {
+  const help = (extra: Partial<KeyInput> = {}) => press("?", { code: "Slash", ...extra });
+
+  it("opens the help in every state, waiting, idle and preview included", () => {
+    for (const ui of [
+      { kind: "waiting" } as TurnUiState,
+      reach(QUEEN),
+      reach(QUEEN, { t: "tapCard", card: "12H" }, { t: "tapPawn", pawn: "bleu0" }),
+      ...ROWS.map((row) => row.ui),
+    ]) {
+      expect(keyIntent(help(), context(QUEEN, ui)), ui.kind).toEqual({ kind: "help" });
+    }
+    // AZERTY types « ? » with Shift on the comma key.
+    expect(keyIntent(help({ code: "KeyM" }), context(QUEEN, reach(QUEEN)))).toEqual({
+      kind: "help",
+    });
+  });
+
+  it("does nothing while a sheet is open, in a field, with Ctrl, Cmd or Alt, or on repeat", () => {
+    const idle = reach(QUEEN);
+    expect(keyIntent(help(), context(QUEEN, idle, { blocked: true }))).toBeNull();
+    expect(keyIntent(help(), context(QUEEN, idle, { focus: { kind: "field" } }))).toBeNull();
+    for (const extra of [
+      { ctrlKey: true },
+      { metaKey: true },
+      { altKey: true },
+      { repeat: true },
+    ]) {
+      expect(keyIntent(help(extra), context(QUEEN, idle))).toBeNull();
+    }
+  });
+});
