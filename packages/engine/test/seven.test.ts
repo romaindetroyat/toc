@@ -132,7 +132,7 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     }
   });
 
-  it("passes own pawns without eating them and eats the partner's pawn it crosses", () => {
+  it("passes own pawns and the partner's pawn without eating them (G15)", () => {
     const state = playState(
       { bleu: [{ p: 5 }, { p: 8 }, "S", "S"], rouge: [{ p: 45 }, "S", "S", "S"] },
       { bleu: [CARD] },
@@ -142,10 +142,27 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const result = applyPlan(state, "bleu", CARD, plan(["bleu0", 7]));
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.captured).toEqual(["rouge0"]);
+      expect(result.captured).toEqual([]);
       expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 8 });
+      expect(result.pawns.rouge0).toEqual({ zone: "ring", progress: 45 });
+      expect(result.events.some((e) => e.t === "pawnCaptured")).toBe(false);
+    }
+  });
+
+  it("eats the partner's pawn it stops on (R-11)", () => {
+    const state = playState(
+      { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: 48 }, "S", "S", "S"] },
+      { bleu: [CARD] },
+      "bleu",
+    );
+    // rouge0 is on cell 36 + 48 = 84 mod 72 = 12: the last cell of bleu0's path.
+    const result = applyPlan(state, "bleu", CARD, plan(["bleu0", 7]));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.captured).toEqual(["rouge0"]);
+      expect(result.pawns.rouge0).toEqual({ zone: "stable" });
       const capture = result.events.find((e) => e.t === "pawnCaptured");
-      expect(capture).toMatchObject({ victim: "rouge0", atStep: 3 });
+      expect(capture).toMatchObject({ victim: "rouge0", atStep: 6 });
     }
   });
 

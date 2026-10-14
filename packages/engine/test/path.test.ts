@@ -259,16 +259,25 @@ describe("landing, captures and passing (RULE-12, G11)", () => {
     expect(r.ok && r.captures).toEqual([]);
   });
 
-  it("with capturePassed, every non-own pawn on a crossed cell is captured at its step", () => {
-    const b = board({
+  it("with capturePassed, every opponent pawn on a crossed cell is captured at its step; the partner's pawn is passed (G15)", () => {
+    const pawns = {
       bleu0: { p: 5 },
       bleu1: { p: 7 }, // cell 7, own: passed without capture
-      rouge0: { p: 44 }, // cell 8
+      rouge0: { p: 44 }, // cell 8, partner: passed without capture (G15)
+      vert0: { p: 27 }, // cell 9
       jaune0: { p: 64 }, // cell 10
-    });
-    const r = walk(b, "bleu0", 6, 1, { capturePassed: true, ownIds: bleuAll });
+    };
+    const r = walk(board(pawns), "bleu0", 6, 1, { capturePassed: true, ownIds: bleuAll });
     expect(r.ok && r.captures).toEqual([
+      { victim: "vert0", atStep: 3 },
+      { victim: "jaune0", atStep: 4 },
+    ]);
+    // SEVEN_EATS_PASSED_PARTNER true: the rule of 2026-10-13 (Q23), the partner's pawn is eaten too.
+    const old = board(pawns, { SEVEN_EATS_PASSED_PARTNER: true });
+    const r2 = walk(old, "bleu0", 6, 1, { capturePassed: true, ownIds: bleuAll });
+    expect(r2.ok && r2.captures).toEqual([
       { victim: "rouge0", atStep: 2 },
+      { victim: "vert0", atStep: 3 },
       { victim: "jaune0", atStep: 4 },
     ]);
   });

@@ -3,6 +3,8 @@
 // and the debug scenario loader. Conventions are documented on the Scenario type.
 // Cell arithmetic: cell = (EXIT[color] + progress) mod 72, with EXIT bleu 0, jaune 18, rouge 36, vert 54.
 // Progress after a swap (G1, default): (cell - EXIT[color]) mod 72, so the lap count is lost.
+// The 7 eats the opponent pawns it passes; it passes the pawns of its own team, own and partner's,
+// without eating them (G15), and eats any pawn a step stops on.
 
 import type { Scenario } from "../src/types.ts";
 
@@ -275,7 +277,7 @@ export const r10: Scenario[] = [
   {
     id: "R-10.6",
     rule: "R-10",
-    title: "Le 7 mange aussi le pion du partenaire qu’il dépasse",
+    title: "Le 7 dépasse le pion du partenaire sans le manger",
     before: {
       pawns: { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: 45 }, "S", "S", "S"] },
       hands: { bleu: ["7S"] },
@@ -284,14 +286,13 @@ export const r10: Scenario[] = [
     action: { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
     expect: {
       legal: true,
-      captured: ["rouge0"],
-      capturedAtStep: { rouge0: 3 },
+      captured: [],
       after: {
-        pawns: { bleu: [{ p: 12 }, "S", "S", "S"], rouge: ["S", "S", "S", "S"] },
+        pawns: { bleu: [{ p: 12 }, "S", "S", "S"], rouge: [{ p: 45 }, "S", "S", "S"] },
       },
-      events: ["cardPlayed", "pawnMoved", "pawnCaptured", "pawnSentHome", "turn"],
+      events: ["cardPlayed", "pawnMoved", "turn"],
     },
-    flags: ["Q23"],
+    flags: ["G15"],
   },
   {
     id: "R-10.7",
@@ -301,7 +302,7 @@ export const r10: Scenario[] = [
       pawns: {
         bleu: [{ p: 5 }, "S", "S", "S"],
         jaune: [{ p: 62 }, "S", "S", "S"],
-        rouge: [{ p: 47 }, "S", "S", "S"],
+        vert: [{ p: 29 }, "S", "S", "S"],
       },
       hands: { bleu: ["7S"] },
       turn: "bleu",
@@ -309,13 +310,13 @@ export const r10: Scenario[] = [
     action: { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
     expect: {
       legal: true,
-      captured: ["jaune0", "rouge0"],
-      capturedAtStep: { jaune0: 2, rouge0: 5 },
+      captured: ["jaune0", "vert0"],
+      capturedAtStep: { jaune0: 2, vert0: 5 },
       after: {
         pawns: {
           bleu: [{ p: 12 }, "S", "S", "S"],
           jaune: ["S", "S", "S", "S"],
-          rouge: ["S", "S", "S", "S"],
+          vert: ["S", "S", "S", "S"],
         },
       },
       events: [
@@ -464,5 +465,26 @@ export const r10: Scenario[] = [
       events: ["cardPlayed", "pawnMoved", "pawnMoved", "pawnMoved", "turn"],
     },
     flags: ["G5"],
+  },
+  {
+    id: "R-10.14",
+    rule: "R-10",
+    title: "Le 7 qui s’arrête sur le pion du partenaire le mange",
+    before: {
+      pawns: { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: 48 }, "S", "S", "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
+    expect: {
+      legal: true,
+      captured: ["rouge0"],
+      capturedAtStep: { rouge0: 6 },
+      after: {
+        pawns: { bleu: [{ p: 12 }, "S", "S", "S"], rouge: ["S", "S", "S", "S"] },
+      },
+      events: ["cardPlayed", "pawnMoved", "pawnCaptured", "pawnSentHome", "turn"],
+    },
+    flags: ["G15"],
   },
 ];

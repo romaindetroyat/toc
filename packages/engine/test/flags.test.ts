@@ -208,12 +208,17 @@ describe("G10 ONLY_OWN_PAWNS_MOVE", () => {
 });
 
 describe("G11 ORDINARY_CARDS_PASS_OVER_PAWNS", () => {
-  const state = (value: boolean) =>
+  // rouge0 (partner) on cell 36 + 44 - 72 = 8, jaune0 (opponent) on cell 18 + 63 - 72 = 9.
+  const state = (value: boolean, rules = {}) =>
     playState(
-      { bleu: [{ p: 5 }, "S", "S", "S"], rouge: [{ p: 44 }, "S", "S", "S"] },
+      {
+        bleu: [{ p: 5 }, "S", "S", "S"],
+        rouge: [{ p: 44 }, "S", "S", "S"],
+        jaune: [{ p: 63 }, "S", "S", "S"],
+      },
       { bleu: ["6S"] },
       "bleu",
-      { ORDINARY_CARDS_PASS_OVER_PAWNS: value },
+      { ORDINARY_CARDS_PASS_OVER_PAWNS: value, ...rules },
     );
 
   it("true: passing a pawn eats nothing (R-07.5)", () => {
@@ -221,9 +226,21 @@ describe("G11 ORDINARY_CARDS_PASS_OVER_PAWNS", () => {
     expect(candidate?.walk?.captures).toEqual([]);
   });
 
-  it("false: ordinary cards also eat what they pass", () => {
+  it("false: ordinary cards also eat the opponents they pass, and pass the partner (G15)", () => {
     const [candidate] = movesForCard(state(false), "bleu", "6S");
-    expect(candidate?.walk?.captures).toEqual([{ victim: "rouge0", atStep: 2 }]);
+    expect(candidate?.walk?.captures).toEqual([{ victim: "jaune0", atStep: 3 }]);
+  });
+
+  it("false with SEVEN_EATS_PASSED_PARTNER: they eat the partner they pass as well", () => {
+    const [candidate] = movesForCard(
+      state(false, { SEVEN_EATS_PASSED_PARTNER: true }),
+      "bleu",
+      "6S",
+    );
+    expect(candidate?.walk?.captures).toEqual([
+      { victim: "rouge0", atStep: 2 },
+      { victim: "jaune0", atStep: 3 },
+    ]);
   });
 });
 

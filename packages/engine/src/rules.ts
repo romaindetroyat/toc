@@ -16,8 +16,8 @@
 //   implementing the alternative first and widening its type.
 //
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
-// G14 records the change Romain made on 2026-10-14 during the phase acceptance test (later changes
-// continue the numbering).
+// G14 and G15 record the changes Romain made on 2026-10-14 during the phase acceptance test (later
+// changes continue the numbering).
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
 
 /**
@@ -113,6 +113,16 @@ export const SEVEN_CONTINUES_WITH_PARTNER: boolean = true;
 export const ENTRY_WITHOUT_FULL_LAP: boolean = true;
 
 /**
+ * G15 — The 7 and the partner's knight (RULES.md R-07, R-10, R-11, R-15, « Décisions de Romain »; decided
+ * by Romain on 2026-10-14 during the acceptance test, UAT test 7).
+ * false: a capture in passing (the 7, and the ordinary cards when G11 is off) eats only opponent knights;
+ * the knights of the mover's team, own and partner's, are passed without being eaten, also when a finished
+ * player plays his partner's knights; landing on a partner's knight still eats it (R-11).
+ * true: the rule of 2026-10-13 (Q23), every passed knight that is not own is eaten.
+ */
+export const SEVEN_EATS_PASSED_PARTNER: boolean = false;
+
+/**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
  * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
@@ -154,6 +164,7 @@ export type RuleSet = {
   ORDINARY_CARDS_PASS_OVER_PAWNS: boolean;
   SEVEN_CONTINUES_WITH_PARTNER: boolean;
   ENTRY_WITHOUT_FULL_LAP: boolean;
+  SEVEN_EATS_PASSED_PARTNER: boolean;
   EMPTY_HAND_SKIPPED: true;
   EXCHANGE_KEEPS_HAND_SIZE: true;
   PAUSE_IN_ALL_PHASES: true;
@@ -175,6 +186,7 @@ export const DEFAULT_RULES: Readonly<RuleSet> = {
   ORDINARY_CARDS_PASS_OVER_PAWNS,
   SEVEN_CONTINUES_WITH_PARTNER,
   ENTRY_WITHOUT_FULL_LAP,
+  SEVEN_EATS_PASSED_PARTNER,
   EMPTY_HAND_SKIPPED,
   EXCHANGE_KEEPS_HAND_SIZE,
   PAUSE_IN_ALL_PHASES,

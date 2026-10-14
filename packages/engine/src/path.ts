@@ -1,6 +1,7 @@
 // The single movement path (RESEARCH Pattern 1): walk() is used by legality, previews, captures,
 // the 7 (plan 01-13, seven.ts) and animation. No second movement code path exists for the 4, the Valet or the 7.
-// Rules read: RULES.md R-02, R-08, R-12, R-13 and the choices G2, G3, G4, G14 through `board.rules`.
+// Rules read: RULES.md R-02, R-08, R-10, R-12, R-13 and the choices G2, G3, G4, G14, G15 through
+// `board.rules` (G15: a capture in passing eats only opponents, the mover's team is passed).
 // Pure, no I/O, erasable syntax only.
 
 import type { RuleSet } from "./rules.ts";
@@ -15,6 +16,7 @@ import {
   pawnIndex,
   RING,
   ringIndex,
+  teamOf,
 } from "./topology.ts";
 import type { Pawn } from "./types.ts";
 
@@ -47,7 +49,10 @@ export type WalkOk = { ok: true; path: Place[]; end: Pawn; captures: Capture[] }
 export type WalkResult = WalkOk | { ok: false; reason: WalkFailure };
 
 export type WalkOpts = {
-  /** The 7 eats every non-own pawn on a crossed cell; ordinary cards pass over (G11). */
+  /**
+   * The 7 eats the opponent pawns on crossed cells and passes the knights of the mover's team, own and
+   * partner's (G15; every non-own pawn when SEVEN_EATS_PASSED_PARTNER); ordinary cards pass over (G11).
+   */
   capturePassed: boolean;
   /** Pawns the mover may neither stop on nor eat: the pawns of the player who moves. */
   ownIds: readonly PawnId[];
@@ -135,7 +140,10 @@ type Stretch =
 
 /**
  * Walks `count` ring cells from `from` in direction `dir`, checking protection and applying the landing
- * rule on the last cell when `lands` (own pawn: illegal; any other pawn: captured).
+ * rule on the last cell when `lands` (own pawn: illegal; any other pawn: captured). With
+ * `opts.capturePassed`, a passed pawn is eaten only when it is not own and, under G15, belongs to the
+ * other team (the mover's colour is that of the knight moved: a finished player moving his partner's
+ * knights spares the whole team).
  */
 function ringStretch(
   board: Board,
@@ -148,6 +156,7 @@ function ringStretch(
   occ: Occupancy,
 ): Stretch {
   const color = pawnColor(id);
+  const team = teamOf(color);
   const path: Place[] = [];
   const captures: Capture[] = [];
   for (let i = 1; i <= count; i++) {
@@ -164,7 +173,11 @@ function ringStretch(
         if (landing) {
           if (own) return { ok: false, reason: "own-pawn" };
           captures.push({ victim: other, atStep: i - 1 });
-        } else if (opts.capturePassed && !own) {
+        } else if (
+          opts.capturePassed &&
+          !own &&
+          (board.rules.SEVEN_EATS_PASSED_PARTNER || teamOf(pawnColor(other)) !== team)
+        ) {
           captures.push({ victim: other, atStep: i - 1 });
         }
       }

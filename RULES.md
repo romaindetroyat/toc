@@ -223,7 +223,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-10 Le 7
 
-**Règle** — Le 7 se répartit comme le joueur veut entre ses chevaux, sur un seul ou sur plusieurs, en pas séparés dont la somme fait exactement 7. Les pas se jouent l’un après l’autre, dans l’ordre choisi. Chaque cheval adverse ou du partenaire que le 7 dépasse ou sur lequel il s’arrête est mangé, au moment où l’attaquant passe sur sa case. Le 7 dépasse ses propres chevaux sans les manger, mais ne peut pas s’arrêter sur l’un d’eux, ni traverser un cheval protégé (R-12). Le 7 se joue en entier ou pas du tout : s’il est impossible de jouer les 7 pas, le 7 est injouable, même si une partie des pas serait possible.
+**Règle** — Le 7 se répartit comme le joueur veut entre ses chevaux, sur un seul ou sur plusieurs, en pas séparés dont la somme fait exactement 7. Les pas se jouent l’un après l’autre, dans l’ordre choisi. Chaque cheval adverse que le 7 dépasse est mangé, au moment où l’attaquant passe sur sa case. Le 7 dépasse ses propres chevaux et ceux de son partenaire sans les manger (G15). Le cheval sur lequel un pas du 7 s’arrête est mangé, qu’il soit adverse ou du partenaire : c’est obligatoire, comme avec toute carte (R-11). Le 7 ne peut pas s’arrêter sur l’un de ses propres chevaux, ni traverser un cheval protégé (R-12). Le 7 se joue en entier ou pas du tout : s’il est impossible de jouer les 7 pas, le 7 est injouable, même si une partie des pas serait possible.
 
 **Cas limites**
 - Dépasser ses propres chevaux sans les manger, jouer le 7 en entier ou pas du tout : c’est acté (D-04).
@@ -245,7 +245,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-10.4](docs/regles/R-10.4.webp)
 - R-10.5 — Le 7 mange un adversaire sur sa case d’arrivée
   ![R-10.5](docs/regles/R-10.5.webp)
-- R-10.6 — Le 7 mange aussi le pion du partenaire qu’il dépasse
+- R-10.6 — Le 7 dépasse le pion du partenaire sans le manger
   ![R-10.6](docs/regles/R-10.6.webp)
 - R-10.7 — Un seul 7 peut manger plusieurs pions, chacun à son passage
   ![R-10.7](docs/regles/R-10.7.webp)
@@ -261,6 +261,8 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-10.12](docs/regles/R-10.12.webp)
 - R-10.13 — Le même pion peut revenir plus tard dans le plan du 7
   ![R-10.13](docs/regles/R-10.13.webp)
+- R-10.14 — Le 7 qui s’arrête sur le pion du partenaire le mange
+  ![R-10.14](docs/regles/R-10.14.webp)
 
 ### R-11 Prise
 
