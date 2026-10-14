@@ -23,7 +23,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
 - [x] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
 - [x] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
-- [x] **RULE-15** : Un pion doit avoir fait le tour complet pour entrer dans sa maison par sa case d'entrée, au compte exact jusqu'à une case vide, sans sauter un pion déjà rentré ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact.
+- [x] **RULE-15** : Un pion entre dans sa maison par sa case d'entrée (carré 16) dès qu'il l'atteint ou la franchit en avançant, même sans avoir fait le tour complet (après un recul avec le 4 ou un échange au Valet ; décision G14 du 2026-10-14), au compte exact jusqu'à une case vide, sans sauter un pion déjà rentré ; on n'y entre jamais en reculant ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact.
 - [x] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
 - [x] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [x] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
@@ -180,4 +180,4 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-13 after roadmap creation*
+*Last updated: 2026-10-14 after the UAT (G14)*

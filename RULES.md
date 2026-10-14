@@ -1,12 +1,12 @@
 # Règles du TOC — version maison
 
-**Statut :** Validé par Romain le 2026-10-13 (voir « Décisions de Romain » à la fin)
-**Date :** 2026-10-13
+**Statut :** Validé par Romain le 2026-10-13 ; règles changées par Romain le 2026-10-14 pendant la recette (voir « Décisions de Romain » à la fin)
+**Date :** 2026-10-14
 **Contenu de cette version :** les seize règles R-01 à R-16 (équipes, plateau, donnes, échange, tour, As et Roi, cartes à avancer, le 4, le Valet, le 7, prise, sortie protégée, maison, main injouable, joueur qui a fini, fin de partie), suivies de « Décisions de Romain » (les points qu’il a validés, avec la valeur retenue) et de « Décidé » (ce qui l’est déjà, avec sa source). Chaque scénario est dessiné sur le plateau : à gauche avant le coup, à droite après.
 
 Chaque règle est numérotée. Chaque règle cite des scénarios (`R-NN.k`) : ce sont de petits cas écrits comme des données, que le moteur de jeu devra reproduire à l’identique. Rien n’est décidé en silence dans le code : ce qui est écrit ici est ce que le jeu fera.
 
-Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Ce que dit ce document est ce que le moteur fait.
+Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Le 2026-10-14, pendant la recette de la phase 1, Romain a changé des règles (G14 et suivantes, dans « Décisions de Romain »). Ce que dit ce document est ce que le moteur fait.
 
 ## Vocabulaire
 
@@ -449,6 +449,12 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R-13.7 et R-10.13, puis l’a validé tel quel le 2026-10-13 : chaque point prend la valeur retenue indiquée. Aucune correction. Les scénarios R-09.9 et R-15.9 dessinent l’autre choix de G1 et de G12 : ils sont conservés comme repères et ne sont pas implémentés. Chaque valeur est une constante nommée dans `packages/engine/src/rules.ts`.
 
+Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci-dessous (G14 et suivantes). Ses mots sont cités tels quels.
+
+- **G14 — Entrée dans la maison sans tour complet (décision du 2026-10-14).** Retenu : un cheval qui atteint ou franchit son carré 16 en avançant entre dans sa maison au compte exact sur une case vide, même s’il n’a pas fait le tour complet ; l’entrée reste obligatoire quand le compte tombe juste ; on n’entre jamais en reculant. Les mots de Romain : « si le cheval n’a pas fait le tour complet et qu’il arrive en situation de pouvoir rentrer (par 4 ou par valet) doit pouvoir rentrer ». Remplace « tour complet obligatoire » (D-04, Q3). Constante ENTRY_WITHOUT_FULL_LAP. Touche R-02, R-08, R-09, R-13 ; scénarios R-02.3, R-08.7, R-13.12, R-13.16 à R-13.21.
+
+Les points validés le 2026-10-13 :
+
 - **G1 — Progression d’un cheval après un échange au Valet.** Retenu : le cheval qui change de case prend la progression de sa nouvelle case (de 0 à 71 ; un cheval qui avait fait un tour de plus perd ce tour). Touche R-02, R-09, R-13 ; scénarios R-09.1, R-09.2, R-09.8, R-15.4. Le scénario R-09.9 (garder ses tours) n’est pas retenu.
 - **G2 — Entrée bloquée par un cheval déjà rentré.** Retenu : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. Touche R-13 ; scénario R-13.7.
 - **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Retenu : il est protégé comme au premier passage, la protection tient à la case et à la couleur, pas au tour. Touche R-12 ; scénario R-12.9.
@@ -473,7 +479,7 @@ Ces points ne sont plus à discuter : ils sont écrits plus haut sans réserve.
 - D-01 : pour entrer dans sa maison, il faut le compte exact jusqu’à une case vide. Si le compte ne tombe pas juste, ou si la case est occupée, le cheval dépasse son entrée et repart pour un tour (R-13).
 - D-02 : quand le compte permet d’entrer pile sur une case vide, l’entrée est obligatoire (R-13).
 - D-03 : un cheval déjà rentré peut encore avancer dans sa maison, au compte exact et sans sauter un autre cheval (R-13).
-- D-04 : sens horaire (R-05) ; entrée par le carré 16 (R-02, R-13) ; losange infranchissable seulement pour le cheval de sa couleur (R-12, Q14) ; le 4 peut reculer depuis la sortie mais jamais pour entrer dans la maison (R-08, Q2, Q18) ; tour complet obligatoire (R-02, R-13, Q3) ; le 7 dépasse ses propres chevaux (Q1) et se joue en entier ou pas du tout (R-10, Q19) ; échange de carte à chaque donne (R-04, Q5) ; le Valet n’échange pas deux chevaux du même joueur (R-09).
+- D-04 : sens horaire (R-05) ; entrée par le carré 16 (R-02, R-13) ; losange infranchissable seulement pour le cheval de sa couleur (R-12, Q14) ; le 4 peut reculer depuis la sortie mais jamais pour entrer dans la maison (R-08, Q2, Q18) ; le tour complet, obligatoire jusqu’au 2026-10-14, ne l’est plus (G14) ; le 7 dépasse ses propres chevaux (Q1) et se joue en entier ou pas du tout (R-10, Q19) ; échange de carte à chaque donne (R-04, Q5) ; le Valet n’échange pas deux chevaux du même joueur (R-09).
 
 **Décidé autrement que l’hypothèse de la recherche**
 - Q10, le Valet ne peut pas échanger deux chevaux du même joueur (RULE-09), alors que la recherche supposait que c’était permis.

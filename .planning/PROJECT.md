@@ -28,7 +28,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 - [ ] 4 : reculer de 4
 - [ ] Prise : s'arrêter sur un pion adverse ou du partenaire le renvoie à son écurie ; on ne peut pas prendre ses propres pions
 - [ ] Un pion sur sa case de sortie (losange 18) est infranchissable : personne ne peut le dépasser, le manger ni l'échanger
-- [ ] Entrée dans la maison (4 cases d'arrivée) au compte exact, sans sauter un pion déjà rentré
+- [ ] Entrée dans la maison (4 cases d'arrivée) au compte exact, sans sauter un pion déjà rentré, même sans tour complet (depuis le 2026-10-14)
 - [ ] Si aucune carte n'est jouable, le joueur pose toute sa main et attend la donne suivante
 - [ ] Un joueur dont les 4 pions sont rentrés continue avec les pions de son partenaire
 - [ ] L'équipe qui rentre ses 8 pions gagne
@@ -100,7 +100,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 
 - Sens de rotation horaire (bleu → jaune → rouge → vert) ; entrée dans la maison par son carré 16.
 - Losange 18 infranchissable seulement quand le pion est de la couleur de cette sortie.
-- Le 4 peut reculer un pion qui vient de sortir ; on n'entre jamais dans la maison en reculant ; tour complet obligatoire.
+- Le 4 peut reculer un pion qui vient de sortir ; on n'entre jamais dans la maison en reculant. Depuis le 2026-10-14, le tour complet n'est plus obligatoire : un pion qui atteint son carré 16 en avançant entre au compte exact (RULES.md, G14).
 - Le 7 peut dépasser ses propres pions sans les manger ; il doit être joué en entier, sinon il est injouable.
 - Échange d'une carte avec le partenaire à chaque donne (5, 4 et 4).
 - Le Valet ne peut pas échanger deux de ses propres pions.
