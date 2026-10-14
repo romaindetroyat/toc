@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 33/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
+**Plans:** 34/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -122,7 +122,7 @@ Plans:
 *(Then, the same day, Romain: « Pour la version iphone, oblige à jouer en format paysage, ça permettra d’utiliser le même plateau », « Oui, paysage obligatoire ». One board, the landscape galet, on the computer and on the phone held sideways; 01-34 to 01-41 were replanned for it.)*
 
 **Wave 25** *(gap closure, UAT tests 3 and 4; blocked on Wave 24 completion)*
-- [ ] 01-34-PLAN.md — Le galet en largeur devient le seul plateau du jeu : les cavaliers, leurs halos, aperçus, marques et cibles dessus
+- [x] 01-34-PLAN.md — Le galet en largeur devient le seul plateau du jeu : les cavaliers, leurs halos, aperçus, marques et cibles dessus
 
 **Wave 26** *(gap closure, UAT test 4; blocked on Wave 25 completion)*
 - [ ] 01-35-PLAN.md — Le tapis et ses cartes sur le galet en largeur
@@ -217,7 +217,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 33/41 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 34/41 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
