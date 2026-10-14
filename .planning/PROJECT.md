@@ -50,7 +50,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 - [ ] Classement entre amis
 
 **Rendu et ambiance**
-- [ ] Le plateau original de Romain (4 quarts de 1280 px) assemblé, lisible sur téléphone (portrait) comme sur grand écran
+- [ ] Le plateau « galet » dessiné par le code, le même sur ordinateur et sur téléphone, toujours en largeur (le téléphone tenu en largeur), lisible sur les deux
 - [ ] Pions en forme de cavaliers d'échecs en « fausse 3D » (ombre portée, dégradés, reflets) aux 4 couleurs
 - [ ] Animations : sortie d'écurie, déplacement case par case, prise (le pion qui mange), pion mangé (retour à l'écurie), arrivée à la maison, échange au Valet
 - [ ] Bruitages : sabots dont la cadence suit la vitesse, hennissements ; la vitesse dépend de la distance à parcourir selon la carte jouée
@@ -66,7 +66,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 
 ## Context
 
-- **Graphismes existants** : `assets/plateau/quart-{jaune,rouge,bleu,vert}.webp`, 4 quarts de 1280×1280 px. Assemblage : jaune en haut à gauche, rouge en haut à droite, bleu en bas à gauche, vert en bas à droite. Le carré vert central forme le tapis où l'on pose les cartes.
+- **Graphismes existants** : `assets/plateau/quart-{jaune,rouge,bleu,vert}.webp`, 4 quarts de 1280×1280 px, le plateau original dessiné par Romain, gardés dans le dépôt comme son œuvre (le jeu ne les embarque plus). Assemblage d'origine : jaune en haut à gauche, rouge en haut à droite, bleu en bas à gauche, vert en bas à droite ; le carré vert central y forme le tapis où l'on pose les cartes. Depuis le 2026-10-14, le jeu dessine le plateau « galet » par le code (`packages/board`), en largeur, avec le cavalier à l'encre de Romain recolorié pour chaque couleur ; le tapis y est l'ellipse verte.
 - **Parcours** : 72 cases. Le losange 18 de chaque couleur est sa case de sortie, à côté de son écurie (4 ronds alignés). Les numéros imprimés comptent la distance depuis la case de sortie précédente : depuis le 18 bleu, on avance sur 1 à 6 (quart bleu), puis 7 à 15, le carré 16, le 17 et le losange 18 (quart jaune), qui est la sortie jaune. Sens de rotation : bleu → jaune → rouge → vert → bleu, soit le sens horaire. Le carré 16 est la case d'entrée vers la maison de la couleur (4 ronds en diagonale vers le centre), deux cases avant sa propre sortie. Chaque quart porte un aide-mémoire des cartes spéciales et un cavalier dessiné à la couleur du joueur.
 - **Équipes** : les partenaires sont face à face, donc jaune avec vert, et rouge avec bleu.
 - **Prototype** : une première maquette de pions en SVG (dégradés, ombre, reflet) posés sur le plateau assemblé a validé l'approche « fausse 3D ».
@@ -77,7 +77,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 
 - **Hébergement** : Cloudflare (Workers, Durable Objects pour les tables temps réel, D1/KV pour les comptes et l'historique) — choix de Romain
 - **Plateforme** : PWA, aussi soignée sur téléphone que sur ordinateur
-- **Graphismes** : reprendre fidèlement le plateau existant ; ne pas le redessiner
+- **Graphismes** : le plateau « galet » en bois, dessiné par le code d'après la maquette choisie par Romain le 2026-10-14, le même sur ordinateur et sur téléphone, toujours en largeur (« paysage obligatoire »), avec ses cavaliers à l'encre ; les quatre quarts du plateau original restent dans `assets/plateau` comme son œuvre
 - **Sons** : bruitages libres de droits (CC0 ou équivalent) ou générés par le code, pour pouvoir publier sans problème de licence
 - **Langue** : interface en français
 
@@ -95,6 +95,8 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 | Pions en cavaliers d'échecs « fausse 3D » plutôt que vraie 3D | Rendu léger et cohérent avec le plateau vu de dessus | — Pending |
 | Hébergement Cloudflare | Adapté aux salons temps réel (Durable Objects) | — Pending |
 | IA : curseur de force 1 à 5 | Réglage fin demandé | — Pending |
+| Plateau galet dessiné par le code à la place des 4 quarts, le même partout, toujours en largeur (2026-10-14, recette test 4) | Romain, à propos du C+ : « trop laid », « Là, on ne voit rien sur ordi » ; puis « J'aime bien le galet », « galet partout », « Pour la version iphone, oblige à jouer en format paysage, ça permettra d'utiliser le même plateau » et « Oui, paysage obligatoire » | — Pending |
+| Écran compact sur le téléphone tenu en largeur (« Compacter l'écran », 2026-10-14) | « Compacter l'écran » (Romain) ; le détail est dérivé, à confirmer par Romain (01-UI-SPEC.md, addendum « Plateau galet », points 8 à 10) | — Pending |
 
 ## Rule Decisions (validées par Romain le 2026-10-13)
 
@@ -125,4 +127,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 after initialization*
+*Last updated: 2026-10-14 after the UAT (plateau galet, paysage obligatoire, écran compact)*

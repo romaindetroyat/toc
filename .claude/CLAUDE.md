@@ -12,7 +12,7 @@ Une adaptation numérique du TOC, le jeu de « petits chevaux » où l'on avance
 
 - **Hébergement** : Cloudflare (Workers, Durable Objects pour les tables temps réel, D1/KV pour les comptes et l'historique) — choix de Romain
 - **Plateforme** : PWA, aussi soignée sur téléphone que sur ordinateur
-- **Graphismes** : reprendre fidèlement le plateau existant ; ne pas le redessiner
+- **Graphismes** : le plateau « galet » en bois, dessiné par le code d'après la maquette choisie par Romain le 2026-10-14, le même sur ordinateur et sur téléphone, toujours en largeur (« paysage obligatoire »), avec ses cavaliers à l'encre ; les quatre quarts du plateau original restent dans `assets/plateau` comme son œuvre
 - **Sons** : bruitages libres de droits (CC0 ou équivalent) ou générés par le code, pour pouvoir publier sans problème de licence
 - **Langue** : interface en français
 

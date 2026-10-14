@@ -73,7 +73,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Rendu et ambiance (FX)
 
-- [x] **FX-01** : Le plateau original (4 quarts) est affiché assemblé, net et lisible sur téléphone en portrait comme sur grand écran.
+- [x] **FX-01** : Le plateau « galet » dessiné par le code (décision de Romain du 2026-10-14, à la place des 4 quarts) est affiché en largeur sur ordinateur et sur un téléphone tenu en largeur, net et lisible sur les deux.
 - [x] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
 - [x] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
 - [x] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
@@ -180,4 +180,4 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-14 after the UAT (G14, G15)*
+*Last updated: 2026-10-14 after the UAT (G14, G15, plateau galet, paysage obligatoire, écran compact)*
