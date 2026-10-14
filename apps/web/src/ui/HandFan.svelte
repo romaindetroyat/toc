@@ -14,6 +14,7 @@
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
   import Card, { type CardState } from "./Card.svelte";
+  import KeyHint from "./KeyHint.svelte";
 
   type Props = {
     hand: readonly CardId[];
@@ -53,6 +54,8 @@
     fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
   );
   const interactive = $derived(mode !== "waiting");
+  // On a computer each card shows the digit that picks it (shortcuts.ts: the n-th card from the left).
+  const hinted = $derived((mode === "turn" || mode === "exchange") && !concealed);
 
   function stateOf(card: CardId): CardState {
     switch (mode) {
@@ -192,6 +195,9 @@
             onpick?.(card);
           }}
         />
+        {#if hinted}
+          <KeyHint label={String(i + 1)} at="card" />
+        {/if}
       </div>
     {/if}
   {/each}

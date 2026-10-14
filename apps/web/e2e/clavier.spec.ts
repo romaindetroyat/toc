@@ -296,3 +296,40 @@ test.describe("au clavier seul", () => {
     await expect(page.getByRole("dialog", { name: "Raccourcis clavier" })).toHaveCount(0);
   });
 });
+
+// The key hints (plan 01-28): on a computer the keys are written where they act; on a phone, nothing.
+const FINE = "(hover: hover) and (pointer: fine)";
+const QUEEN_HAND = {
+  turn: "bleu",
+  pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+  hands: { bleu: ["12H", "4S", "11S"] },
+};
+const visibleHints = (page: Page) => page.locator("[data-key-hint]:visible");
+
+test.describe("les touches se voient sur ordinateur", () => {
+  test("chaque carte montre son chiffre, sur ordinateur seulement", async ({
+    page,
+    isMobile,
+  }, info) => {
+    await openPosition(page, QUEEN_HAND);
+    // The badges hang on this media query: an emulation mismatch fails here, with a clear message.
+    const fine = await page.evaluate((query) => window.matchMedia(query).matches, FINE);
+    expect(fine, `matchMedia('${FINE}') on the ${info.project.name} project`).toBe(!isMobile);
+
+    if (isMobile) {
+      await expect(page.locator("[data-hand] [data-card]")).toHaveCount(3);
+      await expect(visibleHints(page)).toHaveCount(0);
+      return;
+    }
+    const badges = page.locator("[data-hand] [data-key-hint]");
+    await expect(badges).toHaveCount(3);
+    for (const badge of await badges.all()) await expect(badge).toBeVisible();
+    const seen = await badges.evaluateAll((all) =>
+      all
+        .map((each) => ({ x: each.getBoundingClientRect().x, text: each.textContent }))
+        .sort((a, b) => a.x - b.x)
+        .map((each) => each.text),
+    );
+    expect(seen).toEqual(["1", "2", "3"]);
+  });
+});
