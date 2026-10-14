@@ -804,6 +804,28 @@ test.describe("Réduire les animations : les cartes se fondent en 150 ms", () =>
     await expect(page.locator("[data-particles]")).toHaveCount(0);
   });
 
+  test("une image chargée au départ du cheval ne le retarde pas : il glisse toujours 60 ms après la carte", async ({
+    page,
+  }) => {
+    // The frame in which the knight is started is made 20 ms heavier, as on a slow phone. Left to the
+    // compositor, its start would be the frame after (the commit misses its frame): it must still be
+    // the frame in which the card landed.
+    await page.addInitScript(heavyKnightStart, 20);
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    });
+    await playCard(page, "Dame de cœur", "bleu0");
+    await expect
+      .poll(async () => flightsOf(await records(page), "play").length, { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    const card = flightsOf(await records(page), "play")[0] as Rec;
+    const mover = await waitFor(page, "bleu0", "mover", 180);
+    near(mover.begins - card.ends, LEAD, 12);
+    await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:22");
+  });
+
   test("la donne et l’échange : quatre cartes de 150 ms à la fois, la main se fond en 150 ms", async ({
     page,
   }) => {
@@ -849,6 +871,20 @@ test.describe("Réduire les animations : les cartes se fondent en 150 ms", () =>
     await expect(page.locator('[data-felt-posed="bleu"] [data-felt-card]')).toHaveCount(3);
   });
 });
+
+/** Keeps the main thread busy for `ms` each time a knight's slide is started (a heavy frame). */
+function heavyKnightStart(ms: number) {
+  const animate = Element.prototype.animate;
+  Element.prototype.animate = function (this: Element, ...args: Parameters<Element["animate"]>) {
+    if (this.getAttribute("data-role") === "mover") {
+      const until = performance.now() + ms;
+      while (performance.now() < until) {
+        // Nothing else runs on the main thread meanwhile.
+      }
+    }
+    return animate.apply(this, args);
+  };
+}
 
 /** Makes the page believe it is hidden (or visible again), as a switch of tab does. */
 async function setHidden(page: Page, hidden: boolean) {

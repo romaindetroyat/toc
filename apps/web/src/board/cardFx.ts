@@ -11,6 +11,7 @@ import {
   TALON,
 } from "@toc/board";
 import { type CardId, COLORS, type Color, PARTNER } from "@toc/engine";
+import { animateNow } from "./frameClock.ts";
 
 // The cards that move over the board: the deal, a played card, the exchange and a dead hand laid on
 // the felt. Each motion is a list of FlightSpec, one per card: where it goes (in screen-oriented board
@@ -264,11 +265,12 @@ export function layFlights(
 const running = new Set<Animation>();
 
 /**
- * Starts a spec on the node that draws its card (a `<g>` placed at the origin of the board's SVG).
- * The card holds its last pose until the caller takes it away (fill both). Resolves when it ends.
+ * Starts a spec on the node that draws its card (a `<g>` placed at the origin of the board's SVG), on
+ * the frame clock like the knights (animateNow). The card holds its last pose until the caller takes
+ * it away (fill both). Resolves when it ends.
  */
 export function runFlight(node: Element, spec: FlightSpec): Promise<void> {
-  const animation = node.animate(spec.keyframes, {
+  const animation = animateNow(node, spec.keyframes, {
     duration: spec.durationMs,
     delay: spec.delayMs,
     easing: spec.easing,

@@ -1,8 +1,10 @@
 import { type HopTimeline, MOTION, type Mode, type Point, REDUCED, scaleFor } from "@toc/board";
+import { animateNow } from "./frameClock.ts";
 import type { Facing } from "./geometry.ts";
 
 // Every motion is a Web Animations API call on an inner group of a Pawn.svelte (never on the outer
-// <g>, which holds the static anchor), on transform and opacity only. The durations come from
+// <g>, which holds the static anchor), on transform and opacity only, started on the frame clock
+// (animateNow) so that its lead is the Director's and not the compositor's. The durations come from
 // packages/board/src/motion.ts and hopTimeline, so picture and sound share one timing source.
 // Each function returns a promise of its finish and takes `leadMs`: the delay before it starts, the
 // same lead the audio cues are scheduled with (Pitfall 8). Offsets are relative to the pawn's static
@@ -132,7 +134,7 @@ export async function hop(
     transform: translate(p[0] - start[0], p[1] - start[1]),
   }));
   const animations: Animation[] = [
-    mover.animate(keyframes, {
+    animateNow(mover, keyframes, {
       duration: timeline.total,
       delay: leadMs,
       fill: "forwards",
@@ -142,7 +144,7 @@ export async function hop(
   if (facings.length > 0) {
     // Forwards only: before its start the head keeps its old direction (a volte-face may be running).
     animations.push(
-      facing.animate(facingKeyframes(facings, segments), {
+      animateNow(facing, facingKeyframes(facings, segments), {
         duration: timeline.total,
         delay: leadMs,
         fill: "forwards",
@@ -162,8 +164,8 @@ export async function hop(
     const height = peak ?? ARC_HEIGHT * pitch;
     const bound = { duration: timeline.hop, delay: leadMs, iterations: bounds };
     animations.push(
-      arc.animate(leapKeyframes(height), bound),
-      shadow.animate(shadowKeyframes(), bound),
+      animateNow(arc, leapKeyframes(height), bound),
+      animateNow(shadow, shadowKeyframes(), bound),
     );
     const scale = scaleFor(mode);
     const settle = Math.min(MOTION.lastHopSettle * scale, timeline.hop * 0.5);
@@ -171,7 +173,7 @@ export async function hop(
     const landings = Array.from({ length: bounds }, (_, i) => (i + 1) * timeline.hop);
     const squashed = squashKeyframes(landings, timeline.total, settle, impact);
     // Not waited for: the settle of the last landing runs on into the next event.
-    squash.animate(squashed.keyframes, { duration: squashed.duration, delay: leadMs });
+    animateNow(squash, squashed.keyframes, { duration: squashed.duration, delay: leadMs });
   }
   await finished(animations);
 }
@@ -225,7 +227,8 @@ export function volteFace(
 ): Promise<void> {
   if (mode === "reduced") return Promise.resolve();
   const edge = from === to ? 0.85 : 0;
-  const animation = facing.animate(
+  const animation = animateNow(
+    facing,
     [
       { transform: mirror(from), easing: "ease-in-out" },
       { transform: `scale(${(from === "left" ? -1 : 1) * edge}, 1)`, offset: 0.5 },
@@ -247,12 +250,12 @@ export function rear({ rear: group }: PawnParts, leadMs: number, mode: Mode): Pr
   const pose = `rotate(${MOTION.rearAngle}deg) translateY(${-MOTION.rearRise}px)`;
   const up = MOTION.rearUp * scale;
   return finished([
-    group.animate([{ transform: rest }, { transform: pose }], {
+    animateNow(group, [{ transform: rest }, { transform: pose }], {
       duration: up,
       delay: leadMs,
       easing: "ease-out",
     }),
-    group.animate([{ transform: pose }, { transform: rest }], {
+    animateNow(group, [{ transform: pose }, { transform: rest }], {
       duration: MOTION.rearDown * scale,
       delay: leadMs + up,
       easing: "ease-in-out",
@@ -291,21 +294,28 @@ export function eject(
     offset: i / samples,
   }));
   const animations: Animation[] = [
-    mover.animate(along, { duration: flight, delay: leadMs, fill: "forwards", easing: "linear" }),
-    arc.animate(parabola, { duration: flight, delay: leadMs, easing: "linear" }),
+    animateNow(mover, along, {
+      duration: flight,
+      delay: leadMs,
+      fill: "forwards",
+      easing: "linear",
+    }),
+    animateNow(arc, parabola, { duration: flight, delay: leadMs, easing: "linear" }),
     // The little bounce on arrival, with the body squashing as it lands.
-    arc.animate(leapKeyframes(Math.min(24, height * 0.12)), {
+    animateNow(arc, leapKeyframes(Math.min(24, height * 0.12)), {
       duration: bounce,
       delay: leadMs + flight,
     }),
-    squash.animate(
+    animateNow(
+      squash,
       [
         { transform: `scale(${1 + MOTION.landingSquash / 2}, ${1 - MOTION.landingSquash})` },
         { transform: "scale(1, 1)" },
       ],
       { duration: bounce * 0.6, delay: leadMs + flight, easing: "ease-out" },
     ),
-    shadow.animate(
+    animateNow(
+      shadow,
       [
         { transform: "scale(1)", opacity: 1 },
         { transform: `scale(${1 - SHADOW_SHRINK})`, opacity: 1 - SHADOW_FADE, offset: 0.5 },
@@ -313,8 +323,8 @@ export function eject(
       ],
       { duration: flight, delay: leadMs, easing: "ease-in-out" },
     ),
-    shadow.animate(shadowKeyframes(), { duration: bounce, delay: leadMs + flight }),
-    parts.facing.animate([{ transform: mirror(facing) }, { transform: mirror(facing) }], {
+    animateNow(shadow, shadowKeyframes(), { duration: bounce, delay: leadMs + flight }),
+    animateNow(parts.facing, [{ transform: mirror(facing) }, { transform: mirror(facing) }], {
       duration: flight,
       delay: leadMs,
       fill: "forwards",
@@ -332,7 +342,8 @@ function fade(
   duration: number,
 ): Promise<void> {
   return finished([
-    mover.animate(
+    animateNow(
+      mover,
       [
         { transform: translate(0, 0), opacity: 1, offset: 0 },
         { transform: translate(0, 0), opacity: 0, offset: 0.5 },
@@ -389,7 +400,8 @@ export function swapArcs(a: Leg, b: Leg, leadMs: number, mode: Mode): Promise<vo
 export function homeSettle({ squash }: PawnParts, leadMs: number, mode: Mode): Promise<void> {
   if (mode === "reduced") return Promise.resolve();
   return finished([
-    squash.animate(
+    animateNow(
+      squash,
       [
         { transform: "scale(1, 1)" },
         { transform: "scale(1.05, 0.94)", offset: 0.35 },
@@ -413,7 +425,8 @@ export function party(
   if (mode === "reduced") return Promise.resolve();
   const pose = `rotate(${MOTION.rearAngle}deg) translateY(${-MOTION.rearRise * 1.4}px)`;
   const rise = finished([
-    parts.rear.animate(
+    animateNow(
+      parts.rear,
       [
         { transform: "rotate(0deg) translateY(0px)", easing: "ease-out" },
         { transform: pose, offset: 0.35 },
@@ -433,9 +446,10 @@ export function winHop(all: PawnParts[], leadMs: number, mode: Mode): Promise<vo
   return Promise.all(
     all.map(({ arc, shadow, squash }) =>
       finished([
-        arc.animate(leapKeyframes(42), { duration, delay: leadMs }),
-        shadow.animate(shadowKeyframes(), { duration, delay: leadMs }),
-        squash.animate(
+        animateNow(arc, leapKeyframes(42), { duration, delay: leadMs }),
+        animateNow(shadow, shadowKeyframes(), { duration, delay: leadMs }),
+        animateNow(
+          squash,
           squashKeyframes([duration], duration, 0, IMPACT_MS * scaleFor(mode)).keyframes,
           { duration, delay: leadMs },
         ),

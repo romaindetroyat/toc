@@ -1,10 +1,12 @@
 <script lang="ts">
   import { MOTION } from "@toc/board";
+  import { animateNow } from "./frameClock.ts";
 
   // The burst of the fourth knight home (D-14): eight small stars and circles, crème and amber, that
   // fly out of the knight and fade away. Only transform and opacity are animated, by the Web
-  // Animations API, so no filter is repainted per frame. The burst is hidden before it starts and
-  // again once it is over; `onDone` is called when the last particle has finished.
+  // Animations API, so no filter is repainted per frame; the burst starts on the frame clock with the
+  // knight's rear (animateNow). The burst is hidden before it starts and again once it is over;
+  // `onDone` is called when the last particle has finished.
   type Props = {
     /** Where the burst comes from, in board units (the knight's feet). */
     x: number;
@@ -43,7 +45,8 @@
     const nodes = [...root.querySelectorAll<SVGGElement>("[data-particle]")];
     const animations = nodes.map((node, i) => {
       const { dx, dy } = particles[i] as (typeof particles)[number];
-      return node.animate(
+      return animateNow(
+        node,
         [
           { transform: "translate(0px, 0px) scale(0.2)", opacity: 0 },
           { transform: `translate(${dx * 0.5}px, ${dy * 0.5}px) scale(1)`, opacity: 1, offset: 0.25 },
