@@ -28,7 +28,7 @@ test.describe("le tapis en grand", () => {
       .getAttribute("data-felt-card");
     expect(played).not.toBeNull();
 
-    // The whole felt square is the target: at least 44 px each way.
+    // The whole felt is the target: at least 44 px each way.
     const felt = page.getByRole("button", { name: "Sur le tapis" });
     const box = await felt.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(44);
@@ -157,13 +157,14 @@ async function expectFits(page: Page, what: string, selectors: string[]) {
   }
 }
 
-async function expectSquareBoard(page: Page, what: string) {
+/** Board C+ is a portrait 2:3 board (D-07): 1.5 times as tall as it is wide. */
+async function expectPortraitBoard(page: Page, what: string) {
   const box = await page.locator("[data-board]").boundingBox();
   expect(box, `${what}: no board`).not.toBeNull();
   expect(
-    Math.abs((box?.width ?? 0) - (box?.height ?? 1)),
-    `${what}: the board is not square`,
-  ).toBeLessThan(1.5);
+    Math.abs((box?.height ?? 0) - 1.5 * (box?.width ?? 1)),
+    `${what}: the board is not 2:3`,
+  ).toBeLessThan(2);
   expect(box?.width ?? 0, `${what}: the board has no size`).toBeGreaterThan(90);
 }
 
@@ -189,7 +190,7 @@ for (const size of SIZES) {
 
       // The exchange: five cards in the hand, the choice asked in the action zone.
       await expect(zone(page)).toHaveAttribute("data-state", "exchange");
-      await expectSquareBoard(page, "échange");
+      await expectPortraitBoard(page, "échange");
       await expectFits(page, "échange", hand);
       await page.locator("[data-hand] [data-card]").first().click();
       await expectFits(page, "échange, carte choisie", hand);
@@ -208,7 +209,7 @@ for (const size of SIZES) {
       await page.locator(`[data-hit="${pawn}"]`).click({ force: true });
       await expect(page.locator("[data-ghost]")).toBeVisible();
       await expectFits(page, "aperçu du coup", hand);
-      await expectSquareBoard(page, "aperçu");
+      await expectPortraitBoard(page, "aperçu");
       await page.getByRole("button", { name: /^Jouer/ }).click();
       await expect(page.locator('[data-felt-last="bleu"]')).toBeVisible();
       await expectFits(page, "après le coup", hand);
@@ -222,7 +223,7 @@ for (const size of SIZES) {
       await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
       const panel = page.locator("[data-seven-panel]");
       await expect(panel).toBeVisible();
-      await expectSquareBoard(page, "le 7");
+      await expectPortraitBoard(page, "le 7");
       await expectFits(page, "le 7, rien de réparti", [
         "[data-board]",
         "[data-info-bar]",

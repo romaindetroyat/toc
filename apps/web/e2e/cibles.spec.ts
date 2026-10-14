@@ -140,7 +140,9 @@ test.describe("le 7 sous le plateau à 375 x 667", () => {
   test.use({ viewport: { width: 375, height: 667 } });
   test.skip(({ isMobile }) => isMobile, "explicit viewport: desktop project only");
 
-  test("le plateau reste carré et dans l’écran, le panneau avec lui", async ({ page }) => {
+  test("le plateau reste en portrait 2:3 et dans l’écran, le panneau avec lui", async ({
+    page,
+  }) => {
     await openPosition(page, {
       turn: "bleu",
       pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"], jaune: [{ p: 62 }, "S", "S", "S"] },
@@ -163,11 +165,13 @@ test.describe("le 7 sous le plateau à 375 x 667", () => {
     expect(board).not.toBeNull();
     expect(seven).not.toBeNull();
     if (board === null || seven === null) return;
-    expect(Math.abs(board.width - board.height)).toBeLessThan(2);
+    expect(Math.abs(board.height - 1.5 * board.width)).toBeLessThan(2);
+    expect(board.width).toBeGreaterThan(90);
     expect(board.x).toBeGreaterThanOrEqual(0);
     expect(board.x + board.width).toBeLessThanOrEqual(375 + 0.5);
     expect(board.y + board.height).toBeLessThanOrEqual(seven.y + 1);
-    // Bar 56 + board 375 + panel: everything is on screen, no scrolling to reach « Jouer ».
+    // Bar 56 + the 2:3 board and its head room + panel: everything is on screen, no scrolling to
+    // reach « Jouer ».
     expect(seven.y + seven.height).toBeLessThanOrEqual(667 + 0.5);
     const play = await page.getByRole("button", { name: "Jouer", exact: true }).boundingBox();
     expect((play?.y ?? 0) + (play?.height ?? 0)).toBeLessThanOrEqual(667);

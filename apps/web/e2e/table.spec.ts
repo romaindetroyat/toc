@@ -89,24 +89,29 @@ test("table: la couleur choisie est retenue au rechargement de l’accueil", asy
   );
 });
 
-test("table: le plateau tourne avec la couleur choisie, les cavaliers restent droits", async ({
-  page,
-}) => {
-  for (const [color, turns] of [
+test("table: les couleurs prennent leur côté, rien ne tourne", async ({ page }) => {
+  // Board C+ never turns (D-05): the seat k of the chosen colour (bleu 0, vert 1, rouge 2, jaune 3)
+  // puts that colour's camp at the bottom and the partner's at the top.
+  for (const [color, seat] of [
     ["bleu", 0],
     ["vert", 1],
     ["rouge", 2],
     ["jaune", 3],
   ] as const) {
     await sit(page, color);
-    await expect(page.locator("[data-board]")).toHaveAttribute("data-k", String(turns));
-    const angle = await page.locator("[data-board] img").evaluate((img) => {
-      const m = new DOMMatrixReadOnly(getComputedStyle(img).transform);
-      return Math.round((Math.atan2(m.b, m.a) * 180) / Math.PI);
-    });
-    expect(((angle % 360) + 360) % 360).toBe(turns * 90);
-    // The overlay is never turned: the transform of the pawns' svg is the identity.
+    const board = page.locator("[data-board]");
+    await expect(board).toHaveAttribute("data-k", String(seat));
+    await expect(board).toHaveAttribute("data-bottom", color);
+    const box = await board.boundingBox();
+    if (!box) throw new Error("the board has no bounding box");
+    const middle = box.y + box.height / 2;
+    const mine = await centre(page, `[data-board-art] [data-exit="${color}"]`);
+    const partner = await centre(page, `[data-board-art] [data-exit="${partnerOf(color)}"]`);
+    expect(mine.y).toBeGreaterThan(middle);
+    expect(partner.y).toBeLessThan(middle);
+    // Neither the drawing nor the knights' svg is turned.
     await expect(page.locator("[data-board] svg").first()).toHaveCSS("transform", "none");
+    await expect(page.locator("[data-board-art]")).toHaveCSS("transform", "none");
   }
 });
 
@@ -124,14 +129,15 @@ test("table: les cavaliers regardent dans le sens de la marche, tête gardée su
 });
 
 // Knights at three sizes for the human legibility check (UI-SPEC backstop): the board is as wide as
-// the viewport, so the knights are about 17, 39 and 90 px wide.
+// the viewport (2:3 viewports, so the whole board and its head room fit), and a ring knight is about
+// 0.058 x the board width: about 23, 52 and 122 px wide.
 test.describe("cavaliers à trois tailles", () => {
   test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project takes the shots");
 
   for (const [width, height] of [
-    [390, 390],
-    [900, 900],
-    [2100, 2100],
+    [390, 624],
+    [900, 1440],
+    [2100, 3360],
   ] as const) {
     test(`captures du plateau à ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height });

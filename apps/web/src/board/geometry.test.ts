@@ -32,6 +32,17 @@ describe("anchorOf", () => {
       );
     }
   });
+
+  it("seats the next colour clockwise on the left and the previous one on the right", () => {
+    const shift = (c: Color, by: number): Color => COLORS[(COLORS.indexOf(c) + by) % 4] as Color;
+    for (const color of COLORS) {
+      const k = quarterTurnsFor(color);
+      const next = anchorOf({ z: "stable", color: shift(color, 1), slot: 0 }, k);
+      const previous = anchorOf({ z: "stable", color: shift(color, 3), slot: 0 }, k);
+      expect(next[0]).toBeLessThan(SCENE.width / 2);
+      expect(previous[0]).toBeGreaterThan(SCENE.width / 2);
+    }
+  });
 });
 
 describe("screenDelta", () => {
