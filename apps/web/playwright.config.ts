@@ -21,7 +21,13 @@ export default defineConfig({
     launchOptions: { executablePath, args: ["--no-sandbox"] },
   },
   projects: [
-    { name: "phone", use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" } },
+    // Romain's « paysage obligatoire » (2026-10-14): the phone is played held sideways, so the phone
+    // project is Playwright's iPhone 13 held sideways, a 750 x 342 window with touch and a mobile
+    // viewport (Playwright 1.64). Held upright it shows « Tourne ton téléphone » (e2e/tourne.spec.ts).
+    {
+      name: "phone",
+      use: { ...devices["iPhone 13 landscape"], defaultBrowserType: "chromium" },
+    },
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
   ],
 });

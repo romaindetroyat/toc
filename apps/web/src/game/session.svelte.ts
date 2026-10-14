@@ -28,8 +28,15 @@ import {
   turnCtx,
 } from "./turnUi.ts";
 
-/** What the game screen provides: it owns the SVG nodes, so it moves and animates the pawns. */
-export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit" | "layout"> & {
+/**
+ * What the game screen provides: it owns the SVG nodes, so it moves and animates the pawns. Its
+ * `document` is the visibility the Director follows: hidden while the tab is hidden or while the
+ * invitation to turn the screen hides the game (plan 01-38). Default: the page's document.
+ */
+export type SessionEnv = Pick<
+  DirectorDeps,
+  "animator" | "facingOf" | "commit" | "layout" | "document"
+> & {
   /** Default: the audio engine of the app. */
   audio?: DirectorDeps["audio"];
 };
@@ -101,6 +108,7 @@ export function createSession(
     facingOf: env.facingOf,
     commit: env.commit,
     layout: env.layout,
+    document: env.document,
     getMode: paceNow,
   });
   // The controller hands every play to the Director; the session listens in to word the bots' plays.

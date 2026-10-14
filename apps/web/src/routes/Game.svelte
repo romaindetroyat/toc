@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Component, flushSync, onMount, tick } from "svelte";
+  import { type Component, flushSync, onMount, tick, untrack } from "svelte";
   import {
     type CardId,
     COLORS,
@@ -33,6 +33,7 @@
     playFlight,
   } from "../board/cardFx.ts";
   import { anchorOf, type Facing } from "../board/geometry.ts";
+  import type { VisibilitySource } from "../game/director.ts";
   import HitLayer from "../board/HitLayer.svelte";
   import Overlay from "../board/Overlay.svelte";
   import Pawn from "../board/Pawn.svelte";
@@ -53,6 +54,7 @@
   import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
@@ -164,9 +166,43 @@
     });
   }
 
+  /**
+   * A screen taller than wide (UI-SPEC addendum « Plateau galet », item 5, « à confirmer par Romain »):
+   * the invitation to turn it shows instead of the game, which stays mounted behind it, hidden and
+   * inert, exactly as it was.
+   */
+  const prompting = $derived(screen.chrome === "rotate");
+
+  /**
+   * The visibility the Director follows: hidden while the tab is hidden or while the invitation shows.
+   * The moment it shows, a running motion jumps to its end without sound, and later events are applied
+   * without motion until the game is back. Its listeners hear the document's own visibilitychange and
+   * every change of `prompting`.
+   */
+  const visibilityListeners = new Set<() => void>();
+  const visibility: VisibilitySource = {
+    get hidden() {
+      return document.hidden || prompting;
+    },
+    addEventListener: (_type, listener) => visibilityListeners.add(listener),
+    removeEventListener: (_type, listener) => visibilityListeners.delete(listener),
+  };
+  function announceVisibility() {
+    for (const listener of [...visibilityListeners]) listener();
+  }
+  onMount(() => {
+    document.addEventListener("visibilitychange", announceVisibility);
+    return () => document.removeEventListener("visibilitychange", announceVisibility);
+  });
+  $effect(() => {
+    void prompting;
+    untrack(announceVisibility);
+  });
+
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
   const env: SessionEnv = {
     layout: () => boardLayout,
+    document: visibility,
     animator: {
       begin: raise,
       hop(pawn, points, timeline, leadMs, pawnFacings, mode) {
@@ -562,6 +598,12 @@
   // Opened without the launch screen's tap (a reload, a PWA relaunch, a bookmark): the first tap or key
   // on the game screen starts the sound.
   onMount(() => unlockOnFirstGesture());
+
+  /** The invitation's heading: it takes the focus when the invitation appears. */
+  let rotateHeading = $state<HTMLHeadingElement | null>(null);
+  $effect(() => {
+    if (prompting) rotateHeading?.focus({ preventScroll: true });
+  });
 </script>
 
 <main
@@ -575,168 +617,175 @@
   {:else if session?.failure}
     {fail(session.failure)}
   {/if}
-  {#if session !== undefined && render !== null && view !== undefined}
-    <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
-    <div class="layout" data-layout inert={ended}>
-      <div class="info">
-        <InfoBar
-          {render}
-          human={session.human}
-          names={session.names}
-          form={bar ? "column" : band ? "side" : "row"}
-          onabandon={abandon}
-        />
-      </div>
-
-      <div class="stage">
-        <Board
-          {k}
-          layout={boardLayout}
-          {render}
-          {discardTop}
-          {burst}
-          {flights}
-          ontapis={() => (tapisOpen = true)}
-        >
-          {#snippet under(px)}
-            <Overlay
-              layer="under"
-              {px}
-              {k}
-              {render}
-              {ui}
-              {candidates}
-              selected={selectedPawn}
-              target={targetPawn}
-            />
-          {/snippet}
-          {#each drawn as pawn (pawn.id)}
-            <Pawn
-              pawn={pawn.id}
-              color={pawn.color}
-              x={pawn.x}
-              y={pawn.y}
-              place={render.pawns[pawn.id] as Place}
-              facing={facings[pawn.id]}
-              lift={pawn.id === selectedPawn ? 12 : 0}
-              bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
-            />
-          {/each}
-          {#if Geometry}
-            <Geometry {k} />
-          {/if}
-          {#snippet over(px)}
-            <Overlay
-              layer="over"
-              {px}
-              {k}
-              {render}
-              {ui}
-              {candidates}
-              selected={selectedPawn}
-              target={targetPawn}
-            />
-          {/snippet}
-          {#snippet hits(px)}
-            <HitLayer
-              {px}
-              {k}
-              {render}
-              {candidates}
-              active={
-                ui.kind === "cardSelected" ||
-                ui.kind === "jackPick" ||
-                ui.kind === "jackTarget" ||
-                ui.kind === "sevenBuilding" ||
-                ui.kind === "preview"
-              }
-              onpick={pickPawn}
-              onnear={pickNear}
-              onmiss={() => {
-                missed = true;
-              }}
-            />
-          {/snippet}
-        </Board>
-        <DealBanner {render} names={session.names} />
-      </div>
-
-      {#if flow.kind === "sevenBuilding"}
-        <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
-        <div class="seven">
-          <SevenPanel
-            seven={flow}
-            {bar}
-            {band}
-            tray={ui.kind === "tray" ? ui : null}
-            {missed}
-            onpickSteps={(steps) => send({ t: "pickSteps", steps })}
-            onundo={() => send({ t: "undoLast" })}
-            oncancelAll={() => send({ t: "cancelAll" })}
-            onconfirm={() => send({ t: "confirm" })}
-            ontrayPick={pickTrayOption}
-            ontrayClose={() => send({ t: "closeTray" })}
-          />
-        </div>
-      {:else}
-        <div class="action">
-          <ActionZone
-            {ui}
-            {bar}
-            {band}
-            {view}
+  {#if prompting}
+    <RotatePrompt bind:heading={rotateHeading} />
+  {/if}
+  <!-- Behind the invitation to turn the screen the whole game is kept, mounted, but not displayed and
+       inert: no focus, no tap, nothing for a screen reader. -->
+  <div class="play" class:away={prompting} data-game-play inert={prompting}>
+    {#if session !== undefined && render !== null && view !== undefined}
+      <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
+      <div class="layout" data-layout inert={ended}>
+        <div class="info">
+          <InfoBar
+            {render}
             human={session.human}
             names={session.names}
-            hint={session.hint}
-            {missed}
-            thinking={session.thinking}
-            lastPlay={session.lastPlay}
-            onconfirm={() => send({ t: "confirm" })}
-            oncancel={() => send({ t: "cancel" })}
-            onchangeCard={() => send({ t: "changeCard" })}
-            ongive={() => send({ t: "give" })}
-            onpose={() => send({ t: "pose" })}
-            onexit={chooseExit}
-            onadvance={() => send({ t: "chooseAdvance" })}
-            ontrayPick={pickTrayOption}
-            ontrayClose={() => send({ t: "closeTray" })}
+            form={bar ? "column" : band ? "side" : "row"}
+            onabandon={abandon}
           />
         </div>
 
-        <div class="hand">
-          <HandFan
-            hand={view.hand}
-            mode={handMode}
-            playability={verdicts}
-            selected={selectedCard}
-            {received}
-            {concealed}
-            pace={session.pace}
-            {band}
-            onpick={pickCard}
-          />
+        <div class="stage">
+          <Board
+            {k}
+            layout={boardLayout}
+            {render}
+            {discardTop}
+            {burst}
+            {flights}
+            ontapis={() => (tapisOpen = true)}
+          >
+            {#snippet under(px)}
+              <Overlay
+                layer="under"
+                {px}
+                {k}
+                {render}
+                {ui}
+                {candidates}
+                selected={selectedPawn}
+                target={targetPawn}
+              />
+            {/snippet}
+            {#each drawn as pawn (pawn.id)}
+              <Pawn
+                pawn={pawn.id}
+                color={pawn.color}
+                x={pawn.x}
+                y={pawn.y}
+                place={render.pawns[pawn.id] as Place}
+                facing={facings[pawn.id]}
+                lift={pawn.id === selectedPawn ? 12 : 0}
+                bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
+              />
+            {/each}
+            {#if Geometry}
+              <Geometry {k} />
+            {/if}
+            {#snippet over(px)}
+              <Overlay
+                layer="over"
+                {px}
+                {k}
+                {render}
+                {ui}
+                {candidates}
+                selected={selectedPawn}
+                target={targetPawn}
+              />
+            {/snippet}
+            {#snippet hits(px)}
+              <HitLayer
+                {px}
+                {k}
+                {render}
+                {candidates}
+                active={
+                  ui.kind === "cardSelected" ||
+                  ui.kind === "jackPick" ||
+                  ui.kind === "jackTarget" ||
+                  ui.kind === "sevenBuilding" ||
+                  ui.kind === "preview"
+                }
+                onpick={pickPawn}
+                onnear={pickNear}
+                onmiss={() => {
+                  missed = true;
+                }}
+              />
+            {/snippet}
+          </Board>
+          <DealBanner {render} names={session.names} />
         </div>
+
+        {#if flow.kind === "sevenBuilding"}
+          <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
+          <div class="seven">
+            <SevenPanel
+              seven={flow}
+              {bar}
+              {band}
+              tray={ui.kind === "tray" ? ui : null}
+              {missed}
+              onpickSteps={(steps) => send({ t: "pickSteps", steps })}
+              onundo={() => send({ t: "undoLast" })}
+              oncancelAll={() => send({ t: "cancelAll" })}
+              onconfirm={() => send({ t: "confirm" })}
+              ontrayPick={pickTrayOption}
+              ontrayClose={() => send({ t: "closeTray" })}
+            />
+          </div>
+        {:else}
+          <div class="action">
+            <ActionZone
+              {ui}
+              {bar}
+              {band}
+              {view}
+              human={session.human}
+              names={session.names}
+              hint={session.hint}
+              {missed}
+              thinking={session.thinking}
+              lastPlay={session.lastPlay}
+              onconfirm={() => send({ t: "confirm" })}
+              oncancel={() => send({ t: "cancel" })}
+              onchangeCard={() => send({ t: "changeCard" })}
+              ongive={() => send({ t: "give" })}
+              onpose={() => send({ t: "pose" })}
+              onexit={chooseExit}
+              onadvance={() => send({ t: "chooseAdvance" })}
+              ontrayPick={pickTrayOption}
+              ontrayClose={() => send({ t: "closeTray" })}
+            />
+          </div>
+
+          <div class="hand">
+            <HandFan
+              hand={view.hand}
+              mode={handMode}
+              playability={verdicts}
+              selected={selectedCard}
+              {received}
+              {concealed}
+              pace={session.pace}
+              {band}
+              onpick={pickCard}
+            />
+          </div>
+        {/if}
+      </div>
+
+      {#if tapisOpen}
+        <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
       {/if}
-    </div>
 
-    {#if tapisOpen}
-      <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
-    {/if}
+      {#if shortcutsOpen}
+        <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
+      {/if}
 
-    {#if shortcutsOpen}
-      <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
+      {#if ended && render.winner !== null}
+        <EndScreen
+          won={render.winner === teamOf(session.human)}
+          winner={render.winner}
+          stats={session.stats}
+          onreplay={replay}
+          onchange={changeColour}
+        />
+      {/if}
     {/if}
-
-    {#if ended && render.winner !== null}
-      <EndScreen
-        won={render.winner === teamOf(session.human)}
-        winner={render.winner}
-        stats={session.stats}
-        onreplay={replay}
-        onchange={changeColour}
-      />
-    {/if}
-  {/if}
+  </div>
 </main>
 
 <style>
@@ -769,6 +818,15 @@
    *   down, and the hand zone is the fan plus the room the lifted and turned cards need (--hand).
    * In every mode the DOM order, and so the Tab order, is info, board, actions (or the 7), hand.
    */
+  /* The game's wrapper takes no box of its own; behind the invitation it is not displayed at all. */
+  .play {
+    display: contents;
+  }
+
+  .play.away {
+    display: none;
+  }
+
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
     --inset-y: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));

@@ -190,6 +190,16 @@ export const game = {
       ring: (n: number) => `à ${cases(n)} de sa sortie`,
     },
   },
+  /**
+   * The invitation shown instead of the game on a screen taller than wide (UI-SPEC addendum « Plateau
+   * galet », item 5; derived, « à confirmer par Romain »): the phone's title, the computer window's
+   * title, and the line under both.
+   */
+  rotate: {
+    phone: "Tourne ton téléphone",
+    window: "Élargis la fenêtre",
+    body: "La partie t’attend. Elle reprend dès que l’écran est en largeur.",
+  },
 } as const;
 
 /** The pawns an event list moves, for the bot result line: « avance de 12 cases », « mange un cheval bleu ». */
