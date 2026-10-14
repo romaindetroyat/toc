@@ -3,7 +3,7 @@
 // Romain, 2026-10-14: « Pour la version iphone, oblige à jouer en format paysage, ça permettra
 // d'utiliser le même plateau » and « Oui, paysage obligatoire ». The game has one board, the galet in
 // landscape, on a computer and on a phone held sideways alike: this file holds that one plateau and
-// SCENE is its scene. No function takes a layout.
+// SCENE is its scene.
 //
 // Ported from renderVals() of design/plateau-galet.dc.html with the mock-up's own numbers, variant
 // pc-galet (1600 x 800, superellipse exponent 3.2, felt ellipse, no wave). The ring is computed in
@@ -18,10 +18,9 @@
 // start index, as in the mock-up.
 
 import { COLORS, type Color, EXIT, nextColor, PARTNER, type Place } from "@toc/engine";
-import type { Point } from "./layout.ts";
 
-// The art and its tests take Point from here; 01-41 defines it in this file when layout.ts goes.
-export type { Point };
+/** A point (x, y) on the galet, in scene units (the 3200 x 1600 scene) unless stated otherwise. */
+export type Point = readonly [number, number];
 
 /** Where a seat sits on the screen: the human at the bottom, the partner at the top. */
 export type ScreenSide = "bottom" | "left" | "top" | "right";

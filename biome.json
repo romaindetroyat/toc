@@ -11,7 +11,6 @@
       "!**/*.svelte",
       "!**/node_modules",
       "!**/dist",
-      "!packages/board/layout.json",
       "!apps/web/public",
       "!docs",
       "!assets",
