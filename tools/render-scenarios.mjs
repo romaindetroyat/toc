@@ -11,12 +11,22 @@
 // sideways, so the computer and the phone draw the same galet), SCENE of packages/board. Two 2:1
 // boards stacked make a square picture, which RULES.md shows at its full width.
 // Each half is 1200 x 600: the galet drawing of packages/board (artSvg(boardArt(k)) with Romain's
-// four riders from apps/web/src/assets/plateau as data URIs, rasterised by sharp), with the seat
-// whose turn it is at the bottom, k = quarterTurnsFor(before.turn), as the game's debug scenario
-// view does. Pawns are discs drawn on top at sceneXY(place, k).
+// four riders from apps/web/src/assets/plateau as data URIs), with the seat whose turn it is at the
+// bottom, k = quarterTurnsFor(before.turn), as the game's debug scenario view does. Pawns are discs
+// drawn on top at sceneXY(place, k).
+//
+// The cell numbers are in Caveat, the game's own hand (the repository's OFL Caveat,
+// apps/web/src/assets/fonts/caveat-latin.woff2 and caveat-latin-ext.woff2, licence row `caveat`).
+// sharp cannot draw them: its librsvg ignores an @font-face, its FreeType cannot read WOFF2, and the
+// repository holds no TTF of Caveat. So the four board drawings (one per k) are rasterised by the
+// Chromium the e2e already uses (@playwright/test of apps/web), in a page that holds the drawing and
+// the two WOFF2 files inlined as @font-face data URIs, every network request aborted; the script
+// fails if Caveat is not loaded, so a picture never falls back silently. The pawn layers (DejaVu
+// Sans letters and labels), the composition and the webp encoding stay in sharp.
 // The script reads only repository files and writes nothing outside docs/regles/.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import sharp from "sharp";
@@ -39,8 +49,31 @@ const SCALE = HALF_W / SCENE.width;
 const HALF_H = Math.round(SCENE.height * SCALE);
 const RADIUS = Math.round(0.46 * SCENE.step * SCALE * 10) / 10;
 const FONT = "DejaVu Sans, Arial, sans-serif";
-// The cell numbers are drawn in Caveat when librsvg finds it, else in the fallback family.
+// The cell numbers: Caveat, embedded in the page that rasterises the board (checked loaded).
 const HAND = "Caveat, DejaVu Sans, Arial, sans-serif";
+const FONTS_DIR = resolve(root, "apps/web/src/assets/fonts");
+/** The game's two Caveat faces (apps/web/src/app.css: weights 400 to 700, the same unicode-range). */
+const CAVEAT_FACES = [
+  {
+    file: "caveat-latin-ext.woff2",
+    range:
+      "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, " +
+      "U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, " +
+      "U+A720-A7FF",
+  },
+  {
+    file: "caveat-latin.woff2",
+    range:
+      "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, " +
+      "U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+  },
+];
+const CAVEAT_CSS = CAVEAT_FACES.map(
+  ({ file, range }) =>
+    `@font-face{font-family:"Caveat";font-style:normal;font-weight:400 700;font-display:block;` +
+    `src:url(data:font/woff2;base64,${readFileSync(resolve(FONTS_DIR, file)).toString("base64")}) format("woff2");` +
+    `unicode-range:${range};}`,
+).join("");
 // Romain's riders, one picture per colour, inlined as data URIs (artSvg escapes them).
 const RIDERS = Object.fromEntries(
   COLORS.map((color) => [
@@ -129,59 +162,101 @@ function afterPosition(scenario) {
   return position(merged, scenario.expect.captured ?? []);
 }
 
+/**
+ * The e2e's Chromium, chosen as apps/web/playwright.config.ts does: CHROMIUM_PATH, then the
+ * container's browser if it exists, else Playwright's own.
+ */
+const FALLBACK_CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const executablePath =
+  process.env.CHROMIUM_PATH || (existsSync(FALLBACK_CHROMIUM) ? FALLBACK_CHROMIUM : undefined);
+const { chromium } = createRequire(resolve(root, "apps/web/package.json"))("@playwright/test");
+
 mkdirSync(outDir, { recursive: true });
 
-/** The landscape galet for seat k, riders included, rasterised once per k. */
-const boards = new Map();
-async function boardFor(k) {
-  if (!boards.has(k)) {
-    const svg = artSvg(boardArt(k), {
-      width: HALF_W,
-      height: HALF_H,
-      fontFamily: FONT,
-      handFamily: HAND,
-      images: RIDERS,
-    });
-    boards.set(k, await sharp(Buffer.from(svg)).png().toBuffer());
-  }
-  return boards.get(k);
-}
-
+const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] });
 let written = 0;
-for (const scenario of scenarios) {
-  const before = position(scenario.before.pawns);
-  const k = quarterTurnsFor(scenario.before.turn);
-  const board = await boardFor(k);
+try {
+  const page = await browser.newPage({
+    viewport: { width: HALF_W, height: HALF_H },
+    deviceScaleFactor: 1,
+  });
+  // The page holds only inlined data: nothing is fetched.
+  await page.route("**/*", (route) => route.abort());
 
-  const beforeHalos = new Map();
-  let below;
-  if (scenario.expect.after) {
-    below = layerSvg(afterPosition(scenario), new Map(), "après", k);
-  } else {
-    const halos = new Map();
-    for (const id of pawnsOfActions(scenario.expect.legalExclude)) halos.set(id, HALO.exclude);
-    for (const id of pawnsOfActions(scenario.expect.legalInclude)) halos.set(id, HALO.include);
-    const concerned = [...pawnsOfActions(scenario.action ? [scenario.action] : [])];
-    for (const step of scenario.script ?? []) {
-      for (const id of pawnsOfActions([step.action])) concerned.push(id);
+  /** The galet for seat k, riders included, rasterised once per k by Chromium with Caveat. */
+  const boards = new Map();
+  const boardFor = async (k) => {
+    if (!boards.has(k)) {
+      const svg = artSvg(boardArt(k), {
+        width: HALF_W,
+        height: HALF_H,
+        fontFamily: FONT,
+        handFamily: HAND,
+        images: RIDERS,
+      });
+      await page.setContent(
+        `<!doctype html><html><head><meta charset="utf-8"><style>${CAVEAT_CSS}` +
+          `html,body{margin:0;padding:0;background:transparent}svg{display:block}</style></head>` +
+          `<body>${svg}</body></html>`,
+      );
+      const loaded = await page.evaluate(async () => {
+        await document.fonts.load('700 32px "Caveat"', "0123456789");
+        await document.fonts.ready;
+        // check() is also true when no face is named Caveat at all: require a loaded face too.
+        const face = [...document.fonts].some(
+          (f) => f.family.replace(/"/g, "") === "Caveat" && f.status === "loaded",
+        );
+        return face && document.fonts.check('700 32px "Caveat"');
+      });
+      if (!loaded) throw new Error(`render-scenarios: Caveat is not loaded (k = ${k})`);
+      const png = await page.screenshot({
+        type: "png",
+        omitBackground: true,
+        animations: "disabled",
+        clip: { x: 0, y: 0, width: HALF_W, height: HALF_H },
+      });
+      boards.set(k, png);
     }
-    for (const id of concerned) halos.set(id, HALO.action);
-    below = layerSvg(before, halos, "le coup", k);
-  }
-  const above = layerSvg(before, beforeHalos, "avant", k);
+    return boards.get(k);
+  };
 
-  const image = await sharp({
-    create: { width: HALF_W, height: HALF_H * 2, channels: 3, background: "#FFFFFF" },
-  })
-    .composite([
-      { input: board, left: 0, top: 0 },
-      { input: above, left: 0, top: 0 },
-      { input: board, left: 0, top: HALF_H },
-      { input: below, left: 0, top: HALF_H },
-    ])
-    .webp({ quality: 70 })
-    .toBuffer();
-  writeFileSync(resolve(outDir, `${scenario.id}.webp`), image);
-  written++;
+  for (const scenario of scenarios) {
+    const before = position(scenario.before.pawns);
+    const k = quarterTurnsFor(scenario.before.turn);
+    const board = await boardFor(k);
+
+    const beforeHalos = new Map();
+    let below;
+    if (scenario.expect.after) {
+      below = layerSvg(afterPosition(scenario), new Map(), "après", k);
+    } else {
+      const halos = new Map();
+      for (const id of pawnsOfActions(scenario.expect.legalExclude)) halos.set(id, HALO.exclude);
+      for (const id of pawnsOfActions(scenario.expect.legalInclude)) halos.set(id, HALO.include);
+      const concerned = [...pawnsOfActions(scenario.action ? [scenario.action] : [])];
+      for (const step of scenario.script ?? []) {
+        for (const id of pawnsOfActions([step.action])) concerned.push(id);
+      }
+      for (const id of concerned) halos.set(id, HALO.action);
+      below = layerSvg(before, halos, "le coup", k);
+    }
+    const above = layerSvg(before, beforeHalos, "avant", k);
+
+    const image = await sharp({
+      create: { width: HALF_W, height: HALF_H * 2, channels: 3, background: "#FFFFFF" },
+    })
+      .composite([
+        { input: board, left: 0, top: 0 },
+        { input: above, left: 0, top: 0 },
+        { input: board, left: 0, top: HALF_H },
+        { input: below, left: 0, top: HALF_H },
+      ])
+      .webp({ quality: 70 })
+      .toBuffer();
+    writeFileSync(resolve(outDir, `${scenario.id}.webp`), image);
+    written++;
+  }
+} finally {
+  await browser.close();
 }
 console.log(`render-scenarios: ${written} images dans docs/regles/`);
