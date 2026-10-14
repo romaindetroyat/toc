@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+// The landscape galet on screens held sideways (« paysage obligatoire »: from 01-38 a screen taller
+// than wide shows « Tourne ton téléphone » instead of the game): four phone-sized landscape screens
+// (the side panel until 01-37) and the computer (the bottom bar of 01-36).
 const VIEWPORTS = [
-  { width: 320, height: 480 },
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
   { width: 480, height: 320 },
+  { width: 568, height: 320 },
+  { width: 667, height: 375 },
+  { width: 844, height: 390 },
   { width: 1280, height: 800 },
 ];
 

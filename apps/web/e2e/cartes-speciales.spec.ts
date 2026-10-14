@@ -183,8 +183,11 @@ test("chevaux serrés : le plateau propose des pastilles A et B, « Choisir un a
   page,
   isMobile,
 }) => {
-  // The phone project already is a phone (390 x 664); the desktop project is cut down to 375 x 667.
-  if (!isMobile) await page.setViewportSize({ width: 375, height: 667 });
+  // The phone project already is a phone (390 x 664); the desktop project is cut down to a phone held
+  // sideways, 667 x 375. The cells there are close enough (about 10 px apart in the side panel, about
+  // 18.7 px in the compact bar of 01-37) that the two neighbouring knights stay closer than 44 px, so
+  // the tray still opens.
+  if (!isMobile) await page.setViewportSize({ width: 667, height: 375 });
 
   // Two knights on neighbouring cells: both can play the 3, a finger cannot tell them apart.
   await openPosition(page, {

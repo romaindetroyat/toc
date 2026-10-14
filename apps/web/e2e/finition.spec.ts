@@ -107,19 +107,47 @@ test.describe("le tapis en grand", () => {
 
 // --- Every supported screen size (FX-01) ---
 
+// Every screen is held sideways: from 01-38 a screen taller than wide no longer shows the game
+// (« Tourne ton téléphone », Romain's « paysage obligatoire »). Until 01-37 the four small landscape
+// sizes still use the side panel (compact-bar); 1280 x 800 is the computer's bottom bar (01-36).
 type Gauge = { name: string; width: number; height: number };
 const SIZES: Gauge[] = [
-  { name: "320x480", width: 320, height: 480 },
-  { name: "375x667", width: 375, height: 667 },
-  { name: "390x844", width: 390, height: 844 },
-  { name: "480x320 (paysage)", width: 480, height: 320 },
+  { name: "480x320", width: 480, height: 320 },
+  { name: "568x320", width: 568, height: 320 },
+  { name: "667x375", width: 667, height: 375 },
+  { name: "844x390", width: 844, height: 390 },
   { name: "1280x800", width: 1280, height: 800 },
 ];
 
 /**
+ * The computer's bottom bar (UI-SPEC addendum « Plateau galet », item 7): from 960 x 600 held
+ * sideways the board is min(innerWidth − 32, (innerHeight − 160) / (0.5 + 0.02166), 1600) wide,
+ * insets 0 (≈ 1227 at 1280 x 800). Null for the other sizes.
+ */
+function barBoardWidth(width: number, height: number): number | null {
+  if (width < 960 || height < 600 || height >= width) return null;
+  return Math.min(width - 32, (height - 160) / (0.5 + 0.02166), 1600);
+}
+
+/** On a computer screen, the measured board is at least 1200 px wide and within 2 px of the formula. */
+async function expectBarBoard(page: Page, what: string) {
+  const size = page.viewportSize();
+  if (!size) throw new Error("no viewport");
+  const expected = barBoardWidth(size.width, size.height);
+  if (expected === null) return;
+  const box = await page.locator("[data-board]").boundingBox();
+  const width = box?.width ?? 0;
+  expect(width, `${what}: the board is under 1200 px`).toBeGreaterThanOrEqual(1200);
+  expect(
+    Math.abs(width - expected),
+    `${what}: measured ${width}, formula ${expected}`,
+  ).toBeLessThanOrEqual(2);
+}
+
+/**
  * Bleu holds a 7 and two knights on the ring: the 7 panel opens with one tap on the card. The knights
  * stand on opposite sides of the ring, more than 44 px apart even on the 112 px landscape galet of
- * 480 x 320, so each tap picks its knight without the « Lequel ? » tray.
+ * 480 x 320 (the side panel, until 01-37), so each tap picks its knight without the « Lequel ? » tray.
  */
 const SEVEN = {
   turn: "bleu",
@@ -198,6 +226,7 @@ for (const size of SIZES) {
       // The exchange: five cards in the hand, the choice asked in the action zone.
       await expect(zone(page)).toHaveAttribute("data-state", "exchange");
       await expectLandscapeGalet(page, "échange");
+      await expectBarBoard(page, "échange");
       await expectFits(page, "échange", hand);
       await page.locator("[data-hand] [data-card]").first().click();
       await expectFits(page, "échange, carte choisie", hand);
@@ -231,6 +260,7 @@ for (const size of SIZES) {
       const panel = page.locator("[data-seven-panel]");
       await expect(panel).toBeVisible();
       await expectLandscapeGalet(page, "le 7");
+      await expectBarBoard(page, "le 7");
       await expectFits(page, "le 7, rien de réparti", [
         "[data-board]",
         "[data-info-bar]",

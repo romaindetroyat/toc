@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { zone } from "./jouer.ts";
+import { playSimpleMove, untilOwnTurn, zone } from "./jouer.ts";
 import { etatParam } from "./position.ts";
 
 // The computer's screen (UI-SPEC addendum « Plateau galet », items 6 and 7, plan 01-36): from 960 x 600
@@ -23,7 +23,8 @@ function barWidth(width: number, height: number): number {
 
 /**
  * How far a knight's anchor (its outer translate(x y)) is from the centre of the drawn cell, in scene
- * units: both are read in the scene's own coordinates (the attribute and getBBox()).
+ * units: both are read in the scene's own coordinates (the attribute, and getBBox() mapped by the
+ * cell's own transform).
  */
 async function offCell(page: Page, pawn: string, cell: number): Promise<number> {
   return page.evaluate(
@@ -37,11 +38,13 @@ async function offCell(page: Page, pawn: string, cell: number): Promise<number> 
         knight.getAttribute("transform") ?? "",
       );
       if (!match) throw new Error(`knight ${id} has no translate()`);
+      // An exit cell is a turned square: its box is in its own coordinates, mapped by its transform.
       const box = drawn.getBBox();
-      return Math.hypot(
-        Number(match[1]) - (box.x + box.width / 2),
-        Number(match[2]) - (box.y + box.height / 2),
-      );
+      let x = box.x + box.width / 2;
+      let y = box.y + box.height / 2;
+      const m = drawn.transform.baseVal.consolidate()?.matrix;
+      if (m) [x, y] = [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f];
+      return Math.hypot(Number(match[1]) - x, Number(match[2]) - y);
     },
     [pawn, cell] as const,
   );
@@ -389,3 +392,126 @@ for (const [width, height] of [
     });
   });
 }
+
+// --- The computer's size targets and a resized window (Task 3) ---
+
+/**
+ * UI-SPEC « Objectifs de taille », bar mode, insets 0: the board's width = min(innerWidth − 32,
+ * (innerHeight − 160) / (0.5 + 0.02166), 1600).
+ */
+const TARGETS = [
+  // (640 − 160) / 0.52166 ≈ 920.1: height-limited.
+  { width: 1024, height: 640, atLeast: 900 },
+  // (800 − 160) / 0.52166 ≈ 1226.9: height-limited, a step of about 41 px, ring knights about 39 px.
+  { width: 1280, height: 800, atLeast: 1200 },
+  // min(1440 − 32 = 1408, (900 − 160) / 0.52166 ≈ 1418.5): width-limited, 1408.
+  { width: 1440, height: 900, atLeast: 1390 },
+];
+
+test.describe("les tailles visées sur ordinateur", () => {
+  test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project only");
+
+  for (const target of TARGETS) {
+    test(`à ${target.width} × ${target.height}, le galet fait au moins ${target.atLeast} px de large`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: target.width, height: target.height });
+      await page.goto("/");
+      await page.goto(`/#/partie?graine=${SEED}&vitesse=test`);
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      await expect(page.locator("main.game")).toHaveAttribute("data-chrome", "bar");
+      const expected = barWidth(target.width, target.height);
+      const width = await boardWidth(page);
+      test.info().annotations.push({
+        type: "board",
+        description: `${target.width} x ${target.height}: measured ${width} px, formula ${expected.toFixed(1)} px`,
+      });
+      expect(width).toBeGreaterThanOrEqual(target.atLeast);
+      expect(
+        Math.abs(width - expected),
+        `measured ${width}, formula ${expected}`,
+      ).toBeLessThanOrEqual(2);
+      await expectBar(page, "l’échange", ["[data-info-bar]", "[data-hand]", "[data-action-zone]"]);
+      await expectNoScroll(page, "l’échange");
+    });
+  }
+});
+
+type Snapshot = { hand: string[]; places: Record<string, string>; turn: string | null };
+
+/** The hand's cards, every knight's place and the turn, as the screen shows them. */
+function readGame(page: Page): Promise<Snapshot> {
+  return page.evaluate(() => ({
+    hand: [...document.querySelectorAll("[data-hand] [data-card]")].map(
+      (card) => card.getAttribute("data-card") ?? "",
+    ),
+    places: Object.fromEntries(
+      [...document.querySelectorAll("[data-pawn]")].map((pawn) => [
+        pawn.getAttribute("data-pawn") ?? "",
+        pawn.getAttribute("data-place") ?? "",
+      ]),
+    ),
+    turn: document.querySelector("[data-turn]")?.getAttribute("data-turn") ?? null,
+  }));
+}
+
+test.describe("redimensionner garde la partie", () => {
+  test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project only");
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("de 1280 × 800 à 1024 × 640, puis 900 × 700 et retour : même main, mêmes places, même tour", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto("/");
+    await page.goto(`/#/partie?graine=${SEED}&vitesse=test`);
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    // One move each, so that knights stand on the ring; then his turn again.
+    await untilOwnTurn(page);
+    await playSimpleMove(page);
+    await untilOwnTurn(page);
+    const before = await readGame(page);
+    expect(before.hand.length).toBeGreaterThan(0);
+    expect(Object.keys(before.places)).toHaveLength(16);
+    const ring = Object.entries(before.places).filter(([, place]) => place.startsWith("ring:"));
+    expect(ring.length).toBeGreaterThan(0);
+
+    for (const [width, height, chrome] of [
+      [1024, 640, "bar"],
+      [900, 700, "compact-bar"],
+      [1280, 800, "bar"],
+    ] as const) {
+      const what = `${width} × ${height}`;
+      await page.setViewportSize({ width, height });
+      await expect(page.locator("main.game"), what).toHaveAttribute("data-chrome", chrome);
+      expect(await readGame(page), `${what}: the game changed`).toEqual(before);
+      for (const [pawn, place] of ring) {
+        const cell = Number(place.slice("ring:".length));
+        expect(
+          await offCell(page, pawn, cell),
+          `${what}: ${pawn} off its cell`,
+        ).toBeLessThanOrEqual(0.5);
+      }
+      // The board only rescales: still the 2:1 galet, inside the screen.
+      const board = await boxOf(page, "[data-board]");
+      expect(Math.abs(board.height - board.width / 2), `${what}: 2:1`).toBeLessThanOrEqual(1.5);
+      expect(board.x + board.width, `${what}: board inside`).toBeLessThanOrEqual(width + 0.5);
+      expect(board.y + board.height, `${what}: board inside`).toBeLessThanOrEqual(height + 0.5);
+      await expectNoScroll(page, what);
+    }
+    // Back at 1280 × 800, the board has its bar width again.
+    expect(Math.abs((await boardWidth(page)) - barWidth(1280, 800))).toBeLessThanOrEqual(2);
+
+    // A card selected at 1280 × 800: the lit knights and their letters, for Romain's re-test.
+    const card = page
+      .locator('[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])')
+      .first();
+    await card.click();
+    await expect(page.locator("[data-halo]").first()).toBeVisible();
+    // A picture only: past the action zone's 150 ms fade.
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: "test-results/galet-emulation-1280x800.png" });
+    expect(errors).toEqual([]);
+  });
+});
