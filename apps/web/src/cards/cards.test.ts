@@ -3,7 +3,19 @@ import { describe, expect, it } from "vitest";
 import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
 import { botLine, describeAction } from "../i18n/fr/game.ts";
 import { cardFace } from "./faces.ts";
-import { cardSize, fanLayout, fanReach, fanSpread, visibleSlice } from "./fan.ts";
+import {
+  BAND_CARD,
+  BAND_LIFT,
+  BAND_ROW,
+  BAND_TOP,
+  bandLayout,
+  bandVisible,
+  cardSize,
+  fanLayout,
+  fanReach,
+  fanSpread,
+  visibleSlice,
+} from "./fan.ts";
 
 describe("cardFace", () => {
   it("labels ranks and colours suits", () => {
@@ -117,5 +129,58 @@ describe("hand fan", () => {
     expect(cardSize(390, 844)).toEqual({ w: 72, h: 100 });
     expect(cardSize(1280, 800)).toEqual({ w: 88, h: 124 });
     expect(cardSize(480, 1000)).toEqual({ w: 72, h: 100 });
+  });
+});
+
+describe("the compact bar's hand (plan 01-37)", () => {
+  it("lays five 64 x 90 cards flat in 240 px with slices of 44 px", () => {
+    expect(BAND_CARD).toEqual({ w: 64, h: 90 });
+    const slots = bandLayout(5, 240);
+    expect(slots).toHaveLength(5);
+    for (const slot of slots) {
+      expect(slot.rotation).toBe(0);
+      expect(slot.drop).toBe(0);
+    }
+    for (let i = 1; i < slots.length; i++) {
+      const slice = (slots[i]?.dx ?? 0) - (slots[i - 1]?.dx ?? 0);
+      expect(slice).toBe(44);
+    }
+    // Never more than 56 px apart, however wide the row.
+    const wide = bandLayout(5, 600);
+    expect((wide[1]?.dx ?? 0) - (wide[0]?.dx ?? 0)).toBe(56);
+  });
+
+  it("keeps one to five cards inside the row's width", () => {
+    for (const width of [240, 288, 456, 600]) {
+      for (let n = 1; n <= 5; n++) {
+        const slots = bandLayout(n, width);
+        expect(slots).toHaveLength(n);
+        for (const slot of slots) {
+          // The slot is centred, then shifted by dx: its edges are dx ± 32 from the centre.
+          expect(Math.abs(slot.dx) + BAND_CARD.w / 2).toBeLessThanOrEqual(width / 2);
+        }
+      }
+    }
+    expect(bandLayout(1, 240)).toEqual([{ dx: 0, drop: 0, rotation: 0 }]);
+    expect(bandLayout(0, 240)).toEqual([]);
+  });
+
+  it("lifts the selected card no higher than the row's top", () => {
+    expect(BAND_ROW).toBe(64);
+    expect(BAND_TOP - BAND_LIFT).toBeGreaterThanOrEqual(0);
+    expect(BAND_TOP).toBe(8);
+    expect(BAND_LIFT).toBe(8);
+  });
+
+  it("shows at least the top 56 px of every card, cut at the row's bottom edge", () => {
+    expect(bandVisible(false)).toBe(56);
+    expect(bandVisible(true)).toBe(64);
+    for (const selected of [false, true]) {
+      expect(bandVisible(selected)).toBeGreaterThanOrEqual(56);
+      expect(bandVisible(selected)).toBeLessThan(BAND_CARD.h);
+      // Its top plus what shows is the row's bottom edge: nothing hangs below it.
+      const top = selected ? BAND_TOP - BAND_LIFT : BAND_TOP;
+      expect(top + bandVisible(selected)).toBe(BAND_ROW);
+    }
   });
 });

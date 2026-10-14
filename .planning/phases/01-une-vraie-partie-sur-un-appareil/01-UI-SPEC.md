@@ -779,7 +779,7 @@ Appareils réels, calculés et laissés à la recette de Romain (non vérifiés 
 
 Source : recette, test 4 (01-UAT.md, la ligne « decision »), puis le message de Romain du 2026-10-14 sur le téléphone en largeur. Maquette : `design/plateau-galet.dc.html` ; artefact https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A, page « Plateaux en bois », planches « Ordinateur · galet », « iPhone · galet » et « Sur les écrans ».
 
-Cet addendum remplace l’addendum « Plateau C+ ». Il est le contrat des plans qui suivent 01-33 (01-34 à 01-39, replanifiés après la décision du paysage obligatoire). La géométrie et le dessin des deux plateaux galet sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-32). Les cavaliers de Romain sont livrés dans `apps/web/src/assets/plateau/` et les images de RULES.md sont dessinées sur le galet en largeur (plan 01-33).
+Cet addendum remplace l’addendum « Plateau C+ ». Il est le contrat des plans qui suivent 01-33 (01-34 à 01-41, replanifiés après la décision du paysage obligatoire). La géométrie et le dessin des deux plateaux galet sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-32). Les cavaliers de Romain sont livrés dans `apps/web/src/assets/plateau/` et les images de RULES.md sont dessinées sur le galet en largeur (plan 01-33).
 
 ### Décidé par Romain (Révisé par Romain le 2026-10-14)
 
@@ -796,13 +796,13 @@ Seuls ses mots, tels que 01-UAT.md et son message les rapportent.
 
 ### Dérivé de la maquette ou du planificateur, à confirmer par Romain
 
-Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-39).
+Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-41).
 
 1. **Le tapis : sa texture et sa forme.** La texture de bruit du tapis est coupée au tapis seul : c’est ainsi qu’est lue la « correction des transparences du tapis » de la maquette. Le tapis est l’ellipse verte de la planche « Ordinateur · galet ». Le rectangle arrondi de la planche « iPhone · galet » ne sert plus au jeu.
 2. **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut son partenaire, à droite le précédent. Aucune rotation : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k, layout)`, k = `quarterTurnsFor(couleur du joueur)`).
 3. **La taille des cavaliers du galet.** 0,95 pas sur l’anneau, 0,82 dans une maison, 0,78 dans une écurie. Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier).
 4. **Les cartes du tapis et les piles.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon et la défausse sont de part et d’autre du centre, à l’échelle 0,95. Les cartes font 1,3 × 1,82 pas. Tout le tapis est le bouton « Sur le tapis », dans la forme du tapis.
-5. **L’écran plus haut que large.** Safari ne sait pas bloquer l’orientation : en portrait, le téléphone montre une invitation à le tourner, « Tourne ton téléphone », à la place du plateau. Le passage se fait en direct, sans recharger : les mouvements en cours sautent à leur fin, la partie est gardée telle quelle et reprend dès que l’écran est de nouveau en largeur. Pendant ce temps, les joueurs de l’ordinateur attendent. Une fenêtre d’ordinateur plus haute que large montre la même invitation, avec « Élargis la fenêtre ».
+5. **L’écran plus haut que large.** Safari ne sait pas bloquer l’orientation : en portrait, le téléphone montre une invitation à le tourner, « Tourne ton téléphone », à la place du plateau. Le passage se fait en direct, sans recharger : les mouvements en cours sautent à leur fin, la partie est gardée telle quelle et reprend dès que l’écran est de nouveau en largeur. Pendant ce temps, les joueurs de l’ordinateur attendent. Une fenêtre d’ordinateur plus haute que large montre la même invitation, avec « Élargis la fenêtre ». Le texte de l’invitation, dérivé et à confirmer : le titre « Tourne ton téléphone » sur un téléphone et « Élargis la fenêtre » sur un ordinateur, et sous le titre la ligne « La partie t’attend. Elle reprend dès que l’écran est en largeur. »
 6. **Les modes d’écran et leurs seuils.** Le plateau est en largeur partout. « barre » : en largeur à partir de 960 × 600. « barre compacte » : les autres écrans en largeur (téléphone tenu en largeur, petite fenêtre). « tourner » : tout écran plus haut que large (point 5). Le galet en hauteur, le « dock » en portrait de l’addendum C+ et la pile de 01-24 ne servent plus au jeu.
 7. **La barre du bas sur ordinateur.** Le plateau prend la largeur. Dessous, une barre de 160 px :
    - à gauche, les infos, environ 240 px : la ligne du tour, la ligne du donneur, les pastilles d’équipe et la roue des réglages ;
@@ -811,8 +811,23 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
    - l’assistant du 7 prend la place de la main et de la zone d’action.
 
    Largeur du plateau = min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (0,5 + head room), 1600 px). Cela donne environ 1227 px à 1280 × 800, au lieu des 1280 de la planche « Sur les écrans » : il faut garder la place des têtes des cavaliers de la rangée du haut et celle de la barre de 160 px.
-8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur. Une rangée du haut de 44 px : la barre d’infos de 44 px à gauche, la consigne à droite (Label 14, deux lignes au plus). Dessous, la rangée de la main de 92 px. Largeur du plateau = min(100vw − insets, (100dvh − 136 px − insets) / (0,5 + head room)). L’assistant du 7 tient dans les 136 px, et les infos restent visibles.
-9. **Ce que la barre compacte garde du dock.** La rangée de la main de 92 px de la section « Écran compact » de l’addendum C+ : l’éventail à gauche, les boutons de l’état en colonne à droite (au moins 44 px de haut, Label 14 gras sur deux lignes au plus, un seul bouton principal en bas), les cartes compactes de 64 × 90 dont le bas passe sous le bord de l’écran, et l’assistant du 7 à hauteur fixe. Les textes, l’ordre du focus, les raccourcis clavier et les cibles de 44 px ne changent pas.
+8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** Révisé par le planificateur le 2026-10-14, après 01-33, pour approcher des cases d’environ 20 px sur l’iPhone 13 tenu en largeur : la barre de 136 px n’en donnait qu’environ 15. C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur (plan 01-37) :
+   - les infos dans une colonne de 96 px à gauche du plateau : la roue des réglages, la ligne du tour, la ligne du donneur et les deux pastilles d’équipe, les unes sous les autres ; les lignes peuvent passer à la ligne. Comme sous 360 px de large, les mots « Tour de » y sont masqués à l’écran et restent lus par les lecteurs d’écran, pour que tout tienne dans les 200 px qu’un écran de 320 px de haut laisse à côté du plateau ;
+   - à partir de 640 px de large, une seule rangée de 64 px sous le plateau, d’un bord de l’écran à l’autre, avec des marges de 12 px : la main à gauche (240 px), la consigne au milieu (Label 14, trois lignes au plus, un texte plus long défile à l’intérieur), les boutons de l’état côte à côte à droite, dans une zone d’environ 184 px gardée dans tous les états ;
+   - sous 640 px de large, deux rangées : 56 px (la consigne à gauche, les boutons à droite) et 64 px (la main) ;
+   - largeur du plateau = min(100vw − 108 px − insets, (100dvh − barre − insets) / (0,5 + head room)), avec une barre de 64 px ou de 120 px ; 108 px = la colonne de 96 px et la marge de 12 px à droite du plateau ;
+   - l’assistant du 7 et le choix « Lequel ? » tiennent dans la barre, sans jamais la rendre plus haute :
+     - sur une rangée, l’assistant met à gauche une ligne de 20 px (le titre, « Reste n », la consigne et le plan, qui défile de côté) au-dessus des pastilles de pas, et à droite ses trois boutons ;
+     - sur deux rangées, la ligne et le plan sont dans la rangée de 56 px, les pastilles et les boutons dans celle de 64 px ;
+     - les pastilles de pas défilent de côté quand la place manque et gardent leurs 44 × 44 ;
+     - le choix « Lequel ? » met ses pastilles de 44 × 56 à la place de la consigne et « Choisir un autre cheval » à la place des boutons. Dans l’assistant sur une rangée, il prend toute la rangée et la ligne de 20 px s’efface le temps du choix (20 + 56 px ne tiennent pas dans 64) ;
+   - les infos restent visibles.
+9. **Ce que la barre compacte garde du dock** (section « Écran compact » de l’addendum C+) :
+   - les cartes compactes de 64 × 90 en une rangée plate (ni rotation ni décalage vers le bas), leur haut 8 px sous le bord haut de la barre, la carte choisie montée de 8 px ;
+   - au moins les 56 px du haut de chaque carte visibles (indices et symbole), le bas coupé au bord bas de la barre ;
+   - avec cinq cartes, des tranches d’au moins 44 px (une main d’au moins 240 px) ;
+   - des boutons d’au moins 44 px de haut, en Label 14 gras sur deux lignes au plus, un seul bouton principal au plus, « Avance rapide » avec son icône et son libellé ;
+   - inchangés : les textes, l’ordre du focus (Réglages → cavaliers allumés → tapis → boutons d’action → cartes de la main), les raccourcis clavier et leurs aides, les cibles de 44 px et la règle du choix « Lequel ? ».
 10. **Les objectifs de taille et les appareils réels** (section « Objectifs de taille » ci-dessous).
 11. **Les images des règles sur le galet en largeur.** Les 112 images de RULES.md (`docs/regles/<id>.webp`) montrent le plateau du jeu, le galet en largeur, cavaliers compris. « avant » est au-dessus de « après » : deux plateaux 2:1 empilés font une image carrée de 1200 × 1200, chaque moitié de 1200 × 600, la place dont c’est le tour en bas.
 12. **Les ombres sans flou.** Les ombres CSS de la maquette sont dessinées comme des copies décalées, sans filtre de flou.
@@ -836,33 +851,39 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
 
 ### Objectifs de taille
 
-À vérifier en e2e dans l’émulation Chromium de Playwright (insets à 0). Hauteur du plateau = (0,5 + head room) × largeur, avec head room ≈ 0,0217, soit 0,5217 × largeur.
+Vérifiés en e2e dans l’émulation Chromium de Playwright (insets à 0). Hauteur du plateau = (0,5 + head room) × largeur, avec head room ≈ 0,0217, soit 0,5217 × largeur. Le pas vaut largeur × 107,05 / 3200, et un cavalier de l’anneau 0,95 pas.
 
-| Fenêtre | Mode | Calcul | Largeur du plateau attendue |
-|---------|------|--------|-----------------------------|
-| 480 × 320 | barre compacte | (320 − 136) / 0,5217 ≈ 353 px | au moins 340 px |
-| 844 × 390 (iPhone 13 émulé, tenu en largeur) | barre compacte | (390 − 136) / 0,5217 ≈ 487 px | au moins 470 px |
-| 1024 × 640 | barre | (640 − 160) / 0,5217 ≈ 920 px | au moins 900 px |
-| 1280 × 800 | barre | (800 − 160) / 0,5217 ≈ 1227 px | au moins 1200 px |
-| 1440 × 900 | barre | limitée par la largeur : 1440 − 32 = 1408 px | au moins 1390 px |
-| 390 × 844, 375 × 667, 320 × 480 (portrait) | tourner | aucun plateau : l’invitation à tourner l’écran | — |
+| Fenêtre | Mode | Calcul | Largeur du plateau attendue | Pas |
+|---------|------|--------|-----------------------------|-----|
+| 844 × 390 | barre compacte (64 px) | min(844 − 108, (390 − 64) / 0,5217) ≈ 625 px | au moins 610 px | ≈ 20,9 px |
+| 750 × 342 (la fenêtre « iPhone 13 landscape » de Playwright) | barre compacte (64 px) | min(642, 278 / 0,5217) ≈ 533 px | au moins 520 px | ≈ 17,8 px |
+| 667 × 375 | barre compacte (64 px) | min(559, 311 / 0,5217 ≈ 596) ≈ 559 px | au moins 545 px | ≈ 18,7 px |
+| 568 × 320 | barre compacte (120 px) | min(460, 200 / 0,5217) ≈ 383 px | au moins 370 px | ≈ 12,8 px |
+| 480 × 320 | barre compacte (120 px) | min(372, 383) ≈ 372 px | au moins 360 px | ≈ 12,4 px |
+| 1024 × 640 | barre | (640 − 160) / 0,5217 ≈ 920 px | au moins 900 px | ≈ 30,8 px |
+| 1280 × 800 | barre | (800 − 160) / 0,5217 ≈ 1227 px | au moins 1200 px | ≈ 41 px |
+| 1440 × 900 | barre | limitée par la largeur : 1440 − 32 = 1408 px | au moins 1390 px | ≈ 47,1 px |
+| 390 × 844, 375 × 667, 320 × 480 (portrait) | tourner | aucun plateau : l’invitation à tourner l’écran | — | — |
 
-Pas et cavaliers de l’anneau (0,95 pas) :
-- 480 × 320 : pas ≈ 11,8 px, cavaliers ≈ 11,2 px ;
-- 844 × 390 : pas ≈ 16,3 px, cavaliers ≈ 15,5 px ;
-- 1280 × 800 : pas ≈ 41 px, cavaliers ≈ 39 px.
+Cavaliers de l’anneau : ≈ 19,9 px à 844 × 390, ≈ 16,9 px à 750 × 342, ≈ 11,8 px à 480 × 320, ≈ 39 px à 1280 × 800.
 
 Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
-- iPhone 13 en app installée, tenu en largeur (844 × 390, encoche de 47 px de chaque côté, inset du bas de 21 px) : (390 − 136 − 21) / 0,5217 ≈ 447 px, sous la limite de largeur de 750 px ; pas ≈ 15 px.
-- Dans Safari en largeur, la hauteur visible dépend des barres de Safari. Elle n’est pas connue ici : à mesurer sur l’iPhone pendant la recette. Avec 340 px de haut, par exemple, le plateau ferait (340 − 136) / 0,5217 ≈ 391 px de large.
+- iPhone 13 en app installée, tenu en largeur : écran de 844 × 390, encoche de 47 px de chaque côté et inset du bas de 21 px, soit 750 × 369 utiles. min(844 − 94 − 108, (390 − 21 − 64) / 0,5217) ≈ 585 px de large, des cases à ≈ 19,6 px l’une de l’autre : l’objectif d’environ 20 px est atteint.
+- iPhone 13 dans Safari, tenu en largeur : la hauteur visible dépend des barres de Safari et n’est pas connue ici.
+  - Si elle vaut 342 px, comme dans la fenêtre de Playwright : ≈ 533 px (pas ≈ 17,8 px).
+  - Si Safari annonce aussi l’inset du bas de 21 px : ≈ 493 px (pas ≈ 16,5 px).
+  - Romain la mesure sur son iPhone pendant la recette (plan 01-41).
 
-Comparaison honnête, pour la recette de Romain. Le galet en hauteur aurait donné, sur l’iPhone 13 en portrait dans Safari (390 × 664), un plateau d’environ 307 px de large, un pas d’environ 16,7 px et des cavaliers d’environ 15,8 px. Le galet en largeur à 844 × 390 donne un pas de 16,3 px et des cavaliers de 15,5 px : à peu près la même taille (2 % de moins), mais le même plateau que sur l’ordinateur. Sur un petit téléphone tenu en largeur (480 × 320), tout est plus petit : un pas de 11,8 px.
+Comparaison honnête, pour la recette de Romain :
+- La barre de 136 px de 01-33 (une rangée de 44 px sur une rangée de main de 92 px) aurait donné ≈ 487 px à 844 × 390 (pas ≈ 16,3 px) et ≈ 447 px sur l’iPhone 13 installé (pas ≈ 15 px). La barre révisée donne ≈ 625 px (pas ≈ 20,9 px) et ≈ 585 px (pas ≈ 19,6 px).
+- Le galet en hauteur aurait donné, sur l’iPhone 13 en portrait dans Safari (390 × 664), un plateau d’environ 307 px de large, un pas d’environ 16,7 px et des cavaliers d’environ 15,8 px. Le galet en largeur fait mieux tenu en largeur, et c’est le même plateau que sur l’ordinateur.
+- Sur un petit téléphone tenu en largeur (480 × 320), tout est plus petit : un pas de 12,4 px.
 
 ### UI Considerations (addendum galet)
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
 | loading, error | media: board drawing | ✅ covered | Écartés : le plateau est du code. Les cavaliers de Romain sont quatre petits fichiers livrés avec l’app ; le plateau est dessiné sans eux le temps qu’ils arrivent (décor, jamais une cible) |
-| long-text | interactive-control: consigne dans la rangée de 44 px de la barre compacte | ✅ covered | Deux lignes au plus, puis le texte défile à l’intérieur |
+| long-text | interactive-control: consigne dans la barre compacte | ✅ covered | 64 px (trois lignes) ou 56 px (deux lignes), puis le texte défile à l’intérieur |
 | empty | static-content: écran plus haut que large | ✅ covered | L’invitation à tourner l’écran remplace le plateau ; la partie est gardée telle quelle |
-| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain à la fin de la phase (plan 01-39) : les douze points dérivés ci-dessus, le galet en largeur sur l’iPhone et sur l’ordinateur, la taille des cavaliers |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain à la fin de la phase (plan 01-41) : les douze points dérivés ci-dessus, le galet en largeur sur l’iPhone et sur l’ordinateur, la taille des cavaliers |

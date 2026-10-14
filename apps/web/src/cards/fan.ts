@@ -59,3 +59,46 @@ export function fanSpread(n: number, width: number, cardW: number, cardH: number
   const beyond = Math.max(0, Math.ceil(fanReach(n, cardW, cardH)) - FAN_GUTTER);
   return width - 2 * beyond;
 }
+
+// --- The compact bar's hand (UI-SPEC addendum « Plateau galet », items 8 and 9, plan 01-37) ---
+//
+// On a phone held sideways the hand is a flat row inside the band's 64 px row: compact cards of
+// 64 x 90 with no turn and no drop, their top 8 px under the row's top edge, the selected card
+// rising 8 px. The lower part of every card is cut at the row's bottom edge (the bottom of the
+// screen): what shows is the card's top, its indices and its pip.
+
+/** The band's card size, px. */
+export const BAND_CARD = { w: 64, h: 90 } as const;
+
+/** The band's hand row, px (the 64 px row of the compact bar). */
+export const BAND_ROW = 64;
+
+/** How far under the row's top edge the cards' tops sit, px. */
+export const BAND_TOP = 8;
+
+/** How far the selected card rises, px (its top then meets the row's top edge). */
+export const BAND_LIFT = 8;
+
+/**
+ * `n` flat cards in a row `width` px wide: offset = min(56, floor((width − 64) / (n − 1))), no
+ * rotation, no drop. One card is centred.
+ */
+export function bandLayout(n: number, width: number): FanSlot[] {
+  if (n <= 0) return [];
+  if (n === 1) return [{ dx: 0, drop: 0, rotation: 0 }];
+  const offset = Math.min(56, Math.floor((width - BAND_CARD.w) / (n - 1)));
+  return Array.from({ length: n }, (_, i) => ({
+    dx: (i - (n - 1) / 2) * offset,
+    drop: 0,
+    rotation: 0,
+  }));
+}
+
+/**
+ * The visible height of a card in a row `row` px high, px: from its top (8 px under the row's top,
+ * or at it once selected) down to the row's bottom edge, never more than the card itself.
+ */
+export function bandVisible(selected: boolean, row: number = BAND_ROW): number {
+  const top = selected ? BAND_TOP - BAND_LIFT : BAND_TOP;
+  return Math.max(0, Math.min(BAND_CARD.h, row - top));
+}

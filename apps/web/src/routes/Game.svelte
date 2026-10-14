@@ -313,6 +313,8 @@
 
   /** A computer screen (landscape from 960 x 600): the board across the width, the bar under it. */
   const bar = $derived(screen.chrome === "bar");
+  /** Any other landscape screen (a phone held sideways): the info beside the board, the compact bar under it. */
+  const band = $derived(screen.chrome === "compact-bar");
 
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
@@ -581,7 +583,7 @@
           {render}
           human={session.human}
           names={session.names}
-          form={bar ? "column" : "row"}
+          form={bar ? "column" : band ? "side" : "row"}
           onabandon={abandon}
         />
       </div>
@@ -680,6 +682,7 @@
           <ActionZone
             {ui}
             {bar}
+            {band}
             {view}
             human={session.human}
             names={session.names}
@@ -708,6 +711,7 @@
             {received}
             {concealed}
             pace={session.pace}
+            {band}
             onpick={pickCard}
           />
         </div>
@@ -743,7 +747,7 @@
    * the height a board takes is (board ratio + head room) x its width. Safe-area insets are
    * subtracted from both axes. The page never scrolls (FX-01).
    *
-   * Three modes (UI-SPEC addendum « Plateau galet », items 6 and 7, « à confirmer par Romain »), the
+   * Three modes (UI-SPEC addendum « Plateau galet », items 6 to 9, « à confirmer par Romain »), the
    * media queries being the very strings of ui/screen.svelte.ts (the store gives `data-chrome`):
    * - « bar », landscape from 960 x 600 (computers): the board across the width,
    *   min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (ratio + head room), 1600 px), and
@@ -751,9 +755,12 @@
    *   info at the left (240 px), the hand in the middle and the action zone at the right (at least
    *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
    *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
-   * - « compact-bar », every other landscape screen: the board at the left and the right panel of
-   *   01-24, min((100dvh − 32 px − insets) / (ratio + head room), 100vw − 368 px − insets), until the
-   *   compact band of 01-37.
+   * - « compact-bar », every other landscape screen (a phone held sideways, a small window): the
+   *   info in a 96 px column at the left of the board, and under them the band across the screen,
+   *   one 64 px row from 640 px wide (the hand, the prompt, the buttons) or two rows below (56 px
+   *   for the prompt and the buttons over 64 px for the hand). The board is
+   *   max(0, min(100vw − 96 px − 12 px − insets, (100dvh − band − insets) / (ratio + head room))),
+   *   band = 64 or 120 px: about 533 px wide at 750 x 342, 625 at 844 x 390, 372 at 480 x 320.
    * - « rotate », every screen taller than wide: the base rules below, the info bar (56), the board,
    *   the action zone and the hand, min(100vw − 32 px − insets, (100dvh − chrome − insets) /
    *   (ratio + head room), 880 / 1.5), until « Tourne ton téléphone » of 01-38. The action zone has a
@@ -845,65 +852,112 @@
     grid-column: action;
   }
 
-  /* « compact-bar », landscape below 960 x 600: the board at the left, the right panel at least 320
-     wide (01-37 replaces it with the compact band). */
+  /*
+   * « compact-bar », every other landscape screen (a phone held sideways, a small window): the info
+   * in a column of --info-col at the left of the board, and under them the band across the screen.
+   * From 640 px wide the band is one row of --band-row: the hand (240 px, five 44 px slices) at the
+   * left, the action zone (the prompt, then the buttons' area of --band-buttons) at the right, with
+   * --band-edge margins and an 8 px gap. The board is centred in the rest of the top row, its right
+   * margin --band-edge. Nothing else has a margin or a padding, so the formula subtracts exactly
+   * what renders, and the band clips at its bottom edge.
+   */
   @media (orientation: landscape) and (max-width: 959.98px), (orientation: landscape) and (max-height: 599.98px) {
     .game {
+      --info-col: 96px;
+      --band-edge: 12px;
+      --band-row: 64px;
+      --band-buttons: 184px;
+      --band: var(--band-row);
       --board-size: max(
         0px,
         min(
-          (100dvh - 32px - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
-          100vw - 368px - var(--inset-x)
+          100vw - var(--info-col) - var(--band-edge) - var(--inset-x),
+          (100dvh - var(--band) - var(--inset-y)) / (var(--board-ratio) + var(--head-room))
         )
       );
     }
 
     .layout {
-      max-width: 100%;
-      width: fit-content;
-      min-height: calc(100dvh - 32px - var(--inset-y));
-      margin: 16px auto;
-      column-gap: var(--space-md);
-      grid-template-columns: var(--board-size) minmax(320px, 400px);
+      max-width: none;
+      width: 100%;
+      height: calc(100dvh - var(--inset-y));
+      margin: 0;
+      padding: 0;
+      overflow: clip;
+      column-gap: 0;
+      grid-template-columns: var(--band-edge) 240px var(--space-sm) minmax(0, 1fr) var(--band-edge);
       grid-template-areas:
-        "stage info"
-        "stage action"
-        "stage hand";
-      grid-template-rows: 56px minmax(72px, auto) 1fr;
+        "top top top top top"
+        ". hand . action .";
+      grid-template-rows: minmax(0, 1fr) var(--band-row);
       align-content: stretch;
+      /* The band: its rows, from one edge of the screen to the other. */
+      background: linear-gradient(
+        to top,
+        var(--bois-sombre) var(--band),
+        transparent var(--band)
+      );
     }
 
-    .action {
-      min-height: 72px;
-      max-height: 160px;
+    /* The info and the board share the top row: the info in its column, the board beside it. */
+    .info {
+      grid-area: top;
+      justify-self: start;
+      align-self: center;
+      width: var(--info-col);
+      min-height: 0;
+      max-height: 100%;
+      overflow-y: auto;
     }
 
     .stage {
+      grid-area: top;
       align-self: center;
+      min-width: 0;
+      margin: 0 var(--band-edge) 0 var(--info-col);
+    }
+
+    .action {
+      min-height: 0;
+      max-height: none;
+      overflow: visible;
     }
 
     .hand {
       align-self: end;
+      min-width: 0;
+      padding: 0;
+    }
+
+    .seven {
+      grid-row: hand;
+      grid-column: hand / action;
+      min-width: 0;
+      min-height: 0;
     }
   }
 
-  /* A short landscape screen (480 x 320): no outer margin, so the right panel has the height it needs. */
-  @media (orientation: landscape) and (max-height: 400px) {
+  /* Below 640 px wide the band has two rows: the action zone (56 px) over the hand (--band-row). */
+  @media (orientation: landscape) and (max-width: 639.98px) {
     .game {
-      --board-size: max(
-        0px,
-        min(
-          (100dvh - var(--inset-y)) / (var(--board-ratio) + var(--head-room)),
-          100vw - 368px - var(--inset-x)
-        )
-      );
+      --band: calc(56px + var(--band-row));
     }
 
     .layout {
-      min-height: calc(100dvh - var(--inset-y));
-      margin: 0 auto;
+      grid-template-columns: var(--band-edge) minmax(0, 1fr) var(--band-edge);
+      grid-template-areas:
+        "top top top"
+        ". action ."
+        ". hand .";
+      grid-template-rows: minmax(0, 1fr) 56px var(--band-row);
+    }
+
+    .seven {
+      grid-row: action / hand;
+      grid-column: action;
     }
   }
+
   /*
    * « bar », landscape from 960 x 600 (computers): the board centred across the width, then one
    * walnut band of exactly --bar across the screen with the info, the hand and the action zone.

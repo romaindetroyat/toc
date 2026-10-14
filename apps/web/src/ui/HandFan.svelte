@@ -10,7 +10,16 @@
   import { MOTION, type Mode, REDUCED, scaleFor } from "@toc/board";
   import { type CardId, type Playability, sortHand } from "@toc/engine";
   import { tick, untrack } from "svelte";
-  import { cardSize, fanLayout, fanSpread } from "../cards/fan.ts";
+  import {
+    BAND_CARD,
+    BAND_LIFT,
+    BAND_TOP,
+    bandLayout,
+    bandVisible,
+    cardSize,
+    fanLayout,
+    fanSpread,
+  } from "../cards/fan.ts";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
   import Card, { type CardState } from "./Card.svelte";
@@ -29,6 +38,12 @@
     /** The pace of the card motions: the settings by default, `test` turns them off. */
     pace?: Mode | "test";
     onpick?: (card: CardId) => void;
+    /**
+     * The compact bar of a phone held sideways (UI-SPEC addendum « Plateau galet », item 9): a flat
+     * row of 64 x 90 cards in a box exactly --band-row (64 px) high, their top 8 px under its top
+     * edge, the selected card rising 8 px, the lower part cut at the box's bottom edge.
+     */
+    band?: boolean;
   };
 
   let {
@@ -40,6 +55,7 @@
     concealed = false,
     pace = settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
     onpick,
+    band = false,
   }: Props = $props();
 
   let viewportWidth = $state(0);
@@ -48,10 +64,13 @@
   let active = $state(0);
 
   const cards = $derived(sortHand(hand));
-  const size = $derived(cardSize(viewportWidth, viewportHeight));
+  const size = $derived(band ? BAND_CARD : cardSize(viewportWidth, viewportHeight));
   // The turned outer cards stay inside the screen: on a 320 px phone the fan spreads a little less.
+  // In the band the row is flat, so it spreads over its whole width.
   const slots = $derived(
-    fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
+    band
+      ? bandLayout(cards.length, width)
+      : fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
   );
   const interactive = $derived(mode !== "waiting");
   // On a computer each card shows the digit that picks it (shortcuts.ts: the n-th card from the left).
@@ -71,9 +90,13 @@
     }
   }
 
-  /** Where one card sits: its fan slot, raised by its state (8 px playable, 16 px selected). */
+  /**
+   * Where one card sits: its fan slot, raised by its state (8 px playable, 16 px selected). In the
+   * band only the selected card rises, by 8 px, and nothing turns.
+   */
   function transformOf(card: CardId, slot: { dx: number; drop: number; rotation: number }): string {
     const state = stateOf(card);
+    if (band) return `translate(${slot.dx}px, ${state === "selected" ? -BAND_LIFT : 0}px)`;
     if (state === "selected") return `translate(${slot.dx}px, ${slot.drop - 16}px) scale(1.06)`;
     const lift = state === "playable" ? 8 : 0;
     return `translate(${slot.dx}px, ${slot.drop - lift}px) rotate(${slot.rotation}deg)`;
@@ -156,6 +179,7 @@
 <!-- Hand fan (UI-SPEC): 1 to 5 cards, ascending value, rotated about a point below the cards. -->
 <div
   class="fan"
+  class:band
   class:still={settings.reduceMotion}
   class:concealed
   role="toolbar"
@@ -163,6 +187,8 @@
   aria-label={game.hand.label}
   style:--card-w="{size.w}px"
   style:--card-h="{size.h}px"
+  style:--band-top={band ? `${BAND_TOP}px` : undefined}
+  style:--band-card-h={band ? `${BAND_CARD.h}px` : undefined}
   bind:clientWidth={width}
   {onkeydown}
   data-hand
@@ -182,6 +208,7 @@
         class="slot"
         style:transform={transformOf(card, slot)}
         style:z-index={stateOf(card) === "selected" ? 10 : i + 1}
+        style:--card-h={band ? `${bandVisible(stateOf(card) === "selected")}px` : undefined}
       >
         <Card
           {card}
@@ -293,8 +320,59 @@
     pointer-events: none;
   }
 
+  /* The compact bar (a phone held sideways): the box is the band's 64 px row. Each card is a flat
+     slot whose height is what shows of it (--card-h on the slot: 56 px, 64 px once selected), so its
+     box ends at the row's bottom edge; the face inside is drawn as a full 64 x 90 card and its lower
+     part is cut there. The top and the height move together, so the bottom edge never moves. */
+  .fan.band {
+    height: var(--band-row, 64px);
+  }
+
+  .band .slot {
+    top: var(--band-top);
+    bottom: auto;
+    transition:
+      transform 200ms ease-out,
+      height 200ms ease-out;
+  }
+
+  .band.still .slot {
+    transition: none;
+  }
+
+  .band .slot :global(.card) {
+    border-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .band .slot :global(.card .middle) {
+    bottom: auto;
+    height: var(--band-card-h);
+  }
+
+  .band .slot :global(.card .corner.bottom) {
+    display: none;
+  }
+
+  .band .empty {
+    padding: 0 var(--space-sm);
+    overflow-y: auto;
+  }
+
+  .band .empty .heading,
+  .band .empty .body {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+  }
+
+  .band .empty .body {
+    margin-top: 0;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .slot {
+    .slot,
+    .band .slot {
       transition: none;
     }
   }

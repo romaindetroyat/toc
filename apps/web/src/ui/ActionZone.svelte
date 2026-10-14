@@ -45,11 +45,19 @@
      * top (Body 16, up to three lines, then it scrolls) and the buttons right-aligned under it.
      */
     bar?: boolean;
+    /**
+     * In the compact bar of a phone held sideways (plan 01-37): one row, the prompt at the left in
+     * Label 14 (three lines in the 64 px row, two in the 56 px row, a longer one scrolls inside) and
+     * the state's buttons side by side at the right, in an area of --band-buttons (about 184 px)
+     * kept in every state.
+     */
+    band?: boolean;
   };
 
   let {
     ui,
     bar = false,
+    band = false,
     view,
     human,
     names,
@@ -173,11 +181,13 @@
 </script>
 
 <!-- Action zone (UI-SPEC): one state at a time, an aria-live region, prompt lines never truncated. -->
-<section class="zone" class:bar aria-live="polite" data-action-zone data-state={ui.kind}>
+<section class="zone" class:bar class:band aria-live="polite" data-action-zone data-state={ui.kind}>
   {#key key}
     <div class="content" in:fade={{ duration: fadeMs }}>
       {#if lines.length > 0}
-        <div class="text">
+        <!-- In the band the givers of the exchange take the prompt's place: the sentence stays for
+             screen readers only. -->
+        <div class="text" class:spoken={band && ui.kind === "exchangeWaiting"}>
           {#each lines as line, i (i)}
             <p class:prompt={i === 0}>{line}</p>
           {/each}
@@ -463,6 +473,101 @@
 
   .bar .fast {
     align-self: flex-end;
+  }
+
+  /*
+   * The compact bar (a phone held sideways): the zone is its row (64 or 56 px). The prompt is at the
+   * left and the buttons' area of --band-buttons at the right, the same in every state, so a prompt
+   * never moves when the buttons change. « Avance rapide » takes that area while the computer plays.
+   */
+  .zone.band {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  .band .content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--band-buttons, 184px);
+    align-items: center;
+    column-gap: var(--space-sm);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* Label 14; three lines in the 64 px row, two in the 56 px row, then the text scrolls inside. */
+  .band .text {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .band .text p {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+  }
+
+  .band .text.spoken {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .band .givers {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 0 var(--space-sm);
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .band .buttons {
+    grid-column: 2;
+    grid-row: 1;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    margin-left: 0;
+    gap: var(--space-sm);
+  }
+
+  /* Label 14 bold on two lines at most, at least 44 px high. */
+  .band .buttons .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 var(--space-sm);
+    font-size: var(--label-size);
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .band .play {
+    min-width: 0;
+  }
+
+  .band .modes {
+    flex-wrap: nowrap;
+  }
+
+  .band .fast {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: var(--band-buttons, 184px);
+    transform: translateY(-50%);
+  }
+
+  .band .fast-label {
+    display: inline;
   }
 
   @media (min-width: 600px) {
