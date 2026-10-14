@@ -125,7 +125,7 @@ test.describe("sur ordinateur, le galet en largeur et la barre du bas", () => {
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect(page.locator("main.game")).toHaveAttribute("data-chrome", "bar");
 
-    // min(1280 − 32, (800 − 160) / 0.52166, 1600) ≈ 1226.9: height-limited, a step of about 41 px.
+    // min(1280 − 32, (800 − 160) / 0.52166, 1600) ≈ 1226.9 (the addendum’s ≈ 1227 px): height-limited, a step of about 41 px.
     const expected = barWidth(1280, 800);
     const width = await boardWidth(page);
     expect(width).toBeGreaterThanOrEqual(1200);
