@@ -1,21 +1,24 @@
 import {
-  CARD_SIZE,
-  LAST_CARD_SLOT,
   MAX_DEAL_CARDS,
   MOTION,
   type Mode,
   type Point,
   REDUCED,
   rotatePoint,
+  SCENE,
+  type ScreenSide,
   scaleFor,
+  sceneSideOf,
+  seatCard,
   TALON,
 } from "@toc/board";
 import { type CardId, COLORS, type Color, PARTNER } from "@toc/engine";
 import { animateNow } from "./frameClock.ts";
 
 // The cards that move over the board: the deal, a played card, the exchange and a dead hand laid on
-// the felt. Each motion is a list of FlightSpec, one per card: where it goes (in screen-oriented board
-// units, after the rotation toward the human), when it starts and how long it takes. The specs are
+// the felt. Each motion is a list of FlightSpec, one per card: where it goes (in the scene units of
+// board C+, whose drawing never turns: the human's seat is at the bottom), how it is turned, when it
+// starts and how long it takes. The specs are
 // pure data: CardFlights.svelte draws a card per spec and runs it with the Web Animations API, on
 // transform and opacity only. Durations and staggers come from MOTION and REDUCED (motion.ts).
 
@@ -29,18 +32,20 @@ export type FlightSpec = {
   easing: string;
 };
 
-const MIDDLE = 1280;
-/** How far from the centre of the board a seat's cards leave or arrive, a little past the board's edge. */
-const EDGE_REACH = 1400;
-/** The slide of a card when motion is reduced, in board units. */
+/** The centre of the scene. */
+const [MID_X, MID_Y] = [SCENE.width / 2, SCENE.height / 2];
+/** How far past the board's edge a seat's cards leave or arrive. */
+const EDGE_PAST = 120;
+/** The slide of a card when motion is reduced, in scene units. */
 const SLIDE = 70;
-const { w: CW, h: CH } = CARD_SIZE;
+const { w: CW, h: CH } = SCENE.card;
 
-const UNROTATED_EDGE: Record<Color, Point> = {
-  bleu: [MIDDLE, MIDDLE + EDGE_REACH],
-  jaune: [MIDDLE - EDGE_REACH, MIDDLE],
-  rouge: [MIDDLE, MIDDLE - EDGE_REACH],
-  vert: [MIDDLE + EDGE_REACH, MIDDLE],
+/** The point past the board's edge on each screen side, on the axis through the centre. */
+const EDGE: Record<ScreenSide, Point> = {
+  bottom: [MID_X, SCENE.height + EDGE_PAST],
+  top: [MID_X, -EDGE_PAST],
+  left: [-EDGE_PAST, MID_Y],
+  right: [SCENE.width + EDGE_PAST, MID_Y],
 };
 
 /** A tilt between -4 and +4 degrees, the same every time for one card (the felt lays it so). */
@@ -51,10 +56,16 @@ export function tiltOf(card: CardId): number {
 }
 
 /** The edge of the board in front of a seat, where its hand is: below the board for the human. */
-export const seatEdge = (seat: Color, k: number): Point => rotatePoint(UNROTATED_EDGE[seat], k);
+export const seatEdge = (seat: Color, k: number): Point => EDGE[sceneSideOf(seat, k)];
 
-/** The felt slot of a seat's last card. */
-export const seatSlot = (seat: Color, k: number): Point => rotatePoint(LAST_CARD_SLOT[seat], k);
+/** The felt slot of a seat's last card (board C+: in front of its seat, inside the felt). */
+export const seatSlot = (seat: Color, k: number): Point => seatCard(seat, k).at;
+
+/**
+ * How a card lying in front of a seat is turned: it faces its seat (0 at the bottom, 90 on the left,
+ * 180 at the top, 270 on the right), as on the approved C+ mock-up (« à confirmer par Romain »).
+ */
+export const seatAngle = (seat: Color, k: number): number => seatCard(seat, k).angle;
 
 /** The talon. */
 export const talonAt = (k: number): Point => rotatePoint(TALON, k);
@@ -65,7 +76,7 @@ export const talonAt = (k: number): Point => rotatePoint(TALON, k);
  */
 export function posedSlots(seat: Color, count: number, k: number): Point[] {
   const [cx, cy] = seatSlot(seat, k);
-  const horizontal = Math.abs(cy - MIDDLE) > Math.abs(cx - MIDDLE);
+  const horizontal = Math.abs(cy - MID_Y) > Math.abs(cx - MID_X);
   const step = horizontal ? CW / 2 : CH / 2;
   return Array.from({ length: count }, (_, i): Point => {
     const shift = (i - (count - 1) / 2) * step;
@@ -141,18 +152,22 @@ export function dealFlights(
   return flights;
 }
 
-/** A card played: it flies from the edge in front of its seat to its felt slot, and lands tilted. */
+/**
+ * A card played: it flies from the edge in front of its seat to its felt slot and lands there facing
+ * its seat, with its fixed tilt.
+ */
 export function playFlight(seat: Color, card: CardId, k: number, mode: Mode): FlightSpec {
   const edge = seatEdge(seat, k);
   const slot = seatSlot(seat, k);
+  const angle = seatAngle(seat, k);
   const tilt = tiltOf(card);
   if (mode === "reduced") {
     return {
       kind: "play",
       card,
       keyframes: [
-        { transform: pose(offsetToward(slot, edge, SLIDE), tilt), opacity: 0 },
-        { transform: pose(slot, tilt), opacity: 1 },
+        { transform: pose(offsetToward(slot, edge, SLIDE), angle + tilt), opacity: 0 },
+        { transform: pose(slot, angle + tilt), opacity: 1 },
       ],
       delayMs: 0,
       durationMs: REDUCED.cards,
@@ -163,9 +178,13 @@ export function playFlight(seat: Color, card: CardId, k: number, mode: Mode): Fl
     kind: "play",
     card,
     keyframes: [
-      { transform: pose(edge, 0, 0.9), opacity: 0 },
-      { transform: pose(towards(edge, slot, 0.2), tilt * 0.5, 0.95), opacity: 1, offset: 0.2 },
-      { transform: pose(slot, tilt, 1), opacity: 1 },
+      { transform: pose(edge, angle, 0.9), opacity: 0 },
+      {
+        transform: pose(towards(edge, slot, 0.2), angle + tilt * 0.5, 0.95),
+        opacity: 1,
+        offset: 0.2,
+      },
+      { transform: pose(slot, angle + tilt, 1), opacity: 1 },
     ],
     delayMs: 0,
     durationMs: MOTION.cardPlay * scaleFor(mode),

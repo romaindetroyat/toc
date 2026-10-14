@@ -5,6 +5,7 @@
     LAST_CARD_SLOT,
     type Point,
     rotatePoint,
+    seatCard,
     TALON,
   } from "@toc/board";
   import { type CardId, COLORS, type RenderState } from "@toc/engine";
@@ -39,7 +40,7 @@
   const slots = $derived(
     COLORS.map((color) => ({
       color,
-      at: at(LAST_CARD_SLOT[color]),
+      ...seatCard(color, k),
       card: render.lastPlayed[color],
     })),
   );
@@ -119,7 +120,14 @@
   {#each slots as slot (slot.color)}
     {#if slot.card !== null}
       <g data-felt-last={slot.color}>
-        <FaceUpCard card={slot.card} x={slot.at[0]} y={slot.at[1]} tilt={tiltOf(slot.card)} {px} />
+        <FaceUpCard
+          card={slot.card}
+          x={slot.at[0]}
+          y={slot.at[1]}
+          angle={slot.angle}
+          tilt={tiltOf(slot.card)}
+          {px}
+        />
       </g>
     {/if}
   {/each}

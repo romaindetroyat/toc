@@ -1,5 +1,5 @@
-import { LAST_CARD_SLOT, MAX_DEAL_CARDS, quarterTurnsFor } from "@toc/board";
-import { COLORS } from "@toc/engine";
+import { bottomOf, MAX_DEAL_CARDS, SCENE, seatCard } from "@toc/board";
+import { COLORS, type Color, nextColor, PARTNER } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import {
   dealFlights,
@@ -8,6 +8,7 @@ import {
   layFlights,
   playFlight,
   posedSlots,
+  seatAngle,
   seatEdge,
   seatSlot,
   tiltOf,
@@ -29,6 +30,50 @@ const translation = (transform: string): [number, number] => {
   const found = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(transform);
   return [Number(found?.[1]), Number(found?.[2])];
 };
+const rotation = (transform: string): number => {
+  const found = /rotate\((-?[\d.]+)deg\)/.exec(transform);
+  return Number(found?.[1]);
+};
+const KS = [0, 1, 2, 3] as const;
+const { felt } = SCENE;
+const insideFelt = ([x, y]: readonly [number, number]): boolean =>
+  x >= felt.x && x <= felt.x + felt.w && y >= felt.y && y <= felt.y + felt.h;
+/** The seat that sits on the left of the human (the next seat clockwise) and on his right. */
+const previousColor = (color: Color): Color => PARTNER[nextColor(color)];
+
+describe("seatSlot and seatEdge on board C+", () => {
+  it("a seat's slot is its C+ card place, inside the felt, for every k", () => {
+    for (const k of KS) {
+      for (const seat of COLORS) {
+        expect(seatSlot(seat, k)).toEqual(seatCard(seat, k).at);
+        expect(seatAngle(seat, k)).toBe(seatCard(seat, k).angle);
+        expect(insideFelt(seatSlot(seat, k))).toBe(true);
+      }
+    }
+  });
+
+  it("the C+ places: bottom (1000, 2143.4), top (1000, 856.6), left (842.3, 1500), right (1157.7, 1500)", () => {
+    const human = bottomOf(0);
+    const near = (p: readonly [number, number], q: [number, number]) => {
+      expect(p[0]).toBeCloseTo(q[0], 1);
+      expect(p[1]).toBeCloseTo(q[1], 1);
+    };
+    near(seatSlot(human, 0), [1000, 2143.4]);
+    near(seatSlot(PARTNER[human], 0), [1000, 856.6]);
+    near(seatSlot(nextColor(human), 0), [842.3, 1500]);
+    near(seatSlot(previousColor(human), 0), [1157.7, 1500]);
+  });
+
+  it("a seat's edge is 120 units past the board's edge on its side, on the axis through the centre", () => {
+    for (const k of KS) {
+      const human = bottomOf(k);
+      expect(seatEdge(human, k)).toEqual([SCENE.width / 2, SCENE.height + 120]);
+      expect(seatEdge(PARTNER[human], k)).toEqual([SCENE.width / 2, -120]);
+      expect(seatEdge(nextColor(human), k)).toEqual([-120, SCENE.height / 2]);
+      expect(seatEdge(previousColor(human), k)).toEqual([SCENE.width + 120, SCENE.height / 2]);
+    }
+  });
+});
 
 describe("dealFlights", () => {
   it("flies 20 face-down cards, 250 ms each, 40 ms apart, round by round", () => {
@@ -88,25 +133,49 @@ describe("playFlight", () => {
     expect(translation((flight.keyframes[0] as Keyframe).transform as string)).toEqual(
       seatEdge("bleu", 0),
     );
-    expect(translation(lastPose(flight.keyframes))).toEqual(LAST_CARD_SLOT.bleu);
+    expect(translation(lastPose(flight.keyframes))).toEqual(seatSlot("bleu", 0));
     expect(lastPose(flight.keyframes)).toContain(`rotate(${tiltOf("5H")}deg)`);
   });
 
+  it("lands on the seat's slot facing its seat, with the card's tilt, for every k", () => {
+    for (const k of KS) {
+      for (const seat of COLORS) {
+        const flight = playFlight(seat, "11D", k, "normal");
+        const last = lastPose(flight.keyframes);
+        expect(translation(last)).toEqual(seatCard(seat, k).at);
+        expect(rotation(last)).toBe(seatCard(seat, k).angle + tiltOf("11D"));
+        // It leaves the seat's hand already facing its seat and only tilts on the way.
+        const first = (flight.keyframes[0] as Keyframe).transform as string;
+        expect(rotation(first)).toBe(seatCard(seat, k).angle);
+      }
+    }
+  });
+
   it("the human's card leaves from below the board, whatever the colour he plays", () => {
-    for (const colour of COLORS) {
-      const [, y] = seatEdge(colour, quarterTurnsFor(colour));
-      expect(y).toBeGreaterThan(2560);
+    for (const k of KS) {
+      const [, y] = seatEdge(bottomOf(k), k);
+      expect(y).toBeGreaterThan(SCENE.height);
     }
   });
 
   it("is 120 ms in fast mode and a 150 ms slide when motion is reduced", () => {
     expect(playFlight("rouge", "2S", 0, "fast").durationMs).toBeCloseTo(120, 9);
-    const calm = playFlight("rouge", "2S", 0, "reduced");
-    expect(calm.durationMs).toBe(150);
-    // It slides in from a few steps away, not from the edge of the board.
-    const [x, y] = translation((calm.keyframes[0] as Keyframe).transform as string);
-    const [sx, sy] = seatSlot("rouge", 0);
-    expect(Math.hypot(x - sx, y - sy)).toBeLessThan(100);
+    for (const k of KS) {
+      for (const seat of COLORS) {
+        const calm = playFlight(seat, "2S", k, "reduced");
+        expect(calm.durationMs).toBe(150);
+        // It slides 70 units in from the side of the seat's edge, not from the edge of the board.
+        const start = translation((calm.keyframes[0] as Keyframe).transform as string);
+        const end = translation(lastPose(calm.keyframes));
+        const [sx, sy] = seatSlot(seat, k);
+        expect(end).toEqual([sx, sy]);
+        expect(Math.hypot(start[0] - sx, start[1] - sy)).toBeCloseTo(70, 6);
+        const [ex, ey] = seatEdge(seat, k);
+        const toEdge = Math.hypot(ex - sx, ey - sy);
+        expect(Math.hypot(ex - start[0], ey - start[1])).toBeCloseTo(toEdge - 70, 6);
+        expect(rotation(lastPose(calm.keyframes))).toBe(seatCard(seat, k).angle + tiltOf("2S"));
+      }
+    }
   });
 });
 
@@ -134,7 +203,7 @@ describe("exchangeFlights", () => {
     const [bx] = middleOf((bleu as { keyframes: Keyframe[] }).keyframes);
     const [rx] = middleOf((rouge as { keyframes: Keyframe[] }).keyframes);
     expect(bx).not.toBe(rx);
-    expect((bx - 1280) * (rx - 1280)).toBeLessThan(0);
+    expect((bx - SCENE.width / 2) * (rx - SCENE.width / 2)).toBeLessThan(0);
   });
 
   it("is 120 ms in fast mode and 150 ms when motion is reduced", () => {

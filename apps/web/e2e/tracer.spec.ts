@@ -172,6 +172,18 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   // It hopped along the C+ ring and landed on the drawn cell 15.
   await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
 
+  // The Dame lies on the C+ felt in front of the human's seat: the centre of the card is inside the
+  // « Sur le tapis » button, in its lower quarter (the human sits at the bottom).
+  const played = page.locator('[data-felt-last="bleu"] [data-felt-card]');
+  await expect(played).toBeVisible();
+  expect(
+    await centredIn(page, '[data-felt-last="bleu"] [data-felt-card]', "[data-felt-button]"),
+  ).toBe(true);
+  const cardBox = await played.boundingBox();
+  const feltBox = await page.getByRole("button", { name: "Sur le tapis" }).boundingBox();
+  if (!cardBox || !feltBox) throw new Error("no box for the played card or the felt");
+  expect(cardBox.y + cardBox.height / 2).toBeGreaterThan(feltBox.y + 0.75 * feltBox.height);
+
   const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
   expect(scheduled).toEqual(CLOPS);
 });
