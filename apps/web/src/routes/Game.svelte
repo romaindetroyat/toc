@@ -9,6 +9,7 @@
     type Playability,
     pawnColor,
     playability,
+    sortHand,
     teamOf,
   } from "@toc/engine";
   import { MOTION, scaleFor } from "@toc/board";
@@ -47,6 +48,7 @@
     type Session,
     type SessionEnv,
   } from "../game/session.svelte.ts";
+  import { type FocusTarget, keyIntent, litKnights } from "../game/shortcuts.ts";
   import type { TurnUiEvent } from "../game/turnUi.ts";
   import { settings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
@@ -325,39 +327,11 @@
   /** Where the flow stands: under the tray it is the state the tray resumes. */
   const flow = $derived(ui.kind === "tray" ? ui.next : ui);
 
-  /** Knights lit for the selected card: the ring knight itself, or every stable knight for an exit. */
-  const candidates = $derived.by((): PawnId[] => {
-    if (render === null) return [];
-    const out = new Set<PawnId>();
-    if (flow.kind === "sevenBuilding") {
-      // The knights the engine still lets move; the one whose chips are shown is drawn as selected.
-      for (const [pawn, steps] of Object.entries(flow.steps) as [PawnId, number[]][]) {
-        if (steps.length > 0) out.add(pawn);
-      }
-    } else if (flow.kind === "jackPick") for (const pawn of flow.pawns) out.add(pawn);
-    else if (flow.kind === "jackTarget") {
-      out.add(flow.pawn);
-      for (const pawn of flow.targets) out.add(pawn);
-    } else if (flow.kind === "preview" && flow.action.t === "swap") {
-      const own = flow.action.pawn;
-      out.add(own);
-      for (const action of flow.candidates) {
-        if (action.t === "swap" && action.pawn === own) out.add(action.target);
-      }
-    } else if (flow.kind === "cardSelected" || flow.kind === "preview") {
-      for (const action of flow.candidates) {
-        if (action.t === "move") out.add(action.pawn);
-        else if (action.t === "exit") {
-          for (const pawn of PAWNS) {
-            if (pawn.color === pawnColor(action.pawn) && render.pawns[pawn.id]?.z === "stable") {
-              out.add(pawn.id);
-            }
-          }
-        }
-      }
-    }
-    return [...out];
-  });
+  /**
+   * Knights lit for the selected card: the ring knight itself, or every stable knight for an exit. The
+   * same list reaches HitLayer, Overlay and the keyboard shortcuts.
+   */
+  const candidates = $derived(render === null ? [] : litKnights(flow, render.pawns));
 
   const selectedPawn = $derived.by((): PawnId | null => {
     if (render === null) return null;
@@ -481,6 +455,51 @@
     tapped = pawn;
     send({ t: "chooseTrayOption", pawn });
   }
+
+  /** Where the focus is, for the shortcuts: a form field, a card of the hand, a lit knight, or else. */
+  function focusTarget(): FocusTarget {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return { kind: "none" };
+    if (active.matches("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) {
+      return { kind: "field" };
+    }
+    const card = active.closest("[data-hand] [data-card]")?.getAttribute("data-card");
+    if (card) return { kind: "card", card: card as CardId };
+    const pawn = active.closest("[data-hit]")?.getAttribute("data-hit");
+    if (pawn) return { kind: "knight", pawn: pawn as PawnId };
+    return { kind: "control" };
+  }
+
+  /**
+   * The keyboard shortcuts (UI-SPEC addendum 2026-10-14): read before any other handler (capture
+   * phase), turned into reducer events by the pure key map, and sent like the taps they stand for.
+   */
+  function onShortcut(event: KeyboardEvent) {
+    const intent = keyIntent(event, {
+      ui,
+      hand: view === undefined ? [] : sortHand(view.hand),
+      lit: candidates,
+      concealed,
+      focus: focusTarget(),
+      blocked:
+        session === undefined ||
+        view === undefined ||
+        ended ||
+        document.querySelector("[data-sheet-layer]") !== null,
+    });
+    if (intent === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    for (const each of intent.events) {
+      if (each.t === "tapPawn") pickPawn(each.pawn);
+      else send(each);
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener("keydown", onShortcut, { capture: true });
+    return () => window.removeEventListener("keydown", onShortcut, { capture: true });
+  });
 
   function onkeydown(event: KeyboardEvent) {
     // Échap belongs to the sheet that is open (« Réglages »), not to the card selection behind it.

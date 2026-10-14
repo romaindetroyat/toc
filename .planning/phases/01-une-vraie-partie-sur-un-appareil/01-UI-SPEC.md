@@ -599,3 +599,77 @@ Third-party assets are not registry blocks but are still gated: fonts (Nunito, C
 - [x] Dimension 7 Inventory Provenance: PASS
 
 **Approval:** approved 2026-10-13 (2nd pass; FLAGs: « Rejouer » / « Fermer » single-word labels, pawn hit radius 22px to be read as a 44px diameter)
+
+---
+
+## Addendum 2026-10-14 — Raccourcis clavier (ordinateur)
+
+Source: 01-UAT.md test 5 (Romain: « La jouabilité : OK en version iphone, un peu trop d'aller-retours de souris sur ordinateur. Des raccourcis claviers seraient les bienvenus »). This addendum is the contract for plan 01-27 (the shortcuts and the help sheet) and plan 01-28 (the key hints and the Réglages link). It extends « Keyboard and assistive (baseline, Phase 1) »; nothing of that baseline changes (Tab order, arrow keys in the hand, Entrée/Espace on the focused control, French accessible names).
+
+### Key map
+
+| Key | When | Effect | Reducer event |
+|-----|------|--------|---------------|
+| « 1 » to « 5 » | His turn (idle, finished prompt, a card or a knight being chosen, preview, dead hand), the hand not held back by the deal | The n-th card of the hand from the left (the sorted fan) | `tapCard` |
+| « 1 » to « 5 » | Exchange | The n-th card from the left as the card to pass | `selectGive` |
+| « A » to « D » | A card is selected (card's knights, Valet's own knight or target, 7 assistant, preview) | The lit knight with that letter (`knightLetter`) | `tapPawn`; two lit knights or more with that letter (different colours) → `tapAt` with those knights, the tray opens |
+| « A » to « D » | Tray (« Lequel ? ») | The chip with that letter (`trayLetters`) | `chooseTrayOption` |
+| « Entrée » | Preview | « Jouer » / « Jouer quand même » | `confirm` |
+| « Entrée » | 7 assistant at « Tout est réparti. » (nothing left) | The 7's « Jouer » | `confirm` |
+| « Entrée » | Exchange with a chosen card | « Passer cette carte » | `give` |
+| « Entrée » | Dead hand | « Poser mes cartes » | `pose` |
+| « Échap » | Any flow with something chosen | One step back (table below) | `back` |
+| « S » / « A » | As/Roi question « Que veux-tu faire ? » (no knight is lit, so « A » has one meaning only) | « Sortir un cheval » / « Avancer de 1 » or « Avancer de 13 » | `chooseExit` / `chooseAdvance` |
+| « 1 » to « 7 » | 7 assistant (not in its tray) | That many steps for the selected knight; a count the engine does not offer shows the existing refusal notice | `pickSteps` |
+| « Retour arrière » | 7 assistant with at least one step given | « Retirer le dernier pas » | `undoLast` |
+| « P » | Exchange with a chosen card / dead hand | « Passer cette carte » / « Poser mes cartes » | `give` / `pose` |
+| « ? » | Always (game screen) | Opens the sheet « Raccourcis clavier » | none (UI only) |
+
+### Rules
+
+- Every shortcut is a `turnUi` reducer event (`reduceTurnUi`), never an engine action: no new legality path, and a move is only submitted by the confirm step the player triggers (D-19, D-20).
+- Shortcuts are ignored while a sheet or dialog is open (Réglages, « Sur le tapis », the abandon confirmation, the help sheet), when the focus is in a form field or during IME composition, with Ctrl, Cmd or Alt held, on key auto-repeat, and once the end screen is up (the screen behind stays inert).
+- Digits are read from the physical key (`event.code` Digit1..Digit9, Numpad1..Numpad9), so the top row of a French AZERTY keyboard works without Shift (key « & » with code Digit1 is « 1 »). Letters are read from the typed character (`event.key`, case-insensitive).
+- « Entrée » plays only when the focus is on nothing, on the chosen card or on the previewed knight; on any other focused control (« Annuler ce coup », « Sur le tapis », another card or knight) it keeps its native meaning.
+- Tab, the arrow keys and Espace are not shortcuts: they keep the baseline behaviour.
+
+### « Échap » goes back one step
+
+| From | To |
+|------|----|
+| Tray | The flow it was opened from |
+| Preview of a Valet swap | The targets of his chosen knight |
+| Preview of an exit chosen with « Sortir » (As/Roi with both modes) | The As/Roi question |
+| Any other preview | The card's lit knights |
+| Valet, target choice | His own knight choice |
+| Card selected after « Avancer » (As/Roi with both modes) | The As/Roi question |
+| Card selected, Valet's first tap, As/Roi question | Nothing selected |
+| 7 assistant | Unselect the knight; else take back the last step; else drop the card |
+| Exchange with a chosen card | No card chosen |
+
+### Key hints (built in plan 01-28)
+
+- Visible only under `@media (hover: hover) and (pointer: fine)`, never on phones.
+- Style: Label 14px / 700, walnut background `#2B1D12`, crème text `#FFF8E1` and a 1px crème border (readable on cards and on every button style), radius 4, minimum 20 × 20, padding 0 4px, never amber.
+- The hint is `aria-hidden` and `pointer-events: none`; every button that shows one also carries `aria-keyshortcuts` and an `aria-label` equal to its visible label, so neither its accessible name nor the label read by the existing specs changes.
+- Placement: every hint is a small corner badge over the top-right corner of its host; the host keeps its size, so nothing in the layout moves at any screen size.
+  - the digit on each card (his turn and the exchange);
+  - a letter disc above each lit knight (same style as the tray letters);
+  - the key on « Jouer » / « Jouer quand même » (« Entrée »), « Sortir un cheval » (« S »), « Avancer de … » (« A »), « Passer cette carte » (« Entrée »), « Poser mes cartes » (« P »), « Choisir un autre cheval » (« Échap »: `closeTray` and `back` both return to the tray's flow), the 7's « Jouer » (« Entrée ») and « Retirer le dernier pas » (« ⌫ »); the 7 step chips already show their digit.
+- Rule: a button shows a key (badge and `aria-keyshortcuts`) only when pressing that key does exactly what clicking the button does. « Annuler ce coup » and « Changer de carte » therefore carry no key: they drop the card in one go (back to nothing selected), while « Échap » goes back one step (from a preview to the card's lit knights, from the Valet's target to his own knight, after « Avancer » to the As/Roi question).
+
+### Help sheet « Raccourcis clavier »
+
+- Opened by « ? » or by the link « Raccourcis clavier » added to the Réglages links (in a game, fine pointer only; nested like « Crédits et licences », plan 01-28).
+- Content: title « Raccourcis clavier », intro « Sur ordinateur, tu peux jouer sans la souris. », one row per shortcut (key cap, then what it does), button « Fermer »; Échap closes it.
+- Key caps: Label 14px / 700 inside `<kbd>`, crème border, walnut fill, never amber.
+- No button is added to the info bar: on a computer the info bar sits in the narrow right panel of the landscape layout and has no room to spare.
+
+### UI Considerations (addendum)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| empty, loading, error | static-content: help sheet « Raccourcis clavier » | ✅ covered | Dismissed: a static list from the French catalogue, rendered synchronously, never empty |
+| long-text | static-content: help sheet rows | ✅ covered | Each row's text wraps under its key cap; the sheet body scrolls vertically like every sheet |
+| overflow | interactive-control: key hints | ✅ covered | Dismissed: one short label each (a digit, a letter, « Entrée », « Échap », « ⌫ »), a corner badge that never resizes its host |
+| populated | interactive-control: keyboard play | 🧪 backstop | Romain re-runs UAT test 5 on a computer: a game played with the keyboard, without the mouse back-and-forth |
