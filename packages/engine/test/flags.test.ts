@@ -226,3 +226,42 @@ describe("G11 ORDINARY_CARDS_PASS_OVER_PAWNS", () => {
     expect(candidate?.walk?.captures).toEqual([{ victim: "rouge0", atStep: 2 }]);
   });
 });
+
+describe("G14 ENTRY_WITHOUT_FULL_LAP", () => {
+  const state = (value: boolean, card: "5S" | "3S" = "5S") =>
+    playState({ bleu: [{ p: -4 }, "S", "S", "S"] }, { bleu: [card] }, "bleu", {
+      ENTRY_WITHOUT_FULL_LAP: value,
+    });
+
+  it("true: a pawn that backed with the 4 enters at the exact count (R-13.12)", () => {
+    const [candidate] = movesForCard(state(true), "bleu", "5S");
+    expect(candidate?.action).toEqual({ t: "move", card: "5S", pawn: "bleu0" });
+    expect(candidate?.walk?.end).toEqual({ zone: "home", slot: 2 });
+  });
+
+  it("false: the full lap is required, the pawn goes on round the ring (rule of 2026-10-13)", () => {
+    const [candidate] = movesForCard(state(false), "bleu", "5S");
+    expect(candidate?.action).toEqual({ t: "move", card: "5S", pawn: "bleu0" });
+    expect(candidate?.walk?.end).toEqual({ zone: "ring", progress: 1 });
+  });
+
+  it("true: from -4, the 3 and the 6 enter home slots 0 and 3, the 4 goes back to -8", () => {
+    const at = (card: "3S" | "4S" | "6S") =>
+      movesForCard(
+        playState({ bleu: [{ p: -4 }, "S", "S", "S"] }, { bleu: [card] }, "bleu"),
+        "bleu",
+        card,
+      )[0]?.walk?.end;
+    expect(at("3S")).toEqual({ zone: "home", slot: 0 });
+    expect(at("6S")).toEqual({ zone: "home", slot: 3 });
+    expect(at("4S")).toEqual({ zone: "ring", progress: -8 });
+  });
+
+  it("entry stays mandatory at the default: the only move of bleu0 with the 3 ends in home slot 0", () => {
+    const candidates = movesForCard(state(true, "3S"), "bleu", "3S").filter(
+      (c) => c.action.t === "move" && c.action.pawn === "bleu0",
+    );
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.walk?.end).toEqual({ zone: "home", slot: 0 });
+  });
+});

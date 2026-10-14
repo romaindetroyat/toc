@@ -1,7 +1,8 @@
 // Engine invariants over random games (fast-check, fixed seeds). Every seat of every game is driven by the
 // level-1 bot, which sees only its own view. After every action: the 52 cards are all accounted for, no two
 // pawns share a cell, legal actions apply, mutated actions are refused, the 7 generator and the 7 validator
-// agree, deals end, and the same seed and actions give the same JSON.
+// agree, deals end, every home entry goes forward through the colour's carré 16 (G14), and the same seed
+// and actions give the same JSON.
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -14,7 +15,9 @@ import {
   type CardId,
   COLORS,
   type Color,
+  ENTRY,
   FULL_DECK,
+  type GameEvent,
   type GameState,
   IllegalActionError,
   legalActions,
@@ -54,6 +57,9 @@ const seen = {
   sevenPlansChecked: 0,
   botSevens: 0,
   wins: 0,
+  entries: 0,
+  /** Entries crossing the carré 16 below progress 70: refused by the rule of 2026-10-13, allowed by G14. */
+  entriesWithoutLap: 0,
 };
 
 function check(condition: boolean, message: string): void {
@@ -89,6 +95,50 @@ function checkPawns(state: GameState): void {
       const key = `${color}${pawn.slot}`;
       check(!slots.has(key), `two pawns in home slot ${key}`);
       slots.add(key);
+    }
+  }
+}
+
+/**
+ * Every pawnEnteredHome of a pawn that was on the ring in `before` reaches the home through its colour's
+ * ENTRY cell moving forward: the pawn stood on it, or the last ring place of the event path is it. The
+ * progress is followed through the action's events, so a pawn moved twice by one 7 is tracked too.
+ */
+function checkEntries(before: GameState, events: readonly GameEvent[]): void {
+  const progress = new Map<PawnId, number>();
+  for (const id of ALL_PAWNS) {
+    const pawn = before.pawns[id];
+    if (pawn.zone === "ring") progress.set(id, pawn.progress);
+  }
+  for (const event of events) {
+    if (event.t === "pawnMoved") {
+      const from = progress.get(event.pawn);
+      if (from !== undefined) progress.set(event.pawn, from + event.dir * event.path.length);
+    } else if (event.t === "pawnSentHome") {
+      progress.delete(event.pawn);
+    } else if (event.t === "pawnEnteredHome") {
+      const from = progress.get(event.pawn);
+      progress.delete(event.pawn);
+      if (from === undefined) continue; // a home pawn moving inside its home
+      const color = event.pawn.slice(0, -1) as Color;
+      const ringPlaces = event.path.filter((place) => place.z === "ring");
+      const firstHome = event.path.findIndex((place) => place.z === "home");
+      check(firstHome === ringPlaces.length, `${event.pawn} enters with ring cells after its home`);
+      const last = ringPlaces[ringPlaces.length - 1];
+      const throughEntry =
+        last === undefined
+          ? ringIndex(color, from) === ENTRY[color]
+          : last.z === "ring" && last.cell === ENTRY[color];
+      check(throughEntry, `${event.pawn} entered its home without passing its carré 16`);
+      // forward: the ring cells are consecutive from the pawn's cell
+      ringPlaces.forEach((place, i) => {
+        check(
+          place.z === "ring" && place.cell === ringIndex(color, from + i + 1),
+          `${event.pawn} entered its home moving backward`,
+        );
+      });
+      seen.entries++;
+      if (from + ringPlaces.length < RING - 2) seen.entriesWithoutLap++;
     }
   }
 }
@@ -277,6 +327,7 @@ function playChecked(
     seen.steps++;
     checkCards(state);
     checkPawns(state);
+    checkEntries(before, result.events);
 
     // every deal ends within DEAL_CAP actions (RULE-16)
     if (state.dealsPlayed !== before.dealsPlayed) dealActions = 0;
@@ -326,6 +377,8 @@ describe("engine invariants over 200 random games driven by the level-1 bot", ()
     expect(seen.botSevens).toBeGreaterThan(GAMES);
     expect(seen.sevenBoards).toBeGreaterThan(50);
     expect(seen.sevenPlansChecked).toBeGreaterThan(100);
+    expect(seen.entries).toBeGreaterThanOrEqual(GAMES * 8);
+    expect(seen.entriesWithoutLap).toBeGreaterThan(0);
   });
 });
 

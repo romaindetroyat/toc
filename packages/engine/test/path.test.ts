@@ -151,6 +151,12 @@ describe("entry after backing with the 4 (G14)", () => {
     expect(walk(ill, "bleu0", 5, 1, alone("bleu0"))).toEqual({ ok: false, reason: "home-blocked" });
   });
 
+  it("the 4 from -4 still goes backward, to -8: the 4 never enters the home", () => {
+    const b = board({ bleu0: { p: -4 } });
+    const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -8 });
+  });
+
   it("backing 4 from progress 2 stops on the carré 16 and never enters", () => {
     const b = board({ bleu0: { p: 2 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));

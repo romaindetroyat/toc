@@ -516,4 +516,143 @@ export const r13: Scenario[] = [
       events: ["cardPlayed", "pawnEnteredHome", "turn"],
     },
   },
+  {
+    id: "R-13.16",
+    rule: "R-13",
+    title: "Reculer de 4 depuis la sortie, puis entrer au compte exact",
+    before: {
+      pawns: {
+        bleu: [{ p: 0 }, "S", "S", "S"],
+        jaune: [{ p: 0 }, "S", "S", "S"],
+        rouge: [{ p: 0 }, "S", "S", "S"],
+        vert: [{ p: 0 }, "S", "S", "S"],
+      },
+      hands: { bleu: ["4S", "3S"], jaune: ["2H"], rouge: ["2D", "9D"], vert: ["2C"] },
+      turn: "bleu",
+    },
+    script: [
+      { seat: "bleu", action: { t: "move", card: "4S", pawn: "bleu0" } },
+      { seat: "jaune", action: { t: "move", card: "2H", pawn: "jaune0" } },
+      { seat: "rouge", action: { t: "move", card: "2D", pawn: "rouge0" } },
+      { seat: "vert", action: { t: "move", card: "2C", pawn: "vert0" } },
+      { seat: "bleu", action: { t: "move", card: "3S", pawn: "bleu0" } },
+    ],
+    expect: {
+      after: {
+        pawns: {
+          bleu: [{ h: 0 }, "S", "S", "S"],
+          jaune: [{ p: 2 }, "S", "S", "S"],
+          rouge: [{ p: 2 }, "S", "S", "S"],
+          vert: [{ p: 2 }, "S", "S", "S"],
+        },
+      },
+    },
+    flags: ["G14"],
+  },
+  {
+    id: "R-13.17",
+    rule: "R-13",
+    title: "Un pion qui a reculé et s’arrête pile sur son carré 16 n’entre pas",
+    before: {
+      pawns: { bleu: [{ p: -4 }, "S", "S", "S"] },
+      hands: { bleu: ["2S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "2S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: -2 }, "S", "S", "S"] } },
+      events: ["cardPlayed", "pawnMoved", "turn"],
+    },
+    flags: ["G14"],
+  },
+  {
+    id: "R-13.18",
+    rule: "R-13",
+    title: "Après un recul, un compte qui dépasse le fond de la maison fait repartir le pion",
+    before: {
+      pawns: { bleu: [{ p: -4 }, "S", "S", "S"] },
+      hands: { bleu: ["10S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "10S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: 6 }, "S", "S", "S"] } },
+    },
+    flags: ["G14"],
+  },
+  {
+    id: "R-13.19",
+    rule: "R-13",
+    title: "Après un recul, un pion déjà rentré ne se saute pas",
+    before: {
+      pawns: { bleu: [{ p: -4 }, { h: 0 }, "S", "S"] },
+      hands: { bleu: ["5S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "5S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: 1 }, { h: 0 }, "S", "S"] } },
+    },
+    flags: ["G2", "G14"],
+  },
+  {
+    id: "R-13.20",
+    rule: "R-13",
+    title: "Après un recul, un pas du 7 entre dans la maison",
+    before: {
+      pawns: { bleu: [{ p: -4 }, { p: 20 }, "S", "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: {
+      t: "seven",
+      card: "7S",
+      plan: [
+        { pawn: "bleu0", steps: 4 },
+        { pawn: "bleu1", steps: 3 },
+      ],
+    },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ h: 1 }, { p: 23 }, "S", "S"] } },
+      events: ["cardPlayed", "pawnEnteredHome", "pawnMoved", "turn"],
+    },
+    flags: ["G14"],
+  },
+  {
+    id: "R-13.21",
+    rule: "R-13",
+    title: "Placé par le Valet devant son carré 16, le pion entre au compte exact",
+    before: {
+      pawns: {
+        bleu: [{ p: 10 }, "S", "S", "S"],
+        jaune: [{ p: 51 }, "S", "S", "S"],
+        rouge: [{ p: 0 }, "S", "S", "S"],
+        vert: [{ p: 0 }, "S", "S", "S"],
+      },
+      hands: { bleu: ["11S", "3S"], jaune: ["2H"], rouge: ["2D", "9D"], vert: ["2C"] },
+      turn: "bleu",
+    },
+    script: [
+      { seat: "bleu", action: { t: "swap", card: "11S", pawn: "bleu0", target: "jaune0" } },
+      { seat: "jaune", action: { t: "move", card: "2H", pawn: "jaune0" } },
+      { seat: "rouge", action: { t: "move", card: "2D", pawn: "rouge0" } },
+      { seat: "vert", action: { t: "move", card: "2C", pawn: "vert0" } },
+      { seat: "bleu", action: { t: "move", card: "3S", pawn: "bleu0" } },
+    ],
+    expect: {
+      after: {
+        pawns: {
+          bleu: [{ h: 1 }, "S", "S", "S"],
+          jaune: [{ p: 66 }, "S", "S", "S"],
+          rouge: [{ p: 2 }, "S", "S", "S"],
+          vert: [{ p: 2 }, "S", "S", "S"],
+        },
+      },
+    },
+    flags: ["G1", "G14"],
+  },
 ];

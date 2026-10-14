@@ -13,11 +13,11 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 - **Plateau :** un parcours de 72 cases partagé par les quatre couleurs, parcouru dans le sens horaire : bleu → jaune → rouge → vert → bleu.
 - **Numérotation des cases :** dans les scénarios, les cases sont numérotées de 0 à 71 dans le sens horaire en partant du losange bleu. Le losange de sortie est la case 0 pour le bleu, 18 pour le jaune, 36 pour le rouge, 54 pour le vert.
 - **Losange (case de sortie) :** la case où un cheval arrive quand il sort de l’écurie, à côté de son écurie. C’est le losange 18 du quart de la couleur sur le plateau imprimé.
-- **Carré 16 (case d’entrée) :** la case située deux cases avant la sortie de sa couleur. C’est par elle qu’un cheval entre dans sa maison.
+- **Carré 16 (case d’entrée) :** la case située deux cases avant la sortie de sa couleur. C’est par elle qu’un cheval entre dans sa maison. Un cheval qui l’atteint ou le franchit en avançant peut entrer dans sa maison, qu’il ait fait le tour complet ou non (G14).
 - **Écurie :** quatre places où attendent les chevaux qui ne sont pas encore sortis, ou qui ont été mangés.
 - **Maison :** quatre cases d’arrivée, en diagonale vers le centre, où les chevaux rentrent. Un cheval rentré a terminé son parcours.
 - **Équipes :** les partenaires sont face à face, jaune avec vert contre rouge avec bleu.
-- **Progression :** le nombre de cases parcourues par un cheval depuis sa sortie. Un cheval qui vient de sortir est à la progression 0. Avancer l’augmente, reculer la diminue (elle peut devenir négative) et elle n’est pas plafonnée : un cheval qui rate sa maison fait un tour de plus.
+- **Progression :** le nombre de cases parcourues par un cheval depuis sa sortie. Un cheval qui vient de sortir est à la progression 0. Avancer l’augmente, reculer la diminue (elle peut devenir négative) et elle n’est pas plafonnée : un cheval qui rate sa maison fait un tour de plus. Elle ne décide pas de l’entrée dans la maison : seule compte l’arrivée sur le carré 16 en avançant (G14).
 
 ### R-01 Équipes et places
 
@@ -39,7 +39,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 **Cas limites**
 - Un cheval qui recule de 4 depuis sa sortie se retrouve à la progression −4, sur la case située quatre cases avant son losange. Cette décision est actée (D-04).
-- Un cheval à la progression −2 se tient sur son propre carré 16, mais il n’a pas fait le tour : il n’entre pas dans la maison. Un cheval ne peut entrer qu’après avoir fait le tour complet (acté).
+- Un cheval à la progression −2 se tient sur son propre carré 16 sans avoir fait le tour : au compte exact, il entre dans sa maison (G14, R-02.3). Un cheval qui vient de sortir ne peut pas atteindre son carré 16 sans faire le tour : cela n’arrive qu’après un recul avec le 4 ou un échange au Valet.
 - Un cheval peut s’arrêter sur le losange d’une autre couleur ; il y est un cheval ordinaire (R-12).
 - Après un échange au Valet, la progression du cheval qui change de place est précisée en R-09 (G1, validé).
 
@@ -167,7 +167,8 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 **Cas limites**
 - Reculer depuis la sortie est acté (D-04) : le cheval passe à la progression −4.
-- Ne jamais entrer dans la maison en reculant, et devoir faire le tour complet, est acté (D-04).
+- Ne jamais entrer dans la maison en reculant est acté (D-04). Le tour complet n’est plus exigé (G14) : un cheval qui a reculé derrière son carré 16 y entre ensuite au compte exact, en avançant (R-13.12). Reculer jusque sur son carré 16 ne fait pas entrer (R-08.7).
+- Le 4 joué sur un cheval à −4 le fait encore reculer (−8) : le 4 n’entre jamais dans la maison.
 - Un cheval qui recule et s’arrête sur un cheval adverse ou du partenaire le mange, comme avec toute autre carte (R-11).
 - Un cheval protégé sur son losange est infranchissable, y compris pour un autre cheval de sa propre couleur qui voudrait reculer à travers lui (G4, validé).
 - Un cheval à l’écurie ne peut pas reculer. Si aucun cheval ne peut reculer, le 4 est injouable.
@@ -185,6 +186,8 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-08.5](docs/regles/R-08.5.webp)
 - R-08.6 — Un pion à l’écurie ne peut pas reculer : le 4 est injouable
   ![R-08.6](docs/regles/R-08.6.webp)
+- R-08.7 — Reculer jusque sur son carré 16 ne fait pas entrer dans la maison
+  ![R-08.7](docs/regles/R-08.7.webp)
 
 ### R-09 Le Valet
 
@@ -195,7 +198,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 - Un cheval à l’écurie ou dans la maison n’est ni échangé ni visé (Q11, acté par RULE-09).
 - Un cheval protégé sur sa sortie (R-12) ne peut pas être visé (Q12, acté par RULE-13). Mon propre cheval protégé sur ma sortie ne peut pas non plus servir de cheval à échanger (G6, validé).
 - Sans cible possible, le Valet est injouable : le jeu l’indique et le reste de la main se joue (R-14).
-- Après l’échange, chaque cheval est sur la case de l’autre. Sa progression (voir le vocabulaire) est recalculée d’après sa nouvelle case : un cheval qui avait déjà fait un tour de plus perd ce tour, un cheval qui arrive sur son carré 16 peut entrer dans sa maison (G1, validé). L’autre choix possible, garder ses tours déjà faits, est dessiné en R-09.9.
+- Après l’échange, chaque cheval est sur la case de l’autre. Sa progression (voir le vocabulaire) est recalculée d’après sa nouvelle case : un cheval qui avait déjà fait un tour de plus perd ce tour, un cheval qui arrive sur son carré 16 peut entrer dans sa maison (G1, validé). L’autre choix possible, garder ses tours déjà faits, est dessiné en R-09.9. Un cheval que l’échange place juste avant son carré 16 entre lui aussi au compte exact au coup suivant (G14, R-13.21).
 - Le Valet est la seule carte qui déplace un cheval qui n’est pas à soi (G10, validé).
 
 **Scénarios**
@@ -321,7 +324,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 **Cas limites**
 - Compte exact jusqu’à une case vide, entrée obligatoire, avancer dans la maison : c’est acté (D-01, D-02, D-03, RULE-15).
-- Le tour complet est obligatoire et on n’entre jamais en reculant : c’est acté (D-04). Un cheval qui a reculé depuis sa sortie est à la progression −4 et n’a pas fait le tour ; il passe devant le carré 16 sans entrer (R-13.12).
+- On n’entre jamais en reculant : c’est acté (D-04). Le tour complet n’est plus obligatoire depuis le 2026-10-14 (G14) : un cheval qui a reculé depuis sa sortie (progression −4) entre au compte exact dès qu’il repasse son carré 16 en avançant (R-13.12, R-13.16) ; s’il s’arrête pile dessus, il n’entre pas (R-13.17) ; si le compte dépasse le fond de la maison, il repart pour un tour (R-13.18) ; il ne saute pas un cheval déjà rentré (R-13.19, G2). Un pas du 7 entre de la même façon (R-13.20), et un cheval placé par le Valet aussi (R-13.21).
 - La case 0 de la maison est la plus proche du carré 16, la case 3 la plus éloignée.
 - Si la case visée est libre mais qu’un cheval déjà rentré se trouve sur le chemin, le cheval ne le saute pas et repart pour un tour, comme si la case était occupée (G2, validé).
 - Un cheval qui rate sa maison continue sur le parcours, il peut manger ou être mangé comme n’importe quel cheval, et il retrouve le carré 16 un tour plus tard (R-13.15).
@@ -358,6 +361,18 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-13.14](docs/regles/R-13.14.webp)
 - R-13.15 — Après un tour de plus, le pion entre au passage suivant
   ![R-13.15](docs/regles/R-13.15.webp)
+- R-13.16 — Reculer de 4 depuis la sortie, puis entrer au compte exact
+  ![R-13.16](docs/regles/R-13.16.webp)
+- R-13.17 — Un pion qui a reculé et s’arrête pile sur son carré 16 n’entre pas
+  ![R-13.17](docs/regles/R-13.17.webp)
+- R-13.18 — Après un recul, un compte qui dépasse le fond de la maison fait repartir le pion
+  ![R-13.18](docs/regles/R-13.18.webp)
+- R-13.19 — Après un recul, un pion déjà rentré ne se saute pas
+  ![R-13.19](docs/regles/R-13.19.webp)
+- R-13.20 — Après un recul, un pas du 7 entre dans la maison
+  ![R-13.20](docs/regles/R-13.20.webp)
+- R-13.21 — Placé par le Valet devant son carré 16, le pion entre au compte exact
+  ![R-13.21](docs/regles/R-13.21.webp)
 
 ### R-14 Main injouable
 

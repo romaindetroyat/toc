@@ -298,4 +298,21 @@ export const r08: Scenario[] = [
       legalExclude: [{ t: "move", card: "4S", pawn: "bleu0" }],
     },
   },
+  {
+    id: "R-08.7",
+    rule: "R-08",
+    title: "Reculer jusque sur son carré 16 ne fait pas entrer dans la maison",
+    before: {
+      pawns: { bleu: [{ p: 2 }, "S", "S", "S"] },
+      hands: { bleu: ["4S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "4S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: -2 }, "S", "S", "S"] } },
+      events: ["cardPlayed", "pawnMoved", "turn"],
+    },
+    flags: ["Q2"],
+  },
 ];
