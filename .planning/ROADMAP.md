@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 26/28 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14)
+**Plans:** 27/28 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14)
 
 Plans:
 **Wave 1**
@@ -97,7 +97,7 @@ Plans:
 - [x] 01-26-PLAN.md — Règles : le 7 dépasse le partenaire sans le manger (G15)
 
 **Wave 18** *(gap closure, UAT test 5; blocked on Wave 17 completion)*
-- [ ] 01-27-PLAN.md — Jouer au clavier sur ordinateur : chiffres, lettres, Entrée, Échap, aide « ? »
+- [x] 01-27-PLAN.md — Jouer au clavier sur ordinateur : chiffres, lettres, Entrée, Échap, aide « ? »
 
 **Wave 19** *(gap closure, UAT test 5; blocked on Wave 18 completion)*
 - [ ] 01-28-PLAN.md — Les raccourcis se voient sur ordinateur, jamais sur téléphone
@@ -174,7 +174,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 26/28 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 27/28 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
