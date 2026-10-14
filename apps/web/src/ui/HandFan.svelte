@@ -195,12 +195,26 @@
             onpick?.(card);
           }}
         />
-        {#if hinted}
-          <KeyHint label={String(i + 1)} at="card" />
-        {/if}
       </div>
     {/if}
   {/each}
+  {#if hinted}
+    <!-- The digits ride on a layer of their own over the whole fan, each slot following its card, so
+         a raised or selected card never hides the digit of its neighbour. -->
+    {#each cards as card, i (card)}
+      {@const slot = slots[i]}
+      {#if slot}
+        <div
+          class="slot hint-slot"
+          class:received={card === received}
+          style:transform={transformOf(card, slot)}
+          aria-hidden="true"
+        >
+          <KeyHint label={String(i + 1)} at="card" />
+        </div>
+      {/if}
+    {/each}
+  {/if}
 </div>
 
 <style>
@@ -256,6 +270,21 @@
 
   .still .slot {
     transition: none;
+  }
+
+  /* Above every card (the selected one is at 10), and never in the way of a tap. No width: the badge
+     astride the top edge would otherwise widen the turned box of the outer slots past the screen; the
+     pivot stays the card's (50 % of its width, 160 % of its height). */
+  .hint-slot {
+    z-index: 20;
+    width: 0;
+    transform-origin: calc(var(--card-w) / 2) 160%;
+    pointer-events: none;
+  }
+
+  /* The « Reçue » tag holds the top of the received card's slice: its digit sits just above it. */
+  .hint-slot.received :global(.key-hint) {
+    top: -22px;
   }
 
   /* A new hand waits, invisible and out of reach, for the cards of the deal to land. */
