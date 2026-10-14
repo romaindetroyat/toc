@@ -53,6 +53,28 @@ async function centredIn(page: Page, inner: string, outer: string): Promise<bool
   return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
 }
 
+/**
+ * How far the feet of the preview's ghost (the centre of its ring on the ground) are from the centre
+ * of a drawn cell, in steps (the C+ step is 126.156 scene units, the scene 2000 units wide).
+ */
+async function ghostOffCell(page: Page, cell: number): Promise<number> {
+  return page.evaluate((index) => {
+    const feet = document.querySelector("[data-ghost] [data-ghost-feet] ellipse");
+    const drawn = document.querySelector(`[data-board-art] [data-cell="${index}"]`);
+    const svg = document.querySelector("[data-board] svg");
+    if (!feet || !drawn || !svg) throw new Error(`no ghost, no cell ${index} or no board`);
+    const a = feet.getBoundingClientRect();
+    const b = drawn.getBoundingClientRect();
+    const step = (126.156 * svg.getBoundingClientRect().width) / 2000;
+    return (
+      Math.hypot(
+        a.x + a.width / 2 - (b.x + b.width / 2),
+        a.y + a.height / 2 - (b.y + b.height / 2),
+      ) / step
+    );
+  }, cell);
+}
+
 async function openPosition(page: Page, etat: unknown, extra = "") {
   const encoded = etatParam(etat);
   await page.goto("/");
@@ -121,6 +143,8 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
   await page.locator('[data-hit="bleu0"]').click();
   await expect(page.locator("[data-path]")).toBeVisible();
   await expect(page.locator("[data-ghost]")).toBeVisible();
+  // The ghost stands on the drawn cell 15, its feet within half a step of the cell's centre (D-17).
+  expect(await ghostOffCell(page, 15)).toBeLessThanOrEqual(0.5);
   await expect(page.locator("[data-badge]")).toContainText("+12");
   await expect(page.locator("[data-action-zone]")).toContainText(
     `Dame de cœur${NBSP}: avance de 12 cases.`,

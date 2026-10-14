@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { KNIGHT, knightScale, rotatePoint } from "@toc/board";
-  import { type Color, type PawnId, pawnColor, type RenderState } from "@toc/engine";
+  import { KNIGHT, knightScale, rotatePoint, stableCentre } from "@toc/board";
+  import { type Color, type PawnId, pawnColor, type Place, type RenderState } from "@toc/engine";
   import type { Point } from "@toc/board";
   import { knightLetter, type TurnUiState, trayLetters } from "../game/turnUi.ts";
   import { game } from "../i18n/fr/game.ts";
@@ -30,8 +30,18 @@
   const WALNUT = "#2B1D12";
   const CREAM = "#FFF8E1";
   const BRICK = "#A32018";
-  /** Halo radius of a knight in sprite units, scaled with the knight of its zone (D-16). */
+  // Every knight-relative offset and size is in sprite units (KNIGHT) times the knightScale of the
+  // place of the knight it marks (the destination's place for a ghost), D-16, D-17. Sizes in screen
+  // pixels (badges, letters, capture marks: x px) and the path's strokes are not scaled.
+  /** Halo radius of a knight. */
   const HALO_R = KNIGHT.w / 2 + 14;
+  /** A ghost's ring at its feet (half axes), and its badge beside its head. */
+  const GHOST_RX = 70;
+  const GHOST_RY = 26;
+  const BADGE_X = KNIGHT.w / 2 + 7;
+  /** A capture mark above the victim's head, a letter above the knight's head. */
+  const CAPTURE_UP = KNIGHT.head + 10;
+  const LETTER_UP = KNIGHT.head + 22;
 
   /** Last card slot of each seat on the felt (UI-SPEC Tapis), unrotated board units. */
   const SLOT: Record<Color, Point> = {
@@ -65,6 +75,11 @@
   });
   const polyline = $derived(points.map(([x, y]) => `${x},${y}`).join(" "));
   const destination = $derived(points.length > 1 ? (points[points.length - 1] ?? null) : null);
+  /** Size of the knight once it stands on the preview's last place. */
+  const destinationSize = $derived.by(() => {
+    const last = preview?.path[preview.path.length - 1];
+    return last === undefined ? 1 : knightScale(last);
+  });
 
   // A chevron every three cells, turned along the path.
   function chevronsOf(line: readonly Point[]) {
@@ -89,15 +104,26 @@
   const sevenRoutes = $derived(
     (building?.preview.moves ?? []).map((move) => {
       const line: Point[] = [anchorOf(move.from, k), ...move.path.map((place) => anchorOf(place, k))];
-      return { pawn: move.pawn, points: line, chevrons: chevronsOf(line), steps: move.path.length };
+      const to: Place = move.path[move.path.length - 1] ?? move.from;
+      return {
+        pawn: move.pawn,
+        points: line,
+        chevrons: chevronsOf(line),
+        steps: move.path.length,
+        size: knightScale(to),
+      };
     }),
   );
   const sevenGhosts = $derived.by(() => {
-    const byPawn = new Map<PawnId, { at: Point; steps: number }>();
+    const byPawn = new Map<PawnId, { at: Point; size: number; steps: number }>();
     for (const route of sevenRoutes) {
       const end = route.points[route.points.length - 1];
       if (end === undefined) continue;
-      byPawn.set(route.pawn, { at: end, steps: (byPawn.get(route.pawn)?.steps ?? 0) + route.steps });
+      byPawn.set(route.pawn, {
+        at: end,
+        size: route.size,
+        steps: (byPawn.get(route.pawn)?.steps ?? 0) + route.steps,
+      });
     }
     return [...byPawn].map(([pawn, ghost]) => ({ pawn, ...ghost }));
   });
@@ -143,8 +169,8 @@
     swap === null
       ? []
       : [
-          { pawn: swap.a, at: anchorOf(swap.aTo, k) },
-          { pawn: swap.b, at: anchorOf(swap.bTo, k) },
+          { pawn: swap.a, at: anchorOf(swap.aTo, k), size: knightScale(swap.aTo) },
+          { pawn: swap.b, at: anchorOf(swap.bTo, k), size: knightScale(swap.bTo) },
         ],
   );
 
@@ -166,20 +192,38 @@
       : [],
   );
 
-  // The seat whose turn it is: a glow behind its stable and a ring around its felt slot.
+  // The seat whose turn it is: a glow on its stable and a ring around its felt slot.
   const turnSeat = $derived(render.phase === "play" ? render.turn : null);
-  const glow = $derived.by((): Point | null => {
-    if (turnSeat === null) return null;
-    const stables = ([0, 1, 2, 3] as const).map((slot) =>
-      anchorOf({ z: "stable", color: turnSeat, slot }, k),
-    );
-    return [
-      stables.reduce((sum, [x]) => sum + x, 0) / stables.length,
-      stables.reduce((sum, [, y]) => sum + y, 0) / stables.length,
-    ];
-  });
+  const glow = $derived(turnSeat === null ? null : stableCentre(turnSeat, k));
   const seatSlot = $derived(turnSeat === null ? null : rotatePoint(SLOT[turnSeat], k));
 </script>
+
+<!-- A ghost knight drawn like Pawn: the sprite at its feet (KNIGHT.feet x size below the anchor) at
+     the destination's size, its ring on the ground at the feet. -->
+{#snippet ghostKnight(color: Color, size: number)}
+  <g data-ghost-feet transform={`translate(0 ${KNIGHT.feet * size})`}>
+    {#each [{ stroke: CREAM, width: 8 }, { stroke: WALNUT, width: 4 }] as ring (ring.stroke)}
+      <ellipse
+        cx="0"
+        cy={-2 * size}
+        rx={GHOST_RX * size}
+        ry={GHOST_RY * size}
+        fill="none"
+        stroke={ring.stroke}
+        stroke-width={ring.width}
+      />
+    {/each}
+    <use
+      href={`#knight-${color}`}
+      x="-55"
+      y="-186"
+      width="110"
+      height="190"
+      opacity="0.55"
+      transform={`scale(${size})`}
+    />
+  </g>
+{/snippet}
 
 {#if layer === "under"}
   <g data-overlay="under" pointer-events="none">
@@ -299,18 +343,12 @@
   <g data-overlay="over" pointer-events="none">
     {#if destination !== null && ghostColor !== null}
       <g data-ghost transform={`translate(${destination[0]} ${destination[1]})`}>
-        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={CREAM} stroke-width="8" />
-        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={WALNUT} stroke-width="4" />
-        <use
-          href={`#knight-${ghostColor}`}
-          x="-55"
-          y="-186"
-          width="110"
-          height="190"
-          opacity="0.55"
-        />
+        {@render ghostKnight(ghostColor, destinationSize)}
         {#if badge !== null}
-          <g data-badge transform={`translate(${62} ${-190})`}>
+          <g
+            data-badge
+            transform={`translate(${BADGE_X * destinationSize} ${-KNIGHT.head * destinationSize})`}
+          >
             <circle r={21 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
             <text
               text-anchor="middle"
@@ -327,17 +365,8 @@
 
     {#each sevenGhosts as ghost (ghost.pawn)}
       <g data-seven-ghost={ghost.pawn} transform={`translate(${ghost.at[0]} ${ghost.at[1]})`}>
-        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={CREAM} stroke-width="8" />
-        <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={WALNUT} stroke-width="4" />
-        <use
-          href={`#knight-${pawnColor(ghost.pawn)}`}
-          x="-55"
-          y="-186"
-          width="110"
-          height="190"
-          opacity="0.55"
-        />
-        <g data-badge transform={`translate(${62} ${-190})`}>
+        {@render ghostKnight(pawnColor(ghost.pawn), ghost.size)}
+        <g data-badge transform={`translate(${BADGE_X * ghost.size} ${-KNIGHT.head * ghost.size})`}>
           <circle r={21 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
           <text
             text-anchor="middle"
@@ -353,7 +382,10 @@
 
     {#each building?.preview.captures ?? [] as capture (capture.victim)}
       {@const [x, y] = anchorOf(capture.at, k)}
-      <g data-capture={capture.victim} transform={`translate(${x} ${y - 196})`}>
+      <g
+        data-capture={capture.victim}
+        transform={`translate(${x} ${y - CAPTURE_UP * knightScale(capture.at)})`}
+      >
         <g class="pop" class:still>
           <circle r={12 * px} fill={BRICK} stroke={CREAM} stroke-width={2 * px} />
           <path
@@ -396,16 +428,7 @@
         {/each}
         {#each ghosts as ghost (ghost.pawn)}
           <g data-ghost={ghost.pawn} transform={`translate(${ghost.at[0]} ${ghost.at[1]})`}>
-            <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={CREAM} stroke-width="8" />
-            <ellipse cx="0" cy="-2" rx="70" ry="26" fill="none" stroke={WALNUT} stroke-width="4" />
-            <use
-              href={`#knight-${pawnColor(ghost.pawn)}`}
-              x="-55"
-              y="-186"
-              width="110"
-              height="190"
-              opacity="0.55"
-            />
+            {@render ghostKnight(pawnColor(ghost.pawn), ghost.size)}
           </g>
         {/each}
       </g>
@@ -413,7 +436,10 @@
 
     {#each lettered as option (option.pawn)}
       {@const [x, y] = pawnAt(option.pawn)}
-      <g data-letter={option.pawn} transform={`translate(${x} ${y - 208})`}>
+      <g
+        data-letter={option.pawn}
+        transform={`translate(${x} ${y - LETTER_UP * sizeOf(option.pawn)})`}
+      >
         <circle r={14 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
         <text
           text-anchor="middle"
@@ -432,7 +458,7 @@
         class="key-hint-knight"
         data-key-hint-knight={option.pawn}
         aria-hidden="true"
-        transform={`translate(${x} ${y - 208})`}
+        transform={`translate(${x} ${y - LETTER_UP * sizeOf(option.pawn)})`}
       >
         <circle r={14 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
         <text
@@ -449,7 +475,7 @@
     {#if preview !== null}
       {#each preview.captured as victim (victim)}
         {@const [x, y] = pawnAt(victim)}
-        <g data-capture={victim} transform={`translate(${x} ${y - 196})`}>
+        <g data-capture={victim} transform={`translate(${x} ${y - CAPTURE_UP * sizeOf(victim)})`}>
           <g class="pop" class:still>
             <circle r={12 * px} fill={BRICK} stroke={CREAM} stroke-width={2 * px} />
             <path

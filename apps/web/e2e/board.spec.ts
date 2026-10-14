@@ -49,6 +49,38 @@ test("?debug=geometry (build de debug) : l’overlay numérote les 72 cases", as
   await expect(overlay.locator("text[data-ring]")).toHaveCount(72);
   await expect(overlay.locator("text").filter({ hasText: /^71$/ })).toHaveCount(1);
   await expect(overlay.locator("text").filter({ hasText: /^71$/ })).toBeVisible();
+
+  // Drawn on board C+: each index on its drawn cell, the 16 stable and 16 home slots, the four exits
+  // and carrés, the felt, the four seats' card slots, the talon and the défausse.
+  // The cells' shapes may be turned (losanges), so their centre is read on the screen and brought
+  // back to scene units (the scene is 2000 units wide); the labels' x, y are scene units.
+  const off = await page.evaluate(() => {
+    const svg = document.querySelector("[data-board] svg");
+    if (!svg) return -1;
+    const frame = svg.getBoundingClientRect();
+    const unit = 2000 / frame.width;
+    let worst = 0;
+    for (let i = 0; i < 72; i++) {
+      const label = document.querySelector(`[data-debug-geometry] text[data-ring="${i}"]`);
+      const cell = document.querySelector(`[data-board-art] [data-cell="${i}"]`);
+      if (!label || !cell) return -1;
+      const box = cell.getBoundingClientRect();
+      const dx = Number(label.getAttribute("x")) - (box.x + box.width / 2 - frame.x) * unit;
+      const dy = Number(label.getAttribute("y")) - (box.y + box.height / 2 - frame.y) * unit;
+      worst = Math.max(worst, Math.hypot(dx, dy));
+    }
+    return worst;
+  });
+  expect(off).toBeGreaterThanOrEqual(0);
+  // Within a screen pixel or two of the drawn cell's centre.
+  expect(off).toBeLessThanOrEqual(10);
+  await expect(overlay.locator("[data-stable]")).toHaveCount(16);
+  await expect(overlay.locator("[data-home]")).toHaveCount(16);
+  await expect(overlay.locator("[data-debug-exit]")).toHaveCount(4);
+  await expect(overlay.locator("[data-debug-entry]")).toHaveCount(4);
+  await expect(overlay.locator("[data-debug-felt]")).toHaveCount(1);
+  await expect(overlay.locator("[data-debug-card]")).toHaveCount(4);
+  await expect(overlay.locator("[data-debug-pile]")).toHaveCount(2);
 });
 
 test("sans paramètre debug, aucun overlay", async ({ page }) => {

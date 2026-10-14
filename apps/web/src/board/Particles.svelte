@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MOTION } from "@toc/board";
+  import { KNIGHT, knightScale, MOTION } from "@toc/board";
   import { animateNow } from "./frameClock.ts";
 
   // The burst of the fourth knight home (D-14): eight small stars and circles, crème and amber, that
@@ -8,7 +8,7 @@
   // knight's rear (animateNow). The burst is hidden before it starts and again once it is over;
   // `onDone` is called when the last particle has finished.
   type Props = {
-    /** Where the burst comes from, in board units (the knight's feet). */
+    /** Where the knight stands, in board units (the anchor of its home slot: the slot's centre). */
     x: number;
     y: number;
     /** Time before the burst starts, ms. */
@@ -23,9 +23,10 @@
   const CREAM = "#FFF8E1";
   const AMBER = "#FFB02E";
   const COUNT = MOTION.partyParticles;
-  /** How far the particles fly, in board units, and how high above the feet the burst starts. */
+  /** How far the particles fly, in board units, and how far above the anchor the burst starts: the
+   *  chest (body centre) of a knight at its home size. */
   const REACH = 230;
-  const CHEST = -100;
+  const CHEST = -KNIGHT.body * knightScale({ z: "home", color: "bleu", slot: 3 });
 
   const particles = Array.from({ length: COUNT }, (_, i) => {
     const angle = (i / COUNT) * Math.PI * 2 + 0.3;

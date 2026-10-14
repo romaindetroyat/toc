@@ -65,13 +65,14 @@
 </div>
 
 <style>
-  /* The square of the board, below the 4 % band kept free above it. */
+  /* The 2:3 board (--board-size wide, 1.5 times as tall), below the head room kept free above it:
+     the plate is centred on the board, over the felt. */
   .wrap {
     position: absolute;
     left: 0;
     right: 0;
-    top: calc(var(--board-size, 0px) * 0.04);
-    height: var(--board-size, 0px);
+    top: calc(var(--board-size, 0px) * var(--head-room, 0.0466));
+    height: calc(var(--board-size, 0px) * 1.5);
     display: grid;
     place-items: center;
     pointer-events: none;

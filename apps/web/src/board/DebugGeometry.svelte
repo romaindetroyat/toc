@@ -1,20 +1,14 @@
 <script lang="ts">
-  import {
-    CARD_SIZE,
-    DEFAUSSE,
-    FELT_SQUARE,
-    LAST_CARD_SLOT,
-    type Point,
-    rotatePoint,
-    TALON,
-  } from "@toc/board";
+  import { SCENE, seatCard } from "@toc/board";
   import { COLORS, type Color, ENTRY, EXIT, type PawnIndex } from "@toc/engine";
   import { anchorOf } from "./geometry.ts";
 
-  // Same k as Board.svelte: every point is drawn at its rotated screen anchor.
+  // Same k as Board.svelte: every point is drawn at its C+ scene anchor for that seat.
   let { k = 0 }: { k?: number } = $props();
 
-  // Debug-only overlay (plan 01-02): every calibrated cell and felt slot, drawn over the art.
+  // Debug-only overlay (plan 01-02, redrawn on board C+ in 01-31): the 72 ring centres with their
+  // index, the stable and home slots, the exits and carrés, the felt, each seat's card slot
+  // (turned to face its seat), the talon and the défausse, drawn over the board.
   // Sizes are in screen pixels through --px (board units per screen pixel, set by Board.svelte).
   const FILL: Record<Color, string> = {
     bleu: "#0100d6",
@@ -33,22 +27,20 @@
       home: SLOTS.map((slot) => anchorOf({ z: "home", color, slot }, k)),
       diamond: anchorOf({ z: "ring", cell: EXIT[color] }, k),
       square: anchorOf({ z: "ring", cell: ENTRY[color] }, k),
-      card: rotatePoint(LAST_CARD_SLOT[color], k),
+      card: seatCard(color, k),
     })),
   );
   const ring = $derived(RING.map((cell) => anchorOf({ z: "ring", cell }, k)));
-  const talon: Point = $derived(rotatePoint(TALON, k));
-  const defausse: Point = $derived(rotatePoint(DEFAUSSE, k));
+  const card = SCENE.card;
+  const felt = SCENE.felt;
+  const piles = [
+    { name: "talon", at: SCENE.talon },
+    { name: "défausse", at: SCENE.defausse },
+  ] as const;
 </script>
 
 <g data-debug-geometry class="debug">
-  <rect
-    class="felt"
-    x={FELT_SQUARE.min}
-    y={FELT_SQUARE.min}
-    width={FELT_SQUARE.max - FELT_SQUARE.min}
-    height={FELT_SQUARE.max - FELT_SQUARE.min}
-  />
+  <rect class="felt" data-debug-felt x={felt.x} y={felt.y} width={felt.w} height={felt.h} />
 
   {#each ring as [x, y], i (i)}
     <circle class="ring-dot" cx={x} cy={y} />
@@ -58,15 +50,29 @@
   {#each slots as s (s.color)}
     <rect
       class="card"
-      x={s.card[0] - CARD_SIZE.w / 2}
-      y={s.card[1] - CARD_SIZE.h / 2}
-      width={CARD_SIZE.w}
-      height={CARD_SIZE.h}
+      data-debug-card={s.color}
+      x={s.card.at[0] - card.w / 2}
+      y={s.card.at[1] - card.h / 2}
+      width={card.w}
+      height={card.h}
+      stroke={FILL[s.color]}
+      transform={`rotate(${s.card.angle} ${s.card.at[0]} ${s.card.at[1]})`}
+    />
+    <text class="label slot" x={s.card.at[0]} y={s.card.at[1]}>{s.color}</text>
+    <circle
+      class="mark"
+      data-debug-exit={s.color}
+      cx={s.diamond[0]}
+      cy={s.diamond[1]}
       stroke={FILL[s.color]}
     />
-    <text class="label slot" x={s.card[0]} y={s.card[1]}>{s.color}</text>
-    <circle class="mark" cx={s.diamond[0]} cy={s.diamond[1]} stroke={FILL[s.color]} />
-    <circle class="mark" cx={s.square[0]} cy={s.square[1]} stroke={FILL[s.color]} />
+    <circle
+      class="mark"
+      data-debug-entry={s.color}
+      cx={s.square[0]}
+      cy={s.square[1]}
+      stroke={FILL[s.color]}
+    />
     {#each s.stable as [x, y], j (j)}
       <circle class="slot-dot" cx={x} cy={y} fill={FILL[s.color]} />
       <text class="label slot" {x} {y} data-stable={`${s.color}${j}`}>E{j}</text>
@@ -77,22 +83,17 @@
     {/each}
   {/each}
 
-  <rect
-    class="card"
-    x={talon[0] - CARD_SIZE.w / 2}
-    y={talon[1] - CARD_SIZE.h / 2}
-    width={CARD_SIZE.w}
-    height={CARD_SIZE.h}
-  />
-  <text class="label slot" x={talon[0]} y={talon[1]}>talon</text>
-  <rect
-    class="card"
-    x={defausse[0] - CARD_SIZE.w / 2}
-    y={defausse[1] - CARD_SIZE.h / 2}
-    width={CARD_SIZE.w}
-    height={CARD_SIZE.h}
-  />
-  <text class="label slot" x={defausse[0]} y={defausse[1]}>défausse</text>
+  {#each piles as pile (pile.name)}
+    <rect
+      class="card"
+      data-debug-pile={pile.name}
+      x={pile.at[0] - card.w / 2}
+      y={pile.at[1] - card.h / 2}
+      width={card.w}
+      height={card.h}
+    />
+    <text class="label slot" x={pile.at[0]} y={pile.at[1]}>{pile.name}</text>
+  {/each}
 </g>
 
 <style>
