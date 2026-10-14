@@ -1,12 +1,13 @@
 // The single movement path (RESEARCH Pattern 1): walk() is used by legality, previews, captures,
 // the 7 (plan 01-13, seven.ts) and animation. No second movement code path exists for the 4, the Valet or the 7.
-// Rules read: RULES.md R-02, R-08, R-12, R-13 and the choices G2, G3, G4 through `board.rules`.
+// Rules read: RULES.md R-02, R-08, R-12, R-13 and the choices G2, G3, G4, G14 through `board.rules`.
 // Pure, no I/O, erasable syntax only.
 
 import type { RuleSet } from "./rules.ts";
 import {
   COLORS,
   type Color,
+  ENTRY,
   EXIT,
   type PawnId,
   type Place,
@@ -25,7 +26,10 @@ export const ALL_PAWNS: readonly PawnId[] = COLORS.flatMap((color) =>
   ([0, 1, 2, 3] as const).map((index): PawnId => `${color}${index}`),
 );
 
-/** Progress of the entry square: the pawn must have done the whole lap to use it (D-01, D-04). */
+/**
+ * Progress of the entry square on the first lap (D-01). Used only when ENTRY_WITHOUT_FULL_LAP is off
+ * (the rule of 2026-10-13, D-04): then the pawn must have done the whole lap to enter.
+ */
 const ENTRY_PROGRESS = RING - 2;
 /** Pawns in a home. */
 const HOME_SLOTS = 4;
@@ -181,10 +185,21 @@ function homeOccupied(board: Board, color: Color): boolean[] {
 }
 
 /**
+ * True when a pawn of `color` at progress `q` stands on its own carré 16 (the entry square, cell
+ * EXIT - 2, so q = 70 mod 72, negative q included) and may enter from there: always under G14
+ * (ENTRY_WITHOUT_FULL_LAP), otherwise only after the full lap (q >= 70).
+ */
+function entryOpensAt(color: Color, q: number, rules: RuleSet): boolean {
+  if (ringIndex(color, q) !== ENTRY[color]) return false;
+  return rules.ENTRY_WITHOUT_FULL_LAP || q >= ENTRY_PROGRESS;
+}
+
+/**
  * Moves `pawnId` by `steps` (forward with dir 1, backward with dir -1: only the 4 goes backward).
- * Home entry (D-01 to D-03): the pawn enters only if the count ends exactly on an empty home slot, and
- * then it must; otherwise it goes on round the ring. A home pawn advances by the exact count without
- * jumping. Backward moves stay on the ring and never enter the home (D-04).
+ * Home entry (D-01 to D-03, G14): whenever the pawn reaches or crosses its carré 16 moving forward,
+ * full lap done or not, it enters only if the count ends exactly on an empty home slot, and then it
+ * must; otherwise it goes on round the ring. A home pawn advances by the exact count without jumping.
+ * Backward moves stay on the ring and never enter the home (D-04).
  */
 export function walk(
   board: Board,
@@ -218,10 +233,11 @@ export function walk(
   const from = pawn.progress;
   const occ = ringOccupancy(board);
   if (dir === 1) {
-    // The entry square is crossed (or stood on) at progress q, q >= 70, q = 70 mod 72; `r` steps lie beyond it.
+    // The carré 16 is crossed (or stood on) at progress q = from + k, moving forward (G14: lap done or
+    // not); `r` steps lie beyond it.
     for (let k = 0; k < steps; k++) {
       const q = from + k;
-      if (q < ENTRY_PROGRESS || (q - ENTRY_PROGRESS) % RING !== 0) continue;
+      if (!entryOpensAt(color, q, board.rules)) continue;
       const r = steps - k;
       if (r < 1 || r > HOME_SLOTS) break;
       const occupied = homeOccupied(board, color);

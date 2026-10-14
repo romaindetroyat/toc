@@ -82,10 +82,15 @@ describe("home entry (D-01, D-02, D-03)", () => {
     expect(r.ok && r.end).toEqual({ zone: "home", slot: 1 });
   });
 
-  it("a pawn at progress -2 stands on its entry square without the lap done and never enters", () => {
+  it("a pawn at progress -2 enters at the exact count (G14)", () => {
     const b = board({ bleu0: { p: -2 } });
     const r = walk(b, "bleu0", 3, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
+    expect(r).toEqual({
+      ok: true,
+      path: [home(0), home(1), home(2)],
+      end: { zone: "home", slot: 2 },
+      captures: [],
+    });
   });
 
   it("a pawn of another colour enters its own home by its own entry square", () => {
@@ -93,6 +98,69 @@ describe("home entry (D-01, D-02, D-03)", () => {
     const r = walk(b, "jaune0", 5, 1, alone("jaune0"));
     expect(r.ok && r.end).toEqual({ zone: "home", slot: 2 });
     expect(r.ok && r.path[r.path.length - 1]).toEqual({ z: "home", color: "jaune", slot: 2 });
+  });
+});
+
+describe("entry after backing with the 4 (G14)", () => {
+  it("2 steps from -4 stop on the carré 16: standing on it is not entering", () => {
+    const b = board({ bleu0: { p: -4 } });
+    const r = walk(b, "bleu0", 2, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
+  });
+
+  it("3 steps from -4 cross the carré 16 and enter home slot 0", () => {
+    const b = board({ bleu0: { p: -4 } });
+    const r = walk(b, "bleu0", 3, 1, alone("bleu0"));
+    expect(r).toEqual({
+      ok: true,
+      path: [ring(69), ring(70), home(0)],
+      end: { zone: "home", slot: 0 },
+      captures: [],
+    });
+  });
+
+  it("4, 5 and 6 steps from -4 enter home slots 1, 2 and 3", () => {
+    const b = board({ bleu0: { p: -4 } });
+    for (const [steps, slot] of [
+      [4, 1],
+      [5, 2],
+      [6, 3],
+    ] as const) {
+      const r = walk(b, "bleu0", steps, 1, alone("bleu0"));
+      expect(r.ok && r.end).toEqual({ zone: "home", slot });
+    }
+  });
+
+  it("a count that overshoots the home goes on round the ring (7 and 10 steps)", () => {
+    const b = board({ bleu0: { p: -4 } });
+    expect(walk(b, "bleu0", 7, 1, alone("bleu0"))).toMatchObject({
+      ok: true,
+      end: { zone: "ring", progress: 3 },
+    });
+    expect(walk(b, "bleu0", 10, 1, alone("bleu0"))).toMatchObject({
+      ok: true,
+      end: { zone: "ring", progress: 6 },
+    });
+  });
+
+  it("a home pawn in the way: G2 continue goes on round the ring, illegal forbids the move", () => {
+    const cont = board({ bleu0: { p: -4 }, bleu1: { h: 0 } });
+    const r = walk(cont, "bleu0", 5, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
+    const ill = board({ bleu0: { p: -4 }, bleu1: { h: 0 } }, { HOME_JUMP_BLOCKED: "illegal" });
+    expect(walk(ill, "bleu0", 5, 1, alone("bleu0"))).toEqual({ ok: false, reason: "home-blocked" });
+  });
+
+  it("backing 4 from progress 2 stops on the carré 16 and never enters", () => {
+    const b = board({ bleu0: { p: 2 } });
+    const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
+  });
+
+  it("with ENTRY_WITHOUT_FULL_LAP false, -2 playing 3 stays on the ring (rule of 2026-10-13)", () => {
+    const b = board({ bleu0: { p: -2 } }, { ENTRY_WITHOUT_FULL_LAP: false });
+    const r = walk(b, "bleu0", 3, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
   });
 });
 

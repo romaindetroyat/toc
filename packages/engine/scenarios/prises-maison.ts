@@ -2,8 +2,9 @@
 // Declarative data only (no engine call): they feed RULES.md, the engine acceptance tests
 // and the debug scenario loader. Conventions are documented on the Scenario type.
 // Cell arithmetic: cell = (EXIT[color] + progress) mod 72, with EXIT bleu 0, jaune 18, rouge 36, vert 54.
-// Home entry (D-01 to D-03): the entry square is progress 70 (cell EXIT - 2); `r` steps beyond it
-// (1 to 4) land in home slot r - 1, if that slot and every slot before it are empty.
+// Home entry (D-01 to D-03, G14): the entry square is the cell EXIT - 2 (the carré 16), reached at
+// progress 70 on the first lap or at -2 after a backward 4 (G14: the full lap is not required); `r`
+// steps beyond it (1 to 4) land in home slot r - 1, if that slot and every slot before it are empty.
 
 import type { Scenario } from "../src/types.ts";
 
@@ -452,7 +453,8 @@ export const r13: Scenario[] = [
   {
     id: "R-13.12",
     rule: "R-13",
-    title: "Un pion qui a reculé n’a pas fait le tour : il passe devant l’entrée sans entrer",
+    title:
+      "Un pion qui a reculé de 4 entre dans sa maison au compte exact, sans avoir fait le tour",
     before: {
       pawns: { bleu: [{ p: -4 }, "S", "S", "S"] },
       hands: { bleu: ["5S"] },
@@ -461,9 +463,10 @@ export const r13: Scenario[] = [
     action: { t: "move", card: "5S", pawn: "bleu0" },
     expect: {
       legal: true,
-      after: { pawns: { bleu: [{ p: 1 }, "S", "S", "S"] } },
-      events: ["cardPlayed", "pawnMoved", "turn"],
+      after: { pawns: { bleu: [{ h: 2 }, "S", "S", "S"] } },
+      events: ["cardPlayed", "pawnEnteredHome", "turn"],
     },
+    flags: ["G14"],
   },
   {
     id: "R-13.13",

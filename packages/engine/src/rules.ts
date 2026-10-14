@@ -16,6 +16,8 @@
 //   implementing the alternative first and widening its type.
 //
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
+// G14 records the change Romain made on 2026-10-14 during the phase acceptance test (later changes
+// continue the numbering).
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
 
 /**
@@ -102,6 +104,15 @@ export const ORDINARY_CARDS_PASS_OVER_PAWNS: boolean = true;
 export const SEVEN_CONTINUES_WITH_PARTNER: boolean = true;
 
 /**
+ * G14 — Home entry without the full lap (RULES.md R-02, R-08, R-13, « Décisions de Romain »; decided by
+ * Romain on 2026-10-14 during the acceptance test, UAT test 6).
+ * true: a knight enters its home whenever it reaches or crosses its own carré 16 moving forward, lap done
+ * or not, at the exact count onto an empty slot (entry mandatory when the count is exact).
+ * false: the rule of 2026-10-13 (entry only from progress 70 on, after the full lap).
+ */
+export const ENTRY_WITHOUT_FULL_LAP: boolean = true;
+
+/**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
  * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
@@ -142,6 +153,7 @@ export type RuleSet = {
   ONLY_OWN_PAWNS_MOVE: boolean;
   ORDINARY_CARDS_PASS_OVER_PAWNS: boolean;
   SEVEN_CONTINUES_WITH_PARTNER: boolean;
+  ENTRY_WITHOUT_FULL_LAP: boolean;
   EMPTY_HAND_SKIPPED: true;
   EXCHANGE_KEEPS_HAND_SIZE: true;
   PAUSE_IN_ALL_PHASES: true;
@@ -162,6 +174,7 @@ export const DEFAULT_RULES: Readonly<RuleSet> = {
   ONLY_OWN_PAWNS_MOVE,
   ORDINARY_CARDS_PASS_OVER_PAWNS,
   SEVEN_CONTINUES_WITH_PARTNER,
+  ENTRY_WITHOUT_FULL_LAP,
   EMPTY_HAND_SKIPPED,
   EXCHANGE_KEEPS_HAND_SIZE,
   PAUSE_IN_ALL_PHASES,

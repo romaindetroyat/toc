@@ -77,7 +77,7 @@ export const r02: Scenario[] = [
   {
     id: "R-02.3",
     rule: "R-02",
-    title: "Un pion à −2 est sur sa case d’entrée sans avoir fait le tour",
+    title: "Un pion à −2 est sur sa case d’entrée : au compte exact, il entre dans sa maison",
     before: {
       pawns: { bleu: [{ p: -2 }, "S", "S", "S"] },
       hands: { bleu: ["3S"] },
@@ -86,9 +86,10 @@ export const r02: Scenario[] = [
     action: { t: "move", card: "3S", pawn: "bleu0" },
     expect: {
       legal: true,
-      after: { pawns: { bleu: [{ p: 1 }, "S", "S", "S"] } },
-      events: ["cardPlayed", "pawnMoved", "turn"],
+      after: { pawns: { bleu: [{ h: 2 }, "S", "S", "S"] } },
+      events: ["cardPlayed", "pawnEnteredHome", "turn"],
     },
+    flags: ["G14"],
   },
   {
     id: "R-02.4",

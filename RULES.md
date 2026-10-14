@@ -35,7 +35,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-02 Plateau et progression
 
-**Règle** — Le plateau a 72 cases et on le parcourt dans le sens horaire. Un cheval sort sur son losange (progression 0), avance en ajoutant des cases à sa progression et recule en en retirant. Il doit avoir fait le tour complet (progression d’au moins 70) pour pouvoir entrer dans sa maison par le carré 16 ; son entrée dans la maison est détaillée en R-13.
+**Règle** — Le plateau a 72 cases et on le parcourt dans le sens horaire. Un cheval sort sur son losange (progression 0), avance en ajoutant des cases à sa progression et recule en en retirant. Il entre dans sa maison par le carré 16 chaque fois qu’il l’atteint ou le franchit en avançant, même s’il n’a pas fait le tour complet (G14) ; son entrée dans la maison est détaillée en R-13.
 
 **Cas limites**
 - Un cheval qui recule de 4 depuis sa sortie se retrouve à la progression −4, sur la case située quatre cases avant son losange. Cette décision est actée (D-04).
@@ -48,7 +48,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-02.1](docs/regles/R-02.1.webp)
 - R-02.2 — Reculer de 4 depuis la sortie donne une progression de −4
   ![R-02.2](docs/regles/R-02.2.webp)
-- R-02.3 — Un pion à −2 est sur sa case d’entrée sans avoir fait le tour
+- R-02.3 — Un pion à −2 est sur sa case d’entrée : au compte exact, il entre dans sa maison
   ![R-02.3](docs/regles/R-02.3.webp)
 - R-02.4 — Un pion bleu peut s’arrêter sur la case de sortie du jaune
   ![R-02.4](docs/regles/R-02.4.webp)
@@ -317,7 +317,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-13 Entrée dans la maison
 
-**Règle** — Pour entrer dans sa maison, un cheval doit avoir fait le tour complet, puis tomber au compte exact sur une case vide de sa maison : depuis le carré 16, 1 pas mène à la case 0 de la maison, 2 pas à la case 1, 3 pas à la case 2 et 4 pas à la case 3. Quand le compte tombe juste, l’entrée est obligatoire. Si le compte ne tombe pas juste (plus de 4 pas au-delà du carré 16, case visée occupée, cheval déjà rentré à sauter), le cheval n’entre pas : il dépasse son entrée et repart pour un tour, ce coup est permis. S’arrêter pile sur le carré 16 n’est pas entrer. Un cheval déjà rentré peut encore avancer dans sa maison, au compte exact et sans sauter un autre cheval ; il ne ressort jamais de la maison.
+**Règle** — Pour entrer dans sa maison, un cheval doit atteindre ou franchir son carré 16 en avançant, puis tomber au compte exact sur une case vide de sa maison : depuis le carré 16, 1 pas mène à la case 0 de la maison, 2 pas à la case 1, 3 pas à la case 2 et 4 pas à la case 3. Quand le compte tombe juste, l’entrée est obligatoire. Si le compte ne tombe pas juste (plus de 4 pas au-delà du carré 16, case visée occupée, cheval déjà rentré à sauter), le cheval n’entre pas : il dépasse son entrée et repart pour un tour, ce coup est permis. S’arrêter pile sur le carré 16 n’est pas entrer. Le tour complet n’est pas exigé : un cheval qui a reculé avec le 4, ou que le Valet a placé avant son carré 16, entre de la même façon (G14). On n’entre jamais en reculant. Un cheval déjà rentré peut encore avancer dans sa maison, au compte exact et sans sauter un autre cheval ; il ne ressort jamais de la maison.
 
 **Cas limites**
 - Compte exact jusqu’à une case vide, entrée obligatoire, avancer dans la maison : c’est acté (D-01, D-02, D-03, RULE-15).
@@ -350,7 +350,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-13.10](docs/regles/R-13.10.webp)
 - R-13.11 — Au fond de la maison, un pion ne peut pas aller plus loin
   ![R-13.11](docs/regles/R-13.11.webp)
-- R-13.12 — Un pion qui a reculé n’a pas fait le tour : il passe devant l’entrée sans entrer
+- R-13.12 — Un pion qui a reculé de 4 entre dans sa maison au compte exact, sans avoir fait le tour
   ![R-13.12](docs/regles/R-13.12.webp)
 - R-13.13 — Arriver pile sur le carré 16 ne fait pas entrer dans la maison
   ![R-13.13](docs/regles/R-13.13.webp)
