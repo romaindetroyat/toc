@@ -2,7 +2,7 @@
   import { rotatePoint } from "@toc/board";
   import { type Color, type PawnId, pawnColor, type RenderState } from "@toc/engine";
   import type { Point } from "@toc/board";
-  import { type TurnUiState, trayLetters } from "../game/turnUi.ts";
+  import { knightLetter, type TurnUiState, trayLetters } from "../game/turnUi.ts";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
   import { anchorOf } from "./geometry.ts";
@@ -145,6 +145,17 @@
   const lettered = $derived(
     ui.kind === "tray"
       ? ui.options.map((pawn, i) => ({ pawn, letter: trayLetters(ui.options)[i] ?? "" }))
+      : [],
+  );
+
+  // On a computer each lit knight wears the letter of its key (shortcuts.ts); the tray has its own.
+  const keyed = $derived(
+    ui.kind === "cardSelected" ||
+      ui.kind === "jackPick" ||
+      ui.kind === "jackTarget" ||
+      ui.kind === "sevenBuilding" ||
+      ui.kind === "preview"
+      ? candidates.map((pawn) => ({ pawn, letter: knightLetter(pawn) }))
       : [],
   );
 
@@ -406,6 +417,26 @@
       </g>
     {/each}
 
+    {#each keyed as option (option.pawn)}
+      {@const [x, y] = pawnAt(option.pawn)}
+      <g
+        class="key-hint-knight"
+        data-key-hint-knight={option.pawn}
+        aria-hidden="true"
+        transform={`translate(${x} ${y - 208})`}
+      >
+        <circle r={14 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
+        <text
+          text-anchor="middle"
+          dominant-baseline="central"
+          fill={CREAM}
+          font-size={16 * px}
+          font-weight="700"
+          style="font-family: var(--font-ui)">{option.letter}</text
+        >
+      </g>
+    {/each}
+
     {#if preview !== null}
       {#each preview.captured as victim (victim)}
         {@const [x, y] = pawnAt(victim)}
@@ -427,6 +458,17 @@
 {/if}
 
 <style>
+  /* The letters of the keys: computers only, never on a phone (no hover, coarse pointer). */
+  .key-hint-knight {
+    display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .key-hint-knight {
+      display: inline;
+    }
+  }
+
   /* Pulse 1 -> 1.08 over 1.2 s; static under reduced motion. */
   .pulse {
     transform-box: fill-box;

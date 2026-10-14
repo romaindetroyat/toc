@@ -538,4 +538,116 @@ test.describe("les touches se voient sur ordinateur", () => {
       expect(pressed, each.name).toEqual(clicked);
     }
   });
+
+  test("les chevaux éclairés portent leur lettre ; le plateau de choix garde les siennes", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "the phone sweep is below");
+    // Two lit knights for the Dame: A and B.
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+      hands: { bleu: ["12H"] },
+    });
+    await page.keyboard.press("1");
+    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+    const letter = (id: string) => page.locator(`[data-key-hint-knight="${id}"]`);
+    await expect(letter("bleu0")).toBeVisible();
+    await expect(letter("bleu0")).toHaveText("A");
+    await expect(letter("bleu1")).toBeVisible();
+    await expect(letter("bleu1")).toHaveText("B");
+    await expect(page.locator("[data-key-hint-knight]")).toHaveCount(2);
+
+    // The Valet's tray: its chips and the board letters of the tray, no key letter.
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 40 }, "S", "S", "S"] },
+      hands: { bleu: ["11H"] },
+    });
+    await page.keyboard.press("1");
+    await page.keyboard.press("a");
+    await page.keyboard.press("a");
+    await expect(zone(page)).toHaveAttribute("data-state", "tray");
+    await expect(page.locator("[data-tray-option]")).toHaveCount(2);
+    await expect(page.locator("[data-letter]")).toHaveCount(2);
+    await expect(page.locator("[data-key-hint-knight]")).toHaveCount(0);
+  });
+
+  test("Réglages : le lien « Raccourcis clavier » ouvre l’aide, Échap y revient", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "the phone sweep is below");
+    await openPosition(page, ACE);
+    await page.getByRole("button", { name: "Réglages", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: "Réglages" });
+    const link = settings.getByRole("button", { name: "Raccourcis clavier" });
+    await expect(link).toBeVisible();
+    await link.click();
+    const help = page.getByRole("dialog", { name: "Raccourcis clavier" });
+    await expect(help).toBeVisible();
+    await expect(help).toContainText("Sur ordinateur, tu peux jouer sans la souris.");
+    await page.keyboard.press("Escape");
+    await expect(help).toHaveCount(0);
+    await expect(settings).toBeVisible();
+    await expect(link).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(settings).toHaveCount(0);
+    await expect(zone(page)).toHaveAttribute("data-state", "idle");
+  });
+
+  test("sur téléphone, aucune touche nulle part", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "the phone project only");
+    const anyHint = page.locator("[data-key-hint]:visible, [data-key-hint-knight]:visible");
+    const card = (name: string) => page.getByRole("button", { name });
+
+    // Idle, card selected, preview.
+    await openPosition(page, QUEEN_HAND);
+    await expect(anyHint).toHaveCount(0);
+    await card("Dame de cœur, jouable").click();
+    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+    await expect(anyHint).toHaveCount(0);
+    await page.locator('[data-hit="bleu0"]').click({ force: true });
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await expect(anyHint).toHaveCount(0);
+
+    // The As/Roi question.
+    await openPosition(page, ACE);
+    await card("As de pique, jouable").click();
+    await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+    await expect(anyHint).toHaveCount(0);
+
+    // The 7 assistant, a knight chosen and a step given.
+    await openPosition(page, SEVEN);
+    await card("7 de cœur, jouable").click();
+    await expect(seven(page)).toBeVisible();
+    await page.locator('[data-hit="bleu0"]').click({ force: true });
+    await page.locator('[data-step="3"]').click();
+    await expect(anyHint).toHaveCount(0);
+
+    // The exchange, a card chosen.
+    await page.goto("/");
+    await page.goto("/#/partie?graine=1234567890abcdef1234567890abcdef&vitesse=test");
+    await expect(zone(page)).toHaveAttribute("data-state", "exchange");
+    await expect(anyHint).toHaveCount(0);
+    await page.locator("[data-hand] [data-card]").first().click();
+    await expect(anyHint).toHaveCount(0);
+
+    // A dead hand.
+    await openPosition(
+      page,
+      { turn: "bleu", pawns: { bleu: ["S", "S", "S", "S"] }, hands: { bleu: ["2S"] } },
+      "deadHand",
+    );
+    await expect(anyHint).toHaveCount(0);
+
+    // Réglages in a game: no « Raccourcis clavier ».
+    await page.getByRole("button", { name: "Réglages", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: "Réglages" });
+    await expect(settings).toBeVisible();
+    await expect(settings.getByRole("button", { name: "Crédits et licences" })).toBeVisible();
+    await expect(settings.locator("[data-shortcuts-link]")).toBeHidden();
+    await expect(settings.getByRole("button", { name: "Raccourcis clavier" })).toHaveCount(0);
+  });
 });

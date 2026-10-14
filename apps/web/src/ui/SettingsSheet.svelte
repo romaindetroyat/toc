@@ -1,12 +1,14 @@
 <script lang="ts">
   import { setMix } from "../audio/engine.ts";
   import { mixFromSettings } from "../game/audioSettings.ts";
+  import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
   import { reglages } from "../i18n/fr/reglages.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreditsSheet from "./CreditsSheet.svelte";
   import Sheet from "./Sheet.svelte";
+  import ShortcutsSheet from "./ShortcutsSheet.svelte";
   import Slider from "./Slider.svelte";
   import Switch from "./Switch.svelte";
 
@@ -35,6 +37,8 @@
 
   let creditsOpen = $state(false);
   let creditsButton = $state<HTMLButtonElement | null>(null);
+  let shortcutsOpen = $state(false);
+  let shortcutsButton = $state<HTMLButtonElement | null>(null);
   let abandonOpen = $state(false);
   let abandonButton = $state<HTMLButtonElement | null>(null);
   let soundsLink = $state<HTMLAnchorElement | null>(null);
@@ -109,6 +113,18 @@
       >
         {reglages.credits}
       </button>
+      {#if onabandon}
+        <!-- In a game, on a computer only: the same help as the « ? » key (plan 01-28). -->
+        <button
+          type="button"
+          class="btn btn-text shortcuts"
+          data-shortcuts-link
+          bind:this={shortcutsButton}
+          onclick={() => (shortcutsOpen = true)}
+        >
+          {clavier.link}
+        </button>
+      {/if}
     </nav>
 
     {#if onabandon}
@@ -127,6 +143,10 @@
 
 {#if creditsOpen}
   <CreditsSheet onclose={() => (creditsOpen = false)} opener={creditsButton} />
+{/if}
+
+{#if shortcutsOpen}
+  <ShortcutsSheet onclose={() => (shortcutsOpen = false)} opener={shortcutsButton} />
 {/if}
 
 {#if abandonOpen && onabandon}
@@ -161,5 +181,17 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-sm);
+  }
+
+  /* « Raccourcis clavier »: computers only. Not drawn on a phone, so neither Tab nor a screen reader
+     reaches it there. */
+  .shortcuts {
+    display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .shortcuts {
+      display: inline-flex;
+    }
   }
 </style>
