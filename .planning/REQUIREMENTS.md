@@ -19,7 +19,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **RULE-08** : Le 4 fait reculer un pion de 4 cases, y compris un pion qui vient de sortir et se trouve sur sa case de sortie ; on n'entre jamais dans sa maison en reculant.
 - [x] **RULE-09** : Le Valet échange un de ses pions du parcours avec le pion d'un autre joueur (adversaire ou partenaire) sur le parcours ; on ne peut pas échanger deux de ses propres pions, ni un pion de l'écurie ou de la maison, ni un pion protégé sur sa sortie.
 - [x] **RULE-10** : Le 7 se répartit entre ses pions en sous-déplacements dont la somme fait exactement 7 ; s'il est impossible de jouer les 7 pas en entier, le 7 est injouable.
-- [x] **RULE-11** : Le 7 mange tout pion adverse ou partenaire qu'il dépasse ou sur lequel il s'arrête ; il peut dépasser ses propres pions sans les manger.
+- [x] **RULE-11** : Le 7 mange tout pion adverse qu'il dépasse ou sur lequel il s'arrête ; il dépasse ses propres pions et ceux de son partenaire sans les manger, et ne mange le pion du partenaire que s'il s'arrête sur lui (décision G15 du 2026-10-14).
 - [x] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
 - [x] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
 - [x] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
@@ -180,4 +180,4 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-14 after the UAT (G14)*
+*Last updated: 2026-10-14 after the UAT (G14, G15)*

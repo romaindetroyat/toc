@@ -45,6 +45,7 @@ Requirements : RULE-01 à RULE-18, RULE-20, PLAY-01 à PLAY-05, FX-01 à FX-06.
   - échange de carte à chaque donne ;
   - le Valet n'échange pas deux pions du même joueur.
   - **Révisé par Romain le 2026-10-14 (recette, test 6) :** « tour complet obligatoire » est levé ; un cheval qui atteint son carré 16 en avançant entre au compte exact, même sans tour complet (RULES.md, G14).
+  - **Révisé par Romain le 2026-10-14 (recette, test 7) :** le 7 dépasse les chevaux du partenaire sans les manger ; il ne les mange que s’il s’arrête sur eux (RULES.md, G15).
 
   Les autres cas limites (SUMMARY.md, questions 5 à 34) prennent la valeur par défaut de la recherche, à faire valider par Romain dans RULES.md.
 

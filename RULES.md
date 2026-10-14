@@ -457,6 +457,7 @@ Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R
 Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci-dessous (G14 et suivantes). Ses mots sont cités tels quels.
 
 - **G14 — Entrée dans la maison sans tour complet (décision du 2026-10-14).** Retenu : un cheval qui atteint ou franchit son carré 16 en avançant entre dans sa maison au compte exact sur une case vide, même s’il n’a pas fait le tour complet ; l’entrée reste obligatoire quand le compte tombe juste ; on n’entre jamais en reculant. Les mots de Romain : « si le cheval n’a pas fait le tour complet et qu’il arrive en situation de pouvoir rentrer (par 4 ou par valet) doit pouvoir rentrer ». Remplace « tour complet obligatoire » (D-04, Q3). Constante ENTRY_WITHOUT_FULL_LAP. Touche R-02, R-08, R-09, R-13 ; scénarios R-02.3, R-08.7, R-13.12, R-13.16 à R-13.21.
+- **G15 — Le 7 et le cheval du partenaire (décision du 2026-10-14).** Retenu : le 7 mange les chevaux adverses qu’il dépasse, mais dépasse ceux du partenaire sans les manger ; il mange le cheval du partenaire seulement s’il s’arrête sur lui, et c’est obligatoire. Aucun cheval de l’équipe n’est mangé au passage, y compris quand un joueur qui a fini joue les chevaux de son partenaire. Les mots de Romain : « Le 7 ne doit pas manger les partenaires quand il les double, mais seulement s’il arrive sur eux (pas le choix). » Remplace Q23 pour le passage du 7. Constante SEVEN_EATS_PASSED_PARTNER. Touche R-07, R-10, R-11, R-15 ; scénarios R-10.6, R-10.7, R-10.14, R-15.10.
 
 Les points validés le 2026-10-13 :
 
@@ -470,7 +471,7 @@ Les points validés le 2026-10-13 :
 - **G8 — Échange de cartes simultané.** Retenu : les quatre joueurs choisissent, puis les quatre cartes changent de main ensemble. Touche R-04 ; scénarios R-04.1, R-04.2.
 - **G9 — Qui commence chaque donne et quand le donneur change.** Retenu : le joueur après le donneur commence chaque donne ; le donneur reste le même pendant les trois donnes d’un paquet et change à chaque paquet (dans le sens horaire). Touche R-03 ; scénarios R-03.1 à R-03.4.
 - **G10 — Quelle carte déplace un cheval qui n’est pas à soi.** Retenu : seul le Valet. Les autres cartes, le 5 compris, ne déplacent que les chevaux du joueur. Touche R-07, R-09 ; scénario R-07.3.
-- **G11 — Passer par-dessus des chevaux avec les cartes ordinaires.** Retenu : on passe par-dessus tous les chevaux sans les manger ; seul un cheval protégé est infranchissable. Seul le 7 mange ce qu’il dépasse. Touche R-07, R-10 ; scénario R-07.5.
+- **G11 — Passer par-dessus des chevaux avec les cartes ordinaires.** Retenu : on passe par-dessus tous les chevaux sans les manger ; seul un cheval protégé est infranchissable. Seul le 7 mange ce qu’il dépasse, et seulement les chevaux adverses (G15). Touche R-07, R-10 ; scénario R-07.5.
 - **G12 — Le 7 qui rentre mon dernier cheval au milieu du plan.** Retenu : les pas qui restent peuvent se jouer avec les chevaux du partenaire. Touche R-10, R-15 ; scénario R-15.8. Le scénario R-15.9 (7 joué avec les seuls chevaux d’avant le tour) n’est pas retenu.
 - **G13 — Un joueur qui n’a plus de carte est sauté jusqu’à la donne suivante.** Retenu : oui, le tour passe au suivant. Touche R-05, R-14 ; scénarios R-05.3, R-14.4.
 - **Q7 — La carte échangée compte-t-elle dans les 5 cartes de la donne ?** Retenu : on compte avant l’échange ; comme chacun donne une carte et en reçoit une, la taille des mains ne change pas. Touche R-04 ; scénario R-04.4.
@@ -504,7 +505,7 @@ Ces points ne sont plus à discuter : ils sont écrits plus haut sans réserve.
 - Q17, les chevaux du partenaire comptent comme les siens pour toutes les cartes (RULE-17).
 - Q18, un cheval qui vient de sortir peut jouer le 4 (RULE-08).
 - Q20, jouer une carte jouable est obligatoire (RULE-04).
-- Q23, le 7 et les autres cartes mangent aussi le cheval du partenaire (RULE-11, RULE-12).
+- Q23, s’arrêter sur le cheval du partenaire le mange, avec toute carte, le 7 compris (RULE-12) ; depuis le 2026-10-14, le 7 qui le dépasse ne le mange pas (G15).
 - Q24, la partie est gagnée dès que huit chevaux de l’équipe sont rentrés (RULE-18).
 - Q25, chacun ne connaît que sa propre main et les cartes jouées sont publiques (RULE-19, phase 2).
 - Q4 et Q26 à Q34 (déconnexion, réglages de table, bot de remplacement, discussion, comptes, langue) ne sont pas des règles de la phase 1 : la déconnexion est décidée dans PROJECT.md (pause, puis choix du créateur de la table), le reste est traité aux phases suivantes.

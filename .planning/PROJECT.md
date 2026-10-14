@@ -24,7 +24,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 - [ ] Roi : sortir un pion **ou** avancer de 13
 - [ ] Dame : avancer de 12 ; Valet : échanger un de ses pions avec n'importe quel autre pion du parcours
 - [ ] 10, 9, 8, 6, 5, 3, 2 : avancer du nombre indiqué (le 5 ne fait avancer que ses propres pions)
-- [ ] 7 : 7 pas répartis entre ses pions ; il mange tout pion qu'il dépasse ou sur lequel il s'arrête (sauf ses propres pions)
+- [ ] 7 : 7 pas répartis entre ses pions ; il mange tout pion adverse qu'il dépasse, dépasse sans les manger ses pions et ceux de son partenaire, et mange le pion (adverse ou partenaire) sur lequel il s'arrête
 - [ ] 4 : reculer de 4
 - [ ] Prise : s'arrêter sur un pion adverse ou du partenaire le renvoie à son écurie ; on ne peut pas prendre ses propres pions
 - [ ] Un pion sur sa case de sortie (losange 18) est infranchissable : personne ne peut le dépasser, le manger ni l'échanger
@@ -86,7 +86,7 @@ Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre p
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Variante : le 5 ne joue que ses propres pions | Règle maison de Romain | — Pending |
-| Variante : le 7 mange tout ce qu'il dépasse ou là où il s'arrête, sauf ses propres pions | Règle maison | — Pending |
+| Variante : le 7 mange les adversaires qu'il dépasse et tout pion sur lequel il s'arrête ; il dépasse ses pions et ceux du partenaire sans les manger (changé le 2026-10-14) | Règle maison | — Pending |
 | On peut manger le pion de son partenaire, jamais les siens | Règle maison | — Pending |
 | Case de sortie infranchissable | Règle maison | — Pending |
 | Main injouable : on pose toutes ses cartes jusqu'à la donne suivante | Règle maison | — Pending |
