@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SCENE } from "@toc/board";
   import type { PawnId, Place, RenderState } from "@toc/engine";
   import { EXIT, pawnColor, RING } from "@toc/engine";
   import { knightLetter } from "../game/turnUi.ts";
@@ -81,7 +82,7 @@
 {#if active}
   <!-- Invisible: one circle per lit knight, and the rest of the board to catch a miss. -->
   <g data-hit-layer role="presentation" {onclick}>
-    <rect x="0" y="0" width="2560" height="2560" fill="transparent" />
+    <rect x="0" y="0" width={SCENE.width} height={SCENE.height} fill="transparent" />
     {#each targets as target (target.pawn)}
       <g
         class="hit"

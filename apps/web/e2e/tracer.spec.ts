@@ -17,6 +17,32 @@ const CLOPS = [
 const NBSP = "\u00a0";
 
 /** Opens the game screen on a hand-made position (the `etat` debug parameter: base64url JSON). */
+/**
+ * How far a knight's anchor (its outer translate(x y)) is from the centre of the drawn cell, in scene
+ * units: both are read in the scene's own coordinates (the attribute and getBBox()).
+ */
+async function offCell(page: Page, pawn: string, cell: number): Promise<number> {
+  return page.evaluate(
+    ([id, index]) => {
+      const knight = document.querySelector(`[data-pawn="${id}"]`);
+      const drawn = document.querySelector<SVGGraphicsElement>(
+        `[data-board-art] [data-cell="${index}"]`,
+      );
+      if (!knight || !drawn) throw new Error(`no knight ${id} or no cell ${index}`);
+      const match = /translate\(\s*([-\d.e]+)[\s,]+([-\d.e]+)\s*\)/.exec(
+        knight.getAttribute("transform") ?? "",
+      );
+      if (!match) throw new Error(`knight ${id} has no translate()`);
+      const box = drawn.getBBox();
+      return Math.hypot(
+        Number(match[1]) - (box.x + box.width / 2),
+        Number(match[2]) - (box.y + box.height / 2),
+      );
+    },
+    [pawn, cell] as const,
+  );
+}
+
 async function openPosition(page: Page, etat: unknown, extra = "") {
   const encoded = etatParam(etat);
   await page.goto("/");
@@ -29,12 +55,10 @@ test("tracer: Jouer la partie -> plateau -> la main du joueur et l’échange", 
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
 
-  // The four quarters are assembled into one board image.
-  const board = page.locator("img[src*='plateau']");
-  await expect(board).toBeVisible();
-  await expect
-    .poll(() => board.evaluate((img: HTMLImageElement) => img.naturalWidth))
-    .toBeGreaterThan(0);
+  // The board is the C+ drawing (D-05, D-07): drawn by code, 72 ring cells, no raster image.
+  await expect(page.locator("[data-board-art]")).toBeVisible();
+  await expect(page.locator("[data-board-art] [data-cell]")).toHaveCount(72);
+  await expect(page.locator("[data-board] img")).toHaveCount(0);
 
   // Audio was unlocked inside the tap.
   await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
@@ -62,6 +86,8 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
 
   const knight = page.locator('[data-pawn="bleu0"]');
   await expect(knight).toHaveAttribute("data-place", "ring:3");
+  // The knight stands on the drawn cell of its index.
+  expect(await offCell(page, "bleu0", 3)).toBeLessThanOrEqual(0.5);
 
   // His turn: the one card is raised, with its amber outline.
   const card = page.getByRole("button", { name: "Dame de cœur, jouable" });
@@ -106,6 +132,8 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     TOTAL_MS,
   );
   await expect(knight).toHaveAttribute("data-place", "ring:15");
+  // It hopped along the C+ ring and landed on the drawn cell 15.
+  await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
 
   const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
   expect(scheduled).toEqual(CLOPS);

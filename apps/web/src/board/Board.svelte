@@ -10,18 +10,21 @@
 </script>
 
 <script lang="ts">
+  import { bottomOf, SCENE } from "@toc/board";
   import type { CardId, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
-  import { board as t } from "../i18n/fr/board.ts";
   import { game } from "../i18n/fr/game.ts";
+  import BoardArt from "./BoardArt.svelte";
   import CardFlights, { type Flight } from "./CardFlights.svelte";
   import FeltTable from "./FeltTable.svelte";
   import Particles from "./Particles.svelte";
 
-  // k = clockwise quarter turns of the art (D-05). Only the art turns: the overlay svg stays upright
-  // and its children are placed at anchorOf(place, k).
+  // Board C+ in portrait 2:3 (D-05, D-07: decided by Romain). k = the seat at the bottom (bleu 0,
+  // vert 1, rouge 2, jaune 3). The drawing never turns: each colour takes its side, the next seat
+  // clockwise on the left and the previous one on the right (the seating by colour of D-05,
+  // « à confirmer par Romain »), and every child is placed at anchorOf(place, k) = sceneXY(place, k).
   // `under` and `over` are drawn behind and in front of the knights (`children`), `hits` on top of
-  // all; each receives the number of board units per screen pixel.
+  // all; each receives the number of scene units per screen pixel.
   // With a render state the felt is drawn as a card table under all of them (D-08).
   // `burst` puts the particles of the party above the knights; `flights` the cards that are moving.
   let {
@@ -50,59 +53,31 @@
     over?: Snippet<[number]>;
     hits?: Snippet<[number]>;
   } = $props();
-  const turn = $derived(`rotate(${k * 90}deg)`);
 
-  // The three composites produced by tools/build-board.mjs; the browser picks one from `sizes`.
-  const SRCSET = "/plateau-640.webp 640w, /plateau-1280.webp 1280w, /plateau-2560.webp 2560w";
-  const FALLBACK = "/plateau-1280.webp";
-
-  let status = $state<"loading" | "loaded" | "error">("loading");
-  let attempt = $state(0);
   let width = $state(0);
-  const px = $derived(width > 0 ? 2560 / width : 1);
-  let img = $state<HTMLImageElement>();
+  const px = $derived(width > 0 ? SCENE.width / width : 1);
 
-  // « Réessayer » reassigns every source with a cache-busting query.
-  const bust = (sources: string) =>
-    attempt === 0 ? sources : sources.replaceAll(".webp", `.webp?r=${attempt}`);
-
-  // An image served from the cache can finish before the load listener exists.
-  $effect(() => {
-    if (img?.complete && img.naturalWidth > 0) status = "loaded";
-  });
-
-  function retry() {
-    attempt += 1;
-    status = "loading";
-  }
+  // The felt button covers SCENE.felt, as percentages of the scene.
+  const pct = (value: number, of: number) => `${(value / of) * 100}%`;
+  const felt = {
+    left: pct(SCENE.felt.x, SCENE.width),
+    top: pct(SCENE.felt.y, SCENE.height),
+    width: pct(SCENE.felt.w, SCENE.width),
+    height: pct(SCENE.felt.h, SCENE.height),
+  };
 </script>
 
+<!-- The drawing is synchronous: `loaded` is the readiness signal the specs wait for, set at once. -->
 <div
-  class="board"
-  class:loaded={status === "loaded"}
+  class="board loaded"
   data-board
   data-k={k}
+  data-bottom={bottomOf(k)}
   bind:clientWidth={width}
   style:--px={px}
 >
-  <!-- Backdrop while the image loads: oak with the felt square, no spinner. -->
-  <div class="felt" aria-hidden="true" style:transform={turn}></div>
-  <img
-    bind:this={img}
-    src={bust(FALLBACK)}
-    srcset={bust(SRCSET)}
-    sizes={width > 0 ? `${width}px` : "100vw"}
-    alt={t.alt}
-    style:transform={turn}
-    draggable="false"
-    onload={() => {
-      status = "loaded";
-    }}
-    onerror={() => {
-      status = "error";
-    }}
-  />
-  <svg viewBox="0 0 2560 2560" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox={`0 0 ${SCENE.width} ${SCENE.height}`} xmlns="http://www.w3.org/2000/svg">
+    <BoardArt {k} />
     {#if render}
       <FeltTable {render} {discardTop} {k} {px} />
     {/if}
@@ -124,56 +99,41 @@
     {@render hits?.(px)}
   </svg>
   {#if render && ontapis}
-    <!-- The whole felt square is one target (D-08): no knight stands in it, so it never hides a tap. -->
+    <!-- The whole felt is one target (D-08): no knight's body stands on it, so it never hides a tap
+         (only the head of a knight on a deepest home slot reaches over its edge; it is tapped on its body). -->
     <button
       type="button"
       class="tapis"
       aria-label={game.tapis.title}
       aria-haspopup="dialog"
       data-felt-button
+      style:left={felt.left}
+      style:top={felt.top}
+      style:width={felt.width}
+      style:height={felt.height}
       onclick={ontapis}
     ></button>
-  {/if}
-  {#if status === "error"}
-    <div class="failed" role="alert">
-      <p>{t.loadFailed}</p>
-      <button type="button" onclick={retry}>{t.retry}</button>
-    </div>
   {/if}
 </div>
 
 <style>
   .board {
-    /* A knight is 190 units tall and the stables closest to the top edge sit about 94 units below
-       it, so a head can rise up to 4 % of the board above the art: reserve that room above the
-       board and let the overlay draw outside its box. */
-    --side: var(--board-size, min(100vw, 100dvh, 880px));
+    /* --board-size is the board's width; it is 1.5 times as tall (2:3). The head of a lifted
+       top-row knight rises --head-room of the width above the drawing (SCENE.headRoom): that room
+       stays free above the board and the svg draws outside its box. No background: the rounded oak
+       board and its walnut rim are part of the drawing. */
+    --side: var(--board-size, min(100vw, 100dvh / 1.55, 586px));
     position: relative;
     width: var(--side);
-    margin-top: calc(var(--side) * 0.04);
-    aspect-ratio: 1;
-    background: #d8c6b0;
+    margin-top: calc(var(--side) * var(--head-room, 0.0466));
+    aspect-ratio: 2 / 3;
     container-type: inline-size;
     flex: none;
   }
 
-  /* Felt square: x and y 853..1707 of 2560 board units. */
-  .felt {
-    position: absolute;
-    left: 33.32%;
-    top: 33.32%;
-    width: 33.36%;
-    height: 33.36%;
-    background: #005400;
-  }
-
-  /* Invisible button over the felt square (x and y 853..1707 of 2560 board units). */
+  /* Invisible button over the felt (SCENE.felt, placed by its inline percentages). */
   .tapis {
     position: absolute;
-    left: 33.32%;
-    top: 33.32%;
-    width: 33.36%;
-    height: 33.36%;
     min-width: 44px;
     min-height: 44px;
     padding: 0;
@@ -185,64 +145,12 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  img,
   svg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     display: block;
-  }
-
-  svg {
     overflow: visible;
-  }
-
-  img {
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 200ms ease-out;
-  }
-
-  .loaded img {
-    opacity: 1;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    img {
-      transition: none;
-    }
-  }
-
-  .failed {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 8%;
-    text-align: center;
-    color: #2b1d12;
-    font-size: max(13px, 4.4cqw);
-    background: rgb(216 198 176 / 0.92);
-  }
-
-  .failed p {
-    margin: 0;
-  }
-
-  .failed button {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 20px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--ambre);
-    color: var(--noyer);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
   }
 </style>

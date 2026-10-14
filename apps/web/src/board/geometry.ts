@@ -1,12 +1,17 @@
-// Pure screen geometry for the overlay: where a place appears once the board is turned by k
-// clockwise quarter turns. Pawns, cards and badges stay upright; only their anchors move.
+// Pure screen geometry for the board C+ scene (packages/board/src/scene.ts): where a place appears
+// when seat k (bleu 0, vert 1, rouge 2, jaune 3) sits at the bottom. The drawing never turns; the
+// colours take their side. Knights, cards and badges stay upright; only their anchors move.
 
-import { type Point, placeXY, rotatePoint } from "@toc/board";
+import { type Point, sceneXY } from "@toc/board";
 import type { Place } from "@toc/engine";
 
-/** Cell centre of a place on the screen: the point where a pawn's feet stand. */
+/**
+ * Centre of the drawn cell, home slot or stable hole of a place, in scene units, for seat k at the
+ * bottom. A knight stands on it (its feet KNIGHT.feet x its size below it); the Director's hop
+ * points, the overlays and the hit targets use it too.
+ */
 export function anchorOf(place: Place, k: number): Point {
-  return rotatePoint(placeXY(place), k);
+  return sceneXY(place, k);
 }
 
 /** Vector from a to b. */

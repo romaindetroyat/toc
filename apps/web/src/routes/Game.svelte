@@ -12,7 +12,7 @@
     sortHand,
     teamOf,
   } from "@toc/engine";
-  import { MOTION, scaleFor } from "@toc/board";
+  import { MOTION, SCENE, scaleFor } from "@toc/board";
   import {
     type EngineStatus,
     onStatus,
@@ -569,7 +569,7 @@
 
 <svelte:document onvisibilitychange={() => (pageVisible = !document.hidden)} />
 
-<main class="game">
+<main class="game" style:--head-room={SCENE.headRoom}>
   {#if startFailure}
     {fail(startFailure)}
   {:else if session?.failure}
@@ -722,12 +722,17 @@
 
 <style>
   /*
-   * Board side (UI-SPEC "Game screen"): always a square, centred, never cropped. The chrome below the
-   * board in portrait is the info bar (56), the action zone and the hand zone: the action zone has a
-   * fixed height (--action) so that a longer prompt, the preview or the tray never pushes the hand down,
-   * and the hand zone is the fan plus the room the lifted and turned cards need (--hand). The board keeps
-   * 4 % of its side free above it for the head of the top knights; in landscape the right panel takes
-   * 320 + 48. Safe-area insets are subtracted from both axes. The page never scrolls (FX-01).
+   * Board C+ (D-07: the portrait board decided by Romain, UI-SPEC addendum « Plateau C+ »): a 2:3
+   * board, centred, never cropped; --board-size is its width and its height is 1.5 times that. The
+   * chrome below the board in portrait is the info bar (56), the action zone and the hand zone: the
+   * action zone has a fixed height (--action) so that a longer prompt, the preview or the tray never
+   * pushes the hand down, and the hand zone is the fan plus the room the lifted and turned cards need
+   * (--hand). --head-room of the width (SCENE.headRoom) stays free above the board for the head of a
+   * lifted top-row knight, so the height a board takes is (1.5 + head room) x its width.
+   * Portrait: min(100vw − 32 px − insets, (100dvh − chrome − insets) / (1.5 + head room), 880 / 1.5);
+   * landscape: min((100dvh − 32 px − insets) / (1.5 + head room), 100vw − 368 px − insets), the
+   * right panel taking 320 + 48. Safe-area insets are subtracted from both axes. The page never
+   * scrolls (FX-01).
    */
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
@@ -737,7 +742,11 @@
     --chrome: calc(56px + var(--action) + var(--hand));
     --board-size: max(
       0px,
-      min(100vw - var(--inset-x), (100dvh - var(--chrome) - var(--inset-y)) / 1.04, 880px)
+      min(
+        100vw - var(--inset-x) - 2 * var(--space-md),
+        (100dvh - var(--chrome) - var(--inset-y)) / (1.5 + var(--head-room)),
+        880px / 1.5
+      )
     );
     /* Its own formatting context: the outer margin of the landscape layout stays inside the page. */
     display: flow-root;
@@ -814,7 +823,10 @@
     .game {
       --board-size: max(
         0px,
-        min(100dvh - 32px - var(--inset-y), 100vw - 368px - var(--inset-x)) / 1.04
+        min(
+          (100dvh - 32px - var(--inset-y)) / (1.5 + var(--head-room)),
+          100vw - 368px - var(--inset-x)
+        )
       );
     }
 
@@ -852,7 +864,10 @@
     .game {
       --board-size: max(
         0px,
-        min(100dvh - var(--inset-y), 100vw - 368px - var(--inset-x)) / 1.04
+        min(
+          (100dvh - var(--inset-y)) / (1.5 + var(--head-room)),
+          100vw - 368px - var(--inset-x)
+        )
       );
     }
 

@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { KNIGHT, knightScale } from "@toc/board";
   import type { Color, PawnId, Place } from "@toc/engine";
   import { board as t } from "../i18n/fr/board.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import { type Facing, placeKey } from "./geometry.ts";
 
   type Props = {
     pawn: PawnId;
     color: Color;
-    /** Static anchor (cell centre) in board units, already rotated; the feet stand on it. */
+    /** Static anchor in scene units: the centre of the drawn cell, home slot or stable hole. */
     x: number;
     y: number;
     place: Place;
@@ -33,8 +35,15 @@
   }: Props = $props();
 
   const ring = $derived(place.z === "ring" ? place.cell : -1);
-  // Pawns that are home are drawn 10 % smaller in the house (UI-SPEC).
-  const size = $derived(place.z === "home" ? 0.9 : 1);
+  // The mock-up's sizes (« à confirmer par Romain »): 0.92 step wide on the ring, 0.8 in a home and
+  // 0.72 in a stable; the feet stand KNIGHT.feet x size below the anchor (the mock-up's top is
+  // y − h + 0.28 w). A knight that changes zone settles into its new size in 150 ms (D-09).
+  const size = $derived(knightScale(place));
+  const feet = $derived(`translate(0px, ${KNIGHT.feet * size}px)`);
+  const scale = $derived(`scale(${size})`);
+  /** The invisible hit circle of a selectable knight: the sprite's body at its size. */
+  const hit = $derived({ cy: -(KNIGHT.body + KNIGHT.feet) * size, r: 0.65 * KNIGHT.w * size });
+  const still = $derived(settings.reduceMotion);
 
   function onkeydown(event: KeyboardEvent) {
     if (event.key === "Enter" || event.key === " ") {
@@ -45,32 +54,36 @@
 </script>
 
 {#snippet body()}
-  <g data-role="mover">
-    <!-- The shadow stays on the ground: the animator scales and fades it while the knight leaps. -->
-    <g transform={`scale(${size})`}>
-      <g data-role="shadow">
-        <use href="#knight-shadow" />
+  <!-- data-role="zone" groups carry the knight's size and the place of its feet; they ease when the
+       zone changes and are never animated by the Web Animations API. -->
+  <g data-role="zone" class="zone" class:still style:transform={feet}>
+    <g data-role="mover">
+      <!-- The shadow stays on the ground: the animator scales and fades it while the knight leaps. -->
+      <g data-role="zone" class="zone" class:still style:transform={scale}>
+        <g data-role="shadow">
+          <use href="#knight-shadow" />
+        </g>
       </g>
-    </g>
-    <g data-role="arc">
-      <!-- squash scales the body about the feet (the local origin) on landing; rear pivots at the
-           feet too, inside the facing mirror so a left-facing knight rears backwards as well. -->
-      <g data-role="squash">
-        <g transform={`scale(${size})`}>
-          <g transform={lift > 0 ? `translate(0 ${-lift})` : undefined}>
-            <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
-              <g data-role="rear">
-                <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
-                <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+      <g data-role="arc">
+        <!-- squash scales the body about the feet (the local origin) on landing; rear pivots at the
+             feet too, inside the facing mirror so a left-facing knight rears backwards as well. -->
+        <g data-role="squash">
+          <g data-role="zone" class="zone" class:still style:transform={scale}>
+            <g transform={lift > 0 ? `translate(0 ${-lift})` : undefined}>
+              <g data-role="facing" transform={`scale(${facing === "left" ? -1 : 1} 1)`}>
+                <g data-role="rear">
+                  <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
+                  <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+                </g>
               </g>
             </g>
           </g>
         </g>
+        {#if onselect}
+          <!-- Invisible hit area, big enough for a finger. -->
+          <circle cx="0" cy={hit.cy} r={hit.r} fill="transparent" />
+        {/if}
       </g>
-      {#if onselect}
-        <!-- Invisible hit area, big enough for a finger. -->
-        <circle cx="0" cy="-92" r="72" fill="transparent" />
-      {/if}
     </g>
   </g>
 {/snippet}
@@ -109,3 +122,20 @@
     {@render body()}
   </g>
 {/if}
+
+<style>
+  /* A change of zone (stable, ring, home) eases the size over 150 ms; none under reduced motion. */
+  .zone {
+    transition: transform 150ms ease-out;
+  }
+
+  .zone.still {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zone {
+      transition: none;
+    }
+  }
+</style>

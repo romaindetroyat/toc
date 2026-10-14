@@ -1,5 +1,5 @@
-import { LAYOUT, placeXY, rotatePoint } from "@toc/board";
-import { COLORS, type Place } from "@toc/engine";
+import { quarterTurnsFor, SCENE, sceneXY } from "@toc/board";
+import { COLORS, type Color, EXIT, type Place } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import { anchorOf, facingFor, placeKey, screenDelta } from "./geometry.ts";
 
@@ -16,25 +16,21 @@ const places: Place[] = [
 ];
 
 describe("anchorOf", () => {
-  it("is the unrotated placeXY for k = 0", () => {
-    for (const place of places) expect(anchorOf(place, 0)).toEqual(placeXY(place));
-  });
-
-  it("rotates ring, stable and home places like rotatePoint(placeXY(place), k)", () => {
+  it("is sceneXY(place, k) for ring, stable and home places and the four seats", () => {
     for (const k of [0, 1, 2, 3]) {
-      for (const place of places) {
-        const [x, y] = anchorOf(place, k);
-        const [ex, ey] = rotatePoint(placeXY(place), k);
-        expect(x).toBeCloseTo(ex, 9);
-        expect(y).toBeCloseTo(ey, 9);
-      }
+      for (const place of places) expect(anchorOf(place, k)).toEqual(sceneXY(place, k));
     }
   });
 
-  it("moves the exit diamond of the human's colour to the lower half", () => {
-    const k = 1; // vert
-    expect(anchorOf({ z: "ring", cell: 54 }, k)[1]).toBeGreaterThan(1280);
-    expect(LAYOUT.pieces.vert.diamond[0]).toBeGreaterThan(1280);
+  it("puts each colour's exit in the lower half and its partner's in the upper half", () => {
+    const partnerOf = (c: Color): Color => COLORS[(COLORS.indexOf(c) + 2) % 4] as Color;
+    for (const color of COLORS) {
+      const k = quarterTurnsFor(color);
+      expect(anchorOf({ z: "ring", cell: EXIT[color] }, k)[1]).toBeGreaterThan(SCENE.height / 2);
+      expect(anchorOf({ z: "ring", cell: EXIT[partnerOf(color)] }, k)[1]).toBeLessThan(
+        SCENE.height / 2,
+      );
+    }
   });
 });
 
