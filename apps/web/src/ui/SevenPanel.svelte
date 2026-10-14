@@ -24,10 +24,17 @@
     onconfirm: () => void;
     ontrayPick: (pawn: PawnId) => void;
     ontrayClose: () => void;
+    /**
+     * In the computer's bottom bar, in place of the hand and the action zone: never taller than the
+     * bar. The title, « Reste n » and the plan on one line (the plan scrolls sideways), then the step
+     * chips and the buttons side by side when the width allows, else on two rows.
+     */
+    bar?: boolean;
   };
 
   let {
     seven,
+    bar = false,
     tray,
     missed,
     onpickSteps,
@@ -63,78 +70,88 @@
   const chips = $derived(Array.from({ length: seven.remaining }, (_, i) => i + 1));
   const offered = $derived(seven.selected === undefined ? [] : (seven.steps[seven.selected] ?? []));
 
-  // The newest row is the one to see: the list scrolls down to it.
+  // The newest row is the one to see: the list scrolls down to it (sideways in the bar).
   let region = $state<HTMLElement | undefined>();
   $effect(() => {
     void rows.length;
-    if (region) region.scrollTop = region.scrollHeight;
+    if (!region) return;
+    region.scrollTop = region.scrollHeight;
+    region.scrollLeft = region.scrollWidth;
   });
 </script>
 
 <!-- 7 splitter panel (UI-SPEC, D-17): it replaces the action zone and the hand fan. -->
-<section class="panel" data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
-  <header class="head">
-    <span class="mini" data-seven-card style:color={face.colour} role="img" aria-label={game.seven.card(cardName(seven.card))}>
-      <span class="rank">{face.rankLabel}</span><span>{face.suitGlyph}</span>
-    </span>
-    <h2 class="title">{game.seven.title}</h2>
-    <p class="counter t-display tabular" class:done data-remaining={seven.remaining} aria-live="polite">
-      {done ? game.seven.allSpread : game.seven.remaining(seven.remaining)}
-    </p>
-  </header>
+<section class="panel" class:bar data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
+  <!-- In the bar, one line: the title with « Reste n », then the prompt and the plan. -->
+  <div class="top">
+    <header class="head">
+      <span class="mini" data-seven-card style:color={face.colour} role="img" aria-label={game.seven.card(cardName(seven.card))}>
+        <span class="rank">{face.rankLabel}</span><span>{face.suitGlyph}</span>
+      </span>
+      <h2 class="title">{game.seven.title}</h2>
+      <p class="counter t-display tabular" class:done data-remaining={seven.remaining} aria-live="polite">
+        {done ? game.seven.allSpread : game.seven.remaining(seven.remaining)}
+      </p>
+    </header>
+
+    {#if tray === null}
+      <div class="region" bind:this={region} data-seven-region>
+        {#if prompt !== null}
+          <p class="prompt" data-seven-prompt role="status">{prompt}</p>
+        {/if}
+        {#if rows.length > 0}
+          <ol class="rows" data-seven-rows>
+            {#each rows as row, i (i)}
+              <li data-seven-row>{row}</li>
+            {/each}
+          </ol>
+        {/if}
+      </div>
+    {/if}
+  </div>
 
   {#if tray !== null}
     <div class="tray">
       <PawnTray options={tray.options} onpick={ontrayPick} onclose={ontrayClose} />
     </div>
   {:else}
-    <div class="region" bind:this={region} data-seven-region>
-      {#if prompt !== null}
-        <p class="prompt" data-seven-prompt role="status">{prompt}</p>
-      {/if}
-      {#if rows.length > 0}
-        <ol class="rows" data-seven-rows>
-          {#each rows as row, i (i)}
-            <li data-seven-row>{row}</li>
-          {/each}
-        </ol>
-      {/if}
-    </div>
+    <!-- In the bar, the step chips and the buttons side by side, or on two rows. -->
+    <div class="controls">
+      <div class="chips" data-seven-chips>
+        {#each chips as steps (steps)}
+          <StepChip {steps} enabled={offered.includes(steps)} onpick={onpickSteps} />
+        {/each}
+      </div>
 
-    <div class="chips" data-seven-chips>
-      {#each chips as steps (steps)}
-        <StepChip {steps} enabled={offered.includes(steps)} onpick={onpickSteps} />
-      {/each}
-    </div>
-
-    <div class="buttons">
-      <button
-        type="button"
-        class="btn btn-secondary undo"
-        data-seven-undo
-        disabled={seven.plan.length === 0}
-        aria-label={game.seven.undo}
-        aria-keyshortcuts="Backspace"
-        onclick={onundo}
-      >
-        {game.seven.undo}
-        <KeyHint label={clavier.keys.backspace} />
-      </button>
-      <button type="button" class="btn btn-secondary reset" data-seven-reset onclick={oncancelAll}>
-        {game.seven.reset}
-      </button>
-      <button
-        type="button"
-        class="btn btn-primary play"
-        data-seven-play
-        disabled={!done}
-        aria-label={game.seven.play}
-        aria-keyshortcuts="Enter"
-        onclick={onconfirm}
-      >
-        {game.seven.play}
-        <KeyHint label={clavier.keys.enter} />
-      </button>
+      <div class="buttons">
+        <button
+          type="button"
+          class="btn btn-secondary undo"
+          data-seven-undo
+          disabled={seven.plan.length === 0}
+          aria-label={game.seven.undo}
+          aria-keyshortcuts="Backspace"
+          onclick={onundo}
+        >
+          {game.seven.undo}
+          <KeyHint label={clavier.keys.backspace} />
+        </button>
+        <button type="button" class="btn btn-secondary reset" data-seven-reset onclick={oncancelAll}>
+          {game.seven.reset}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary play"
+          data-seven-play
+          disabled={!done}
+          aria-label={game.seven.play}
+          aria-keyshortcuts="Enter"
+          onclick={onconfirm}
+        >
+          {game.seven.play}
+          <KeyHint label={clavier.keys.enter} />
+        </button>
+      </div>
     </div>
   {/if}
 </section>
@@ -262,6 +279,78 @@
     display: flex;
     flex: 1 1 auto;
     align-items: center;
+  }
+
+  /* Outside the bar the two groups lay their children out in the panel's own column. */
+  .top,
+  .controls {
+    display: contents;
+  }
+
+  /* The bottom bar (computers): at most --bar high, two or three rows. */
+  .panel.bar {
+    justify-content: center;
+    gap: var(--space-sm);
+    height: 100%;
+    min-height: 0;
+    max-height: var(--bar, 160px);
+    padding: var(--space-xs) 0;
+  }
+
+  .bar .top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    min-width: 0;
+  }
+
+  .bar .head {
+    flex: none;
+  }
+
+  .bar .title {
+    flex: none;
+  }
+
+  /* The prompt and the plan on one line that scrolls sideways. */
+  .bar .region {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    min-width: 0;
+    height: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+
+  .bar .rows {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .bar .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+  }
+
+  .bar .chips {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+
+  .bar .buttons {
+    flex: none;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+
+  .bar .buttons .btn {
+    flex: none;
+    padding: 0 var(--space-md);
   }
 
   @media (min-width: 360px) {

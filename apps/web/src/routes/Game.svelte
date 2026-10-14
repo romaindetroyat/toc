@@ -664,6 +664,7 @@
         <div class="seven">
           <SevenPanel
             seven={flow}
+            {bar}
             tray={ui.kind === "tray" ? ui : null}
             {missed}
             onpickSteps={(steps) => send({ t: "pickSteps", steps })}
@@ -927,7 +928,7 @@
       margin: 0;
       padding: 0 var(--space-md);
       column-gap: var(--space-md);
-      grid-template-columns: 240px minmax(0, 1fr) minmax(320px, 400px);
+      grid-template-columns: 240px minmax(336px, 1fr) minmax(320px, 400px);
       grid-template-areas:
         "stage stage stage"
         "info hand action";
