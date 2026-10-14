@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 35/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
+**Plans:** 36/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -128,7 +128,7 @@ Plans:
 - [x] 01-35-PLAN.md — Le tapis et ses cartes sur le galet en largeur
 
 **Wave 27** *(gap closure, UAT tests 4 and 5; blocked on Wave 26 completion)*
-- [ ] 01-36-PLAN.md — Sur ordinateur, le galet en largeur et la barre du bas ; les trois modes d’écran
+- [x] 01-36-PLAN.md — Sur ordinateur, le galet en largeur et la barre du bas ; les trois modes d’écran
 
 **Wave 28** *(gap closure, UAT tests 3 and 4, « Compacter l'écran »; blocked on Wave 27 completion)*
 - [ ] 01-37-PLAN.md — Sur le téléphone tenu en largeur, la barre compacte
@@ -217,7 +217,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 35/41 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 36/41 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
