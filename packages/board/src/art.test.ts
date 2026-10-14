@@ -43,9 +43,12 @@ const textOf = (shape: ArtShape | undefined) => (shape?.kind === "text" ? shape.
 const colorOfExit = (cell: number): Color | undefined =>
   COLORS.find((c) => EXIT[c] === ((cell % 72) + 72) % 72);
 const tiltOf = (cell: number) => ((cell * 37) % 13) - 6;
-const first = (art: Art, role: ArtRole) => art.shapes.findIndex((x) => x.role === role);
+// Painting order of the objects (a detail, like the outline's fine line drawn over its grain,
+// follows its object where the mock-up draws it).
+const first = (art: Art, role: ArtRole) =>
+  art.shapes.findIndex((x) => x.role === role && !x.detail);
 const last = (art: Art, role: ArtRole) =>
-  art.shapes.length - 1 - [...art.shapes].reverse().findIndex((x) => x.role === role);
+  art.shapes.length - 1 - [...art.shapes].reverse().findIndex((x) => x.role === role && !x.detail);
 
 describe("boardArt", () => {
   for (const layout of LAYOUTS) {

@@ -89,8 +89,16 @@
   style:--px={px}
   style:aspect-ratio={`${scene.width} / ${scene.height}`}
 >
-  <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
+  <!-- The drawing in its own svg, under the game's, promoted to a layer of its own: the knights'
+       motions never repaint its noise filters (T-01-51). -->
+  <svg
+    class="art-layer"
+    viewBox={`0 0 ${scene.width} ${scene.height}`}
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <BoardArt {k} {layout} />
+  </svg>
+  <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
       <FeltTable {render} {discardTop} {k} {px} />
     {/if}
@@ -165,5 +173,11 @@
     height: 100%;
     display: block;
     overflow: visible;
+  }
+
+  /* The static drawing: a compositing layer of its own, never under the pointer. */
+  .art-layer {
+    will-change: transform;
+    pointer-events: none;
   }
 </style>
