@@ -54,6 +54,8 @@ Requirements : RULE-01 à RULE-18, RULE-20, PLAY-01 à PLAY-05, FX-01 à FX-06.
   - Dans l'illustration d'origine, chaque aide-mémoire est écrit pour un joueur assis de son côté : bleu en bas, jaune à gauche, rouge en haut, vert à droite.
   - Les partenaires sont donc face à face : bleu et rouge, jaune et vert.
   - **Reversibility:** reversible.
+  - **Révisé par Romain le 2026-10-14 (recette, test 4 ; plateau C+) :** le plateau est le C+ (planche « C+ · Portrait avec les idées du 01 », maquette `design/plateau-maquette.dc.html`), dessiné par le code, en portrait. Son propre camp est centré en bas, celui de son partenaire centré en haut. Les petits cadres de rappel des règles disparaissent, « inutiles car impossibles à voir ».
+  - **Conséquence de mise en œuvre (planificateur), à confirmer par Romain :** un plateau 2:3 ne peut pas tourner d’un quart de tour. Au lieu de tourner le dessin, chaque couleur reçoit son côté : la couleur du joueur en bas, son partenaire en haut, le joueur suivant dans le sens horaire à gauche, le précédent à droite. Le dessin ne tourne jamais. Point repris dans la recette de fin de phase (plan 01-36).
 - **D-06 :** En solo, le joueur **choisit sa couleur avant la partie**, ce qui fixe aussi son partenaire. Il faut donc un petit écran de lancement : choix de la couleur, puis « Jouer ».
 - **D-07 :** Sur téléphone en portrait :
   - le plateau carré occupe toute la largeur en haut de l'écran ;
@@ -61,10 +63,15 @@ Requirements : RULE-01 à RULE-18, RULE-20, PLAY-01 à PLAY-05, FX-01 à FX-06.
   - un bandeau fin indique à qui c'est le tour, le donneur et les équipes.
 
   Sur grand écran, même logique avec plus d'espace.
+  - **Révisé par Romain le 2026-10-14 (recette, test 4 ; plateau C+) :** le plateau n’est plus carré : c’est le C+ en portrait (2:3), en haut de l’écran.
+  - **Révisé par Romain le 2026-10-14 (« Compacter l’écran ») :** sur téléphone en portrait, le bandeau d’infos est plus fin, les boutons d’action passent sur la rangée de la main (plus de bandeau séparé pour la zone d’action), la main est un peu plus basse et moins haute. Le plateau grandit d’autant : au moins 300 px de large sur un iPhone 13 dans Safari, l’objectif donné à Romain avec la question.
+  - **Conséquence de mise en œuvre (planificateur), à confirmer par Romain :** le « dock » décrit dans l’addendum « Plateau C+ » de 01-UI-SPEC.md (rangée de la consigne au-dessus de la rangée de la main, boutons en colonne à sa droite, cartes de 64 × 90 dont le bas passe sous le bord de l’écran) et les objectifs de taille de sa section « Écran compact (téléphone en portrait) ». Points repris dans la recette de fin de phase (plan 01-36).
 - **D-08 :** Le carré vert central sert de **tapis de jeu**.
   - La dernière carte jouée par chacun y est posée devant sa place, comme à une vraie table.
   - Le talon et la défausse y sont aussi.
   - Une main injouable y est posée face visible.
+  - **Révisé par Romain le 2026-10-14 (recette, test 4 ; plateau C+) :** le tapis est le rectangle vert vertical au milieu du C+.
+  - **Conséquence de mise en œuvre (maquette), à confirmer par Romain :** la dernière carte de chaque place est posée devant elle, tournée vers elle, avec sa petite inclinaison ; le talon est au-dessus du centre et la défausse en dessous, comme sur la planche approuvée. Point repris dans la recette de fin de phase (plan 01-36).
 
 ### Cavaliers et animations
 - **D-09 :** Les pions sont des **cavaliers d'échecs de style Staunton en bois peint**.

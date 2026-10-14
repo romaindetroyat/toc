@@ -673,3 +673,104 @@ Source: 01-UAT.md test 5 (Romain: « La jouabilité : OK en version iphone, un p
 | long-text | static-content: help sheet rows | ✅ covered | Each row's text wraps under its key cap; the sheet body scrolls vertically like every sheet |
 | overflow | interactive-control: key hints | ✅ covered | Dismissed: one short label each (a digit, a letter, « Entrée », « Échap », « ⌫ »), a corner badge that never resizes its host |
 | populated | interactive-control: keyboard play | 🧪 backstop | Romain re-runs UAT test 5 on a computer: a game played with the keyboard, without the mouse back-and-forth |
+
+## Addendum 2026-10-14 — Plateau C+
+
+Source : recette, test 4 (01-UAT.md). Romain : « La visibilité en version iphone n’est pas très bonne. On va changer le plateau de jeu pour avoir son propre camp centré en bas, le camp du partenaire centré en haut, les rappels de règles (petits cadres entre les camps) sont inutiles car impossibles à voir. » Puis, le 2026-10-14 : « On part sur le plateau C+ pour le moment ». Le C+ est la planche « C+ · Portrait avec les idées du 01 » de https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A ; sa source est `design/plateau-maquette.dc.html` (`renderVals()`, variante « portrait », `idees01` vrai).
+
+Cet addendum est le contrat des plans 01-30 à 01-36. La géométrie et le dessin de C+ sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-29). Les images de RULES.md (`docs/regles/`) sont déjà dessinées sur C+.
+
+### Décidé par Romain (Révisé par Romain le 2026-10-14)
+
+- **Le plateau C+**, en portrait :
+  - 72 cases bord à bord, numérotées de 1 à 17 après chaque losange ;
+  - le losange « 18 » de chaque sortie, dans sa couleur ;
+  - le carré « 16 » de chaque entrée, dans la couleur de la maison qu’il ouvre ;
+  - un pointillé de l’écurie vers la sortie ;
+  - un rail de couleur du carré 16 dans la maison ;
+  - des flèches discrètes du sens de la marche, près des coins ;
+  - les cases de maison teintées et les trous des écuries ;
+  - le tapis vert au milieu.
+- **Aucun cadre de rappel des règles** sur le plateau.
+- **Son propre camp centré en bas**, le camp de son partenaire centré en haut.
+- **« Compacter l’écran »** : sur téléphone en portrait, le bandeau d’infos est plus fin, les boutons d’action passent sur la rangée de la main, la main est un peu plus basse et moins haute, pour que le plateau grandisse (au moins 300 px de large sur un iPhone 13 dans Safari).
+
+### Dérivé de la maquette ou du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris dans la recette de fin de phase (plan 01-36).
+
+- **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut le partenaire, à droite le précédent. Aucune rotation CSS : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k)`, avec k = `quarterTurnsFor(couleur du joueur)`).
+- **La taille des cavaliers de la maquette.** 0,92 s sur l’anneau, 0,8 s dans une maison, 0,72 s dans une écurie (s = le pas entre deux cases). Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier). Un changement de zone règle la taille en 150 ms, sans transition en mouvement réduit. Les halos, les lettres, les repères et les zones de toucher suivent le cavalier de sa zone.
+- **Les cartes du tapis.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon est au-dessus du centre, la défausse en dessous. Cartes de 1,3 s × 1,82 s. Tout le tapis reste le bouton « Sur le tapis ».
+- **L’écran compact** : ses détails et ses objectifs de taille (section « Écran compact (téléphone en portrait) » ci-dessous).
+
+### Faits techniques (sans confirmation)
+
+- **Scène.** viewBox `0 0 2000 3000` = la maquette × 2 (`SCENE.scale` = 2). Pas s ≈ 126,16 unités (63,078 dans la maquette, itéré 6 fois jusqu’au périmètre / 72). Anneau : colonnes x = 87,51 et 1912,49, rangées y = 87,51 et 2912,49, coins de rayon s. Tapis : x de 690,9 à 1309,1, y de 705,2 à 2294,8. Talon (1000 ; 1354,9), défausse (1000 ; 1645,1), cartes de 164,0 × 229,6. Dernière carte de chaque place : en bas (1000 ; 2143,4), en haut (1000 ; 856,6), à gauche (842,3 ; 1500), à droite (1157,7 ; 1500).
+- **Cavaliers.** Le sprite reste de 110 × 190 (`KNIGHT`). Échelles (`knightScale`) : anneau 1,0551, maison 0,9175, écurie 0,8257. Un cavalier de l’anneau mesure donc environ 116 unités de large, l’empreinte pour laquelle les constantes des plans 01-08 à 01-28 ont été réglées.
+- **Couleurs du dessin** = la palette C+ (`PALETTE`) : bleu `#2C68B0`, jaune `#D9A20F`, rouge `#C23B2B`, vert `#2F8743`, leurs teintes, encre `#4A2F1B`, crème `#FBF5E6`, chêne `#E8D3A6`, bordure en noyer `#5A3B23`, anneau `#D2AF77`, tapis `#1F5A3B`. Les sprites des cavaliers et les pastilles des places ne changent pas.
+- **Ce que l’addendum remplace** :
+  - la scène carrée de 2560 et son exception « Board units » (Spacing Scale) ;
+  - « Board assembly » et « Board delivery » (assemblage des quarts, image composée, `layout.json`) ;
+  - la colonne de rotation par quarts de tour du tableau des couleurs des joueurs ;
+  - les états de chargement et d’erreur de l’image du plateau et leurs textes (« Le plateau n’a pas pu se charger. », « Réessayer ») ;
+  - les positions de la section « Tapis » ;
+  - la règle responsive carrée (`B = min(100vw, 100dvh − chrome, 880px)`) ;
+  - le carré du tapis (x/y 853..1707).
+- **Règle responsive.** La largeur du plateau vaut :
+  - en portrait : min(100vw − 32 px − insets, (100dvh − chrome − insets) / (1,5 + head room), 880 px / 1,5) ;
+  - en paysage : min((100dvh − 32 px − insets) / (1,5 + head room), 100vw − 368 px − insets).
+
+  En portrait, 32 px = les marges extérieures de 16 px à gauche et à droite. En paysage, 32 px = la marge extérieure de 16 px en haut et en bas (aucune sur un écran de 400 px de haut ou moins) ; 368 px = le panneau de 320 px, l’écart de 16 px et deux marges extérieures de 16 px. La hauteur du plateau est 1,5 fois sa largeur.
+- **Head room.** 0,0466 de la largeur (`SCENE.headRoom`) reste libre au-dessus du plateau : la tête d’un cavalier levé de la rangée du haut y dépasse de 93 unités.
+- **Typographie, exception.** Les numéros imprimés des cases sont un élément du dessin (`aria-hidden`, Nunito 800 ou 900, 0,36 à 0,4 s). Comme les numéros de l’ancien plateau imprimé, ils échappent au minimum de 14 px et à la règle des deux graisses. Le texte d’interface posé dans la scène (badges, lettres, « D ») garde 14 px et plus.
+
+### Écran compact (téléphone en portrait) — « Compacter l’écran » (Romain, 2026-10-14)
+
+Contrat du plan 01-33. « Compacter l’écran » est la décision de Romain ; les détails ci-dessous sont ceux du planificateur, à confirmer par Romain.
+
+- **Où.** En portrait sous 600 px de large. Le portrait large et le paysage gardent la mise en page de 01-30.
+- **Bandeau d’infos : 44 px.** Deux lignes en Label 14 sur une hauteur de ligne de 20 px, pastilles d’équipe de 20 px, roue des réglages de 44 × 44.
+- **Le dock.** Sous le plateau, un seul dock remplace le bandeau de la zone d’action et la zone de la main.
+- **Trois hauteurs partagées.** Ce sont des propriétés CSS communes à la mise en page, au dock et à l’éventail, pour que la formule du plateau et les boîtes affichées ne puissent pas diverger :
+  - `--info` 44 px ;
+  - `--prompt-row` 56 px : la consigne, la ligne du bot, les donneurs de l’échange ou les pastilles du choix « Lequel ? » (44 × 56) ; `aria-live` ; Label 14 sur trois lignes au plus, un texte plus long défile à l’intérieur comme aujourd’hui ;
+  - `--hand-row` 92 px : à partir de 375 px de large, l’éventail à gauche et les boutons de l’état en colonne d’environ 96 px à droite. Chaque bouton fait au moins 44 px de haut, son libellé est en Label 14 gras, sur deux lignes au plus. Deux boutons sont empilés, l’unique bouton principal en bas. « Avance rapide » n’a que son icône (44 × 44) et garde son `aria-label`. La colonne est réservée dans tous les états.
+- **Sous 375 px de large**, une rangée `--buttons-row` de 48 px s’insère entre les deux. Elle fait exactement 48 px : c’est un maximum strict, le chrome ne grandit jamais.
+- **Marges du dock** 12 px, écart 8 px.
+- **Cartes compactes** de 64 × 90.
+- **La boîte de l’éventail.** Dans le dock, la boîte de l’éventail fait exactement `--hand-row` de haut (au lieu de la hauteur de carte + 36 px de l’éventail normal). Le haut de la carte levée reste dedans. Le bas des cartes passe sous le bord inférieur de l’écran, coupé. Chaque carte montre au moins ses 56 px du haut (indices et symbole) et chaque tranche visible fait au moins 44 px de large avec cinq cartes.
+- **L’assistant du 7** remplace tout le dock et tient dans sa hauteur fixe : un en-tête de 34 px avec « Reste n », le plan sur une ligne qui défile horizontalement, les sept pastilles de pas (44 × 44) sur une rangée qui défile horizontalement quand elle fait moins de 332 px, puis la rangée des boutons.
+- **Inchangés** : les textes, l’ordre du focus (Réglages → cavaliers allumés → boutons d’action → cartes de la main), les raccourcis clavier et leurs aides (01-27, 01-28), les cibles de 44 px, la règle du choix « Lequel ? », un seul bouton principal.
+- **Chrome** = 44 + 56 + 92 = 192 px à partir de 375 px de large ; 44 + 56 + 48 + 92 = 240 px en dessous.
+
+#### Objectifs de taille
+
+Vérifiés en e2e dans l’émulation Chromium de Playwright (insets à 0), calculés avec la formule, avec une marge :
+
+| Fenêtre | Calcul | Largeur du plateau attendue |
+|---------|--------|-----------------------------|
+| 390 × 664 (fenêtre émulée de l’iPhone 13) | (664 − 192) / 1,5466 ≈ 305 px | au moins 300 px |
+| 375 × 667 | ≈ 307 px | au moins 295 px |
+| 390 × 844 | limitée par la largeur : 358 px | au moins 350 px |
+| 390 × 763 (hauteur que garde l’app iPhone 13 installée, après ses insets) | limitée par la largeur : 358 px | au moins 350 px |
+| 320 × 480, assistant du 7 ouvert compris | (480 − 240) / 1,5466 ≈ 155 px | au moins 150 px |
+| 480 × 320 (paysage) | ≈ 112 px | au moins 105 px |
+| 1280 × 800 (paysage) | (800 − 32) / 1,5466 ≈ 497 px | au moins 470 px |
+
+À 390 × 664, les cavaliers de l’anneau font environ 18 px et les cases sont à environ 19 px l’une de l’autre : +22 % pour les cavaliers et +13 % pour les cases par rapport à l’ancien plateau carré à cette taille.
+
+En paysage, rien ne change : la hauteur du plateau est celle de l’écran moins la marge extérieure de 16 px en haut et en bas (32 px en tout, aucune sur un écran de 400 px de haut ou moins), et sa largeur vaut au plus celle de l’écran moins 368 px (le panneau de 320 px, l’écart de 16 px et deux marges extérieures de 16 px).
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- iPhone 13 en app installée (390 × 844, insets de 47 px en haut et 34 px en bas) : limité par la largeur, 358 px, l’objectif tient.
+- Dans Safari avec ses barres, les insets sont supposés à 0 (≈ 305 px). Si Safari y annonçait l’inset du bas de 34 px, on tomberait à ≈ 283 px, sous l’objectif de 300 px.
+
+### UI Considerations (addendum C+)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| loading, error | media: board drawing | ✅ covered | Écartés : le plateau est du code, rien ne se charge. Les états « chargement » et « erreur » de l’image du plateau et leurs textes disparaissent |
+| long-text | static-content: numéros des cases | ✅ covered | Un ou deux chiffres par case ; exception typographique du dessin ci-dessus |
+| long-text | interactive-control: consigne dans la rangée de 56 px | ✅ covered | Trois lignes au plus, puis le texte défile à l’intérieur |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain dans 01-UAT à la fin de la phase (plan 01-36) : C+ sur iPhone, les places par couleur, la taille des cavaliers, les cartes du tapis et l’écran compact |
