@@ -28,18 +28,34 @@ export async function untilOwnTurn(page: Page) {
   throw new Error("the player's turn never came");
 }
 
-/** Plays one simple card: a card that moves a knight (not the 7 nor the Valet), the first lit knight, « Jouer ». */
+/**
+ * After a simple card is tapped: the knight it moves. Several lit knights wait for a tap on the first
+ * one; a card that only one knight can play shows its preview by itself (recette 3, test 27).
+ * Returns the knight of the preview, marked as the chosen one.
+ */
+export async function chooseKnight(page: Page, onLit?: () => Promise<void>): Promise<string> {
+  await expect(zone(page)).toHaveAttribute("data-state", /^(cardSelected|preview)$/);
+  if ((await zone(page).getAttribute("data-state")) === "cardSelected") {
+    if (onLit) await onLit();
+    const halo = page.locator("[data-halo]").first();
+    await expect(halo).toBeVisible();
+    const lit = await halo.getAttribute("data-halo");
+    await page.locator(`[data-hit="${lit}"]`).click({ force: true });
+  }
+  const chosen = page.locator("[data-selected]").first();
+  await expect(chosen).toBeVisible();
+  return (await chosen.getAttribute("data-selected")) ?? "";
+}
+
+/** Plays one simple card: a card that moves a knight (not the 7 nor the Valet), its knight, « Jouer ». */
 export async function playSimpleMove(page: Page) {
   const card = page
     .locator('[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])')
     .first();
   await expect(card).toBeVisible();
   await card.click();
-  const halo = page.locator("[data-halo]").first();
-  await expect(halo).toBeVisible();
-  const pawn = await halo.getAttribute("data-halo");
+  const pawn = await chooseKnight(page);
   const before = await page.locator(`[data-pawn="${pawn}"]`).getAttribute("data-place");
-  await page.locator(`[data-hit="${pawn}"]`).click({ force: true });
   await page.getByRole("button", { name: /^Jouer/ }).click();
   await expect(page.locator(`[data-pawn="${pawn}"]`)).not.toHaveAttribute(
     "data-place",

@@ -141,11 +141,10 @@ test.describe("sur ordinateur, le galet en largeur et la barre du bas", () => {
     expect(gear.height).toBeGreaterThanOrEqual(44);
     await expectNoScroll(page, "à toi de jouer");
 
-    // The Dame, the knight, « Jouer »: bleu0 hops from cell 3 to cell 15.
+    // The Dame, then « Jouer »: bleu0, her only knight, is chosen by itself (recette 3, test 27) and
+    // hops from cell 3 to cell 15.
     await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
-    await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
-    await expectBar(page, "carte choisie", zones);
-    await page.locator('[data-hit="bleu0"]').click();
+    await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
     await expect(page.locator("[data-ghost]")).toBeVisible();
     const play = page.getByRole("button", { name: "Jouer", exact: true });
     await expect(play).toBeVisible();
@@ -508,7 +507,8 @@ test.describe("redimensionner garde la partie", () => {
       .locator('[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])')
       .first();
     await card.click();
-    await expect(page.locator("[data-halo]").first()).toBeVisible();
+    // Lit knights, or the lone knight chosen by itself (recette 3, test 27).
+    await expect(page.locator("[data-halo], [data-selected]").first()).toBeVisible();
     // A picture only: past the action zone's 150 ms fade.
     await page.waitForTimeout(400);
     await page.screenshot({ path: "test-results/galet-emulation-1280x800.png" });

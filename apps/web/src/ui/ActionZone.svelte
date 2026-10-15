@@ -132,7 +132,8 @@
         return [game.finished(names[partner]), game.turn.ownTurn];
       case "cardSelected": {
         if (missed) return [game.turn.chooseLit];
-        return [ui.candidates.length === 1 ? game.turn.singleHorse : game.turn.chooseHorse];
+        // A lone knight never gets here: its card opens the preview by itself (recette 3, test 27).
+        return [game.turn.chooseHorse];
       }
       case "modeChoice":
         return [game.turn.modeQuestion];

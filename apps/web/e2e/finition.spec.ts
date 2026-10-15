@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { playSimpleMove, playToEnd, untilOwnTurn, zone } from "./jouer.ts";
+import { chooseKnight, playSimpleMove, playToEnd, untilOwnTurn, zone } from "./jouer.ts";
 import { etatParam } from "./position.ts";
 
 // The finishing checks of phase 1 (plan 01-24): the felt in large form, then (further down) the five
@@ -242,17 +242,15 @@ for (const size of SIZES) {
       await expectFits(page, "échange, carte choisie", hand);
       await page.getByRole("button", { name: "Passer cette carte" }).click();
 
-      // His turn: card selected, knight tapped (the preview), then the move.
+      // His turn: card selected, knight tapped (the preview; at once for a lone knight, recette 3,
+      // test 27), then the move.
       await untilOwnTurn(page);
       await expectFits(page, "à toi de jouer", hand);
       const card = page
         .locator('[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])')
         .first();
       await card.click();
-      await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
-      await expectFits(page, "carte choisie", hand);
-      const pawn = await page.locator("[data-halo]").first().getAttribute("data-halo");
-      await page.locator(`[data-hit="${pawn}"]`).click({ force: true });
+      await chooseKnight(page, () => expectFits(page, "carte choisie", hand));
       await expect(page.locator("[data-ghost]")).toBeVisible();
       await expectFits(page, "aperçu du coup", hand);
       await expectLandscapeGalet(page, "aperçu");
@@ -354,9 +352,11 @@ async function tabOrder(page: Page, limit = 40): Promise<string[]> {
 }
 
 test.describe("au clavier", () => {
+  // Two knights on the ring can play the Dame, so she lights them both (a lone knight would be
+  // chosen by itself, recette 3, test 27).
   const HAND = {
     turn: "bleu",
-    pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+    pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
     hands: { bleu: ["12H", "4S", "11S"] },
   };
 

@@ -8,6 +8,12 @@
 // Nothing here ever plays for the human (D-19, D-20): the reducer returns a `submit` only for
 // `confirm` in a preview, `give` with a chosen card and `pose` on a dead hand. A preview is
 // resolveMove(view, seat, action), the engine's own code, so what is shown is what will happen.
+//
+// A card that only one knight can play skips the knight tap (recette 3, test 27). Romain: « Quand il
+// ne reste qu'un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet
+// évidemment ». The card tap opens that knight's preview, flagged `auto`, and « Jouer » still decides
+// (D-19): an automatic step never submits. One step back from it puts the card down, since there was
+// no knight choice to go back to.
 
 import {
   type Action,
@@ -105,6 +111,8 @@ export type TurnUiState =
       /** A knight of his own side would be eaten (D-16): the UI warns. */
       partnerCapture: boolean;
       description: PreviewDescription;
+      /** Reached by itself: the card had a single knight to play it (recette 3, test 27). */
+      auto?: true;
     }
   | { kind: "exchange"; selected?: CardId }
   | { kind: "exchangeWaiting"; pending: Color[] }
@@ -252,7 +260,18 @@ function previewState(
   candidates: Action[],
   action: Action,
   ctx: TurnCtx,
-): TurnUiState | null {
+  auto = false,
+): Extract<TurnUiState, { kind: "preview" }> | null {
+  const state = resolvedPreview(card, candidates, action, ctx);
+  return state !== null && auto ? { ...state, auto: true } : state;
+}
+
+function resolvedPreview(
+  card: CardId,
+  candidates: Action[],
+  action: Action,
+  ctx: TurnCtx,
+): Extract<TurnUiState, { kind: "preview" }> | null {
   if (action.t !== "exit" && action.t !== "move" && action.t !== "swap") return null;
   const resolved = resolveMove(ctx.view, ctx.seat, action);
   const first = resolved.events[0];
@@ -315,6 +334,16 @@ function selectCard(card: CardId, ctx: TurnCtx): TurnUiState {
   const exit = candidates.find((a) => a.t === "exit");
   const advance = candidates.filter((a) => a.t === "move");
   if (exit !== undefined && advance.length > 0) return { kind: "modeChoice", card, exit, advance };
+  return litOrAuto(card, candidates, ctx);
+}
+
+/** The card's lit knights, or, when a single one can play it, its preview at once (recette 3, test 27). */
+function litOrAuto(card: CardId, candidates: Action[], ctx: TurnCtx): TurnUiState {
+  const only = candidates[0];
+  if (candidates.length === 1 && only !== undefined) {
+    const preview = previewState(card, candidates, only, ctx, true);
+    if (preview !== null) return preview;
+  }
   return { kind: "cardSelected", card, candidates };
 }
 
@@ -458,7 +487,8 @@ function stepFor(state: TurnUiState, pawn: PawnId, ctx: TurnCtx): TurnUiState | 
         return stepFromSwap(state, own, targets, pawn, ctx);
       }
       const action = actionFor(state.candidates, pawn, ctx);
-      return action === undefined ? null : previewState(state.card, state.candidates, action, ctx);
+      if (action === undefined) return null;
+      return previewState(state.card, state.candidates, action, ctx, state.auto === true);
     }
     default:
       return null;
@@ -574,6 +604,11 @@ function back(state: TurnUiState, ctx: TurnCtx): TurnUiResult {
       return { state: state.next };
     case "preview": {
       const { action, card, candidates } = state;
+      if (state.auto) {
+        // Reached by itself: there was no knight to choose, so back is the As/Roi question or no card.
+        const question = selectCard(card, ctx);
+        return { state: question.kind === "modeChoice" ? question : IDLE };
+      }
       if (action.t === "swap") {
         return {
           state: {

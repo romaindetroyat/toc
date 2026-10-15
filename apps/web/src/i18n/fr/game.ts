@@ -48,7 +48,6 @@ export const game = {
   turn: {
     ownTurn: "À toi de jouer. Choisis une carte.",
     chooseHorse: "Choisis un cheval.",
-    singleHorse: "Un seul cheval peut jouer cette carte : touche-le.",
     chooseLit: "Choisis un des chevaux éclairés.",
     modeQuestion: "Que veux-tu faire ?",
     exitButton: "Sortir un cheval",

@@ -228,9 +228,10 @@ test.describe("sur le téléphone tenu en largeur, la barre compacte", () => {
     await expectBoard(page, "à toi de jouer", 520);
     await expectNoScroll(page, "à toi de jouer");
 
-    // The Dame: every hand card's top lies 8 px under the band's top, so its top 56 px show.
+    // The Dame: every hand card's top lies 8 px under the band's top, so its top 56 px show. Her lone
+    // knight is chosen by itself and the preview shows at once (recette 3, test 27).
     await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
-    await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
+    await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
     await settled(page);
     const band = await boxOf(page, "[data-hand]");
     const cards = await page.locator("[data-hand] [data-card]").evaluateAll((nodes) =>
@@ -257,8 +258,7 @@ test.describe("sur le téléphone tenu en largeur, la barre compacte", () => {
     }
     await expectBandRows(page, "carte choisie");
 
-    // The knight, then « Jouer » in the band, right of the fan.
-    await page.locator('[data-hit="bleu0"]').click();
+    // « Jouer » in the band, right of the fan.
     await expect(page.locator("[data-ghost]")).toBeVisible();
     const play = page.getByRole("button", { name: "Jouer", exact: true });
     await expect(play).toBeVisible();
@@ -613,19 +613,19 @@ test.describe("les tailles visées du téléphone tenu en largeur (émulation Ch
       await expectBoard(page, what, target.atLeast);
       await expectNoScroll(page, what);
 
-      // A move: the Dame, the knight, « Jouer »; bleu0 lands on the drawn cell 15.
+      // A move: the Dame, then « Jouer » (her lone knight is chosen by itself, recette 3, test 27);
+      // bleu0 lands on the drawn cell 15.
       await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
-      await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
+      await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
       await settled(page);
       await expectBandRows(page, `${what}, carte choisie`);
       if (target.shot) {
-        // A picture for Romain's re-test, a card selected and its knight lit, past the zone's fade.
+        // A picture for Romain's re-test, a card selected and its knight chosen, past the zone's fade.
         await page.waitForTimeout(400);
         await page.screenshot({
           path: `test-results/galet-emulation-${target.width}x${target.height}.png`,
         });
       }
-      await page.locator('[data-hit="bleu0"]').click({ force: true });
       const play = page.getByRole("button", { name: "Jouer", exact: true });
       await expect(play).toBeVisible();
       await expectBandRows(page, `${what}, aperçu`);

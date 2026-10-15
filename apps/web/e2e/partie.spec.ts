@@ -160,9 +160,9 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
   await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 7/8");
 
   await page.getByRole("button", { name: "5 de pique, jouable" }).click();
-  // The partner's knights carry the halos.
-  await expect(page.locator('[data-halo="rouge3"]')).toBeVisible();
-  await page.locator('[data-hit="rouge3"]').click({ force: true });
+  // The partner's last knight is the only one to play the 5: it is chosen by itself and its move
+  // shown (recette 3, test 27); « Jouer » plays it.
+  await expect(page.locator('[data-selected="rouge3"]')).toBeVisible();
   await page.getByRole("button", { name: "Jouer", exact: true }).click();
 
   const end = page.locator("[data-end-screen]");

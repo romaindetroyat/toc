@@ -72,7 +72,7 @@ test("le Roi : « Avancer de 13 » éclaire les chevaux de l’anneau puis montr
   });
   await page.getByRole("button", { name: "Roi de cœur, jouable" }).click();
   await page.getByRole("button", { name: "Avancer de 13", exact: true }).click();
-  await expect(zone(page)).toContainText("Un seul cheval peut jouer cette carte");
+  await expect(zone(page)).toContainText("Choisis un cheval.");
   await expect(page.locator("[data-halo]")).toHaveCount(1);
   await page.locator('[data-hit="bleu0"]').click({ force: true });
   await expect(page.locator("[data-ghost]")).toBeVisible();
@@ -89,9 +89,13 @@ test("une seule façon de jouer l’As ou le Roi : la question n’est pas posé
     hands: { bleu: ["1S"] },
   });
   await page.getByRole("button", { name: "As de pique, jouable" }).click();
-  await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+  // The exit is the As's only move: its preview shows at once (recette 3, test 27). One stable
+  // knight is marked as the one leaving, the three others stay lit.
+  await expect(zone(page)).toHaveAttribute("data-state", "preview");
   await expect(zone(page)).not.toContainText("Que veux-tu faire ?");
-  await expect(page.locator("[data-halo]")).toHaveCount(4);
+  await expect(zone(page)).toContainText("Sort de l’écurie.");
+  await expect(page.locator("[data-selected]")).toHaveCount(1);
+  await expect(page.locator("[data-halo]")).toHaveCount(3);
 });
 
 test("une seule façon de jouer le Roi sur l’anneau : la question n’est pas posée", async ({

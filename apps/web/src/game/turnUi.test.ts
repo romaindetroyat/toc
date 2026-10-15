@@ -170,7 +170,7 @@ function deadBefore(): Scenario["before"] {
 }
 
 describe("with exactly one legal move nothing is played for him (D-19)", () => {
-  it("previews it after the card and the knight, and submits only on confirm", () => {
+  it("previews it at the card tap (recette 3, test 27), and submits only on confirm", () => {
     const ctx = ctxOf(SINGLE);
     expect(ctx.legal).toHaveLength(1);
     const [sync, card, pawn, confirm] = run(
@@ -183,7 +183,7 @@ describe("with exactly one legal move nothing is played for him (D-19)", () => {
     );
     expect(sync?.state).toEqual({ kind: "idle" });
     expect(sync?.submit).toBeUndefined();
-    expect(card?.state.kind).toBe("cardSelected");
+    expect(card?.state).toMatchObject({ kind: "preview", auto: true });
     expect(card?.submit).toBeUndefined();
     expect(pawn?.state.kind).toBe("preview");
     expect(pawn?.submit).toBeUndefined();
@@ -256,8 +256,9 @@ describe("tapping an unplayable card", () => {
 
   it("keeps a selected card selected when another, unplayable, card is tapped", () => {
     const ctx = ctxOf(stuck);
+    // The As has the exit only: its preview shows at once (recette 3, test 27).
     const selected = reduceTurnUi(synced(ctx), { t: "tapCard", card: "1H" }, ctx).state;
-    expect(selected.kind).toBe("cardSelected");
+    expect(selected).toMatchObject({ kind: "preview", card: "1H", auto: true });
     const result = reduceTurnUi(selected, { t: "tapCard", card: "4S" }, ctx);
     expect(result.state).toBe(selected);
     expect(result.hint).toBe("no-pawn-can-move");
@@ -273,7 +274,14 @@ describe("tapping an unplayable card", () => {
 });
 
 describe("deselecting", () => {
-  const ctx = ctxOf(SINGLE);
+  // Two knights can play the 5: the card lights both (one alone would preview at once, test 27).
+  const ctx = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+      hands: { bleu: ["5H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
   const toSelected = () => reduceTurnUi({ kind: "idle" }, { t: "tapCard", card: "5H" }, ctx).state;
   const toPreview = () => reduceTurnUi(toSelected(), { t: "tapPawn", pawn: "bleu0" }, ctx).state;
 
@@ -297,7 +305,7 @@ describe("deselecting", () => {
 
   it("changes the card without going through idle when another playable card is tapped", () => {
     const two = build({
-      pawns: { bleu: [{ p: 5 }, "S", "S", "S"] },
+      pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
       hands: { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
       turn: "bleu",
     });
@@ -510,7 +518,10 @@ describe("the exchange", () => {
 describe("the finished player plays his partner's knights", () => {
   it("offers the partner's knights as candidates", () => {
     const finished = build({
-      pawns: { bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      pawns: {
+        bleu: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+        rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+      },
       hands: { bleu: ["5H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
       turn: "bleu",
     });
@@ -524,7 +535,13 @@ describe("the finished player plays his partner's knights", () => {
       { t: "tapPawn", pawn: "rouge0" },
       { t: "confirm" },
     );
-    expect(card?.state.kind).toBe("cardSelected");
+    expect(card?.state).toMatchObject({
+      kind: "cardSelected",
+      candidates: [
+        { t: "move", card: "5H", pawn: "rouge0" },
+        { t: "move", card: "5H", pawn: "rouge1" },
+      ],
+    });
     expect(pawn?.state.kind).toBe("preview");
     expect(confirm?.submit).toEqual({ t: "move", card: "5H", pawn: "rouge0" });
   });
@@ -619,8 +636,9 @@ describe("As and Roi: « Sortir ou avancer » (D-16, PLAY-04)", () => {
         turn: "bleu",
       }),
     );
+    // The exit is then the card's only move: its preview shows at once (recette 3, test 27).
     const exitOnly = reduceTurnUi(synced(stable), { t: "tapCard", card: "1S" }, stable).state;
-    expect(exitOnly).toMatchObject({ kind: "cardSelected", card: "1S" });
+    expect(exitOnly).toMatchObject({ kind: "preview", card: "1S", auto: true });
     // No knight in the stable: only advancing.
     const ring = ctxOf(
       build({
@@ -1314,6 +1332,14 @@ describe("back: one step back (Échap)", () => {
   const back = (state: TurnUiState, ctx: TurnCtx) => reduceTurnUi(state, { t: "back" }, ctx);
 
   const simple = ctxOf(SINGLE);
+  // Two knights can play the 6: the card lights both.
+  const two = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+      hands: { bleu: ["6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
   // As with both modes: an exit and an advance.
   const ace = ctxOf(
     build({
@@ -1371,10 +1397,11 @@ describe("back: one step back (Échap)", () => {
   });
 
   it("takes a move preview back to the card's lit knights", () => {
-    const selected = stateAfter(simple, { t: "tapCard", card: "5H" });
-    const preview = reduceTurnUi(selected, { t: "tapPawn", pawn: "bleu0" }, simple).state;
+    const selected = stateAfter(two, { t: "tapCard", card: "6H" });
+    expect(selected.kind).toBe("cardSelected");
+    const preview = reduceTurnUi(selected, { t: "tapPawn", pawn: "bleu0" }, two).state;
     expect(preview.kind).toBe("preview");
-    expect(back(preview, simple).state).toEqual(selected);
+    expect(back(preview, two).state).toEqual(selected);
   });
 
   it("takes an exit chosen with « Sortir » back to the As/Roi question", () => {
@@ -1385,13 +1412,12 @@ describe("back: one step back (Échap)", () => {
     expect(back(preview, ace).state).toEqual(question);
   });
 
-  it("takes an exit preview with no question back to the stable knights", () => {
-    const selected = stateAfter(exitOnly, { t: "tapCard", card: "1S" });
-    expect(selected.kind).toBe("cardSelected");
-    const preview = reduceTurnUi(selected, { t: "tapPawn", pawn: "bleu2" }, exitOnly).state;
-    expect(preview.kind).toBe("preview");
-    expect(back(preview, exitOnly).state).toEqual(selected);
-    expect(back(selected, exitOnly).state).toEqual({ kind: "idle" });
+  it("takes an exit preview with no question, reached by itself, back to nothing selected", () => {
+    const preview = stateAfter(exitOnly, { t: "tapCard", card: "1S" });
+    expect(preview).toMatchObject({ kind: "preview", auto: true });
+    // A stable knight tapped there is the same exit, still automatic.
+    expect(reduceTurnUi(preview, { t: "tapPawn", pawn: "bleu2" }, exitOnly).state).toEqual(preview);
+    expect(back(preview, exitOnly).state).toEqual({ kind: "idle" });
   });
 
   it("takes « Avancer » back to the As/Roi question, then the question to nothing selected", () => {
@@ -1417,8 +1443,8 @@ describe("back: one step back (Échap)", () => {
   });
 
   it("drops a simple card selection", () => {
-    const selected = stateAfter(simple, { t: "tapCard", card: "5H" });
-    expect(back(selected, simple).state).toEqual({ kind: "idle" });
+    const selected = stateAfter(two, { t: "tapCard", card: "6H" });
+    expect(back(selected, two).state).toEqual({ kind: "idle" });
   });
 
   it("the 7: unselects the knight, then takes back the last step, then drops the card", () => {
@@ -1485,5 +1511,95 @@ describe("back: one step back (Échap)", () => {
         current = result.state;
       }
     }
+  });
+});
+
+describe("un seul cheval pour la carte (recette 3, test 27)", () => {
+  // Romain : « Quand il ne reste qu'un cheval sur le plateau, inutile de cliquer dessus pour jouer la
+  // carte, sauf valet évidemment ». The lone knight is chosen by itself, « Jouer » still decides (D-19).
+  const simple = ctxOf(SINGLE);
+  const twoKnights = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+      hands: { bleu: ["6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const exitOnly = ctxOf(
+    build({
+      pawns: { bleu: ["S", "S", "S", "S"] },
+      hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+
+  it("one knight, a 5: the card tap previews its move, flagged automatic, with no submit", () => {
+    const [tapped] = run(synced(simple), simple, { t: "tapCard", card: "5H" });
+    expect(tapped?.state).toMatchObject({
+      kind: "preview",
+      card: "5H",
+      auto: true,
+      action: { t: "move", card: "5H", pawn: "bleu0" },
+      description: { verb: "advance", pawn: "bleu0", steps: 5 },
+    });
+    expect(tapped?.submit).toBeUndefined();
+  });
+
+  it("plays it only on confirm; nothing before submits", () => {
+    const results = run(
+      initialTurnUi,
+      simple,
+      { t: "sync" },
+      { t: "tapCard", card: "5H" },
+      { t: "tapPawn", pawn: "bleu0" },
+      { t: "back" },
+      { t: "tapCard", card: "5H" },
+      { t: "confirm" },
+    );
+    const confirm = results.pop();
+    for (const result of results) expect(result.submit).toBeUndefined();
+    expect(confirm?.submit).toEqual({ t: "move", card: "5H", pawn: "bleu0" });
+    expect(confirm?.state).toEqual({ kind: "waiting" });
+  });
+
+  it("back, changeCard and cancel from the automatic preview put the card down", () => {
+    const preview = reduceTurnUi(synced(simple), { t: "tapCard", card: "5H" }, simple).state;
+    for (const event of [
+      { t: "back" },
+      { t: "changeCard" },
+      { t: "cancel" },
+      { t: "escape" },
+      { t: "tapCard", card: "5H" },
+    ] as TurnUiEvent[]) {
+      const result = reduceTurnUi(preview, event, simple);
+      expect(result.state, event.t).toEqual({ kind: "idle" });
+      expect(result.submit).toBeUndefined();
+    }
+  });
+
+  it("tapping the lone knight in its automatic preview keeps it automatic", () => {
+    const preview = reduceTurnUi(synced(simple), { t: "tapCard", card: "5H" }, simple).state;
+    const again = reduceTurnUi(preview, { t: "tapPawn", pawn: "bleu0" }, simple).state;
+    expect(again).toEqual(preview);
+    expect(reduceTurnUi(again, { t: "back" }, simple).state).toEqual({ kind: "idle" });
+  });
+
+  it("two knights that can play the card: both are lit, as before", () => {
+    const tapped = reduceTurnUi(synced(twoKnights), { t: "tapCard", card: "6H" }, twoKnights);
+    expect(tapped.state).toMatchObject({ kind: "cardSelected", card: "6H" });
+    if (tapped.state.kind !== "cardSelected") throw new Error("no cardSelected");
+    expect(tapped.state.candidates).toHaveLength(2);
+  });
+
+  it("an As with only an exit: the card tap previews the exit", () => {
+    const tapped = reduceTurnUi(synced(exitOnly), { t: "tapCard", card: "1S" }, exitOnly);
+    expect(tapped.state).toMatchObject({
+      kind: "preview",
+      auto: true,
+      action: { t: "exit", card: "1S" },
+      description: { verb: "exit" },
+    });
+    expect(tapped.submit).toBeUndefined();
+    expect(reduceTurnUi(tapped.state, { t: "back" }, exitOnly).state).toEqual({ kind: "idle" });
   });
 });

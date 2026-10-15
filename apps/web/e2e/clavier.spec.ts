@@ -37,19 +37,35 @@ const SEVEN = {
 test.describe("au clavier seul", () => {
   test.skip(({ isMobile }) => isMobile, "keyboard shortcuts are for computers");
 
-  test("la Dame : 1, A, Entrée jouent le coup sans la souris", async ({ page }) => {
+  test("la Dame d’un cheval seul : 1, Entrée jouent le coup sans la souris", async ({ page }) => {
     await openPosition(page, {
       turn: "bleu",
       pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
       hands: { bleu: ["12H"] },
     });
 
+    // Her lone knight is chosen by itself (recette 3, test 27): no letter is needed.
     await page.keyboard.press("1");
-    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
-    await page.keyboard.press("a");
     await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(pawn(page, "bleu0")).toHaveAttribute("data-place", "ring:22");
+  });
+
+  test("la Dame de deux chevaux : 1, B, Entrée jouent le coup sans la souris", async ({ page }) => {
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+      hands: { bleu: ["12H"] },
+    });
+
+    await page.keyboard.press("1");
+    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+    await page.keyboard.press("b");
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await page.keyboard.press("Enter");
+    await expect(pawn(page, "bleu1")).toHaveAttribute("data-place", "ring:42");
+    await expect(pawn(page, "bleu0")).toHaveAttribute("data-place", "ring:10");
   });
 
   test("Entrée joue depuis le cheval montré, mais garde son sens sur « Annuler ce coup »", async ({
@@ -299,9 +315,11 @@ test.describe("au clavier seul", () => {
 
 // The key hints (plan 01-28): on a computer the keys are written where they act; on a phone, nothing.
 const FINE = "(hover: hover) and (pointer: fine)";
+// Two knights on the ring can play the Dame, so she lights them both (a lone knight would be chosen
+// by itself, recette 3, test 27).
 const QUEEN_HAND = {
   turn: "bleu",
-  pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+  pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
   hands: { bleu: ["12H", "4S", "11S"] },
 };
 const visibleHints = (page: Page) => page.locator("[data-key-hint]:visible");

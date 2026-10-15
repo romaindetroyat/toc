@@ -170,9 +170,7 @@ test("tracer: Jouer la partie -> plateau -> la main du joueur et l’échange", 
   await expect(page.locator("[data-action-zone]")).toContainText("En attente de");
 });
 
-test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué à sa place", async ({
-  page,
-}) => {
+test("tracer: carte -> aperçu -> « Jouer », et rien n’est joué à sa place", async ({ page }) => {
   await page.goto("/");
   await page.goto(SCENARIO);
   await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
@@ -192,19 +190,20 @@ test("tracer: carte -> cheval -> aperçu -> « Jouer », et rien n’est joué �
     "À toi de jouer. Choisis une carte.",
   );
 
-  // Tapping the card lights the knight and, with a single possibility, only says so (D-19).
+  // One knight only can play the Dame: tapping the card chooses it by itself and shows the preview at
+  // once, with no knight tap (Romain, recette 3, test 27: « inutile de cliquer dessus pour jouer la
+  // carte »). The knight wears the mark of the chosen knight, and only « Jouer » plays (D-19).
   await card.click();
-  await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
+  await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "preview");
   await expect(page.locator("[data-action-zone]")).toContainText(
-    `Un seul cheval peut jouer cette carte${NBSP}: touche-le.`,
+    `Dame de cœur${NBSP}: avance de 12 cases.`,
   );
-  await expect(page.getByRole("button", { name: "Changer de carte" })).toBeVisible();
-  // The halo and the hit target are centred on the knight's body at its size (D-16).
-  expect(await centredIn(page, '[data-halo="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
+  await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
+  // The mark and the hit target are centred on the knight's body at its size (D-16).
+  expect(await centredIn(page, '[data-selected="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
   expect(await centredIn(page, '[data-hit="bleu0"]', '[data-pawn="bleu0"]')).toBe(true);
 
-  // Tapping the knight shows the path, the ghost, the badge and « Jouer ».
-  await page.locator('[data-hit="bleu0"]').click();
+  // The preview: the path, the ghost, the badge and « Jouer ».
   await expect(page.locator("[data-path]")).toBeVisible();
   await expect(page.locator("[data-ghost]")).toBeVisible();
   // The ghost stands on the drawn cell 15, its feet within half a step of the cell's centre (D-17).
@@ -313,9 +312,9 @@ test.describe("traceur : le galet en largeur à 1280 × 800, au clavier", () => 
     // From before the keys until the knight reads ring:15.
     await recordHop(page);
 
-    // « 1 » picks the Dame, « a » the lit knight, « Entrée » plays it.
+    // « 1 » picks the Dame, whose lone knight is chosen by itself (recette 3, test 27); « Entrée »
+    // plays it.
     await page.keyboard.press("1");
-    await page.keyboard.press("a");
     await expect(page.locator("[data-ghost]")).toBeVisible();
     await page.keyboard.press("Enter");
 
@@ -327,7 +326,7 @@ test.describe("traceur : le galet en largeur à 1280 × 800, au clavier", () => 
   });
 });
 
-test("tracer: « Annuler ce coup » et « Changer de carte » reviennent en arrière", async ({
+test("tracer: « Annuler ce coup » repose la carte d’un cheval seul, même touché à nouveau", async ({
   page,
 }) => {
   await page.goto("/");
@@ -336,7 +335,6 @@ test("tracer: « Annuler ce coup » et « Changer de carte » reviennent en arri
 
   const card = page.getByRole("button", { name: "Dame de cœur, jouable" });
   await card.click();
-  await page.locator('[data-hit="bleu0"]').click();
   await expect(page.locator("[data-path]")).toBeVisible();
 
   await page.getByRole("button", { name: "Annuler ce coup" }).click();
@@ -344,10 +342,14 @@ test("tracer: « Annuler ce coup » et « Changer de carte » reviennent en arri
   await expect(page.locator("[data-action-zone]")).toContainText(
     "À toi de jouer. Choisis une carte.",
   );
+  await expect(page.locator('[data-selected="bleu0"]')).toHaveCount(0);
 
+  // The lone knight is touched again in its preview: still the same preview, still not played.
   await card.click();
-  await page.getByRole("button", { name: "Changer de carte" }).click();
-  await expect(page.locator('[data-halo="bleu0"]')).toHaveCount(0);
+  await page.locator('[data-hit="bleu0"]').click();
+  await expect(page.locator("[data-path]")).toBeVisible();
+  await page.getByRole("button", { name: "Annuler ce coup" }).click();
+  await expect(page.locator('[data-selected="bleu0"]')).toHaveCount(0);
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:3");
 });
 
@@ -361,9 +363,13 @@ test("une carte grisée dit pourquoi, un As montre la sortie de l’écurie", as
   );
   await expect(page.locator("[data-halo]")).toHaveCount(0);
 
-  // The As exits a knight: every stable knight is lit, and the preview ends on the exit diamond.
+  // The As exits a knight, its only move: the preview ends on the exit diamond at once (recette 3,
+  // test 27). One stable knight is marked as the one leaving; the three others stay lit, any of them
+  // standing for the exit.
   await page.getByRole("button", { name: "As de cœur, jouable" }).click();
-  await expect(page.locator("[data-halo]")).toHaveCount(4);
+  await expect(page.locator("[data-ghost]")).toBeVisible();
+  await expect(page.locator("[data-selected]")).toHaveCount(1);
+  await expect(page.locator("[data-halo]")).toHaveCount(3);
   await page.locator('[data-hit="bleu2"]').click({ force: true });
   await expect(page.locator("[data-ghost]")).toBeVisible();
   await expect(page.locator("[data-action-zone]")).toContainText("Sort de l’écurie.");

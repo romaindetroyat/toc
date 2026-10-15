@@ -96,6 +96,14 @@ const QUEEN = table({
   turn: "bleu",
 });
 
+// The Dame with two knights on the ring that can play it: the card lights both (recette 3, test 27:
+// a lone knight would preview at once).
+const QUEENS = table({
+  pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+  hands: { bleu: ["12H", "4S", "11S", "2D", "9C"] },
+  turn: "bleu",
+});
+
 // The Valet: bleu0 and bleu1 on the ring, vert0 and jaune0 to swap with.
 const JACK = table({
   pawns: {
@@ -126,9 +134,15 @@ describe("litKnights: the knights lit for the flow", () => {
     expect(litKnights(reach(QUEEN), QUEEN.places)).toEqual([]);
   });
 
-  it("lights the card's moving knight", () => {
-    const ui = reach(QUEEN, { t: "tapCard", card: "12H" });
+  it("lights the card's moving knights", () => {
+    const ui = reach(QUEENS, { t: "tapCard", card: "12H" });
     expect(ui.kind).toBe("cardSelected");
+    expect(litKnights(ui, QUEENS.places)).toEqual(["bleu0", "bleu1"]);
+  });
+
+  it("lights the lone knight in the preview its card opens by itself (recette 3, test 27)", () => {
+    const ui = reach(QUEEN, { t: "tapCard", card: "12H" });
+    expect(ui).toMatchObject({ kind: "preview", auto: true });
     expect(litKnights(ui, QUEEN.places)).toEqual(["bleu0"]);
   });
 
@@ -333,6 +347,7 @@ type Key = (typeof KEYS)[number];
 type Row = { name: string; t: Table; ui: TurnUiState; expect: Partial<Record<Key, TurnUiEvent[]>> };
 
 const queenHand = sortHand(QUEEN.ctx.view.hand);
+const queensHand = sortHand(QUEENS.ctx.view.hand);
 const exchangeHand = sortHand(EXCHANGE.ctx.view.hand);
 const sevenStart = reach(SEVEN, { t: "tapCard", card: "7H" });
 const sevenPicked = reach(SEVEN, { t: "tapCard", card: "7H" }, { t: "tapPawn", pawn: "bleu0" });
@@ -391,13 +406,14 @@ const ROWS: Row[] = [
   },
   {
     name: "cardSelected",
-    t: QUEEN,
-    ui: reach(QUEEN, { t: "tapCard", card: "12H" }),
+    t: QUEENS,
+    ui: reach(QUEENS, { t: "tapCard", card: "12H" }),
     expect: {
       Escape: [{ t: "back" }],
-      "1": [{ t: "tapCard", card: queenHand[0] as CardId }],
-      "3": [{ t: "tapCard", card: queenHand[2] as CardId }],
+      "1": [{ t: "tapCard", card: queensHand[0] as CardId }],
+      "3": [{ t: "tapCard", card: queensHand[2] as CardId }],
       a: [{ t: "tapPawn", pawn: "bleu0" }],
+      b: [{ t: "tapPawn", pawn: "bleu1" }],
     },
   },
   {
@@ -674,11 +690,22 @@ describe("keyIntent: round trips through the reducer", () => {
   });
 
   it("Échap reaches the reducer as back: one step at a time", () => {
-    const digit = String(queenHand.indexOf("12H") + 1);
-    const preview = play(QUEEN, reach(QUEEN), digit, "a");
+    const digit = String(queensHand.indexOf("12H") + 1);
+    const preview = play(QUEENS, reach(QUEENS), digit, "a");
     expect(preview.state.kind).toBe("preview");
-    expect(play(QUEEN, preview.state, "Escape").state.kind).toBe("cardSelected");
-    expect(play(QUEEN, preview.state, "Escape", "Escape").state.kind).toBe("idle");
+    expect(play(QUEENS, preview.state, "Escape").state.kind).toBe("cardSelected");
+    expect(play(QUEENS, preview.state, "Escape", "Escape").state.kind).toBe("idle");
+  });
+
+  it("a lone knight's card: the digit previews it, « Entrée » plays it, Échap puts it down", () => {
+    const digit = String(queenHand.indexOf("12H") + 1);
+    const shown = play(QUEEN, reach(QUEEN), digit);
+    expect(shown.state).toMatchObject({ kind: "preview", auto: true });
+    expect(shown.submitted).toEqual([]);
+    expect(play(QUEEN, reach(QUEEN), digit, "Enter").submitted).toEqual([
+      { t: "move", card: "12H", pawn: "bleu0" },
+    ]);
+    expect(play(QUEEN, shown.state, "Escape").state.kind).toBe("idle");
   });
 
   it("the Valet: two knights « A » open the tray, « b » takes vert0, « Entrée » swaps", () => {

@@ -57,11 +57,10 @@ const prompt = (page: Page) => page.locator("[data-rotate-prompt]");
 const wrapperInert = (page: Page) =>
   page.locator("[data-game-play]").evaluate((node) => (node as HTMLElement).inert);
 
-/** The Dame, bleu0, « Jouer »: bleu0 lands on ring:15. */
+/** The Dame, then « Jouer » (bleu0, her lone knight, is chosen by itself): bleu0 lands on ring:15. */
 async function playDame(page: Page) {
   await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
-  await expect(page.locator('[data-halo="bleu0"]')).toBeVisible();
-  await page.locator('[data-hit="bleu0"]').click();
+  await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
   await page.getByRole("button", { name: "Jouer", exact: true }).click();
 }
 
