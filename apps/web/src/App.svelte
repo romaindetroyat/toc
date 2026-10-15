@@ -11,6 +11,11 @@
     throw new Error("panne de test");
   }
 
+  /** The bench page's chunk could not load (offline, a new version): the error screen takes over. */
+  function rethrow(error: unknown): never {
+    throw error;
+  }
+
   /** A fresh start: back on the launch screen, so a reload cannot loop into the same error. */
   function reload() {
     location.hash = "#/";
@@ -39,6 +44,14 @@
     <Game />
   {:else if route === "#/sons"}
     <SoundTest />
+  {:else if route === "#/banc"}
+    <!-- The bench « Banc d’essai de l’ordinateur » (03-06), in every build and linked from nowhere: its
+         own chunk, loaded only here. Not behind « Tourne ton téléphone »: it works held either way. -->
+    {#await import("./routes/Bench.svelte") then bench}
+      <bench.default />
+    {:catch error}
+      {rethrow(error)}
+    {/await}
   {:else if __TOC_DEBUG__ && route === "#/panne"}
     {explode()}
   {:else}
