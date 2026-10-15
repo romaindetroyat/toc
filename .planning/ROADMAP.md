@@ -12,9 +12,9 @@ Le parcours part du cœur du jeu. On écrit d'abord les règles maison, que Roma
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Une vraie partie sur un appareil** - Règles validées, moteur, plateau original, cavaliers animés et bruitages, partie complète contre l'ordinateur
+- [x] **Phase 1: Une vraie partie sur un appareil** *(close le 2026-10-15 à la demande de Romain, « Close, essais restants notés » ; essais restants dans 01-UAT.md)* - Règles validées, moteur, plateau galet, cavaliers animés et bruitages, partie complète contre l'ordinateur
 - [ ] **Phase 2: Jouer en ligne entre proches** - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, chat, revanche et reprise
-- [ ] **Phase 3: L'ordinateur à la force choisie** - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
+- [ ] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
 - [ ] **Phase 4: Comptes, amis et application installable** - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
 - [ ] **Phase 5: Suivi, apprentissage et finition** - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
 
@@ -209,7 +209,7 @@ Plans:
 
 **Goal**: Chaque place tenue par l'ordinateur joue à la force choisie, du niveau 1 (un coup légal au hasard) au niveau 5 (un vrai jeu d'équipe). L'ordinateur ne triche jamais et joue à un rythme naturel.
 **Mode:** mvp
-**Depends on**: Phase 2
+**Depends on**: Phase 1 (avancée avant la phase 2 le 2026-10-15 ; la table en ligne de la phase 2 reprendra le choix de force)
 **Requirements**: BOT-01, BOT-02, BOT-03, BOT-04, BOT-05
 **Success Criteria** (what must be TRUE):
   1. Le créateur de la table choisit une force de 1 à 5 pour chaque place tenue par l'ordinateur, et chaque place joue à sa force.
@@ -259,7 +259,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 53/55 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
