@@ -3,7 +3,7 @@ status: partial
 phase: 01-une-vraie-partie-sur-un-appareil
 source: [01-VERIFICATION.md, 01-UI-REVIEW.md]
 started: 2026-10-13T23:30:00Z
-updated: 2026-10-15T12:00:00Z
+updated: 2026-10-15T08:06:24Z
 ---
 
 ## Current Test
@@ -11,7 +11,7 @@ updated: 2026-10-15T12:00:00Z
 number: 8
 name: "Re-test 3 : lisibilité des cavaliers sur le galet en largeur (iPhone tenu en largeur et 1280 × 800)"
 expected: |
-  Sur l'iPhone tenu en largeur et sur l'ordinateur en 1280 × 800, les seize cavaliers se lisent bien et se distinguent dans leurs quatre couleurs (le jaune compris), on voit dans quel sens ils regardent et la lettre A à D des cavaliers allumés. Leur taille paraît juste : 0,95 case sur l'anneau, 0,82 dans une maison, 0,78 dans une écurie. Ils sont faciles à toucher.
+  Sur l'iPhone tenu en largeur et sur l'ordinateur en 1280 × 800, les seize cavaliers se lisent bien et se distinguent dans leurs quatre couleurs (le jaune compris), on voit dans quel sens ils regardent et la lettre A à D des cavaliers allumés. Leur taille paraît juste : 0,95 case sur l'anneau, 0,82 dans une maison, 0,78 dans une écurie. Ils sont faciles à toucher. Quand deux cavaliers allumés sont à moins de 44 px l'un de l'autre (sur l'iPhone, jusqu'à deux cases d'écart), un toucher ouvre le choix « Lequel ? » au lieu de prendre directement le cheval : Romain dit si cela lui convient.
 awaiting: user response
 
 ## Tests
@@ -62,7 +62,7 @@ expected: Sur l'iPhone tenu en largeur et sur l'ordinateur en 1280 × 800, les s
 result: [pending]
 
 ### 9. Re-test 4 : le plateau galet sur l'iPhone tenu en largeur (Safari et app installée), « Tourne ton téléphone » en portrait, et sur ordinateur
-expected: (1) Sur l'iPhone tenu en largeur, dans Safari puis dans l'app ajoutée à l'écran d'accueil : son camp centré en bas, celui de son partenaire centré en haut, aucun petit cadre de rappel des règles, les cases, les numéros, les losanges 18, les carrés 16 et ses cavaliers dessinés dans les coins se lisent bien ; le bois et le tapis ressemblent à la planche « Ordinateur · galet » ; la barre compacte (les infos à gauche du plateau, la main, la consigne et les boutons dessous) se manie bien avec les pouces. (2) Téléphone tourné à la verticale en pleine partie : « Tourne ton téléphone » remplace le plateau ; en le remettant en largeur, on retrouve la même partie, les joueurs de l'ordinateur ayant attendu. Une fenêtre d'ordinateur plus haute que large montre « Élargis la fenêtre ». (3) Sur l'ordinateur : le galet prend la largeur avec la barre du bas, il se lit bien, et l'on joue à l'aise à la souris comme au clavier (lettres sur les cavaliers allumés, aides des touches) ; agrandir ou réduire la fenêtre garde la partie. (4) Taille du plateau sur son propre iPhone, calculée et à vérifier : environ 585 px de large dans l'app installée (cases à environ 20 px l'une de l'autre) ; dans Safari environ 533 px (cases à environ 18 px), ou environ 493 px (cases à environ 16,5 px) si Safari compte aussi la marge du bas. Romain dit ce qu'il voit.
+expected: (1) Sur l'iPhone tenu en largeur, dans Safari puis dans l'app ajoutée à l'écran d'accueil : son camp centré en bas, celui de son partenaire centré en haut, aucun petit cadre de rappel des règles, les cases, les numéros, les losanges 18, les carrés 16 et ses cavaliers dessinés dans les coins se lisent bien ; le bois et le tapis ressemblent à la planche « Ordinateur · galet » ; le plateau prend toute la hauteur de l'écran, sous une ligne de consigne de 24 px, avec une bande de 60 px de chaque côté (à gauche la pastille d'infos en haut et la main en colonne, à droite la roue des réglages, « Avance rapide » et les boutons), et tout se manie bien avec les pouces. (2) Téléphone tourné à la verticale en pleine partie : « Tourne ton téléphone » remplace le plateau ; en le remettant en largeur, on retrouve la même partie, les joueurs de l'ordinateur ayant attendu. Une fenêtre d'ordinateur plus haute que large montre « Élargis la fenêtre ». (3) Sur l'ordinateur : le galet prend la largeur avec la barre du bas, il se lit bien, et l'on joue à l'aise à la souris comme au clavier (lettres sur les cavaliers allumés, aides des touches) ; agrandir ou réduire la fenêtre garde la partie. (4) Taille du plateau sur son propre iPhone (iPhone 13), calculée et à vérifier : environ 594 px de large dans Safari (cases à environ 19,9 px l'une de l'autre, au lieu d'environ 493 px avec l'ancienne barre compacte) et environ 630 px dans l'app installée (cases à environ 21,1 px, au lieu d'environ 585 px) ; mesuré dans l'émulation : 630 px à 750 × 342, 724 px à 844 × 390. Romain dit ce qu'il voit.
 result: [pending]
 note: "Recette 3 du 2026-10-15 : Romain a trouvé le plateau « trop petit sur iphone » (test 24) et a choisi « Plateau sur toute la hauteur ». Le point (4) sera refait sur la nouvelle disposition (plans 01-47 et 01-48) ; le reste du test attend sa réponse."
 
@@ -103,7 +103,7 @@ expected: Les cartes compactes de 64 × 90 en une rangée plate, la carte choisi
 result: [pending]
 
 ### 19. À confirmer : les objectifs de taille et les appareils réels
-expected: Largeur du plateau mesurée dans l'émulation (marges d'écran à 0) : 844 × 390 → 625 px (cases à 20,9 px) ; 750 × 342 → 533 px (17,8 px) ; 667 × 375 → 559 px (18,7 px) ; 568 × 320 → 383 px (12,8 px) ; 480 × 320 → 372 px (12,4 px) ; 1024 × 640 → 920 px (30,8 px) ; 1280 × 800 → 1227 px (41 px) ; 1440 × 900 → 1408 px (47,1 px) ; en portrait, pas de plateau mais l'invitation à tourner l'écran. Sur un vrai iPhone 13 tenu en largeur (calculé, pas mesuré) : environ 585 px dans l'app installée (cases à environ 19,6 px), environ 533 px dans Safari (17,8 px), ou environ 493 px (16,5 px) si Safari compte la marge du bas. Romain dit si ces tailles lui conviennent et ce qu'il mesure sur son iPhone (voir test 9).
+expected: Largeur du plateau mesurée dans l'émulation (marges d'écran à 0), avec le plateau sur toute la hauteur du téléphone (plans 01-47 et 01-48 ; deux bandes de 60 px et une ligne de consigne de 24 px à chaque taille) : 844 × 390 → 724 px (cases à 24,2 px ; 625 px avant) ; 750 × 342 → 630 px (21,1 px ; 533 px avant) ; 667 × 375 → 547 px (18,3 px ; 559 px avant) ; 568 × 320 → 448 px (15 px ; 383 px avant) ; 480 × 320 → 360 px (12 px ; 372 px avant). L'ordinateur ne change pas : 1024 × 640 → 920 px (30,8 px) ; 1280 × 800 → 1227 px (41 px) ; 1440 × 900 → 1408 px (47,1 px). En portrait, pas de plateau mais l'invitation à tourner l'écran. Sur un vrai iPhone 13 tenu en largeur (calculé, pas mesuré) : environ 594 px dans Safari (cases à environ 19,9 px) et environ 630 px dans l'app installée (21,1 px). Romain dit si ces tailles lui conviennent et ce qu'il mesure sur son iPhone (voir tests 9 et 32).
 result: [pending]
 note: "Recette 3 du 2026-10-15 : « Le plateau de jeu est trop petit sur iphone » (test 24). Les tailles du téléphone tenu en largeur changent avec « Plateau sur toute la hauteur » (plans 01-47 et 01-48) ; le plan 01-54 réécrit l'attendu de ce test avec les nouvelles tailles, et Romain les confirme alors."
 
@@ -170,12 +170,68 @@ result: issue
 reported: "Le panneau de victoire défaite est moche"
 severity: minor
 
+### 31. Re-test 23 : le son en mode silencieux
+expected: Sur son iPhone, interrupteur de sonnerie sur silencieux (pas seulement le volume au minimum), dans Safari puis dans l'app ajoutée à l'écran d'accueil, après le premier toucher (« Jouer la partie ») : il entend les sabots des chevaux, et aussi les hennissements et les sons de cartes tels qu'ils sont aujourd'hui. Après un passage en arrière-plan ou un verrouillage, le son revient au toucher suivant. Sous « Son » (Réglages) et en tête de « Test des sons », l'aide dit : « Le son joue aussi quand l'iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté. » (Il a déjà accepté que la musique d'une autre app s'arrête pendant la partie : « Oui, ça me va ».)
+result: [pending]
+note: "Seul le fait d'entendre les sons en mode silencieux est à vérifier ici. Le travail sur les hennissements et les sons de cartes (plans 01-52 et 01-53) est reporté par Romain le 2026-10-15 : « OK, continue, laisse les sons de côté sauf les sabots des chevaux, et montre moi quand c'est prêt. »"
+
+### 32. Re-test 24 : le plateau sur toute la hauteur
+expected: Sur son iPhone tenu en largeur, dans Safari puis dans l'app ajoutée à l'écran d'accueil : le plateau prend toute la hauteur de l'écran, sous une ligne de consigne ; il le trouve assez grand pour bien voir les cases et toucher les cavaliers. La main en colonne à gauche du plateau, les boutons à droite et la pastille d'infos en haut à gauche se prennent bien avec les pouces. Il dit quelle largeur de plateau il voit sur son iPhone 13 : calculée, environ 594 px dans Safari (cases à environ 19,9 px l'une de l'autre, au lieu d'environ 493 px avant) et environ 630 px dans l'app installée (cases à environ 21,1 px, au lieu d'environ 585 px) ; mesurée dans l'émulation, 630 px à 750 × 342 et 724 px à 844 × 390 (captures apps/web/test-results/galet-emulation-*.png).
+result: [pending]
+
+### 33. Re-test 25 : les cavaliers tournés vers leur camp
+expected: Les quatre cavaliers à l'encre dessinés dans les coins du galet ont les sabots tournés vers le bord de leur camp : celui du bas comme avant, celui de gauche et celui de droite d'un quart de tour, celui du haut tête en bas (comme on le voit depuis sa place). Chacun reste dans son coin, hors des cases, des écuries, des maisons et du tapis. Il en va de même dans les images de RULES.md.
+result: [pending]
+
+### 34. Re-test 26 : la règle G16
+expected: Il relit R-13 et la décision G16 dans RULES.md (jugée carte par carte, comme il l'a répondu : « Oui, autorisé ») et les images R-13.22 à R-13.27, puis joue quelques tours avec un cheval près de sa maison, un 7 compris. La carte qui peut faire entrer ce cheval pile sur une case vide de sa maison ne le joue que pour l'y faire entrer ; une autre carte (un 9 par exemple) peut lui faire continuer son tour ; les autres chevaux restent libres ; avec le 7, ce cheval entre ou ne bouge pas.
+result: [pending]
+
+### 35. Re-test 27 : un seul cheval, directement « Jouer »
+expected: Quand un seul cheval peut jouer la carte choisie, il n'a plus à le toucher : l'aperçu (le chemin, le cheval fantôme, les prises, la phrase) s'affiche tout de suite avec « Jouer ». De même pour l'As ou le Roi après « Avancer » avec un seul cheval sur l'anneau, et pour un 7 qui n'a qu'un partage possible (l'assistant s'ouvre déjà rempli). Le Valet demande toujours ses deux chevaux, et l'As et le Roi posent toujours la question « Sortir » ou « Avancer » quand les deux sont possibles. Rien n'est joué sans toucher « Jouer ». Sur ordinateur : le chiffre de la carte, puis Entrée.
+result: [pending]
+
+### 36. Re-test 28 : la donne un peu moins rapide
+expected: La donne se suit à l'œil : chaque carte vole 300 ms (au lieu de 250), 55 ms après la précédente (au lieu de 40) ; les 20 cartes d'une première donne arrivent en environ 1,35 s (au lieu de 1,01 s), et ses propres cartes se retournent au même rythme. « Avance rapide » et « Réduire les animations » restent rapides.
+result: [pending]
+
+### 37. Re-test 29 : la page des sons à choix, pour les sabots
+expected: Sur #/sons (Réglages → « Tester les sons »), après un toucher, il écoute les quatre versions des sabots : A (le son d'avant), B « sur la terre », C « sur les pavés », D « sur le bois ». Il choisit la sienne dans « Mon choix », l'écoute à d'autres vitesses (« Cadence de ton choix » et le curseur des distances), l'entend dans une partie sur le même appareil, puis l'envoie avec « Copier mes choix » (une ligne comme « Sabots : C ») pour qu'elle devienne le son de tous.
+result: [pending]
+note: "Seuls les sabots ont des versions à choisir. Les hennissements et les sons de cartes en plusieurs versions (plans 01-52 et 01-53) sont reportés par Romain le 2026-10-15 : « OK, continue, laisse les sons de côté sauf les sabots des chevaux, et montre moi quand c'est prêt. » Sur la page, ils n'ont qu'une version, « A », le son actuel ; ils ne sont pas à juger dans cette recette."
+
+### 38. Re-test 30 : la planche de fin de partie
+expected: Il gagne une partie et en perd une (ou regarde les captures apps/web/test-results/fin-victoire-*.png et fin-defaite-*.png). La fin est une planche dans le bois du galet, au-dessus du plateau assombri : « Victoire ! » (souligné d'un trait ambre) ou « Défaite » écrit en Caveat, les deux cavaliers de l'équipe gagnante sur des disques de leurs couleurs avec leurs noms (« Toi » d'abord), le score « nous – eux » dans un cartouche, les donnes jouées et les chevaux mangés, puis « Rejouer » et « Changer de couleur ». Une colonne sur l'ordinateur, deux sur l'iPhone tenu en largeur, jamais de défilement. Il la trouve belle et dans le style du plateau.
+result: [pending]
+note: "Les sons « Victoire » et « Défaite » (plan 01-53) sont reportés par Romain le 2026-10-15 : « OK, continue, laisse les sons de côté sauf les sabots des chevaux, et montre moi quand c'est prêt. » La planche n'a donc pas encore de son « Victoire » ou « Défaite » ; seule la planche est à juger."
+
+### 39. À confirmer (lecture du planificateur) : la règle G16 avec le 7
+expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain », jamais ses mots : « avec le 7, le cheval ne peut pas s'arrêter avant sa maison ; il peut s'arrêter sur son carré 16 et entrer à un pas suivant du même 7 » et « G16 ne rend jamais le 7 injouable : si aucun partage ne la respecte, le 7 se joue comme avant ». Autrement dit, quand un partage du 7 peut faire entrer un cheval dans sa maison, le 7 l'y fait entrer ou ne le bouge pas (RULES.md R-13, images R-13.23, R-13.24 et R-13.26). Romain confirme ou demande un changement.
+result: [pending]
+
+### 40. À confirmer (lecture du planificateur) : la disposition du téléphone tenu en largeur
+expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain » et 01-UI-SPEC.md « Le plateau sur toute la hauteur du téléphone » : « le plateau prend toute la hauteur, sous une ligne de consigne de 24 px. La main passe dans une bande de 60 px à gauche du galet, les boutons dans une bande de 60 px à droite. Les infos deviennent une petite pastille en haut de la bande de gauche, qui ouvre une feuille « Infos de la partie ». Les boutons portent des libellés courts (« Autre carte », « Passer », « Poser »). » « Avance rapide » n'y est plus qu'une icône (son nom reste lu). Les petits téléphones, limités par leur largeur, perdent 2 à 3 % : 547 px de plateau au lieu de 559 à 667 × 375, 360 px au lieu de 372 à 480 × 320. L'ordinateur ne change pas. Romain confirme ou demande un changement.
+result: [pending]
+
+### 41. À confirmer (lecture du planificateur) : le 7 rempli tout seul, et Échap
+expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain » : « Avec le 7, si un seul partage est possible, il est rempli tout seul. Le jeu ne joue toujours pas à la place du joueur (D-19) : il faut toujours toucher « Jouer ». » Et, quand l'aperçu est venu tout seul (un seul cheval possible), Échap (ou « Changer de carte ») repose la carte : on revient au choix d'une carte. Romain confirme ou demande un changement.
+result: [pending]
+
+### 42. À confirmer (lecture du planificateur) : le choix des sabots
+expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain », ramenée aux sabots seuls : quatre versions, de A à D, A étant le son d'avant ; chaque version est générée par le code. Son choix vaut tout de suite dans le jeu, mais sur son appareil seulement, tant qu'il ne l'a pas envoyé avec « Copier mes choix » ; une fois envoyé et recopié dans le jeu, il devient le son de tous. « Tant qu'il n'a rien choisi, le jeu garde les sons actuels » : la version A. Romain confirme ou demande un changement.
+result: [pending]
+note: "La lecture du planificateur visait aussi les hennissements, les sons de cartes et deux nouveaux sons, « Victoire » et « Défaite » (muets tant que rien n'est choisi). Cette partie est reportée par Romain le 2026-10-15 : « OK, continue, laisse les sons de côté sauf les sabots des chevaux, et montre moi quand c'est prêt. » (plans 01-52 et 01-53 non faits) ; elle n'est pas à confirmer maintenant."
+
+### 43. À confirmer (lecture du planificateur) : la planche de fin de partie
+expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain » : « le panneau devient une planche dans le bois du galet. Il porte le titre en Caveat, les deux couleurs de l'équipe gagnante avec leurs cavaliers, le score des chevaux rentrés (« 8 – 5 »), les donnes jouées et les chevaux mangés, puis « Rejouer » et « Changer de couleur ». » Son aspect (face en chêne veinée, bord en noyer, ombre nette sans flou) et son titre en Caveat de 44 px, une exception à la typographie du jeu (le plus grand texte est sinon de 28 px), comme les numéros des cases : 01-UI-SPEC.md « La planche de fin de partie ». Romain confirme ou demande un changement.
+result: [pending]
+
 ## Summary
 
-total: 30
+total: 43
 passed: 1
 issues: 14
-pending: 15
+pending: 28
 skipped: 0
 blocked: 0
 
