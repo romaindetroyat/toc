@@ -4,7 +4,10 @@ const KEY = "toc.settings.v1";
 
 const radio = (page: Page, name: string) => page.getByRole("radio", { name, exact: true });
 
-test("lancement: Bleu préselectionné, partenaire et adversaires affichés", async ({ page }) => {
+test("lancement: Bleu préselectionné, partenaire et adversaires affichés", async ({
+  page,
+  isMobile,
+}) => {
   await page.goto("/");
   const colours = page.getByRole("radiogroup", { name: "Choisis ta couleur" });
   await expect(colours).toBeVisible();
@@ -17,14 +20,39 @@ test("lancement: Bleu préselectionné, partenaire et adversaires affichés", as
   await expect(page.locator(".sr-only", { hasText: "Ton équipe : Bleu + Rouge" })).toBeAttached();
   await expect(page.locator(".sr-only", { hasText: "Adversaires : Jaune + Vert" })).toBeAttached();
 
-  // Every tile is at least 128 x 128.
+  // Every tile is at least 128 x 128 on the computer; on the phone held sideways the compact tiles
+  // are 96 x 88 (03-UI-SPEC), still at least 44 x 44, and the partner tag is out of sight while it
+  // stays the partner tile's description.
+  for (const tile of await colours.getByRole("radio").all()) {
+    const box = await tile.boundingBox();
+    if (isMobile) {
+      expect(box?.width).toBeCloseTo(96, 0);
+      expect(box?.height).toBeCloseTo(88, 0);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    } else {
+      expect(box?.width).toBeGreaterThanOrEqual(128);
+      expect(box?.height).toBeGreaterThanOrEqual(128);
+    }
+  }
+  if (isMobile) {
+    const tag = await radio(page, "Rouge").locator(".tag").boundingBox();
+    expect(tag?.width ?? 0).toBeLessThanOrEqual(1);
+  }
+  const play = await page.getByRole("button", { name: "Jouer la partie" }).boundingBox();
+  expect(play?.height).toBeGreaterThanOrEqual(48);
+
+  // Held upright: the phase-1 tiles, at least 128 x 128, the tag in sight.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("main.launch")).toHaveAttribute("data-layout", "portrait");
   for (const tile of await colours.getByRole("radio").all()) {
     const box = await tile.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(128);
     expect(box?.height).toBeGreaterThanOrEqual(128);
   }
-  const play = await page.getByRole("button", { name: "Jouer la partie" }).boundingBox();
-  expect(play?.height).toBeGreaterThanOrEqual(48);
+  await expect(radio(page, "Rouge")).toHaveAccessibleDescription("Partenaire");
+  const tag = await radio(page, "Rouge").locator(".tag").boundingBox();
+  expect(tag?.width).toBeGreaterThan(40);
 });
 
 test("lancement: le choix est retenu, les flèches déplacent la sélection", async ({ page }) => {

@@ -59,9 +59,25 @@
     tiles[next]?.focus();
   }
 
-  // The layout follows the game's screen modes (03-UI-SPEC « Launch screen layouts »): two columns
-  // on the computer (screen.chrome "bar"); elsewhere the phase-1 column.
-  const layout = $derived(screen.chrome === "bar" ? "computer" : "portrait");
+  // The layout follows the game's screen modes (03-UI-SPEC « Launch screen layouts »), plus one width
+  // threshold for the phone held sideways. The launch screen is never behind « Tourne ton téléphone ».
+  // - computer: screen.chrome "bar" (landscape from 960 x 600), two columns under a centred header;
+  // - two: compact from 640 wide, two columns, smaller tiles, no tagline or note;
+  // - one: compact under 640 wide, one column that scrolls, the button in a sticky band;
+  // - portrait: the phase-1 column, with the same sticky band.
+  type Layout = "computer" | "two" | "one" | "portrait";
+  const TWO_COLUMNS_FROM = 640;
+  let width = $state(typeof window === "undefined" ? 1280 : window.innerWidth);
+  const layout = $derived<Layout>(
+    screen.chrome === "bar"
+      ? "computer"
+      : screen.chrome === "rotate"
+        ? "portrait"
+        : width >= TWO_COLUMNS_FROM
+          ? "two"
+          : "one",
+  );
+  const compact = $derived(layout === "two" || layout === "one");
 
   let settingsOpen = $state(false);
   let settingsButton = $state<HTMLButtonElement | null>(null);
@@ -74,6 +90,8 @@
   }
 </script>
 
+<svelte:window bind:innerWidth={width} />
+
 {#snippet header()}
   <header>
     <h1 class="t-display">{launch.title}</h1>
@@ -82,10 +100,11 @@
 {/snippet}
 
 <main class="launch" data-layout={layout}>
-  {@render header()}
+  {#if !compact}{@render header()}{/if}
 
   <div class="columns">
     <section class="choice">
+      {#if compact}{@render header()}{/if}
       <h2 id="choose-color" class="t-heading">{launch.chooseColor}</h2>
       <div class="grid" role="radiogroup" aria-labelledby="choose-color">
         {#each COLORS as color (color)}
@@ -97,6 +116,7 @@
             bind:el={tiles[color]}
             onselect={() => select(color)}
             {onkeydown}
+            {compact}
           />
         {/each}
       </div>
@@ -252,17 +272,88 @@
     margin-top: var(--space-lg);
   }
 
-  /* Portrait and, until the phone layouts, every other screen: the phase-1 column (max 480). */
-  .launch[data-layout="portrait"] {
-    max-width: 480px;
-    gap: var(--space-xl);
-    padding-block: var(--space-2xl);
+  /* Phone held sideways from 640 wide: two columns centred as a group, the left one 200 (TOC, the
+     heading, the 2 x 2 tiles of 96 x 88), the right one at most 520 (the rows, the button row). */
+  .launch[data-layout="two"] {
+    padding-block: calc(12px + env(safe-area-inset-top, 0px))
+      calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
-  .launch[data-layout="portrait"] .columns {
+  .launch[data-layout="two"] .columns {
     display: flex;
-    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+
+  .launch[data-layout="two"] .choice {
+    flex: none;
+    width: 200px;
+  }
+
+  .launch[data-layout="two"] .right {
+    flex: 0 1 520px;
+    min-width: 0;
+  }
+
+  .launch[data-layout="two"] .grid {
+    grid-template-columns: repeat(2, 96px);
+  }
+
+  .launch[data-layout="two"] .actions {
+    margin-top: var(--space-md);
+  }
+
+  /* Phone held sideways under 640 wide: one column that scrolls; the four tiles in one row. */
+  .launch[data-layout="one"] {
+    justify-content: flex-start;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  .launch[data-layout="one"] .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .launch[data-layout="one"] .strength {
+    margin-top: var(--space-md);
+  }
+
+  .launch[data-layout="one"] .actions {
+    margin-top: var(--space-md);
+  }
+
+  /* Both compact layouts: TOC, 8, the heading, 8, the tiles 8 apart; no tagline, no note. */
+  .launch[data-layout="two"] header,
+  .launch[data-layout="one"] header {
+    margin-bottom: var(--space-sm);
+    text-align: start;
+  }
+
+  .launch[data-layout="two"] h2,
+  .launch[data-layout="one"] h2 {
+    margin-bottom: var(--space-sm);
+  }
+
+  .launch[data-layout="two"] .grid,
+  .launch[data-layout="one"] .grid,
+  .launch[data-layout="two"] .rows,
+  .launch[data-layout="one"] .rows {
+    gap: var(--space-sm);
+  }
+
+  .launch[data-layout="two"] .tagline,
+  .launch[data-layout="one"] .tagline,
+  .launch[data-layout="two"] .note,
+  .launch[data-layout="one"] .note {
+    display: none;
+  }
+
+  /* Portrait: the phase-1 column (max 480, padding 48 / 16), the page scrolls. */
+  .launch[data-layout="portrait"] {
+    max-width: 480px;
+    justify-content: flex-start;
     gap: var(--space-xl);
+    padding-top: calc(var(--space-2xl) + env(safe-area-inset-top, 0px));
   }
 
   .launch[data-layout="portrait"] h2 {
@@ -284,7 +375,24 @@
     text-align: center;
   }
 
+  /* One column and portrait: the wrappers step aside, so the button row is a child of the page's
+     column and its sticky band stays at the bottom of the screen while the page scrolls. */
+  .launch[data-layout="one"] .columns,
+  .launch[data-layout="one"] .right,
+  .launch[data-layout="portrait"] .columns,
+  .launch[data-layout="portrait"] .right {
+    display: contents;
+  }
+
+  .launch[data-layout="one"] .actions,
   .launch[data-layout="portrait"] .actions {
-    margin-top: var(--space-xl);
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-inline: calc(-1 * var(--gutter-l)) calc(-1 * var(--gutter-r));
+    padding: var(--space-sm) var(--gutter-r) max(var(--space-sm), env(safe-area-inset-bottom, 0px))
+      var(--gutter-l);
+    border-top: 1px solid var(--brun-aide-memoire);
+    background: var(--noyer);
   }
 </style>

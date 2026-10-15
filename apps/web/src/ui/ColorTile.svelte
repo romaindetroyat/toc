@@ -15,6 +15,12 @@
     el?: HTMLButtonElement;
     onselect: () => void;
     onkeydown?: (event: KeyboardEvent) => void;
+    /**
+     * The compact launch layouts (03-UI-SPEC « compact tiles »): 88 high, as wide as its grid cell
+     * (96 in the 2 x 2, a quarter of the column in one row), a 40 px knight, the « Partenaire » tag
+     * visually hidden but kept as the tile's description; the dashed partner outline stays.
+     */
+    compact?: boolean;
   };
 
   let {
@@ -25,6 +31,7 @@
     el = $bindable(),
     onselect,
     onkeydown,
+    compact = false,
   }: Props = $props();
 
   const tagId = $derived(`tile-tag-${color}`);
@@ -39,6 +46,7 @@
   class="tile"
   class:selected
   class:partner
+  class:compact
   aria-checked={selected}
   aria-label={seats[color].name}
   aria-describedby={partner ? tagId : undefined}
@@ -48,7 +56,12 @@
   {onkeydown}
 >
   <span class="visual" aria-hidden="true">
-    <svg viewBox="0 0 110 190" width="37" height="64" focusable="false">
+    <svg
+      viewBox="0 0 110 190"
+      width={compact ? 23 : 37}
+      height={compact ? 40 : 64}
+      focusable="false"
+    >
       <use href={`#knight-${color}`} />
     </svg>
   </span>
@@ -122,6 +135,37 @@
     border-radius: 50%;
     background: #2b1d12;
     color: var(--creme);
+  }
+
+  /* Compact: 8 from the outer edge (3 of border, 5 of padding), knight 40, 4, chip 28 = 88. */
+  .tile.compact {
+    width: 100%;
+    min-width: var(--touch);
+    height: 88px;
+    min-height: 0;
+    gap: var(--space-xs);
+    padding: 5px;
+  }
+
+  .compact .visual {
+    width: 40px;
+    height: 40px;
+  }
+
+  .compact .check {
+    top: var(--space-xs);
+    right: var(--space-xs);
+  }
+
+  /* The tag's text stays the tile's accessible description (aria-describedby), out of sight. */
+  .compact .tag {
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .tag {
