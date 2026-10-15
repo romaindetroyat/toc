@@ -102,6 +102,7 @@ Out of scope: online play, accounts, a tutorial or hints for the human, bot chat
 - Hints or a tutorial using the bot's evaluation for the human: phase 5 (learning).
 - The online table's strength picker: phase 2 reuses D-01 to D-03.
 - The sound work deferred from phase 1 (neighs, card sounds, end sounds): tracked in `.planning/phases/01-une-vraie-partie-sur-un-appareil/deferred-items.md`, not part of this phase.
+- **Note, 2026-10-15 (plan 03-08): « Oui, que les sabots ».** After trying the game Romain wrote « les sons n'ont pas été supprimés... », and to « Les sons : je comprends que tu veux qu'on n'entende plus que les sabots dans le jeu (plus de hennissements, ni de sons de cartes, ni de fin de partie). C'est bien ça ? » he answered « Oui, que les sabots ». Gap plan 03-08 silences every sound but the hoof clops behind one switch (`ENABLED_SOUNDS` in `apps/web/src/audio/sounds.ts`); the synthesis code and the cue plan stay, so the sounds can come back. Details in the phase 1 `deferred-items.md`.
 
 </deferred>
 

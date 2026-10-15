@@ -15,7 +15,14 @@
     unlock,
     type VariantState,
   } from "../audio/engine.ts";
-  import { SOUND_IDS, SOUNDS, type SoundId, type SoundVariant, type VariantKey } from "../audio/sounds.ts";
+  import {
+    isSoundEnabled,
+    SOUND_IDS,
+    SOUNDS,
+    type SoundId,
+    type SoundVariant,
+    type VariantKey,
+  } from "../audio/sounds.ts";
   import { mixFromSettings } from "../game/audioSettings.ts";
   import { credits } from "../i18n/fr/credits.ts";
   import { sons } from "../i18n/fr/sons.ts";
@@ -42,8 +49,13 @@
 
   /** The distances (in cells) the page plays the hoof cadence for. */
   const HOOF_CASES = [1, 4, 7, 13] as const;
-  const neighIds = SOUND_IDS.filter((id) => id.startsWith("hennissement-"));
-  const cardIds = SOUND_IDS.filter((id) => id.startsWith("carte-"));
+  // Only the sounds heard in the game have a row (ENABLED_SOUNDS: the hooves alone since Romain's
+  // « Oui, que les sabots », 2026-10-15). A section with no sound left is not shown, and one line
+  // says the others are cut for now; they come back with their id in ENABLED_SOUNDS.
+  const shownIds = SOUND_IDS.filter(isSoundEnabled);
+  const someMuted = shownIds.length < SOUND_IDS.length;
+  const neighIds = shownIds.filter((id) => id.startsWith("hennissement-"));
+  const cardIds = shownIds.filter((id) => id.startsWith("carte-"));
 
   // --- Audio state ---
   let engineStatus = $state<EngineStatus>(status());
@@ -163,7 +175,7 @@
   let fallbackText = $state<string | undefined>();
 
   async function copyChoices() {
-    const text = choicesAsText(current, sons.names);
+    const text = choicesAsText(current, sons.names, shownIds);
     try {
       // Plain text only: nothing in the choices is ever turned into markup.
       await navigator.clipboard.writeText(text);
@@ -251,6 +263,9 @@
     <p class="state" role="status" data-state={engineStatus}>{stateLine}</p>
     <p class="hint">{sons.silentSwitchHint}</p>
     <p class="intro">{sons.intro}</p>
+    {#if someMuted}
+      <p class="hint" data-muted-note>{sons.mutedNote}</p>
+    {/if}
   </header>
 
   <section aria-labelledby="sec-sabots">
@@ -304,23 +319,27 @@
     </ul>
   </section>
 
-  <section aria-labelledby="sec-hennissements">
-    <h2 id="sec-hennissements" class="t-heading">{sons.sections.hennissements}</h2>
-    <ul class="rows">
-      {#each neighIds as sound (sound)}
-        {@render soundRow(sound)}
-      {/each}
-    </ul>
-  </section>
+  {#if neighIds.length > 0}
+    <section aria-labelledby="sec-hennissements">
+      <h2 id="sec-hennissements" class="t-heading">{sons.sections.hennissements}</h2>
+      <ul class="rows">
+        {#each neighIds as sound (sound)}
+          {@render soundRow(sound)}
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
-  <section aria-labelledby="sec-cartes">
-    <h2 id="sec-cartes" class="t-heading">{sons.sections.cartes}</h2>
-    <ul class="rows">
-      {#each cardIds as sound (sound)}
-        {@render soundRow(sound)}
-      {/each}
-    </ul>
-  </section>
+  {#if cardIds.length > 0}
+    <section aria-labelledby="sec-cartes">
+      <h2 id="sec-cartes" class="t-heading">{sons.sections.cartes}</h2>
+      <ul class="rows">
+        {#each cardIds as sound (sound)}
+          {@render soundRow(sound)}
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <footer>
     <button type="button" class="btn btn-primary copy" onclick={copyChoices}>
@@ -339,7 +358,7 @@
       <textarea
         class="choices-text"
         readonly
-        rows={SOUND_IDS.length + 1}
+        rows={shownIds.length + 1}
         aria-label={sons.choicesText}
         value={fallbackText}
         onfocus={(event) => event.currentTarget.select()}

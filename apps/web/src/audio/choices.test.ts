@@ -121,4 +121,9 @@ describe("choicesAsText", () => {
     expect(lines).toContain("Nom carte-pose : A");
     expect(lines.map((line) => line.split(" ")[0])).toEqual(SOUND_IDS.map((id) => NAMES[id]));
   });
+
+  it("lists only the sounds it is given: the page passes the heard ones (only the hooves today)", () => {
+    const text = choicesAsText(effectiveChoices({ sabot: "c" }), NAMES, ["sabot"]);
+    expect(text).toBe("Nom sabot : C");
+  });
 });

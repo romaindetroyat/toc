@@ -9,7 +9,14 @@ import {
   type PlayedSound,
   type RenderSound,
 } from "./engine.ts";
-import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId } from "./sounds.ts";
+import {
+  ENABLED_SOUNDS,
+  isSoundEnabled,
+  SOUND_IDS,
+  SOUNDS,
+  type SoundDef,
+  type SoundId,
+} from "./sounds.ts";
 import { normalize } from "./synth.ts";
 
 function mulberry32(seed: number): () => number {
@@ -39,6 +46,7 @@ async function setup(
     choices?: Partial<Choices>;
     decode?: Decoder;
     render?: RenderSound;
+    enabled?: ReadonlySet<SoundId>;
   } = {},
 ) {
   const backend = new FakeBackend();
@@ -49,11 +57,18 @@ async function setup(
     catalogue: options.catalogue,
     choices: effectiveChoices(options.choices ?? {}),
     decode: options.decode,
+    enabled: options.enabled,
   });
   engine.unlock();
   await engine.whenReady();
   return { backend, engine };
 }
+
+/**
+ * Every sound heard: the machinery of the silenced sounds (their versions, files, failures) stays
+ * tested with it, so they can come back by adding their id to ENABLED_SOUNDS.
+ */
+const EVERY_SOUND: ReadonlySet<SoundId> = new Set(SOUND_IDS);
 
 describe("catalogue", () => {
   it("holds the ten Phase 1 sounds, all effects: no ambience (removed on 2026-10-14)", () => {
@@ -177,6 +192,7 @@ describe("voice pool", () => {
       render: async (recipe, variant) =>
         recipe === "hoof" ? fakeRender(recipe, variant) : undefined,
       random: () => 0.5,
+      enabled: EVERY_SOUND,
     });
     engine.unlock();
     await engine.whenReady();
@@ -212,7 +228,7 @@ describe("jitter", () => {
       [0.9999999, 1.04, 1.5],
     ] as const) {
       const { backend, engine } = await setup({ random: () => value });
-      engine.cue("carte-pose");
+      engine.cue("sabot");
       const play = backend.plays[0];
       expect(play?.rate).toBeCloseTo(rate, 4);
       expect(play?.gainDb).toBeCloseTo(db, 4);
@@ -222,8 +238,8 @@ describe("jitter", () => {
   it("starts a cue now when no time is given, and honours explicit options", async () => {
     const { backend, engine } = await setup({ random: () => 0.5 });
     backend.time = 3;
-    engine.cue("hennissement-sortie");
-    engine.cue("hennissement-sortie", 5, { gainDb: -6, rate: 0.5 });
+    engine.cue("sabot");
+    engine.cue("sabot", 5, { gainDb: -6, rate: 0.5 });
     expect(backend.plays[0]?.at).toBe(3);
     expect(backend.plays[1]?.at).toBe(5);
     expect(backend.plays[1]?.rate).toBeCloseTo(0.5, 6);
@@ -274,7 +290,8 @@ describe("versions and choices", () => {
       "hoof-terre#1",
       "hoof-terre#2",
     ]);
-    expect(asked).toHaveLength(12); // 3 takes of the hoof + 9 sounds of one take
+    // Only the hooves are heard since 2026-10-15: the 9 other sounds are not rendered at all.
+    expect(asked).toHaveLength(3);
     engine.cue("sabot");
     engine.scheduleClops([0, 100, 200], 1);
     expect(backend.plays.map((p) => tagOf(p.buffer))).toEqual([
@@ -380,6 +397,7 @@ describe("versions and choices", () => {
     const { backend, engine } = await setup({
       catalogue: withFile(["/audio/carte-pose.mp3", "/audio/carte-pose.m4a"]),
       choices: { "carte-pose": "b" },
+      enabled: EVERY_SOUND,
       decode: async (url) => {
         tried.push(url);
         if (url.endsWith(".m4a")) throw new Error("EncodingError");
@@ -396,6 +414,7 @@ describe("versions and choices", () => {
     const { backend, engine } = await setup({
       catalogue: withFile(["/audio/carte-pose.m4a", "/audio/carte-pose.mp3"]),
       choices: { "carte-pose": "b" },
+      enabled: EVERY_SOUND,
       decode: async () => {
         throw new Error("EncodingError");
       },
@@ -409,6 +428,7 @@ describe("versions and choices", () => {
     const { backend, engine } = await setup({
       catalogue: withFile([]),
       choices: { "carte-pose": "c" },
+      enabled: EVERY_SOUND,
     });
     expect(engine.availability("carte-pose", "c")).toBe("ready");
     engine.cue("carte-pose");
@@ -498,8 +518,8 @@ describe("no ambience (removed on 2026-10-14)", () => {
     expect(backend.plays).toHaveLength(0);
   });
 
-  it("plays every cued sound once, on the effect bus, never looped", async () => {
-    const { backend, engine } = await setup();
+  it("plays every cued sound once, on the effect bus, never looped (every sound heard)", async () => {
+    const { backend, engine } = await setup({ enabled: EVERY_SOUND });
     for (const id of SOUND_IDS) engine.cue(id);
     expect(backend.plays).toHaveLength(SOUND_IDS.length);
     expect(backend.plays.every((play) => play.bus === "sfx")).toBe(true);
@@ -517,6 +537,7 @@ describe("availability", () => {
         return fakeRender(recipe, variant);
       },
       random: () => 0.5,
+      enabled: EVERY_SOUND,
     });
     expect(engine.availability("sabot", "a")).toBe("absent");
     engine.unlock();
@@ -524,6 +545,80 @@ describe("availability", () => {
     expect(engine.availability("sabot", "a")).toBe("ready");
     expect(engine.availability("sabot", "b")).toBe("absent");
     expect(engine.availability("hennissement-ruade", "a")).toBe("failed");
+  });
+});
+
+describe("only the hooves (Romain, 2026-10-15: « Oui, que les sabots »)", () => {
+  const silenced = SOUND_IDS.filter((id) => id !== "sabot");
+
+  it("ENABLED_SOUNDS, the one switch, holds the hooves alone", () => {
+    expect([...ENABLED_SOUNDS]).toEqual(["sabot"]);
+    expect(isSoundEnabled("sabot")).toBe(true);
+    for (const id of silenced) expect(isSoundEnabled(id), id).toBe(false);
+    // The silenced sounds stay in the catalogue, with their recipes, to come back later.
+    expect(silenced).toHaveLength(9);
+    for (const id of silenced) expect(SOUNDS[id].variants[0]?.source.kind, id).toBe("synth");
+  });
+
+  it("renders only the hoof takes at unlock: no neigh, no card sound", async () => {
+    const asked: string[] = [];
+    const { engine } = await setup({
+      render: async (recipe, take) => {
+        asked.push(`${recipe}#${take}`);
+        return fakeRender(recipe, take);
+      },
+    });
+    expect(asked).toEqual(["hoof#0", "hoof#1", "hoof#2"]);
+    for (const id of silenced) {
+      expect(engine.availability(id, "a"), id).toBe("absent");
+      expect(engine.activeVariant(id), id).toBeUndefined();
+    }
+  });
+
+  it("plays none of the silenced sounds, by cue or by play, and still plays the clops", async () => {
+    const played: PlayedSound[] = [];
+    const backend = new FakeBackend();
+    const engine = createAudioEngine({
+      backend,
+      render: fakeRender,
+      random: () => 0.5,
+      onPlay: (sound) => played.push(sound),
+    });
+    engine.unlock();
+    await engine.whenReady();
+    for (const id of silenced) {
+      engine.cue(id);
+      engine.cue(id, 1, { gainDb: 3 });
+      engine.play(id, "a");
+    }
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(backend.plays).toHaveLength(0);
+    for (const id of silenced) expect(engine.availability(id, "a"), id).toBe("absent");
+    engine.scheduleClops(hopTimeline(4).clops, 0);
+    expect(backend.plays).toHaveLength(4);
+    expect(played.every((sound) => sound.id === "sabot")).toBe(true);
+  });
+
+  it("keeps the choice of a silenced sound without preparing it", async () => {
+    const asked: string[] = [];
+    const catalogue: Record<SoundId, SoundDef> = {
+      ...SOUNDS,
+      "carte-pose": {
+        bus: "sfx",
+        variants: [...SOUNDS["carte-pose"].variants, { key: "b", source: { kind: "silence" } }],
+      },
+    };
+    const { engine } = await setup({
+      catalogue,
+      render: async (recipe, take) => {
+        asked.push(recipe);
+        return fakeRender(recipe, take);
+      },
+    });
+    engine.setChoices({ ...effectiveChoices({}), "carte-pose": "b" });
+    expect(engine.choices()["carte-pose"]).toBe("b");
+    expect(engine.availability("carte-pose", "b")).toBe("absent");
+    expect(asked.filter((recipe) => !recipe.startsWith("hoof"))).toEqual([]);
   });
 });
 
