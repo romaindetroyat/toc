@@ -27,8 +27,9 @@ export type Facing = "right" | "left";
 const VERTICAL_RATIO = 0.35;
 
 /**
- * Facing for a hop whose screen-space delta is (dx, dy), after the board rotation. A near-vertical
- * hop (|dx| < 0.35 * |dy|) and a hop that goes nowhere keep the previous facing.
+ * Facing for a hop whose screen-space delta is (dx, dy), on the galet as the human sees it (the
+ * board never turns; the seat index only places the colours). A near-vertical hop
+ * (|dx| < 0.35 * |dy|) and a hop that goes nowhere keep the previous facing.
  */
 export function facingFor(previous: Facing, dx: number, dy: number): Facing {
   if (dx === 0 || Math.abs(dx) < VERTICAL_RATIO * Math.abs(dy)) return previous;

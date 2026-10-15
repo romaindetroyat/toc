@@ -119,7 +119,10 @@ export type DirectorDeps = {
     /** The neighs and the card sounds, on the audio clock like the clops. */
     cue?(id: SoundId, at?: number): void;
   };
-  /** Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. */
+  /**
+   * The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet. Hop
+   * points are screen anchors.
+   */
   quarterTurns: number;
   /** Where the pawn's head points right now, before the event is played. */
   facingOf(pawn: PawnId): Facing;

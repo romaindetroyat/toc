@@ -14,8 +14,17 @@ Out-of-scope discoveries logged by executors. They are not fixed by the plan tha
   - `apps/web/src/game/director.ts:122` « Clockwise quarter turns of the board toward the human (D-05): hop points are screen anchors. » on `quarterTurns`;
   - `apps/web/src/board/geometry.ts:30` « … after the board rotation » in the doc of `facingFor`.
   Suggested wording, later: « The human's seat index k (quarterTurnsFor): which colour sits at the bottom of the galet », as FeltTable.svelte and Overlay.svelte already say.
+  - **Fixed in 01-54:** the three comments now say « The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet » (session.svelte.ts on `Session.k`, director.ts on `quarterTurns`), and the doc of `facingFor` (geometry.ts) speaks of the galet as the human sees it, which never turns. Comment-only, no behaviour change.
 - **01-UI-SPEC.md, addendum « Plateau galet », not in 01-41's files:** item 2 still writes `sceneXY(place, k, layout)` (the layout parameter left in 01-40), and « Faits techniques » still describes the portrait scene (2000 × 3000) as kept in the code « pour l'instant » (removed in 01-40).
 
 ## Found during 01-43
 
 - **Rule pictures ring pawns, not moves:** tools/render-scenarios.mjs draws one halo per pawn, and an allowed move overrides a refused one on the same pawn (lines 234-235). In R-13.23 every knight of a refused 7 plan also moves in an allowed plan, so the picture shows bleu A and bleu B ringed in green and no red ring; R-13.22 rings bleu A once for both the 2 and the 9. The text of R-13 says which plans are refused. Drawing per-move halos (or the landing cell) would change the renderer and so could alter the 112 earlier pictures, which 01-43 must keep byte-identical.
+
+## Deferred by Romain (2026-10-15)
+
+- **Plans 01-52 and 01-53 are not executed.** Romain wrote on 2026-10-15, after 01-51 was built: « OK, continue, laisse les sons de côté sauf les sabots des chevaux, et montre moi quand c'est prêt. » So:
+  - 01-52 (the neighs in three or four versions) is deferred: the neighs keep their single version « A » (today's synthesis);
+  - 01-53 (the card sounds in three or four versions, and the new « Victoire » and « Défaite » sounds at the end of a game) is deferred: the card sounds keep their single version « A », and no « Victoire » or « Défaite » sound is added;
+  - the hooves (01-51) are kept: four versions A–D on `#/sons`, his choice heard in his games, « Copier mes choix » to send it.
+  - ROADMAP.md marks both plans « reporté le 2026-10-15 ». 01-CONTEXT.md (« Recette 3 de Romain ») and 01-UAT.md (notes on tests 31, 37, 38 and 42) record the deferral. Gap G-01-29 stays open for the neighs, the card sounds and the end-of-game sounds, for a later phase or when Romain asks for them again.

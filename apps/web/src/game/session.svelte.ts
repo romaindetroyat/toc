@@ -48,7 +48,7 @@ export type BotPlay = { seat: Color; events: GameEvent[] };
 
 export type Session = {
   readonly human: Color;
-  /** Clockwise quarter turns of the board toward the human (D-05). */
+  /** The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet. */
   readonly k: number;
   /** The pace of the moment (settings, or `test` under the debug speed): read again at each use. */
   readonly pace: DirectorMode;
