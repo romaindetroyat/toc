@@ -3,7 +3,7 @@ status: partial
 phase: 01-une-vraie-partie-sur-un-appareil
 source: [01-VERIFICATION.md, 01-UI-REVIEW.md]
 started: 2026-10-13T23:30:00Z
-updated: 2026-10-14T22:45:00Z
+updated: 2026-10-15T12:00:00Z
 ---
 
 ## Current Test
@@ -64,6 +64,7 @@ result: [pending]
 ### 9. Re-test 4 : le plateau galet sur l'iPhone tenu en largeur (Safari et app installée), « Tourne ton téléphone » en portrait, et sur ordinateur
 expected: (1) Sur l'iPhone tenu en largeur, dans Safari puis dans l'app ajoutée à l'écran d'accueil : son camp centré en bas, celui de son partenaire centré en haut, aucun petit cadre de rappel des règles, les cases, les numéros, les losanges 18, les carrés 16 et ses cavaliers dessinés dans les coins se lisent bien ; le bois et le tapis ressemblent à la planche « Ordinateur · galet » ; la barre compacte (les infos à gauche du plateau, la main, la consigne et les boutons dessous) se manie bien avec les pouces. (2) Téléphone tourné à la verticale en pleine partie : « Tourne ton téléphone » remplace le plateau ; en le remettant en largeur, on retrouve la même partie, les joueurs de l'ordinateur ayant attendu. Une fenêtre d'ordinateur plus haute que large montre « Élargis la fenêtre ». (3) Sur l'ordinateur : le galet prend la largeur avec la barre du bas, il se lit bien, et l'on joue à l'aise à la souris comme au clavier (lettres sur les cavaliers allumés, aides des touches) ; agrandir ou réduire la fenêtre garde la partie. (4) Taille du plateau sur son propre iPhone, calculée et à vérifier : environ 585 px de large dans l'app installée (cases à environ 20 px l'une de l'autre) ; dans Safari environ 533 px (cases à environ 18 px), ou environ 493 px (cases à environ 16,5 px) si Safari compte aussi la marge du bas. Romain dit ce qu'il voit.
 result: [pending]
+note: "Recette 3 du 2026-10-15 : Romain a trouvé le plateau « trop petit sur iphone » (test 24) et a choisi « Plateau sur toute la hauteur ». Le point (4) sera refait sur la nouvelle disposition (plans 01-47 et 01-48) ; le reste du test attend sa réponse."
 
 ### 10. À confirmer : le tapis, sa texture et sa forme
 expected: « La texture de bruit du tapis est coupée au tapis seul » (c'est ainsi qu'a été lue la « correction des transparences du tapis » de la maquette), et « le tapis est l'ellipse verte de la planche « Ordinateur · galet » ». Romain confirme ou demande un changement.
@@ -104,6 +105,7 @@ result: [pending]
 ### 19. À confirmer : les objectifs de taille et les appareils réels
 expected: Largeur du plateau mesurée dans l'émulation (marges d'écran à 0) : 844 × 390 → 625 px (cases à 20,9 px) ; 750 × 342 → 533 px (17,8 px) ; 667 × 375 → 559 px (18,7 px) ; 568 × 320 → 383 px (12,8 px) ; 480 × 320 → 372 px (12,4 px) ; 1024 × 640 → 920 px (30,8 px) ; 1280 × 800 → 1227 px (41 px) ; 1440 × 900 → 1408 px (47,1 px) ; en portrait, pas de plateau mais l'invitation à tourner l'écran. Sur un vrai iPhone 13 tenu en largeur (calculé, pas mesuré) : environ 585 px dans l'app installée (cases à environ 19,6 px), environ 533 px dans Safari (17,8 px), ou environ 493 px (16,5 px) si Safari compte la marge du bas. Romain dit si ces tailles lui conviennent et ce qu'il mesure sur son iPhone (voir test 9).
 result: [pending]
+note: "Recette 3 du 2026-10-15 : « Le plateau de jeu est trop petit sur iphone » (test 24). Les tailles du téléphone tenu en largeur changent avec « Plateau sur toute la hauteur » (plans 01-47 et 01-48) ; le plan 01-54 réécrit l'attendu de ce test avec les nouvelles tailles, et Romain les confirme alors."
 
 ### 20. À confirmer : les images des règles sur le galet en largeur, « avant » au-dessus d'« après »
 expected: « Les 112 images de RULES.md montrent le plateau du jeu, le galet en largeur, cavaliers compris. « avant » est au-dessus de « après » : deux plateaux 2:1 empilés font une image carrée de 1200 × 1200 », la place dont c'est le tour en bas ; les numéros des cases sont écrits en Caveat, comme dans le jeu. Romain regarde deux ou trois images de RULES.md et confirme ou demande un changement.
@@ -117,11 +119,62 @@ result: [pending]
 expected: Choix fait lors de la réalisation (plan 01-38), pas une demande de Romain : tant que « Tourne ton téléphone » (ou « Élargis la fenêtre ») est affiché, les joueurs de l'ordinateur ne jouent pas ; quand l'écran repasse en largeur, la partie reprend là où elle était. Romain dit s'il veut garder ce comportement ou si les joueurs de l'ordinateur doivent continuer à jouer pendant ce temps.
 result: [pending]
 
+### 23. Recette 3 (2026-10-15) : le son sur l'iPhone en mode silencieux
+expected: Sur l'iPhone, interrupteur de sonnerie sur silencieux (pas seulement le volume au minimum), les sabots, les hennissements et les sons de cartes se font entendre dans Safari comme dans l'app ajoutée à l'écran d'accueil.
+result: issue
+reported: "Les sons ne fonctionnent pas sur iphone en mode silencieux (pas volume au minimum, mais silencieux, pas de sonnerie)"
+severity: major
+
+### 24. Recette 3 (2026-10-15) : la taille du plateau sur l'iPhone tenu en largeur
+expected: Sur l'iPhone tenu en largeur, le plateau est assez grand pour bien voir les cases et toucher les cavaliers.
+result: issue
+reported: "Le plateau de jeu est trop petit sur iphone"
+severity: major
+note: "Question posée ensuite, choix de Romain : « Plateau sur toute la hauteur (Recommandé) »."
+
+### 25. Recette 3 (2026-10-15) : le sens des cavaliers dessinés sur le plateau
+expected: Les cavaliers à l'encre dessinés dans les coins du galet sont tournés vers leur camp.
+result: issue
+reported: "Les chevaux gravés sur le plateau sont tous orientés de la même façon mais je voudrais les tourner pour que les sabots soient dirigés vers chaque camp"
+severity: minor
+
+### 26. Recette 3 (2026-10-15) : l'entrée dans la maison
+expected: Un cheval qui peut atteindre une case vide de sa maison y entre.
+result: issue
+reported: "J'ai l'impression que l'entrée dans la zone d'arrivée ne fonctionne pas toujours : si l'on peut atteindre une case vide de la zone d'arrivée, il faut que ce soit le seul coup à jouer"
+severity: major
+note: "Question posée ensuite, « que doit-on interdire ? », choix de Romain : « Seulement pour ce cheval »."
+
+### 27. Recette 3 (2026-10-15) : un seul cheval pour la carte choisie
+expected: Quand un seul cheval peut jouer la carte, le joueur n'a pas à le toucher.
+result: issue
+reported: "Quand il ne reste qu'un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet évidemment"
+severity: minor
+
+### 28. Recette 3 (2026-10-15) : le rythme de la donne
+expected: La distribution des cartes se suit à l'œil.
+result: issue
+reported: "La distribution de cartes est un tout petit peu trop rapide"
+severity: cosmetic
+
+### 29. Recette 3 (2026-10-15) : la qualité des sons
+expected: Les sons (sabots, hennissements, cartes, prise, fin de partie) sont agréables et crédibles.
+result: issue
+reported: "les sons ne sont pas bons, il faut les retravailler"
+severity: major
+note: "Question posée ensuite, choix de Romain : « Page d'essai à choix (Recommandé) »."
+
+### 30. Recette 3 (2026-10-15) : le panneau de fin de partie
+expected: Le panneau « Victoire ! » / « Défaite » est beau et dans le style du plateau.
+result: issue
+reported: "Le panneau de victoire défaite est moche"
+severity: minor
+
 ## Summary
 
-total: 22
+total: 30
 passed: 1
-issues: 6
+issues: 14
 pending: 15
 skipped: 0
 blocked: 0
@@ -137,7 +190,8 @@ blocked: 0
   artifacts: [apps/web/src/audio/synth.ts, apps/web/src/audio/sounds.ts]
   missing: ["Reporté par Romain à plus tard : à traiter dans une phase ultérieure (échantillons CC0 ou nouvelle synthèse)"]
   debug_session: ""
-  deferred: true
+  deferred: false
+  reopened: "Romain, recette 3 du 2026-10-15 : « les sons ne sont pas bons, il faut les retravailler » et « Les sons ne fonctionnent pas sur iphone en mode silencieux » ; les sons ne sont plus reportés et sont repris dans cette phase (gaps G-01-23 et G-01-29, plans 01-49 et 01-51 à 01-53)"
 - truth: "Sur iPhone, le plateau est bien lisible : son propre camp centré en bas, celui du partenaire centré en haut, sans les petits cadres de rappel des règles"
   status: failed
   reason: "User reported: La visibilité en version iphone n'est pas très bonne. On va changer le plateau de jeu pour avoir son propre camp centré en bas, le camp du partenaire centré en haut, les rappels de règles (petits cadres entre les camps) sont inutiles car impossibles à voir. Je vais te proposer une version de plateau mieux."
@@ -174,4 +228,87 @@ blocked: 0
   root_cause: "packages/engine/src/path.ts:163 mange tout cheval dépassé qui n'est pas « à soi » (capturePassed && !own) : le partenaire est mangé au passage (Q23, RULES.md R-10, scénario R-10.6)"
   artifacts: [packages/engine/src/path.ts, packages/engine/src/seven.ts, packages/engine/scenarios, RULES.md, .planning/REQUIREMENTS.md]
   missing: ["Le 7 ne mange au passage que les adversaires ; le partenaire dépassé reste en place ; s'arrêter sur lui le mange toujours ; mettre à jour RULES.md R-10 (Q23) et le scénario R-10.6, et l'aperçu/animation (cues) en conséquence"]
+  debug_session: ""
+- gap_id: G-01-23
+  truth: "Sur l'iPhone en mode silencieux (interrupteur de sonnerie), les bruitages du jeu se font entendre, dans Safari comme dans l'app installée"
+  status: failed
+  reason: "User reported: Les sons ne fonctionnent pas sur iphone en mode silencieux (pas volume au minimum, mais silencieux, pas de sonnerie)"
+  severity: major
+  test: 23
+  root_cause: "apps/web/src/audio/engine.ts, unlock() : navigator.audioSession.type = 'playback' n'est posé qu'après la création de l'AudioContext (new WebAudioBackend()), et c'est la seule mesure. Sur l'iPhone de Romain, l'interrupteur de sonnerie coupe toujours le Web Audio : soit le type arrive trop tard, soit son Safari l'ignore pour le Web Audio. Aucun élément audio HTML ne fait passer la session audio de la page en lecture. Les textes d'aide (reglages.ts, sons.ts) disent encore de quitter le mode silencieux."
+  artifacts: [apps/web/src/audio/engine.ts, apps/web/src/i18n/fr/reglages.ts, apps/web/src/i18n/fr/sons.ts, apps/web/e2e/audio.spec.ts]
+  missing: ["Poser audioSession.type = 'playback' avant de créer l'AudioContext, dans le premier geste", "Sur iPhone et iPad, lancer dans le même geste un élément audio muet en boucle (WAV de silence généré par le code, en data URI), mis en pause quand la page est cachée ou quand « Son » est coupé, relancé au geste suivant", "Textes d'aide mis à jour", "Recette sur le vrai iPhone de Romain, interrupteur sur silencieux"]
+  debug_session: ""
+- gap_id: G-01-24
+  truth: "Sur l'iPhone tenu en largeur, le plateau prend toute la hauteur de l'écran ; la main et les boutons sont sur les côtés du galet, les infos dans une petite pastille"
+  status: failed
+  reason: "User reported: Le plateau de jeu est trop petit sur iphone"
+  severity: major
+  test: 24
+  root_cause: "Mode « barre compacte » (apps/web/src/routes/Game.svelte, ui/screen.svelte.ts) : la rangée de 64 px (ou 120 px) sous le plateau et la colonne d'infos de 96 px limitent sa largeur à min(100vw − 108 px − insets, (100dvh − 64 px − insets) / 0,5217) : ≈ 493 à 533 px dans Safari sur l'iPhone 13 tenu en largeur (cases à ≈ 16,5 à 17,8 px), ≈ 585 px dans l'app installée."
+  artifacts: [apps/web/src/routes/Game.svelte, apps/web/src/ui/screen.svelte.ts, apps/web/src/ui/InfoBar.svelte, apps/web/src/ui/HandFan.svelte, apps/web/src/ui/ActionZone.svelte, apps/web/src/ui/SevenPanel.svelte, apps/web/src/ui/PawnTray.svelte, apps/web/src/cards/fan.ts, apps/web/e2e/compact.spec.ts]
+  missing: ["Choix de Romain : « Plateau sur toute la hauteur (Recommandé) » : le plateau sous une ligne de consigne de 24 px, sur toute la hauteur ; une bande de 60 px de chaque côté du galet, la pastille d'infos et la main en colonne à gauche, la roue, « Avance rapide » et les boutons à droite ; l'assistant du 7 et le choix « Lequel ? » dans ces bandes ; l'ordinateur inchangé", "Nouvelles tailles visées et mesurées (844 × 390 ≈ 724 px, 750 × 342 ≈ 630 px), recette sur l'iPhone de Romain"]
+  debug_session: ""
+  decision: "Romain, 2026-10-15 : « Plateau sur toute la hauteur (Recommandé) »"
+- gap_id: G-01-25
+  truth: "Les quatre cavaliers à l'encre du galet ont les sabots tournés vers le camp de leur couleur"
+  status: failed
+  reason: "User reported: Les chevaux gravés sur le plateau sont tous orientés de la même façon mais je voudrais les tourner pour que les sabots soient dirigés vers chaque camp"
+  severity: minor
+  test: 25
+  root_cause: "packages/board/src/scene.ts riderBox() ne donne qu'une boîte droite ; art.ts pose l'image sans transform ; apps/web/src/board/BoardArt.svelte n'applique aucun transform à l'image. Les quatre cavaliers ont donc tous les sabots vers le bas de l'écran, quel que soit le côté de leur couleur."
+  artifacts: [packages/board/src/scene.ts, packages/board/src/art.ts, packages/board/src/scene.test.ts, packages/board/src/art.test.ts, apps/web/src/board/BoardArt.svelte, docs/regles]
+  missing: ["Chaque cavalier tourné d'un quart de tour selon le côté de sa couleur (0° en bas, 90° à gauche, 180° en haut, 270° à droite), toujours hors des cases, des écuries, des maisons et du tapis ; images des règles redessinées (rendu déterministe)"]
+  debug_session: ""
+- gap_id: G-01-26
+  truth: "Un cheval qui peut entrer dans une case vide de sa maison avec une des cartes de la main ne dépasse pas son entrée ; le joueur peut toujours jouer un autre cheval ou une autre carte"
+  status: failed
+  reason: "User reported: J'ai l'impression que l'entrée dans la zone d'arrivée ne fonctionne pas toujours : si l'on peut atteindre une case vide de la zone d'arrivée, il faut que ce soit le seul coup à jouer"
+  severity: major
+  test: 26
+  root_cause: "Pas d'erreur du moteur. Diagnostic du planificateur sur 300 parties entre ordinateurs de niveau 1 (graine 7) : 4123 entrées, et 8685 fois un cheval passe devant son carré 16 sans entrer. Chaque fois que le compte de la carte jouée tombait sur une case vide sans cheval rentré à sauter, le cheval est entré (0 exception). Les passages viennent du compte qui dépasse la maison (6104, 70 %), de la case visée occupée (2402, 28 %) ou d'un cheval rentré sur le chemin (179, 2 %, G2). Mais 1415 de ces chevaux auraient pu rentrer avec une autre carte de la même main, et 285 fois un 7 a été partagé de façon à faire dépasser sa maison à un cheval qu'un autre partage faisait entrer. La règle actuelle (D-01, D-02, G14, packages/engine/src/path.ts walk()) ne rend l'entrée obligatoire que pour le compte de la carte jouée."
+  artifacts: [packages/engine/src/path.ts, packages/engine/src/legal.ts, packages/engine/src/seven.ts, packages/engine/src/apply.ts, packages/engine/src/rules.ts, packages/engine/src/types.ts, packages/engine/scenarios/prises-maison.ts, RULES.md, .planning/REQUIREMENTS.md]
+  missing: ["Choix de Romain : « Seulement pour ce cheval ». Règle G16 (constante KNIGHT_MUST_ENTER, réglable comme G14 et G15) : un cheval qu'une carte de la main fait entrer ne dépasse son entrée avec aucune carte ni aucun pas du 7 ; le 4 et le Valet ne sont pas concernés ; une carte qui ne ferait que lui faire dépasser sa maison n'est pas jouable (raison « must-enter ») ; la règle ne rend jamais une main injouable", "RULES.md (R-13, Décisions de Romain G16), scénarios R-13.22 à R-13.27 et leurs images, REQUIREMENTS.md RULE-15 ; rules-trace reste vert"]
+  debug_session: ""
+  decision: "Romain, 2026-10-15, à la question « que doit-on interdire ? » : « Seulement pour ce cheval »"
+- gap_id: G-01-27
+  truth: "Quand un seul cheval peut jouer la carte choisie, il est choisi tout seul et l'aperçu s'affiche avec « Jouer » (sauf le Valet, et la question « Sortir » ou « Avancer » de l'As et du Roi)"
+  status: failed
+  reason: "User reported: Quand il ne reste qu'un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet évidemment"
+  severity: minor
+  test: 27
+  root_cause: "apps/web/src/game/turnUi.ts selectCard() rend l'état cardSelected même avec un seul candidat, et ActionZone.svelte affiche « Un seul cheval peut jouer cette carte : touche-le. » ; chooseMode('advance') fait de même après « Avancer »."
+  artifacts: [apps/web/src/game/turnUi.ts, apps/web/src/game/turnUi.test.ts, apps/web/src/ui/ActionZone.svelte, apps/web/src/i18n/fr/game.ts, apps/web/e2e/tracer.spec.ts, apps/web/e2e/cartes-speciales.spec.ts, apps/web/e2e/clavier.spec.ts]
+  missing: ["Un seul candidat : aperçu direct avec « Jouer » (D-19 tient : rien n'est joué sans « Jouer ») ; le 7 à un seul partage est rempli tout seul ; le Valet demande toujours ; Échap depuis un aperçu automatique repose la carte ; le clavier : chiffre puis Entrée"]
+  debug_session: ""
+- gap_id: G-01-28
+  truth: "La donne se suit à l'œil : chaque carte vole un peu plus lentement"
+  status: failed
+  reason: "User reported: La distribution de cartes est un tout petit peu trop rapide"
+  severity: cosmetic
+  test: 28
+  root_cause: "packages/board/src/motion.ts MOTION.dealCard = 250 ms et MOTION.dealStagger = 40 ms : 20 cartes en ≈ 1,01 s."
+  artifacts: [packages/board/src/motion.ts, packages/board/src/motion.test.ts, apps/web/src/board/cardFx.test.ts, apps/web/e2e/animations.spec.ts]
+  missing: ["dealCard 300 ms, dealStagger 55 ms (≈ 1,35 s pour 20 cartes) ; avance rapide × 0,4 ; tests et 01-UI-SPEC.md mis à jour"]
+  debug_session: ""
+- gap_id: G-01-29
+  truth: "Romain choisit, son par son, la version qu'il préfère parmi trois ou quatre sur la page des sons, et le jeu joue sa version ; chaque version est générée par le code ou CC0 (ou domaine public), licence tracée"
+  status: failed
+  reason: "User reported: les sons ne sont pas bons, il faut les retravailler"
+  severity: major
+  test: 29
+  root_cause: "Tous les sons sont synthétisés par le code (apps/web/src/audio/synth.ts), une seule version chacun ; la page #/sons (routes/SoundTest.svelte) permet de les noter mais pas d'en choisir un autre ; aucun enregistrement CC0 n'a été retenu ; il n'y a pas de son de fin de partie."
+  artifacts: [apps/web/src/audio/sounds.ts, apps/web/src/audio/synth.ts, apps/web/src/audio/engine.ts, apps/web/src/audio/soundNotes.ts, apps/web/src/routes/SoundTest.svelte, apps/web/src/i18n/fr/sons.ts, assets/audio/LICENSES.md, apps/web/e2e/sons.spec.ts]
+  missing: ["Choix de Romain : « Page d'essai à choix (Recommandé) » : trois ou quatre versions par son (A = le son actuel, les autres générées par le code ou CC0/domaine public vérifié fichier par fichier) ; un choix par son, valable tout de suite sur l'appareil, « Copier mes choix » pour en faire le choix de tous ; le jeu garde les sons actuels tant que rien n'est choisi", "Nouveaux sons « Victoire » et « Défaite » à la fin de la partie"]
+  debug_session: ""
+  decision: "Romain, 2026-10-15 : « Page d'essai à choix (Recommandé) »"
+- gap_id: G-01-30
+  truth: "Le panneau de fin de partie est une planche dans le bois du galet : titre en Caveat, couleurs et cavaliers de l'équipe gagnante, score des chevaux rentrés, « Rejouer »"
+  status: failed
+  reason: "User reported: Le panneau de victoire défaite est moche"
+  severity: minor
+  test: 30
+  root_cause: "apps/web/src/ui/EndScreen.svelte est une simple boîte de noyer foncé (#4A2F1A) de 400 px : les pastilles des places dans les couleurs du plateau d'origine (pas la palette du galet), aucun score des chevaux rentrés, aucun bois ni rappel du galet."
+  artifacts: [apps/web/src/ui/EndScreen.svelte, apps/web/src/routes/Game.svelte, apps/web/src/i18n/fr/game.ts, apps/web/e2e/partie.spec.ts, apps/web/e2e/finition.spec.ts]
+  missing: ["Panneau dans le bois du galet (chêne, liseré de noyer, ombre sans flou), titre Caveat, les deux couleurs et cavaliers de l'équipe gagnante, score « 8 – n », donnes jouées et chevaux mangés, « Rejouer » et « Changer de couleur » ; tient dans 750 × 342 ; addendum de 01-UI-SPEC.md"]
   debug_session: ""
