@@ -156,8 +156,8 @@ async function expectBarBoard(page: Page, what: string) {
 
 /**
  * Bleu holds a 7 and two knights on the ring: the 7 panel opens with one tap on the card. The knights
- * stand on opposite sides of the ring, more than 44 px apart even on the 112 px landscape galet of
- * 480 x 320 (the side panel, until 01-37), so each tap picks its knight without the « Lequel ? » tray.
+ * stand on opposite sides of the ring, more than 44 px apart even on the smallest landscape galet
+ * (360 px wide at 480 x 320, plan 01-47), so each tap picks its knight without the « Lequel ? » tray.
  */
 const SEVEN = {
   turn: "bleu",
@@ -259,41 +259,60 @@ for (const size of SIZES) {
       await expectFits(page, "après le coup", hand);
     });
 
-    test(`le panneau du 7 tient sous le plateau ou à côté (${size.name})`, async ({ page }) => {
+    test(`l’assistant du 7 tient sous le plateau ou autour de lui (${size.name})`, async ({
+      page,
+    }) => {
       await page.goto("/");
       await page.goto(`/#/partie?etat=${etatParam(SEVEN)}&vitesse=test`);
       await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
       await expect(zone(page)).toHaveAttribute("data-state", "idle");
       await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
-      const panel = page.locator("[data-seven-panel]");
-      await expect(panel).toBeVisible();
+      await expect(page.locator("[data-seven-panel]")).toBeVisible();
       await expectLandscapeGalet(page, "le 7");
       await expectBarBoard(page, "le 7");
-      await expectFits(page, "le 7, rien de réparti", [
+      // In the computer's bar the assistant is one panel under the board; in the compact mode
+      // (plan 01-47) its region has no box of its own and its parts stand around the board: the line
+      // over it, the step chips in the left strip, the buttons in the right one.
+      const compact = (await page.locator("main.game").getAttribute("data-chrome")) === "compact";
+      const parts = compact
+        ? ["[data-seven-line]", "[data-seven-chips]", "[data-seven-buttons]"]
+        : ["[data-seven-panel]"];
+      // The step chips' column may run past the screen inside its scrolling strip (480 x 320): it is
+      // checked by compact.spec; here only that it stays beside the board.
+      const chrome = [
         "[data-board]",
         "[data-info-bar]",
-        "[data-seven-panel]",
-      ]);
+        ...parts.filter((part) => part !== "[data-seven-chips]"),
+      ];
 
-      // The panel never covers the board: it is below it or beside it.
-      const board = await page.locator("[data-board]").boundingBox();
-      const spot = await panel.boundingBox();
-      if (!board || !spot) throw new Error("no box for the board or the 7 panel");
-      const below = spot.y >= board.y + board.height - 1;
-      const beside = spot.x >= board.x + board.width - 1;
-      expect(below || beside, "le panneau passe sous le plateau ou à côté").toBe(true);
+      /** None of the assistant's parts covers the board: each is below it, above it or beside it. */
+      const expectClear = async (what: string) => {
+        const board = await page.locator("[data-board]").boundingBox();
+        if (!board) throw new Error("no box for the board");
+        for (const part of parts) {
+          for (const spot of await page.locator(part).all()) {
+            const box = await spot.boundingBox();
+            if (!box || box.width === 0 || box.height === 0) continue;
+            const below = box.y >= board.y + board.height - 1;
+            const above = box.y + box.height <= board.y + 1;
+            const beside = box.x >= board.x + board.width - 1 || box.x + box.width <= board.x + 1;
+            expect(below || above || beside, `${what}: ${part} covers the board`).toBe(true);
+          }
+        }
+      };
 
-      // Two knights and their steps: the panel at its fullest still fits.
+      await expectFits(page, "le 7, rien de réparti", chrome);
+      await expectClear("le 7, rien de réparti");
+
+      // Two knights and their steps: the assistant at its fullest still fits.
       await page.locator('[data-hit="bleu0"]').click({ force: true });
+      await expectClear("le 7, sept pastilles");
       await page.getByRole("button", { name: "4 pas" }).click();
       await page.locator('[data-hit="bleu1"]').click({ force: true });
       await page.getByRole("button", { name: "3 pas" }).click();
       await expect(page.locator("[data-remaining]")).toHaveText("Tout est réparti.");
-      await expectFits(page, "le 7, tout réparti", [
-        "[data-board]",
-        "[data-info-bar]",
-        "[data-seven-panel]",
-      ]);
+      await expectFits(page, "le 7, tout réparti", chrome);
+      await expectClear("le 7, tout réparti");
       await expect(page.getByRole("button", { name: "Jouer", exact: true })).toBeEnabled();
     });
   });
@@ -372,9 +391,17 @@ test.describe("au clavier", () => {
   }) => {
     await openHand(page);
 
-    // No card selected: the settings, the felt, then the hand (one card holds the tab stop).
+    // No card selected: the settings, the felt, then the hand (one card holds the tab stop). In the
+    // compact mode of a phone held sideways (plan 01-47) the info pill, at the top of the left strip,
+    // comes first, then « Réglages » at the top of the right one.
     const idle = await tabOrder(page);
-    expect(idle[0]).toBe("Réglages");
+    const compact = (await page.locator("main.game").getAttribute("data-chrome")) === "compact";
+    if (compact) {
+      expect(idle[0]).toMatch(/^Infos de la partie\s:\s/);
+      expect(idle[1]).toBe("Réglages");
+    } else {
+      expect(idle[0]).toBe("Réglages");
+    }
     expect(idle.indexOf("Sur le tapis")).toBeGreaterThan(0);
     expect(
       idle.findIndex((name) => /^(?!Cheval).+, (jouable|pas jouable)$/.test(name)),

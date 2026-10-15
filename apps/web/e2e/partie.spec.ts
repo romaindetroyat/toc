@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { etatParam } from "./position.ts";
 
 // A seeded game (the `graine` debug parameter fixes the deck and the bots) at test speed (no think
@@ -11,6 +11,25 @@ async function openGame(page: Page, query: string) {
   await page.goto("/");
   await page.goto(`/#/partie?${query}`);
   await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+}
+
+/**
+ * Checks the info bar: on a computer the bar itself; on a phone held sideways (the compact mode of
+ * plan 01-47) the info is a pill whose sheet « Infos de la partie » holds the same bar, so the sheet
+ * is opened, checked and closed.
+ */
+async function checkInfo(page: Page, check: (info: Locator) => Promise<void>) {
+  const pill = page.locator('[data-info-bar][data-form="pill"]');
+  if ((await pill.count()) === 0) {
+    await check(page.locator("[data-info-bar]"));
+    return;
+  }
+  await pill.click();
+  const sheet = page.locator("[data-info-sheet]");
+  await expect(sheet).toBeVisible();
+  await check(sheet.locator("[data-info-bar]"));
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
 }
 
 /** Chooses the first card of the hand and passes it to the partner. */
@@ -42,10 +61,12 @@ test("l’échange : choisir, passer, attendre, recevoir une carte marquée « R
   await openGame(page, `graine=${SEED}&vitesse=test`);
 
   // The info bar names the dealer and the deal; the felt shows the talon and the empty défausse.
-  await expect(page.locator("[data-info-bar]")).toContainText("Donneur");
-  await expect(page.locator("[data-info-bar]")).toContainText("Donne 1 sur 3");
-  await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 0/8");
-  await expect(page.locator("[data-info-bar] [data-team-them]")).toContainText("Eux 0/8");
+  await checkInfo(page, async (info) => {
+    await expect(info).toContainText("Donneur");
+    await expect(info).toContainText("Donne 1 sur 3");
+    await expect(info.locator("[data-team-us]")).toContainText("Nous 0/8");
+    await expect(info.locator("[data-team-them]")).toContainText("Eux 0/8");
+  });
   await expect(page.locator("[data-talon]")).toHaveAttribute("data-talon", "32");
   await expect(page.locator("[data-discard]")).toHaveAttribute("data-discard", "0");
   await expect(page.locator("[data-felt-last]")).toHaveCount(0);
@@ -66,7 +87,7 @@ test("l’échange : choisir, passer, attendre, recevoir une carte marquée « R
   await expect(page.locator("[data-hand] [data-card]").first()).toBeVisible();
   await expect(page.getByText("Reçue", { exact: true })).toBeVisible();
   await expect(page.locator(`[data-hand] [data-card="${given}"]`)).toHaveCount(0);
-  await expect(page.locator("[data-info-bar]")).toContainText("Donneur");
+  await checkInfo(page, (info) => expect(info).toContainText("Donneur"));
 });
 
 test("un coup simple : carte, cheval, aperçu, rien ne bouge seul, « Jouer », la carte sur le tapis", async ({
@@ -157,7 +178,7 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
   await expect(zone(page)).toContainText(
     /Tes quatre chevaux sont rentrés\. Tu joues avec ceux d(e |’)\S+\./,
   );
-  await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 7/8");
+  await checkInfo(page, (info) => expect(info.locator("[data-team-us]")).toContainText("Nous 7/8"));
 
   await page.getByRole("button", { name: "5 de pique, jouable" }).click();
   // The partner's last knight is the only one to play the 5: it is chosen by itself and its move
@@ -214,6 +235,8 @@ test("fin de partie : « Rejouer » ouvre une nouvelle partie avec la même coul
   await expect(page.locator("[data-board]")).toHaveAttribute("data-k", turns as string);
   await expect(zone(page)).toHaveAttribute("data-state", "exchange");
   await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
-  await expect(page.locator("[data-info-bar]")).toContainText("Donne 1 sur 3");
-  await expect(page.locator("[data-info-bar] [data-team-us]")).toContainText("Nous 0/8");
+  await checkInfo(page, async (info) => {
+    await expect(info).toContainText("Donne 1 sur 3");
+    await expect(info.locator("[data-team-us]")).toContainText("Nous 0/8");
+  });
 });

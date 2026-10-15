@@ -34,11 +34,20 @@ test("As et Roi : « Que veux-tu faire ? », « Sortir » montre la sortie sans 
   const advance = page.getByRole("button", { name: "Avancer de 1", exact: true });
   await expect(exit).toBeVisible();
   await expect(advance).toBeVisible();
-  // The two choices are buttons of at least 48 px, side by side; no knight is lit yet.
+  // The two choices are buttons of at least 48 px: side by side in the computer's bar, stacked in
+  // the right strip of a phone held sideways (the compact mode of plan 01-47); no knight is lit yet.
   const [exitBox, advanceBox] = [await exit.boundingBox(), await advance.boundingBox()];
-  expect(exitBox?.height).toBeGreaterThanOrEqual(48);
-  expect(advanceBox?.height).toBeGreaterThanOrEqual(48);
-  expect(Math.abs((exitBox?.y ?? 0) - (advanceBox?.y ?? 99))).toBeLessThan(2);
+  if (!exitBox || !advanceBox) throw new Error("no box for « Sortir » or « Avancer »");
+  expect(exitBox.height).toBeGreaterThanOrEqual(48);
+  expect(advanceBox.height).toBeGreaterThanOrEqual(48);
+  const compact = (await page.locator("main.game").getAttribute("data-chrome")) === "compact";
+  if (compact) {
+    expect(Math.abs(exitBox.x - advanceBox.x), "stacked").toBeLessThan(2);
+    const [top, bottom] = exitBox.y < advanceBox.y ? [exitBox, advanceBox] : [advanceBox, exitBox];
+    expect(bottom.y, "one under the other").toBeGreaterThanOrEqual(top.y + top.height);
+  } else {
+    expect(Math.abs(exitBox.y - advanceBox.y), "side by side").toBeLessThan(2);
+  }
   await expect(page.locator("[data-halo]")).toHaveCount(0);
 
   // The Roi asks the same question with its own number.
@@ -196,10 +205,10 @@ test("chevaux serrés : le plateau propose des pastilles A et B, « Choisir un a
   page,
   isMobile,
 }) => {
-  // The phone project already is a phone (390 x 664); the desktop project is cut down to a phone held
-  // sideways, 667 x 375. The cells there are close enough (about 10 px apart in the side panel, about
-  // 18.7 px in the compact bar of 01-37) that the two neighbouring knights stay closer than 44 px, so
-  // the tray still opens.
+  // The phone project already is a phone held sideways (750 x 342); the desktop project is cut down
+  // to a smaller one, 667 x 375. The cells there are close enough (about 18.3 px apart with the board
+  // on the full height, 547 px wide, plan 01-47) that the two neighbouring knights stay closer than
+  // 44 px, so the tray still opens.
   if (!isMobile) await page.setViewportSize({ width: 667, height: 375 });
 
   // Two knights on neighbouring cells: both can play the 3, a finger cannot tell them apart.
@@ -270,7 +279,12 @@ test("le 7 : réparti sur deux chevaux, prise en chemin, un seul « Jouer »", a
   await expect(panel(page)).toBeVisible();
   await expect(page.locator("[data-hand]")).toHaveCount(0);
   await expect(page.locator("[data-action-zone]")).toHaveCount(0);
-  await expect(panel(page)).toContainText("Le 7 : répartis tes pas");
+  // Its title names the region; it is shown in the computer's bar, while on a phone held sideways
+  // the region's three parts stand around the board and the title is only its name (plan 01-47).
+  await expect(panel(page)).toHaveAccessibleName("Le 7 : répartis tes pas");
+  if ((await page.locator("main.game").getAttribute("data-chrome")) !== "compact") {
+    await expect(panel(page)).toContainText("Le 7 : répartis tes pas");
+  }
   await expect(counter(page)).toHaveText("Reste 7");
   await expect(rows(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Jouer", exact: true })).toBeDisabled();

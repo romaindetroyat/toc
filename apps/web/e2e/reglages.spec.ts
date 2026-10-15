@@ -207,11 +207,11 @@ test.describe("« Réduire les animations » suit la préférence du système, p
 });
 
 test.describe("en pleine partie", () => {
-  test("réglages: la roue dentée de la barre d’info (44 x 44) ouvre la même feuille", async ({
-    page,
-  }) => {
+  test("réglages: la roue dentée (44 x 44) ouvre la même feuille", async ({ page }) => {
     await openGame(page);
-    const gear = page.locator("[data-info-bar]").getByRole("button", { name: "Réglages" });
+    // In the info bar on a computer; at the top of the right strip on a phone held sideways (the
+    // compact mode of plan 01-47). Both stand in a [data-settings-slot].
+    const gear = page.locator("[data-settings-slot]").getByRole("button", { name: "Réglages" });
     const box = await gear.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(44);
     expect(box?.height).toBeGreaterThanOrEqual(44);

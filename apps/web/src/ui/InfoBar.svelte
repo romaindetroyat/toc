@@ -12,16 +12,14 @@
     /** « toi » for the human, a horse name for each bot. */
     names: Record<Color, string>;
     /**
-     * « row »: the 56 px bar of the screens taller than wide and of the side panel. « column »: the
-     * info zone at the left of the computer's bottom bar (lines, pills and gear stacked, on the
-     * bar's own band). « side »: the 96 px column at the left of the board on the compact bar of a
-     * phone held sideways (plan 01-37): the gear on top, then the turn and dealer lines, wrapping,
-     * then the two team pills stacked. « pill »: the compact mode's info pill (plan 01-47), 52 x 44
+     * « row »: a 56 px bar, the form the game keeps behind « Tourne ton téléphone » (never shown).
+     * « column »: the info zone at the left of the computer's bottom bar (lines, pills and gear
+     * stacked, on the bar's own band). « pill »: the compact mode's info pill (plan 01-47), 52 x 44
      * at the top of the left strip: the turn dot and the glyph of the seat whose turn it is, and
      * under them the score « n–m »; a tap opens the sheet « Infos de la partie » with this bar in its
      * column form. The gear is not in the pill: it stands at the top of the right strip.
      */
-    form?: "row" | "column" | "side" | "pill";
+    form?: "row" | "column" | "pill";
     /** Whether the bar holds the gear (« Réglages »); the sheet's copy of the bar does not. */
     gear?: boolean;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
@@ -97,7 +95,6 @@
   <header
     class="bar"
     class:column={form === "column"}
-    class:side={form === "side"}
     data-info-bar
     data-form={form}
   >
@@ -185,67 +182,6 @@
   .column .pill {
     flex: 1 1 0;
     padding: 0 var(--space-sm);
-  }
-
-  /* Side form (the compact bar): a column of 96 px beside the board, on the page's own background.
-     A grid places the zones without moving them in the DOM: the gear (44 x 44) on top, the turn and
-     dealer lines under it (they wrap, the bot's name is never cut), then the pills stacked. As below
-     360 px, « Tour de » is hidden visually and stays for screen readers, so that everything fits the
-     200 px a 320 px high screen leaves beside the board. */
-  .bar.side {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "gear"
-      "left"
-      "teams";
-    align-content: center;
-    gap: var(--space-xs);
-    height: auto;
-    padding: 0 0 0 6px;
-    background: transparent;
-  }
-
-  .side .left {
-    grid-area: left;
-  }
-
-  .side .left p {
-    line-height: 1.25;
-  }
-
-  .side .turn {
-    flex-wrap: wrap;
-    white-space: normal;
-  }
-
-  .side .name {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-
-  .side .prefix {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .side .deal {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .side .teams {
-    grid-area: teams;
-    width: auto;
-    gap: var(--space-xs);
-  }
-
-  .side .gear {
-    grid-area: gear;
   }
 
   .left p {

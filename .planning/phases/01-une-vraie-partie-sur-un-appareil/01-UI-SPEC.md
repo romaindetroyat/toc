@@ -799,7 +799,7 @@ Seuls ses mots, tels que 01-UAT.md et son message les rapportent.
 Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-41).
 
 1. **Le tapis : sa texture et sa forme.** La texture de bruit du tapis est coupée au tapis seul : c’est ainsi qu’est lue la « correction des transparences du tapis » de la maquette. Le tapis est l’ellipse verte de la planche « Ordinateur · galet ». Le rectangle arrondi de la planche « iPhone · galet » ne sert plus au jeu.
-2. **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut son partenaire, à droite le précédent. Aucune rotation : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k, layout)`, k = `quarterTurnsFor(couleur du joueur)`).
+2. **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut son partenaire, à droite le précédent. Aucune rotation : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k)`, k = `quarterTurnsFor(couleur du joueur)`).
 3. **La taille des cavaliers du galet.** 0,95 pas sur l’anneau, 0,82 dans une maison, 0,78 dans une écurie. Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier).
 4. **Les cartes du tapis et les piles.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon et la défausse sont de part et d’autre du centre, à l’échelle 0,95. Les cartes font 1,3 × 1,82 pas. Tout le tapis est le bouton « Sur le tapis », dans la forme du tapis.
 5. **L’écran plus haut que large.** Safari ne sait pas bloquer l’orientation : en portrait, le téléphone montre une invitation à le tourner, « Tourne ton téléphone », à la place du plateau. Le passage se fait en direct, sans recharger : les mouvements en cours sautent à leur fin, la partie est gardée telle quelle et reprend dès que l’écran est de nouveau en largeur. Pendant ce temps, les joueurs de l’ordinateur attendent. Une fenêtre d’ordinateur plus haute que large montre la même invitation, avec « Élargis la fenêtre ». Le texte de l’invitation, dérivé et à confirmer : le titre « Tourne ton téléphone » sur un téléphone et « Élargis la fenêtre » sur un ordinateur, et sous le titre la ligne « La partie t’attend. Elle reprend dès que l’écran est en largeur. »
@@ -811,7 +811,7 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
    - l’assistant du 7 prend la place de la main et de la zone d’action.
 
    Largeur du plateau = min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (0,5 + head room), 1600 px). Cela donne environ 1227 px à 1280 × 800, au lieu des 1280 de la planche « Sur les écrans » : il faut garder la place des têtes des cavaliers de la rangée du haut et celle de la barre de 160 px.
-8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** Révisé par le planificateur le 2026-10-14, après 01-33, pour approcher des cases d’environ 20 px sur l’iPhone 13 tenu en largeur : la barre de 136 px n’en donnait qu’environ 15. C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur (plan 01-37) :
+8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».* Révisé par le planificateur le 2026-10-14, après 01-33, pour approcher des cases d’environ 20 px sur l’iPhone 13 tenu en largeur : la barre de 136 px n’en donnait qu’environ 15. C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur (plan 01-37) :
    - les infos dans une colonne de 96 px à gauche du plateau : la roue des réglages, la ligne du tour, la ligne du donneur et les deux pastilles d’équipe, les unes sous les autres ; les lignes peuvent passer à la ligne. Comme sous 360 px de large, les mots « Tour de » y sont masqués à l’écran et restent lus par les lecteurs d’écran, pour que tout tienne dans les 200 px qu’un écran de 320 px de haut laisse à côté du plateau ;
    - à partir de 640 px de large, une seule rangée de 64 px sous le plateau, d’un bord de l’écran à l’autre, avec des marges de 12 px : la main à gauche (240 px), la consigne au milieu (Label 14, trois lignes au plus, un texte plus long défile à l’intérieur), les boutons de l’état côte à côte à droite, dans une zone d’environ 184 px gardée dans tous les états ;
    - sous 640 px de large, deux rangées : 56 px (la consigne à gauche, les boutons à droite) et 64 px (la main) ;
@@ -822,13 +822,13 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
      - les pastilles de pas défilent de côté quand la place manque et gardent leurs 44 × 44 ;
      - le choix « Lequel ? » met ses pastilles de 44 × 56 à la place de la consigne et « Choisir un autre cheval » à la place des boutons. Dans l’assistant sur une rangée, il prend toute la rangée et la ligne de 20 px s’efface le temps du choix (20 + 56 px ne tiennent pas dans 64) ;
    - les infos restent visibles.
-9. **Ce que la barre compacte garde du dock** (section « Écran compact » de l’addendum C+) :
+9. **Ce que la barre compacte garde du dock** (section « Écran compact » de l’addendum C+). *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».* Elle gardait :
    - les cartes compactes de 64 × 90 en une rangée plate (ni rotation ni décalage vers le bas), leur haut 8 px sous le bord haut de la barre, la carte choisie montée de 8 px ;
    - au moins les 56 px du haut de chaque carte visibles (indices et symbole), le bas coupé au bord bas de la barre ;
    - avec cinq cartes, des tranches d’au moins 44 px (une main d’au moins 240 px) ;
    - des boutons d’au moins 44 px de haut, en Label 14 gras sur deux lignes au plus, un seul bouton principal au plus, « Avance rapide » avec son icône et son libellé ;
    - inchangés : les textes, l’ordre du focus (Réglages → cavaliers allumés → tapis → boutons d’action → cartes de la main), les raccourcis clavier et leurs aides, les cibles de 44 px et la règle du choix « Lequel ? ».
-10. **Les objectifs de taille et les appareils réels** (section « Objectifs de taille » ci-dessous).
+10. **Les objectifs de taille et les appareils réels** (section « Objectifs de taille » ci-dessous). *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».*
 11. **Les images des règles sur le galet en largeur.** Les 112 images de RULES.md (`docs/regles/<id>.webp`) montrent le plateau du jeu, le galet en largeur, cavaliers compris. « avant » est au-dessus de « après » : deux plateaux 2:1 empilés font une image carrée de 1200 × 1200, chaque moitié de 1200 × 600, la place dont c’est le tour en bas.
 12. **Les ombres sans flou.** Les ombres CSS de la maquette sont dessinées comme des copies décalées, sans filtre de flou.
 
@@ -836,7 +836,7 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
 
 - **Scènes** = la maquette × 2, citées de `scene.ts` :
   - en largeur (le plateau du jeu) : 3200 × 1600, pas ≈ 107,05, head room ≈ 0,0217 de la largeur ;
-  - en hauteur : 2000 × 3000, pas ≈ 108,37, head room ≈ 0,0354. Cette géométrie reste dans le code pour l’instant, sans servir au jeu ; un plan suivant la retire.
+  - en hauteur : 2000 × 3000, pas ≈ 108,37, head room ≈ 0,0354. Cette géométrie, qui ne servait plus au jeu, a été retirée du code par le plan 01-40.
 - **Couleurs du galet** = la palette de la maquette (`PALETTE`) : HEX bleu `#1F4FA8`, jaune `#E3A90C`, rouge `#C3271D`, vert `#1F8A3C` ; LIGHT `#5C86D4`, `#F7D35A`, `#EE6B5E`, `#5CC27A` ; ON blanc, sauf l’encre sur le jaune ; INK `#2A1A0E` ; CREAM `#FBF4E2`. Les sprites des cavaliers et les pastilles des places ne changent pas.
 - **Le tapis** en largeur : une ellipse de demi-axes 600 et 224 (boîte de 1200 × 448, centrée en (1600 ; 800)). Talon (1450 ; 800), défausse (1750 ; 800), cartes de 139,2 × 194,8. En hauteur, il reste le rectangle arrondi de 720 × 840, de rayon 88.
 - **Le dessin** est dans sa propre couche svg (`will-change: transform`) ; les animations ne le touchent jamais.
@@ -936,3 +936,83 @@ Source : la recette refaite par Romain le 2026-10-15 (01-UAT.md, tests 23 à 30)
 - Une seule source de vérité : `MOTION.dealCard` (300) et `MOTION.dealStagger` (55) dans `packages/board/src/motion.ts`, avec les mots de Romain en commentaire. Seules ces deux constantes changent ; aucun autre temps de mouvement ne bouge.
 - `dealFlights` (`apps/web/src/board/cardFx.ts`) en tire le délai n × 55 ms et la durée de 300 ms de chaque carte, `HandFan.svelte` le retournement des cartes du joueur, et `cardsDuration(count, "deal", mode)` (lu par `eventDuration` pour le rythme du Director et des robots) la durée de la donne. Le Director attend que les cartes se posent avant la suite : le bruit de la donne, le bandeau et le rythme des robots suivent la donne sans aucun nombre écrit en dur.
 - `motion.test.ts`, `cardFx.test.ts` et les deux tests de la donne de `e2e/animations.spec.ts` (vitesse normale et « Avance rapide ») mesurent ces valeurs ; la capture de la donne fige toujours les 20 cartes en vol avant le chargement de la page.
+
+### Le plateau sur toute la hauteur du téléphone
+
+Plans 01-47 (la mise en page) et 01-48 (chaque état prouvé, ce contrat). Il remplace, pour le téléphone tenu en largeur et les petites fenêtres, les points 8, 9 et 10 de l’addendum « Plateau galet » (la barre compacte de 01-37). L’ordinateur ne change pas : sa barre de 160 px (point 7 du même addendum) garde ses largeurs, ≈ 1227 px de plateau à 1280 × 800.
+
+#### Décidé par Romain
+
+- **Ses mots** (recette 3, test 24, révise D-07) : « Le plateau de jeu est trop petit sur iphone ».
+- **Son choix**, à la question posée ensuite : « Plateau sur toute la hauteur (Recommandé) ».
+
+#### Dérivé du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-54).
+
+1. **La ligne de consigne.** Une seule ligne de 24 px au-dessus du plateau, centrée sur lui : la consigne, le dernier coup des ordinateurs, ou, pendant le 7, « Reste n » en ambre suivi de la consigne et du partage, joints par « · ». En Label 14 crème. Un texte trop long finit par « … » ; le texte entier reste dans la région lue par les lecteurs d’écran et dans le titre (au survol). Une prise d’un cheval de son équipe passe en tête de ligne, pour que « … » ne la coupe jamais. Pendant « Lequel ? », la ligne dit « Lequel de ces chevaux ? » (texte nouveau). Pendant l’attente de l’échange, les trois donneurs (sablier ou coche) prennent la place de la ligne.
+2. **Les deux bandes.** Une bande d’au moins 60 px de chaque côté du galet, sur toute la hauteur : les coins arrondis du galet ne laissent pas de place aux cartes sans couvrir des cases de l’anneau. Le plateau est centré et les bandes prennent ce qui reste ; aux cinq tailles visées le plateau est limité par la largeur et chaque bande fait exactement 60 px.
+3. **La main en colonne.** En bas de la bande de gauche : des cartes de 52 × 73, chacune montrant au moins ses 44 px du haut (son indice), la dernière entière ; cinq cartes font 4 × 44 + 73 = 249 px, et la boîte garde cette hauteur pour ne jamais sauter quand une carte part. La carte choisie avance de 6 px vers le plateau et garde sa place dans la pile. Les cartes injouables sont couvertes d’un voile noyer opaque (des cartes à 40 % laissaient voir celle du dessous). Une main vide montre « Plus de cartes » ; la phrase qui suit est lue, pas affichée. Les flèches haut et bas parcourent la colonne.
+4. **La pastille et sa feuille.** En haut de la bande de gauche, un bouton de 52 × 44 : le point du tour (ambre quand c’est à toi), la pastille de la place dont c’est le tour, et dessous « n–m », les chevaux rentrés de « nous » et d’« eux », en chiffres tabulaires. Son nom lu : « Infos de la partie : {la ligne du tour}, nous n sur 8, eux m sur 8 ». Un toucher ouvre la feuille « Infos de la partie » : la ligne du tour, le donneur, « Donne n sur 3 », les deux pastilles d’équipe, et « Fermer » ; Échap la ferme.
+5. **« Réglages » et « Avance rapide » en haut à droite.** La roue (44 × 44) en haut de la bande de droite, puis, pendant que l’ordinateur joue, « Avance rapide » en icône seule (44 × 44, bouton à bascule, son nom et son titre « Avance rapide »).
+6. **Les boutons de l’état.** En bas de la bande de droite, empilés à 4 px : 58 px de large (« Annuler » mesure 52,4 px en Label 14 gras et ne tenait pas dans 52), au moins 48 px de haut, deux lignes au plus. Un seul bouton principal au plus, le plus bas. Exception gardée de 01-36 : la question de l’As et du Roi garde ses deux boutons ambre, « Sortir » et « +n ».
+7. **Les libellés courts.** Dans ce mode seulement ; le nom lu et le titre gardent le libellé entier :
+
+   | Libellé entier | Libellé court |
+   |----------------|---------------|
+   | Annuler ce coup | Annuler |
+   | Changer de carte | Autre carte |
+   | Choisir un autre cheval | Autre cheval |
+   | Passer cette carte | Passer |
+   | Poser mes cartes | Poser |
+   | Sortir un cheval | Sortir |
+   | Avancer de n | +n |
+   | Jouer quand même | Jouer (l’avertissement reste dans la ligne de consigne) |
+   | Retirer le dernier pas | Retour |
+   | Tout annuler | Effacer |
+   | Jouer | Jouer (inchangé) |
+
+8. **Le 7 dans les bandes.** Le titre « Le 7 : répartis tes pas » n’est plus que le nom de la région. La ligne « Reste n · consigne · partage » est dans la ligne de consigne. Les pastilles de pas du cheval choisi (44 × 44, à 4 px) prennent la place de la main, en colonne ; quand la bande est trop courte pour les sept (déjà à 750 × 342, où les pastilles 6 et 7 sont sous le bord, et à 480 × 320), la colonne défile et chaque pastille garde ses 44 × 44. « Retour », « Effacer » et « Jouer » sont en bas de la bande de droite.
+9. **« Lequel ? » dans les bandes.** Les pastilles A à D (44 × 56) prennent la place de la main (ou des pastilles de pas) dans la bande de gauche, et « Autre cheval » la place des boutons dans la bande de droite.
+10. **Le message (toast) sur le tapis.** Il est centré sur le tapis, au plus 3/4 de la largeur du plateau (et 480 px), jamais sur une bande ni sur la rangée du bas de l’anneau.
+11. **Le badge « +n » de l’aperçu.** Sur une case de la rangée du haut, il est descendu juste assez pour rester sur le plateau : il ne monte plus dans la ligne de consigne (vu par 01-47 à 750 × 342, corrigé par 01-48). La tête d’un cavalier levé de la rangée du haut peut, elle, monter dans cette ligne : c’est sa place.
+12. **Les petits téléphones.** Limités par leur largeur, ils perdent 2 à 3 % : 547 px au lieu de 559 à 667 × 375, 360 px au lieu de 372 à 480 × 320. Tous les autres gagnent (tableau ci-dessous).
+
+#### Faits techniques (sans confirmation)
+
+- **Le mode** s’appelle `compact` (`data-chrome="compact"`, `COMPACT_QUERY` dans `apps/web/src/ui/screen.svelte.ts`, la même requête qu’avant : en largeur, sous 960 × 600). Les deux autres modes ne changent pas : `bar` (l’ordinateur) et `rotate` (« Tourne ton téléphone »).
+- **La formule** (`Game.svelte`, bloc `compact`) : largeur du plateau = max(0, min(100vw − 2 × 60 px − insets, (100dvh − 24 px − insets) / 0,5)). Variables `--strip: 60px`, `--strip-button: 58px`, `--prompt-row: 24px`, `--board-size`. Pas de head room propre (`--head-room: 0`) : la ligne de consigne en tient lieu. La grille : colonnes `minmax(60px, 1fr) plateau minmax(60px, 1fr)`, rangées `1fr / 24px / plateau / 1fr`, la ligne et le plateau gardés ensemble et centrés dans la hauteur.
+- **Les composants en parties** : `ActionZone` (`part` = prompt | buttons | fast), `SevenPanel` (line | chips | buttons, dans une région `[data-seven-panel]` en `display: contents`), `PawnTray` (chips | close), `HandFan` (`compact`, la colonne de `columnLayout` dans `cards/fan.ts`), `InfoBar` (forme `pill`), `SettingsButton.svelte`.
+- **L’ordre du focus** (l’ordre du DOM) : la pastille, « Réglages », « Avance rapide », les cavaliers éclairés, le tapis, les pastilles du 7 ou de « Lequel ? », les boutons de l’état, la main. `e2e/finition.spec.ts` vérifie que la pastille vient d’abord, puis « Réglages ».
+- **Le badge « +n »** : `badgeAt(y, size)` dans `apps/web/src/board/Overlay.svelte` garde le haut du rond (21 px de rayon et son trait) au-dessus du bord haut de la scène ; partout, sur l’ordinateur aussi.
+- **Les preuves** (`apps/web/e2e/compact.spec.ts`) : le traceur de la Dame et celui du 7 à 750 × 342 ; « chaque état du tour, plateau sur toute la hauteur » à 750 × 342 et 480 × 320 (aucune carte, deux chevaux éclairés, l’aperçu venu tout seul, la question de l’As et du Roi, les deux touchers du Valet, « Lequel ? » seul et dans le 7, le 7 et ses pastilles, l’échange et son attente, la main morte, la main posée, l’attente des ordinateurs) : chaque contrôle dans l’écran, jamais sur le plateau, d’au moins 44 × 44, trois boutons d’état au plus, un seul principal (sauf l’As et le Roi), une ligne de consigne d’une ligne, aucun défilement de la page ; puis les cinq tailles.
+
+#### Objectifs de taille
+
+Mesurés en e2e dans l’émulation Chromium de Playwright (insets à 0), plan 01-48. Le pas vaut largeur × 107,05 / 3200.
+
+| Fenêtre | Calcul | Mesuré | Objectif | Avant (barre compacte de 01-37) | Pas |
+|---------|--------|--------|----------|---------------------------------|-----|
+| 844 × 390 | min(844 − 120 = 724, (390 − 24) / 0,5 = 732) | 724 px | au moins 710 | 625 px | ≈ 24,2 px |
+| 750 × 342 (la fenêtre « iPhone 13 landscape » de Playwright) | min(630, 636) | 630 px | au moins 615 | 533 px | ≈ 21,1 px |
+| 667 × 375 | min(547, 702) | 547 px | au moins 535 | 559 px | ≈ 18,3 px |
+| 568 × 320 | min(448, 592) | 448 px | au moins 435 | 383 px | ≈ 15,0 px |
+| 480 × 320 | min(360, 592) | 360 px | au moins 350 | 372 px | ≈ 12,0 px |
+
+À chaque taille, les deux bandes mesurent 60 px et la ligne de consigne 24 px, juste au-dessus du plateau. Captures : `apps/web/test-results/galet-emulation-{844x390,750x342,667x375,568x320,480x320}.png` (une carte choisie, son aperçu affiché).
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- **iPhone 13 dans Safari, tenu en largeur** : 844 × 342 visibles, encoche de 47 px de chaque côté et inset du bas de 21 px. min(844 − 94 − 120 = 630, (342 − 21 − 24) / 0,5 = 594) ≈ **594 px** de large au lieu de ≈ 493, des cases à ≈ **19,9 px** l’une de l’autre.
+- **iPhone 13 en app installée, tenu en largeur** : 844 × 390, mêmes insets. min(630, (390 − 21 − 24) / 0,5 = 690) ≈ **630 px** au lieu de ≈ 585, des cases à ≈ **21,1 px**.
+- Romain dit, pendant la recette (plan 01-54), quelle largeur il voit et si la main, les boutons et la pastille se prennent bien au pouce.
+
+#### UI Considerations (plateau sur toute la hauteur)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| long-text | interactive-control: ligne de consigne | ✅ covered | Une ligne de 24 px, « … » à la fin ; le texte entier dans la région aria-live et le titre ; l’avertissement d’une prise de son équipe en tête |
+| long-text | interactive-control: boutons de la bande de droite | ✅ covered | Libellés courts de 58 px de large, deux lignes au plus ; le nom lu et le titre gardent le libellé entier |
+| overflow | interactive-control: pastilles de pas du 7 | ✅ covered | Colonne qui défile dans la bande de gauche, chaque pastille de 44 × 44 (750 × 342 et 480 × 320) |
+| overlap | static-content: badge « +n » d’une case du haut | ✅ covered | Descendu pour rester sur le plateau ; vérifié dans chaque état de compact.spec |
+| empty | static-content: main vide | ✅ covered | « Plus de cartes » dans la colonne, la phrase suivante lue seulement |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain (plan 01-54) : les douze points ci-dessus, la largeur vue sur son iPhone (≈ 594 px dans Safari, ≈ 630 px installée), la prise au pouce |

@@ -3,8 +3,8 @@ import { etatParam } from "./position.ts";
 
 // Touch targets (UI-SPEC « Touch targets »): every button, card slice, step chip, tray chip and candidate
 // knight hit circle measures at least 44 x 44 screen px on the smallest phones, held sideways (Romain's
-// « paysage obligatoire »: the compact bar of plan 01-37; a screen taller than wide leaves the game in
-// 01-38). Explicit viewports on the desktop project.
+// « paysage obligatoire »: the board on the full height with a strip at each side, plan 01-47; a
+// screen taller than wide leaves the game in 01-38). Explicit viewports on the desktop project.
 
 const VIEWPORTS = [
   { width: 480, height: 320 },
@@ -63,10 +63,14 @@ for (const viewport of VIEWPORTS) {
       await expectTargets("card", cards);
       await expectAllButtons(page);
 
-      // Each visible slice of the fan is at least 44 px wide: the next card starts 44 px or more on.
+      // Each visible slice of the hand is at least 44 px: the next card starts 44 px or more on, along
+      // the hand (across in a fan, down in the column of the left strip, plan 01-47).
       const boxes = await Promise.all((await cards.all()).map((card) => card.boundingBox()));
       for (let i = 1; i < boxes.length; i++) {
-        const gap = (boxes[i]?.x ?? 0) - (boxes[i - 1]?.x ?? 0);
+        const gap = Math.max(
+          Math.abs((boxes[i]?.x ?? 0) - (boxes[i - 1]?.x ?? 0)),
+          Math.abs((boxes[i]?.y ?? 0) - (boxes[i - 1]?.y ?? 0)),
+        );
         expect(gap, `slice ${i - 1}`).toBeGreaterThanOrEqual(MIN - TOLERANCE);
       }
       await cards.first().click();
@@ -140,18 +144,34 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test.describe("le 7 sous le plateau à 667 x 375, le téléphone tenu en largeur", () => {
+test.describe("le 7 autour du plateau à 667 x 375, le téléphone tenu en largeur", () => {
   test.use({ viewport: { width: 667, height: 375 } });
   test.skip(({ isMobile }) => isMobile, "explicit viewport: desktop project only");
 
-  test("le galet en largeur reste 2:1 et dans l’écran, le panneau avec lui", async ({ page }) => {
+  /** The boxes of the 7's three parts around the board (plan 01-47), and the board's. */
+  async function sevenParts(page: Page) {
+    const boxOf = async (selector: string) => {
+      const box = await page.locator(selector).boundingBox();
+      if (box === null) throw new Error(`no box for ${selector}`);
+      return box;
+    };
+    return {
+      board: await boxOf("[data-board]"),
+      line: await boxOf("[data-seven-line]"),
+      buttons: await boxOf("[data-seven-buttons]"),
+    };
+  }
+
+  test("le galet en largeur reste 2:1 et dans l’écran, l’assistant autour de lui", async ({
+    page,
+  }) => {
     await openPosition(page, {
       turn: "bleu",
       pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"], jaune: [{ p: 62 }, "S", "S", "S"] },
       hands: { bleu: ["7H"] },
     });
     await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
-    // Three micro-moves: the plan list is full, the panel must not grow past the screen.
+    // Three micro-moves: the plan is full, the assistant must not grow past the screen.
     for (const [pawn, steps] of [
       ["bleu0", 3],
       ["bleu1", 2],
@@ -162,19 +182,17 @@ test.describe("le 7 sous le plateau à 667 x 375, le téléphone tenu en largeur
     }
     await expect(page.locator("[data-seven-row]")).toHaveCount(3);
 
-    const board = await page.locator("[data-board]").boundingBox();
-    const seven = await page.locator("[data-seven-panel]").boundingBox();
-    expect(board).not.toBeNull();
-    expect(seven).not.toBeNull();
-    if (board === null || seven === null) return;
+    const { board, line, buttons } = await sevenParts(page);
     expect(Math.abs(board.height - 0.5 * board.width)).toBeLessThan(2);
     expect(board.width).toBeGreaterThan(90);
     expect(board.x).toBeGreaterThanOrEqual(0);
     expect(board.x + board.width).toBeLessThanOrEqual(667 + 0.5);
-    expect(board.y + board.height).toBeLessThanOrEqual(seven.y + 1);
-    // The 2:1 landscape galet and its head room over the compact bar, which the panel takes: everything
-    // is on screen, no scrolling to reach « Jouer ».
-    expect(seven.y + seven.height).toBeLessThanOrEqual(375 + 0.5);
+    expect(board.y + board.height).toBeLessThanOrEqual(375 + 0.5);
+    // The line over the board, the buttons in the right strip: none covers the board, everything is
+    // on screen, no scrolling to reach « Jouer ».
+    expect(line.y + line.height).toBeLessThanOrEqual(board.y + 0.5);
+    expect(buttons.x).toBeGreaterThanOrEqual(board.x + board.width - 0.5);
+    expect(buttons.y + buttons.height).toBeLessThanOrEqual(375 + 0.5);
     const play = await page.getByRole("button", { name: "Jouer", exact: true }).boundingBox();
     expect((play?.y ?? 0) + (play?.height ?? 0)).toBeLessThanOrEqual(375);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(
@@ -182,7 +200,7 @@ test.describe("le 7 sous le plateau à 667 x 375, le téléphone tenu en largeur
     );
   });
 
-  test("beaucoup d’étapes : la liste défile dans le panneau, qui garde sa taille", async ({
+  test("beaucoup d’étapes : la ligne de consigne garde une ligne, le plan entier dans son titre", async ({
     page,
   }) => {
     await openPosition(page, {
@@ -191,25 +209,29 @@ test.describe("le 7 sous le plateau à 667 x 375, le téléphone tenu en largeur
       hands: { bleu: ["7H"] },
     });
     await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
-    const before = await page.locator("[data-seven-panel]").boundingBox();
+    const before = await sevenParts(page);
     // One step at a time with alternating knights: seven rows.
     for (let i = 0; i < 7; i++) {
       await page.locator(`[data-hit="bleu${i % 2}"]`).click({ force: true });
       await page.getByRole("button", { name: "1 pas" }).click();
     }
     await expect(page.locator("[data-seven-row]")).toHaveCount(7);
-    const after = await page.locator("[data-seven-panel]").boundingBox();
-    expect(after?.height).toBe(before?.height);
-    // In the compact bar the plan is one line that scrolls sideways (UI-SPEC addendum « Plateau
-    // galet », item 8).
-    const region = page.locator("[data-seven-region]");
+    const after = await sevenParts(page);
+    // Nothing grows: the line, the buttons and the board keep their boxes.
+    expect(after.line).toEqual(before.line);
+    expect(after.buttons).toEqual(before.buttons);
+    expect(after.board).toEqual(before.board);
+    // In the 24 px prompt row the plan is one line ending in « … » (UI-SPEC addendum « Recette 3 de
+    // Romain »): the whole plan, the newest row included, is in its title and read out.
+    const line = page.locator("[data-seven-line]");
     expect(
-      await region.evaluate(
-        (el) => el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth,
-      ),
+      await line.evaluate((el) => {
+        const text = el.firstElementChild as HTMLElement;
+        return text.scrollWidth > text.clientWidth;
+      }),
     ).toBe(true);
-    // The newest row is the one in view.
-    await expect(page.locator("[data-seven-row]").last()).toBeInViewport();
+    const last = await page.locator("[data-seven-row]").last().textContent();
+    await expect(line).toHaveAttribute("title", new RegExp(`${(last ?? "").trim()}$`));
   });
 });
 
