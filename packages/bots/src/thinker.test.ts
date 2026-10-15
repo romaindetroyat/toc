@@ -67,7 +67,8 @@ function match(seed: Rng, a: BotLevel, b: BotLevel): GameState {
   for (let i = 0; i < 5000 && state.phase !== "won"; i++) {
     const seat = actingSeat(state);
     const level = teamOf(seat) === "bleu-rouge" ? a : b;
-    const thought = chooseAction(viewFor(state, seat), seat, level, rng);
+    // Level 5 searches with a small budget here: these games check legality, not strength.
+    const thought = chooseAction(viewFor(state, seat), seat, level, rng, { plies: 60 });
     rng = thought.rng;
     // apply throws IllegalActionError on anything legalActions does not list.
     state = apply(state, seat, thought.action).state;
@@ -128,7 +129,8 @@ describe("chooseAction levels 2 to 5", () => {
         rng: [9, 8, 7, 6],
         difficulty: 0,
         candidates: 1,
-        units: 1,
+        // Level 5 counts its search plies: none for a single candidate.
+        units: level === 5 ? 0 : 1,
       });
     }
   });

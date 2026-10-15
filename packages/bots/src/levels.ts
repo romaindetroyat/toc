@@ -23,7 +23,7 @@ export function parseBotLevel(value: unknown): BotLevel | null {
  * - epsilon: the chance of a uniformly random candidate instead of a considered one;
  * - temperature: the softmax temperature over the evaluation, in evaluation units (T = 8 reads « a
  *   move 8 progress steps worse is e^-1 as likely »); 0 picks the best score, ties to the first.
- * Level 1 does not use them: it plays randomLegal. Plan 03-04 adds level 5's search budget here.
+ * Level 1 does not use them: it plays randomLegal. Level 5 plays T = 0 on top of its search (below).
  */
 export type LevelParams = { epsilon: number; temperature: number };
 
@@ -58,4 +58,21 @@ export const LEVEL_PARAMS: Readonly<Record<BotLevel, LevelParams>> = {
   3: { epsilon: 0, temperature: GALOPEUR_TEMPERATURE },
   4: { epsilon: 0, temperature: PUR_SANG_TEMPERATURE },
   5: { epsilon: 0, temperature: 0 },
+};
+
+/** Work, not time: one unit = one apply and one policy call inside level 5's search. */
+export type Budget = { plies: number };
+
+/**
+ * Level 5, Champion (D-04, 03-RESEARCH Pattern 5): how many candidates the search keeps by the static
+ * evaluation (captures and home entries are always kept on top of these).
+ */
+export const CHAMPION_KEEP = 6;
+/** Plies rolled out after each kept candidate, every seat playing the noiseless policy (one round). */
+export const CHAMPION_PLIES = 4;
+/** Imagined deals the default budget pays for when CHAMPION_KEEP candidates are kept. */
+export const CHAMPION_WORLDS = 12;
+/** Level 5's default budget: each kept candidate costs its own apply plus CHAMPION_PLIES per deal. */
+export const CHAMPION_BUDGET: Readonly<Budget> = {
+  plies: CHAMPION_KEEP * CHAMPION_WORLDS * (1 + CHAMPION_PLIES),
 };

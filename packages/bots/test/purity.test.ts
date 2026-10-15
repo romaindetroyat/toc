@@ -66,10 +66,19 @@ function stripComments(text: string): string {
     .replace(/\s\/\/.*$/gm, "");
 }
 
+/**
+ * The one deciding file allowed to name the full state: determinize.ts builds an imagined GameState from
+ * the PlayerView alone, for level 5's search to play in (no real state ever reaches it; the hidden-hand
+ * swap property of noCheat.test.ts proves it). Its module-memory rules still apply.
+ */
+const IMAGINED_WORLD = "determinize.ts";
+
 /** Returns "file: label" for each forbidden use found in `text`. */
 function violations(file: string, text: string): string[] {
   const code = stripComments(text);
-  const rules = file.endsWith(".test.ts") ? FORBIDDEN : [...FORBIDDEN, ...DECIDING];
+  const deciding =
+    file === IMAGINED_WORLD ? DECIDING.filter(({ label }) => label !== "full state") : DECIDING;
+  const rules = file.endsWith(".test.ts") ? FORBIDDEN : [...FORBIDDEN, ...deciding];
   return rules.filter(({ pattern }) => pattern.test(code)).map(({ label }) => `${file}: ${label}`);
 }
 

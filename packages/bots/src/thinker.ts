@@ -9,25 +9,27 @@
 //   score, ties to the first);
 // - exchange phase: level 1 gives like randomLegal; levels 2 to 5 score each card for the partner
 //   (exchange.ts giveScores, D-09) and pick through the same noise, level 5 taking the best.
+// - level 5 in the play phase: the search over imagined deals (search.ts, D-04), anytime: each step
+//   runs more of its budget (levels.ts CHAMPION_BUDGET by default) and result() is valid at any moment.
 // Work is counted in units (Budget), never in time, so the same inputs give the same move on every
-// machine and inside the Durable Object of phase 2. Levels 1 to 5 finish in their first step here;
-// plan 03-04 makes level 5 anytime.
+// machine and inside the Durable Object of phase 2. Levels 1 to 4 (and level 5 outside the play phase)
+// finish in their first step.
 // Pure, no I/O, erasable syntax only.
 
 import { type Action, type Color, next, type PlayerView, type Rng } from "@toc/engine";
 import { candidatesFor } from "./candidates.ts";
 import { scoreOf } from "./evaluate.ts";
 import { giveScores } from "./exchange.ts";
-import { type BotLevel, LEVEL_PARAMS } from "./levels.ts";
+import { type BotLevel, type Budget, CHAMPION_BUDGET, LEVEL_PARAMS } from "./levels.ts";
 import { randomLegal } from "./randomLegal.ts";
+import { createSearch } from "./search.ts";
 
-/** Work, not time: one unit = one apply and one policy call inside a search (level 5, plan 03-04). */
-export type Budget = { plies: number };
+export type { Budget } from "./levels.ts";
 
 /**
  * A decision: the action, the rng after it, how hard the choice was (0 to 1), how many options, and the
- * work spent in units (levels 1 to 4: one unit per candidate scored; plan 03-04 counts level 5's
- * rollout plies). The ladder reports the units of each side.
+ * work spent in units (levels 1 to 4 and every exchange: one unit per candidate scored; level 5 in the
+ * play phase: its rollout plies, never more than its budget). The ladder reports the units of each side.
  */
 export type Thought = {
   action: Action;
@@ -38,7 +40,7 @@ export type Thought = {
 };
 
 export type Thinker = {
-  /** Runs up to `units` more work; true when the decision is final. */
+  /** Runs about `units` more work (never past the budget); true when the decision is final. */
   step(units: number): boolean;
   /** Always valid, also before the search is finished (anytime). */
   result(): Thought;
@@ -164,9 +166,12 @@ export function createThinker(
   seat: Color,
   level: BotLevel,
   rng: Rng,
-  _budget?: Budget,
+  budget?: Budget,
 ): Thinker {
   const start: Rng = [rng[0], rng[1], rng[2], rng[3]];
+  if (level === 5 && view.phase === "play") {
+    return createSearch(view, seat, start, budget ?? CHAMPION_BUDGET);
+  }
   let thought: Thought | null = null;
   const result = (): Thought => {
     thought ??= decide(view, seat, level, start);
@@ -191,7 +196,7 @@ export function chooseAction(
 ): Thought {
   const thinker = createThinker(view, seat, level, rng, budget);
   while (!thinker.step(256)) {
-    // Each step runs more of the budget; the levels of this plan finish in the first.
+    // Each step runs more of the budget; levels 1 to 4 finish in the first.
   }
   return thinker.result();
 }

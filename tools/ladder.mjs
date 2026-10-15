@@ -10,7 +10,8 @@
 //
 // Prints the win rate of A, its Wilson 95 % interval, the pair outcomes 2–0 / 1–1 / 0–2, the decision
 // time of each side (mean, p95, max) and its work units, the wall time and a verdict. The bar
-// (« nettement »): p̂ ≥ --min and the Wilson lower bound > --lower.
+// (« nettement »): p̂ ≥ --min and the Wilson lower bound > --lower (--min 0 --lower 0: a probe that
+// reports without judging; a failed game still fails it).
 // Exit codes: 0 PASS, 1 FAIL or a failed game (printed with its seeds), 2 bad arguments.
 // The engine and the bots are TypeScript files imported directly by Node (type stripping).
 
@@ -69,7 +70,8 @@ function fraction(name, fallback) {
   const value = raw(name);
   if (value === undefined) return fallback;
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0 || n >= 1) usage(`--${name} expects a number between 0 and 1`);
+  // 0 is allowed: a probe that reports without judging (--min 0 --lower 0).
+  if (!Number.isFinite(n) || n < 0 || n >= 1) usage(`--${name} expects a number from 0 to below 1`);
   return n;
 }
 
