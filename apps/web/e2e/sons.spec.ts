@@ -15,20 +15,26 @@ const played = (page: Page) =>
   );
 
 const INTRO = "Écoute les versions de chaque son et choisis ta préférée.";
+/** Only the hooves are heard since 2026-10-15 (Romain: « Oui, que les sabots »; plan 03-08). */
+const MUTED_NOTE = `Les hennissements et les sons des cartes sont coupés pour l’instant${NBSP}: dans la partie, on n’entend que les sabots.`;
 const scheduledOf = (page: Page) =>
   page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
 const sabots = (page: Page) => page.getByRole("radiogroup", { name: "Mon choix pour Sabots" });
 
 test.describe("page de test des sons à choix", () => {
-  test("sons: la page liste les trois sections, chaque son ses versions et son choix, boutons d’au moins 44 x 44", async ({
+  // Since 2026-10-15 only the hooves are heard: the « Hennissements » and « Cartes » sections are
+  // hidden (they were listed here with their 9 rows, one version each) and one line says so.
+  test("sons: la page liste les sabots seuls, leurs versions et leur choix, boutons d’au moins 44 x 44", async ({
     page,
   }) => {
     await page.goto("/#/sons");
     await expect(page.getByRole("heading", { name: "Test des sons", level: 1 })).toBeVisible();
-    for (const section of ["Sabots", "Hennissements", "Cartes"]) {
-      await expect(page.getByRole("heading", { name: section, level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sabots", level: 2 })).toBeVisible();
+    for (const section of ["Hennissements", "Cartes"]) {
+      await expect(page.getByRole("heading", { name: section, level: 2 })).toHaveCount(0);
     }
-    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(3);
+    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(1);
+    await expect(page.getByText(MUTED_NOTE)).toBeVisible();
     await expect(
       page.getByText(
         "Écoute les versions de chaque son et choisis ta préférée. Ton choix compte tout de suite dans tes parties, sur cet appareil. Pour qu’il compte pour tout le monde, touche «\u202fCopier mes choix\u202f» et envoie-les.",
@@ -40,24 +46,25 @@ test.describe("page de test des sons à choix", () => {
       ),
     ).toBeVisible();
 
-    // 10 sounds + the hoof cadence and the distance rows (no ambience since 2026-10-14).
-    await expect(page.locator("li.row")).toHaveCount(12);
-    await expect(page.locator("li.row[data-sound]")).toHaveCount(10);
-    // One choice per sound; the hooves have four versions, the other sounds one (01-52 and 01-53 deferred).
-    await expect(page.getByRole("radiogroup")).toHaveCount(10);
-    await expect(page.getByRole("radiogroup", { name: /^Mon choix pour / })).toHaveCount(10);
+    // The hooves + their cadence and distance rows (no ambience since 2026-10-14; no neigh and no
+    // card sound since 2026-10-15).
+    await expect(page.locator("li.row")).toHaveCount(3);
+    await expect(page.locator("li.row[data-sound]")).toHaveCount(1);
+    // One choice, the hooves', with their four versions.
+    await expect(page.getByRole("radiogroup")).toHaveCount(1);
+    await expect(page.getByRole("radiogroup", { name: /^Mon choix pour / })).toHaveCount(1);
     await expect(sabots(page).getByRole("radio")).toHaveText(["A", "B", "C", "D"]);
     for (const letter of ["A", "B", "C", "D"]) {
       await expect(
         page.getByRole("button", { name: `Écouter Sabots, version ${letter}`, exact: true }),
       ).toBeVisible();
     }
-    await expect(page.getByRole("button", { name: /, version [A-D]$/ })).toHaveCount(13);
-    await expect(page.getByText("Mon choix", { exact: true })).toHaveCount(10);
+    await expect(page.getByRole("button", { name: /, version [A-D]$/ })).toHaveCount(4);
+    await expect(page.getByText("Mon choix", { exact: true })).toHaveCount(1);
 
     const buttons = page.locator("button.play");
     const count = await buttons.count();
-    expect(count).toBe(18); // 13 versions + 4 cadences + the distance
+    expect(count).toBe(9); // 4 versions + 4 cadences + the distance
     for (let i = 0; i < count; i++) {
       const box = await buttons.nth(i).boundingBox();
       expect(box?.width, `play button ${i} width`).toBeGreaterThanOrEqual(44);
@@ -168,7 +175,7 @@ test.describe("page de test des sons à choix", () => {
     }
   });
 
-  test("sons: un choix est gardé après rechargement, les autres sons restent sur A", async ({
+  test("sons: un choix est gardé après rechargement, et lui seul est enregistré", async ({
     page,
   }) => {
     await page.goto("/#/sons");
@@ -191,8 +198,10 @@ test.describe("page de test des sons à choix", () => {
       "aria-checked",
       "true",
     );
-    const other = page.getByRole("radiogroup", { name: "Mon choix pour Poser une carte" });
-    await expect(other.getByRole("radio", { name: "A" })).toHaveAttribute("aria-checked", "true");
+    // The card sounds have no row since 2026-10-15 (only the hooves are heard).
+    await expect(
+      page.getByRole("radiogroup", { name: "Mon choix pour Poser une carte" }),
+    ).toHaveCount(0);
 
     const stored = await page.evaluate(() => localStorage.getItem("toc.soundchoices.v1"));
     expect(JSON.parse(stored ?? "{}")).toEqual({ sabot: "d" });
@@ -237,11 +246,10 @@ test.describe("page de test des sons à choix", () => {
       "aria-checked",
       "true",
     );
+    // The stored card choice is ignored; the card sounds have no row since 2026-10-15.
     await expect(
-      page
-        .getByRole("radiogroup", { name: "Mon choix pour Poser une carte" })
-        .getByRole("radio", { name: "A" }),
-    ).toHaveAttribute("aria-checked", "true");
+      page.getByRole("radiogroup", { name: "Mon choix pour Poser une carte" }),
+    ).toHaveCount(0);
     // The old ratings have no control left.
     await expect(page.getByRole("radio", { name: /À écouter|Bon|À changer/ })).toHaveCount(0);
     // Unreadable JSON: the defaults too.
@@ -280,8 +288,9 @@ test.describe("page de test des sons à choix", () => {
     await page.goto("/#/sons");
     await page.getByText(INTRO).click();
     await expect(page.getByText("Son prêt")).toBeVisible();
-    await expect(page.locator(".version .source")).toHaveCount(13);
-    await expect(page.getByText("Généré par le code", { exact: true })).toHaveCount(13);
+    // The four hoof versions (the 9 single-version neigh and card rows are hidden since 2026-10-15).
+    await expect(page.locator(".version .source")).toHaveCount(4);
+    await expect(page.getByText("Généré par le code", { exact: true })).toHaveCount(4);
     await expect(page.getByText("Son indisponible")).toHaveCount(0);
     const hooves = page.locator('li.row[data-sound="sabot"] .version .what');
     await expect(hooves).toHaveText(["actuel", "sur la terre", "sur les pavés", "sur le bois"]);
@@ -289,11 +298,38 @@ test.describe("page de test des sons à choix", () => {
 
   test("sons: chaque son montre l’auteur et la licence du registre", async ({ page }) => {
     await page.goto("/#/sons");
-    await expect(page.locator("li.row[data-sound] > .licence")).toHaveCount(10);
+    // The hooves' row (the neigh and card rows are hidden since 2026-10-15).
+    await expect(page.locator("li.row[data-sound] > .licence")).toHaveCount(1);
     await expect(page.getByText("Jeu TOC (synthèse Web Audio) · Aucune œuvre tierce")).toHaveCount(
-      10,
+      1,
     );
     await expect(page.getByText("Licence non renseignée")).toHaveCount(0);
+  });
+
+  test("sons: les hennissements et les sons des cartes sont coupés pour l’instant, rien d’eux n’est rendu", async ({
+    page,
+  }) => {
+    await page.goto("/#/sons");
+    await expect(page.getByText(MUTED_NOTE)).toBeVisible();
+    await expect(page.locator('li.row[data-sound^="hennissement-"]')).toHaveCount(0);
+    await expect(page.locator('li.row[data-sound^="carte-"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Écouter Sortie de l’écurie/ })).toHaveCount(0);
+    await page.getByText(INTRO).click();
+    await expect(page.getByText("Son prêt")).toBeVisible();
+    const rendered = await page.evaluate(() =>
+      Object.keys(
+        (window as unknown as { __tocDebug?: { audio: { sounds?: object } } }).__tocDebug?.audio
+          .sounds ?? {},
+      ),
+    );
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.filter((key) => !key.startsWith("hoof"))).toEqual([]);
+    // A hoof version still plays; nothing else does.
+    await page.getByRole("button", { name: "Écouter Sabots, version A", exact: true }).click();
+    await expect
+      .poll(async () => (await played(page)).filter((p) => p.id === "sabot").length)
+      .toBeGreaterThan(0);
+    expect((await played(page)).filter((p) => p.id !== "sabot")).toEqual([]);
   });
 
   test("sons: la page défile et le lien Retour ramène au lancement", async ({ page }) => {
@@ -322,11 +358,11 @@ test.describe("copier mes choix", () => {
     await expect(page.getByRole("textbox", { name: "Mes choix" })).toHaveCount(0);
 
     const clipboard = await page.evaluate(() => navigator.clipboard.readText());
-    const lines = clipboard.split("\n");
-    expect(lines).toHaveLength(10);
-    expect(lines[0]).toBe(`Sabots${NBSP}: B`);
-    expect(lines).toContain(`Sortie de l’écurie${NBSP}: A`);
-    expect(lines).toContain(`Donne${NBSP}: A`);
+    // The sounds the page shows: the hooves alone since 2026-10-15 (the list had the 9 neigh and
+    // card lines too, « Sortie de l’écurie : A », « Donne : A »…).
+    expect(clipboard).toBe(`Sabots${NBSP}: B`);
+    expect(clipboard).not.toContain("Sortie de l’écurie");
+    expect(clipboard).not.toContain("Donne");
     expect(clipboard).not.toContain("Ambiance");
   });
 
@@ -373,8 +409,8 @@ test.describe("copier mes choix", () => {
     const box = page.getByRole("textbox", { name: "Mes choix" });
     await expect(box).toBeVisible();
     await expect(box).toHaveAttribute("readonly", "");
-    await expect(box).toHaveValue(new RegExp(`^Sabots${NBSP}: C\n`));
-    await expect(box).toHaveValue(new RegExp(`Poser une carte${NBSP}: A`));
+    // The hooves alone since 2026-10-15 (the card line « Poser une carte : A » is gone with its row).
+    await expect(box).toHaveValue(`Sabots${NBSP}: C`);
   });
 });
 

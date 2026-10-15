@@ -11,6 +11,11 @@ import { etatParam } from "./position.ts";
 // duration, delay and the moment it begins. The sounds come from window.__tocDebug.audio.cues (debug
 // builds), read by id and by time.
 //
+// Only the hooves sound since 2026-10-15 (Romain: « laisse les sons de côté sauf les sabots des
+// chevaux », then « Oui, que les sabots »; plan 03-08). The tests that heard a neigh or a card sound
+// now check that none is asked for (audio.cues) nor played (audio.played); the timings of those
+// sounds stay in the cue plan, tested in src/game/cues.test.ts, for the day they come back.
+//
 // The cards (plan 01-22): a card in flight has the role `flight-deal`, `flight-play`,
 // `flight-exchange` or `flight-lay`; a card of the hand that flips open or slides in has the role
 // `hand-card`. Its `card` field is the card id (`back` for a face-down card).
@@ -26,11 +31,14 @@ type Rec = {
   ends: number;
 };
 type Cue = { id: string; at: number; requestedAt: number };
+type Played = { id: string; variant: string };
 type TocWindow = Window & {
   __anims: Rec[];
   __paused: Animation[];
   __armed?: Promise<void>;
-  __tocDebug?: { audio: { cues?: Cue[]; scheduled: number[]; history: number[][] } };
+  __tocDebug?: {
+    audio: { cues?: Cue[]; played?: Played[]; scheduled: number[]; history: number[][] };
+  };
 };
 
 function recorder() {
@@ -86,6 +94,29 @@ const records = (page: Page) =>
   page.evaluate(() => (window as unknown as TocWindow).__anims.slice());
 const cues = (page: Page) =>
   page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.cues?.slice() ?? []);
+/** Every buffer the audio engine started (debug builds). */
+const played = (page: Page) =>
+  page.evaluate(() => (window as unknown as TocWindow).__tocDebug?.audio.played?.slice() ?? []);
+
+/**
+ * Only the hooves sound (ENABLED_SOUNDS, 2026-10-15): no neigh and no card sound is asked for or
+ * played. `hooves`: the move also scheduled its clops.
+ */
+async function expectOnlyHooves(page: Page, hooves = true) {
+  if (hooves) {
+    await expect
+      .poll(async () =>
+        (
+          await page.evaluate(
+            () => (window as unknown as TocWindow).__tocDebug?.audio.history ?? [],
+          )
+        ).flat(),
+      )
+      .not.toEqual([]);
+  }
+  expect((await cues(page)).filter((c) => c.id !== "sabot")).toEqual([]);
+  expect((await played(page)).filter((p) => p.id !== "sabot")).toEqual([]);
+}
 
 /** The records of a knight's inner group, with the duration asked for (± 1 ms). */
 function pick(all: Rec[], pawn: string, role: string, duration: number): Rec[] {
@@ -227,7 +258,7 @@ async function shootArmed(page: Page, name: string) {
 
 const LEAD = 60;
 
-test("sortie : un seul bond de 600 ms jusqu’au losange, avec un hennissement au départ", async ({
+test("sortie : un seul bond de 600 ms jusqu’au losange, sans hennissement (que les sabots)", async ({
   page,
 }) => {
   await openPosition(page, {
@@ -242,10 +273,9 @@ test("sortie : un seul bond de 600 ms jusqu’au losange, avec un hennissement a
   near(arc.begins, mover.begins, 5);
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:0");
 
-  const sounds = await cues(page);
-  expect(sounds.map((c) => c.id)).toContain("hennissement-sortie");
-  const neigh = sounds.find((c) => c.id === "hennissement-sortie") as Cue;
-  near(neigh.at - neigh.requestedAt, 0.06, 0.03);
+  // The neigh at take-off is silenced (2026-10-15): the landing clop alone.
+  await expectOnlyHooves(page);
+  expect((await cues(page)).map((c) => c.id)).not.toContain("hennissement-sortie");
 });
 
 test("4 à reculons : un demi-tour de la tête de 120 ms avant les quatre bonds", async ({
@@ -302,14 +332,11 @@ test("prise sur la dernière case : la ruade (220 + 280 ms) puis l’éjection (
   );
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:8");
 
-  const sounds = await cues(page);
-  const snort = sounds.find((c) => c.id === "hennissement-ruade") as Cue;
-  const whinny = sounds.find((c) => c.id === "hennissement-plainte") as Cue;
-  expect(snort).toBeDefined();
-  expect(whinny).toBeDefined();
-  near(whinny.at - snort.at, 0.5, 0.01);
-  // The snort is at the arrival of the three hops, the whinny when the knight leaves.
-  near(snort.at - snort.requestedAt, 0.06 + 0.666, 0.03);
+  // The snort at the arrival and the whinny of the eaten knight are silenced (2026-10-15).
+  await expectOnlyHooves(page);
+  const ids = (await cues(page)).map((c) => c.id);
+  expect(ids).not.toContain("hennissement-ruade");
+  expect(ids).not.toContain("hennissement-plainte");
 });
 
 test("le 7 : le cheval mangé en chemin part au moment où le mangeur passe, avant la fin du déplacement", async ({
@@ -347,11 +374,12 @@ test("le 7 : le cheval mangé en chemin part au moment où le mangeur passe, ava
 
   // No rearing: the attacker does not stop on the cell it passes.
   expect(pick(await records(page), "jaune0", "rear", 220)).toHaveLength(0);
-  const whinny = (await cues(page)).find((c) => c.id === "hennissement-plainte") as Cue;
-  near(whinny.at - whinny.requestedAt, 0.06 + beat / 1000, 0.04);
+  // The whinny at the beat is silenced (2026-10-15).
+  await expectOnlyHooves(page);
+  expect((await cues(page)).map((c) => c.id)).not.toContain("hennissement-plainte");
 });
 
-test("Valet : deux arcs qui se croisent, 900 ms, en même temps, avec un hennissement surpris", async ({
+test("Valet : deux arcs qui se croisent, 900 ms, en même temps, sans hennissement surpris", async ({
   page,
 }) => {
   await openPosition(page, {
@@ -377,12 +405,12 @@ test("Valet : deux arcs qui se croisent, 900 ms, en même temps, avec un henniss
     timeout: 10_000,
   });
   expect(await placeOf(page, "vert0")).toBe(mine);
-  const neigh = (await cues(page)).find((c) => c.id === "hennissement-surpris") as Cue;
-  expect(neigh).toBeDefined();
-  near(neigh.at - neigh.requestedAt, 0.06, 0.03);
+  // The surprised neigh is silenced (2026-10-15), and a swap has no clop: no sound at all.
+  await expectOnlyHooves(page, false);
+  expect((await cues(page)).map((c) => c.id)).not.toContain("hennissement-surpris");
 });
 
-test("maison : un petit hennissement joyeux et un tassement de 150 ms pour les trois premiers", async ({
+test("maison : un tassement de 150 ms pour les trois premiers, sans hennissement joyeux", async ({
   page,
 }) => {
   await openPosition(page, {
@@ -398,13 +426,15 @@ test("maison : un petit hennissement joyeux et un tassement de 150 ms pour les t
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "home:bleu:0", {
     timeout: 10_000,
   });
+  // The joyful neigh is silenced (2026-10-15): the clops of the walk alone.
+  await expectOnlyHooves(page);
   const ids = (await cues(page)).map((c) => c.id);
-  expect(ids).toContain("hennissement-joyeux");
+  expect(ids).not.toContain("hennissement-joyeux");
   expect(ids).not.toContain("hennissement-fete");
   await expect(page.locator("[data-particles]")).toHaveCount(0);
 });
 
-test("le quatrième cheval : il se cabre 500 ms, 8 étoiles pendant 700 ms, le long hennissement", async ({
+test("le quatrième cheval : il se cabre 500 ms, 8 étoiles pendant 700 ms, sans le long hennissement", async ({
   page,
 }) => {
   await openPosition(page, {
@@ -431,8 +461,10 @@ test("le quatrième cheval : il se cabre 500 ms, 8 étoiles pendant 700 ms, le l
   await shoot(page, "fete", LEAD + 932 + 300);
 
   await expect(page.locator("[data-particles]")).toHaveCount(0, { timeout: 10_000 });
+  // The long neigh is silenced (2026-10-15).
+  await expectOnlyHooves(page);
   const ids = (await cues(page)).map((c) => c.id);
-  expect(ids).toContain("hennissement-fete");
+  expect(ids).not.toContain("hennissement-fete");
   expect(ids).not.toContain("hennissement-joyeux");
 });
 
@@ -511,8 +543,10 @@ test.describe("Réduire les animations : glissement, fondus, pas de ruade ni de 
     );
     const all = await records(page);
     expect(all.filter((r) => r.role === "rear")).toHaveLength(0);
+    // No ruade under reduced motion; the whinny is silenced too since 2026-10-15.
+    await expectOnlyHooves(page);
     const sounds = (await cues(page)).map((c) => c.id);
-    expect(sounds).toContain("hennissement-plainte");
+    expect(sounds).not.toContain("hennissement-plainte");
     expect(sounds).not.toContain("hennissement-ruade");
   });
 
@@ -528,7 +562,9 @@ test.describe("Réduire les animations : glissement, fondus, pas de ruade ni de 
     });
     await expect(page.locator("[data-particles]")).toHaveCount(0);
     expect((await records(page)).filter((r) => r.role === "rear")).toHaveLength(0);
-    expect((await cues(page)).map((c) => c.id)).toContain("hennissement-fete");
+    // The long neigh is silenced since 2026-10-15.
+    await expectOnlyHooves(page);
+    expect((await cues(page)).map((c) => c.id)).not.toContain("hennissement-fete");
   });
 
   test("le Valet est un fondu enchaîné de 150 ms", async ({ page }) => {
@@ -586,7 +622,7 @@ function bannerWatch() {
   }).observe(document, { childList: true, subtree: true });
 }
 
-test("la donne : 20 cartes de 300 ms à 55 ms d’intervalle avec le bruit de la donne, puis la main se retourne", async ({
+test("la donne : 20 cartes de 300 ms à 55 ms d’intervalle sans bruit de donne, puis la main se retourne", async ({
   page,
 }) => {
   // The 20 cards are all in flight together for only 300 ms, until the first one lands: the freeze is
@@ -606,9 +642,9 @@ test("la donne : 20 cartes de 300 ms à 55 ms d’intervalle avec le bruit de la
     expect(flight.card).toBe("back");
   }
 
-  const riffle = (await cues(page)).filter((c) => c.id === "carte-donne");
-  expect(riffle).toHaveLength(1);
-  near((riffle[0] as Cue).at - (riffle[0] as Cue).requestedAt, 0.06, 0.03);
+  // The riffle is silenced (2026-10-15): the deal makes no sound.
+  expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(0);
+  await expectOnlyHooves(page, false);
 
   // The five cards of the player come face up one after the other, once the deal has landed.
   await expect.poll(async () => handCards(await records(page)).length).toBe(5);
@@ -634,7 +670,7 @@ test("la bannière de donne reste 1,2 s sur le plateau", async ({ page }) => {
   expect(off - on).toBeLessThanOrEqual(1600);
 });
 
-test("une carte jouée vole 300 ms jusqu’à son emplacement du tapis avec le bruit de la carte, avant le cheval", async ({
+test("une carte jouée vole 300 ms jusqu’à son emplacement du tapis, sans bruit de carte, avant le cheval", async ({
   page,
 }) => {
   // Bleu plays a 2; then Jaune, a bot whose only card is a 7, plays it with its only knight.
@@ -659,9 +695,9 @@ test("une carte jouée vole 300 ms jusqu’à son emplacement du tapis avec le b
   const seven = await waitFor(page, "jaune0", "mover", 1198);
   expect(seven.begins).toBeGreaterThan(theirs.ends - 8);
 
-  const sounds = (await cues(page)).filter((c) => c.id === "carte-pose");
-  expect(sounds.length).toBeGreaterThanOrEqual(2);
-  near((sounds[0] as Cue).at - (sounds[0] as Cue).requestedAt, 0.06, 0.03);
+  // The card-down sound is silenced (2026-10-15): the clops of the two moves alone.
+  expect((await cues(page)).filter((c) => c.id === "carte-pose")).toHaveLength(0);
+  await expectOnlyHooves(page);
 
   await expect(page.locator('[data-felt-last="bleu"] [data-felt-card="2S"]')).toBeVisible();
   await expect(page.locator('[data-felt-last="jaune"] [data-felt-card="7H"]')).toBeVisible({
@@ -670,7 +706,7 @@ test("une carte jouée vole 300 ms jusqu’à son emplacement du tapis avec le b
   await expect(page.locator("[data-flight]")).toHaveCount(0);
 });
 
-test("l’échange : quatre cartes se croisent en 300 ms avec le bruit de la glissade, la reçue entre dans la main", async ({
+test("l’échange : quatre cartes se croisent en 300 ms, sans bruit de glissade, la reçue entre dans la main", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -690,9 +726,9 @@ test("l’échange : quatre cartes se croisent en 300 ms avec le bruit de la gli
     expect(flight.card).toBe("back");
   }
 
-  const slide = (await cues(page)).filter((c) => c.id === "carte-echange");
-  expect(slide).toHaveLength(1);
-  near((slide[0] as Cue).at - (slide[0] as Cue).requestedAt, 0.06, 0.03);
+  // The slide sound is silenced (2026-10-15).
+  expect((await cues(page)).filter((c) => c.id === "carte-echange")).toHaveLength(0);
+  await expectOnlyHooves(page, false);
 
   // The received card slides into the hand when the crossing is over.
   await expect(page.getByText("Reçue", { exact: true })).toBeVisible();
@@ -722,8 +758,9 @@ test("main posée : les cartes se couchent 350 ms chacune, à 60 ms d’interval
     near(flight.begins - (laid[0] as Rec).begins, i * 60, 6);
   }
 
-  const sounds = (await cues(page)).filter((c) => c.id === "carte-pose");
-  expect(sounds).toHaveLength(1);
+  // The card-down sound is silenced (2026-10-15).
+  expect((await cues(page)).filter((c) => c.id === "carte-pose")).toHaveLength(0);
+  await expectOnlyHooves(page, false);
   await expect(page.locator('[data-felt-posed="bleu"] [data-felt-card]')).toHaveCount(3);
   await expect(page.locator("[data-flight]")).toHaveCount(0);
 });
@@ -820,7 +857,7 @@ test.describe("Avance rapide : le bond de 4 cases, les cartes", () => {
     }
     await expect.poll(async () => handCards(await records(page)).length).toBe(5);
     for (const flip of handCards(await records(page))) near(flip.duration, 120, 2);
-    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(1);
+    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(0); // silenced
   });
 
   test("une main posée : 140 ms par carte, 24 ms d’intervalle", async ({ page }) => {
@@ -903,7 +940,7 @@ test.describe("Réduire les animations : les cartes se fondent en 150 ms", () =>
       near(fade.duration, 150, 1);
       near(fade.delay, 0, 1);
     }
-    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(1);
+    expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(0); // silenced
 
     await expect(page.locator("[data-flight]")).toHaveCount(0);
     await page.locator("[data-hand] [data-card]").first().click();
@@ -912,7 +949,7 @@ test.describe("Réduire les animations : les cartes se fondent en 150 ms", () =>
       .poll(async () => flightsOf(await records(page), "exchange").length, { timeout: 30_000 })
       .toBe(4);
     for (const flight of flightsOf(await records(page), "exchange")) near(flight.duration, 150, 1);
-    expect((await cues(page)).filter((c) => c.id === "carte-echange")).toHaveLength(1);
+    expect((await cues(page)).filter((c) => c.id === "carte-echange")).toHaveLength(0); // silenced
     expect(
       (await records(page)).filter((r) => r.role === "particle" || r.role === "arc"),
     ).toHaveLength(0);
@@ -1011,20 +1048,17 @@ test("onglet caché : le coup en cours finit d’un coup, les suivants s’appli
   expect((await clopHistory(page)).length).toBe(before.clops);
   expect((await records(page)).length).toBe(before.animations);
 
-  // Back on the page, the game moves and sounds again.
+  // Back on the page, the game moves again. Its slide sound is silenced since 2026-10-15 (only the
+  // hooves sound; their silence while hidden and their return are covered in director.test.ts).
   await setHidden(page, false);
   await expect(page.locator("[data-hand]")).not.toHaveClass(/concealed/);
   await page.locator("[data-hand] [data-card]").first().click();
   await page.getByRole("button", { name: "Passer cette carte" }).click();
+  // The cards are recorded once they have taken off (the recorder reads the running animations frame
+  // by frame): wait for them, do not read them once.
   await expect
-    .poll(async () => (await cues(page)).some((c) => c.id === "carte-echange"), {
-      timeout: 30_000,
-    })
-    .toBe(true);
-  expect((await cues(page)).length).toBeGreaterThan(before.cues);
-  // The cue is logged when the step is scheduled and the cards are recorded once they have taken off
-  // (the recorder reads the running animations frame by frame): wait for them, do not read them once.
-  await expect
-    .poll(async () => flightsOf(await records(page), "exchange").length, { timeout: 10_000 })
+    .poll(async () => flightsOf(await records(page), "exchange").length, { timeout: 30_000 })
     .toBe(4);
+  expect((await cues(page)).some((c) => c.id === "carte-echange")).toBe(false);
+  await expectOnlyHooves(page, false);
 });
