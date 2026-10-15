@@ -12,6 +12,7 @@ import {
 } from "@toc/engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOT_NAMES } from "./botNames.ts";
+import { type BotRunner, ThinkCancelled, type ThinkRequest } from "./botRunner.ts";
 import {
   type CreateGameOptions,
   createGame,
@@ -498,6 +499,101 @@ describe("bots: think time by the move, the decision counted inside it (D-11, D-
     game.dispose();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(COLORS.filter((c) => game.view().hasGiven[c]).length).toBe(before);
+  });
+});
+
+describe("bots: the runner of the decision, its cap and its cancel (BOT-05)", () => {
+  const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] };
+
+  /** A runner whose thinks the test settles by hand. */
+  function scriptedRunner() {
+    const requests: ThinkRequest[] = [];
+    const pending: { resolve: (t: Thought) => void; reject: (e: unknown) => void }[] = [];
+    let cancels = 0;
+    const runner: BotRunner = {
+      think(request) {
+        requests.push(request);
+        return new Promise<Thought>((resolve, reject) => pending.push({ resolve, reject }));
+      },
+      cancel() {
+        cancels++;
+        for (const think of pending.splice(0)) think.reject(new ThinkCancelled());
+      },
+    };
+    return { runner, requests, pending, cancels: () => cancels };
+  }
+
+  const playedBy = (director: FakeDirector, seat: Color) =>
+    director.events.filter((e) => e.t === "cardPlayed" && e.seat === seat).length;
+
+  for (const [speed, cap] of [
+    ["normal", 2500],
+    ["fast", 500],
+    ["test", null],
+  ] as const) {
+    it(`gives the runner the bot's own view and a deadline of ${cap ?? "none"} at ${speed} speed`, async () => {
+      const scripted = scriptedRunner();
+      const { game } = scenarioGame(play(hands as never), speed, {
+        now: () => Date.now(),
+        runner: scripted.runner,
+      });
+      const t0 = Date.now();
+      game.start();
+      game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(scripted.requests).toHaveLength(1);
+      const request = scripted.requests[0] as ThinkRequest;
+      expect(request.seat).toBe("jaune");
+      expect(request.level).toBe(3);
+      expect(request.view.kind).toBe("view");
+      expect(request.view.seat).toBe("jaune");
+      expect(request.view).not.toHaveProperty("hands");
+      expect(request.deadline).toBe(cap === null ? null : t0 + cap);
+      expect(game.thinking()).toBe("jaune");
+      game.dispose();
+    });
+  }
+
+  it("plays the runner's decision at once when the search took longer than the pace", async () => {
+    const scripted = scriptedRunner();
+    const { game, director } = scenarioGame(play(hands as never), "normal", {
+      now: () => Date.now(),
+      runner: scripted.runner,
+    });
+    game.start();
+    game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+    await vi.advanceTimersByTimeAsync(2400);
+    expect(playedBy(director, "jaune")).toBe(0);
+    expect(game.thinking()).toBe("jaune");
+    const request = scripted.requests[0] as ThinkRequest;
+    scripted.pending[0]?.resolve(realChooseAction(request.view, request.seat, 3, request.rng));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(playedBy(director, "jaune")).toBe(1);
+    game.dispose();
+  });
+
+  it("cancels a think in progress when the game is left: nothing is played, no error", async () => {
+    const scripted = scriptedRunner();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { game, director } = scenarioGame(play(hands as never), "normal", {
+      runner: scripted.runner,
+    });
+    const seen: unknown[] = [];
+    game.onError((error) => seen.push(error));
+    game.start();
+    game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(scripted.requests).toHaveLength(1);
+    const calls = director.calls;
+
+    game.dispose();
+    expect(scripted.cancels()).toBe(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(director.calls).toBe(calls);
+    expect(playedBy(director, "jaune")).toBe(0);
+    expect(scripted.requests).toHaveLength(1);
+    expect(seen).toEqual([]);
+    expect(errors).not.toHaveBeenCalled();
   });
 });
 

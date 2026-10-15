@@ -3,16 +3,17 @@
 // computer players at a natural pace, and hands every engine event to the Director.
 //
 // Nothing is ever played for the human: his give, his play and his dead-hand discard happen only
-// through submit() (D-19, D-20). Each bot plays at the level of its seat (phase 3, BOT-01) through the
-// single bot entry point chooseAction, which is given viewFor(state, bot) only (BOT-04), and the deck
-// and bot seeds come from the browser's secure random source (T-01-21, T-01-22).
+// through submit() (D-19, D-20). Each bot plays at the level of its seat (phase 3, BOT-01) through a
+// runner of the single bot entry point (botRunner.ts), which is given viewFor(state, bot) only (BOT-04),
+// and the deck and bot seeds come from the browser's secure random source (T-01-21, T-01-22).
 //
 // The pace (D-11, D-13, pace.ts): a bot decides first, then waits only what is left of the think time
-// its decision deserves, so the search's own time is inside the think and never added to it. A decision
+// its decision deserves, so the search's own time is inside the think and never added to it. The runner
+// stops the search at hardCap (BOT-05) with its best move so far, and is cancelled on dispose. A decision
 // is played only if the same bot is still due on the same state after every wait; otherwise it is
 // dropped and the bot thinks again (the human's give during the exchange, 03-RESEARCH Pitfall 4).
 
-import { type BotLevel, chooseAction, DEFAULT_BOT_LEVEL } from "@toc/bots";
+import { type BotLevel, DEFAULT_BOT_LEVEL } from "@toc/bots";
 import {
   type Action,
   apply,
@@ -33,7 +34,8 @@ import {
   viewFor,
 } from "@toc/engine";
 import { BOT_NAMES } from "./botNames.ts";
-import { paceFor } from "./pace.ts";
+import { type BotRunner, syncRunner, ThinkCancelled } from "./botRunner.ts";
+import { hardCap, paceFor } from "./pace.ts";
 
 /** `normal` and `fast` pace the bots (D-11, D-13); `test` has no think time (debug builds and tests). */
 export type Speed = "normal" | "fast" | "test";
@@ -59,6 +61,11 @@ export type CreateGameOptions = {
   levels?: Partial<Record<Color, BotLevel>>;
   /** The clock of the think times, in ms. Default: performance.now (tests inject their fake clock). */
   now?: () => number;
+  /**
+   * How a decision is computed. Default: syncRunner, the whole decision at once (Node tests, tools);
+   * the browser session passes the time-sliced inline runner. Its clock must be `now`'s.
+   */
+  runner?: BotRunner;
   director: GameDirector;
 };
 
@@ -128,6 +135,7 @@ export function createGame(options: CreateGameOptions): GameController {
   const seed = options.seed ?? randomSeed();
   const levels: Partial<Record<Color, BotLevel>> = { ...options.levels };
   const now = options.now ?? (() => performance.now());
+  const runner = options.runner ?? syncRunner;
   let botRng: Rng = options.botSeed ?? randomSeed();
   const speedOf: () => Speed =
     typeof options.speed === "function"
@@ -216,12 +224,15 @@ export function createGame(options: CreateGameOptions): GameController {
         const seen = state;
         setThinking(bot);
         const start = now();
-        const thought = chooseAction(
-          viewFor(state, bot),
-          bot,
-          levels[bot] ?? DEFAULT_BOT_LEVEL,
-          botRng,
-        );
+        const cap = hardCap(speedOf());
+        const thought = await runner.think({
+          view: viewFor(state, bot),
+          seat: bot,
+          level: levels[bot] ?? DEFAULT_BOT_LEVEL,
+          rng: botRng,
+          deadline: cap === null ? null : start + cap,
+        });
+        if (disposed) break;
         // The rng moves on even if this decision is dropped below: a seeded game stays reproducible.
         botRng = thought.rng;
         let u: number;
@@ -240,6 +251,8 @@ export function createGame(options: CreateGameOptions): GameController {
         play(bot, thought.action);
       }
     } catch (error) {
+      // Leaving the game cancels the think in progress: that is not a failure.
+      if (disposed || error instanceof ThinkCancelled) return;
       // The loop cannot go on: a silent console line would leave the board locked on a bot's turn
       // forever. The failure is kept (no bot plays again) and handed to the screen.
       console.error(error);
@@ -296,6 +309,7 @@ export function createGame(options: CreateGameOptions): GameController {
     },
     dispose() {
       disposed = true;
+      runner.cancel();
       clearTimeout(timer);
       wake?.();
       listeners.clear();

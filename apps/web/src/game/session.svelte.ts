@@ -19,6 +19,7 @@ import {
 import * as audio from "../audio/engine.ts";
 import type { BotLevels } from "../settings/settings.ts";
 import { settings } from "../settings/store.svelte.ts";
+import { createInlineRunner } from "./botRunner.ts";
 import type { DebugParams } from "./debugParams.ts";
 import { createDirector, type DirectorDeps, type DirectorMode } from "./director.ts";
 import {
@@ -163,6 +164,12 @@ export function createSession(
     levels: levelsByColour(settings.botLevels, human),
     scenario,
     director: watched,
+    // The Champion searches in slices that let the page breathe, within the cap of the speed; the
+    // controller's clock and the runner's are the same (performance.now, the controller's default).
+    runner: createInlineRunner({
+      now: () => performance.now(),
+      isHidden: () => document.hidden,
+    }),
   });
 
   let view = $state.raw<PlayerView>(controller.view());

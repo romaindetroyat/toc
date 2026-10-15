@@ -89,3 +89,14 @@ test("rythme : en « Avance rapide », l’ordinateur réfléchit presque aussit
   expect(measured.length).toBeGreaterThanOrEqual(3);
   for (const think of measured) expect(think.ms, think.name).toBeLessThanOrEqual(700);
 });
+
+test("rythme : trois Champions réfléchissent eux aussi 2,6 s au plus, la recherche en tranches", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await open(page, { botLevels: { partner: 5, left: 5, right: 5 } });
+  await playTwoTurns(page);
+  const measured = closed(await thinks(page));
+  expect(measured.length).toBeGreaterThanOrEqual(3);
+  for (const think of measured) expect(think.ms, think.name).toBeLessThanOrEqual(2600);
+});
