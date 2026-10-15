@@ -6,14 +6,24 @@ import {
   type VoiceHandle,
   WebAudioBackend,
 } from "./backend.ts";
+import { type Choices, DEFAULT_CHOICES, loadChoices } from "./choices.ts";
 import {
   createKeepAlive,
   isAppleTouch,
   type KeepAlive,
   type KeepAliveDocument,
 } from "./keepAlive.ts";
-import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId, type SynthRecipe } from "./sounds.ts";
-import { renderCard, renderHoof, renderNeigh } from "./synth.ts";
+import {
+  SOUND_IDS,
+  SOUNDS,
+  type SoundDef,
+  type SoundId,
+  type SynthRecipe,
+  type VariantKey,
+  type VariantSource,
+  variantOf,
+} from "./sounds.ts";
+import { renderCard, renderHoof, renderHoofTerre, renderNeigh } from "./synth.ts";
 
 // The audio engine. Everything is fire-and-forget: no function here returns a promise the game
 // loop has to await, and every start time is on the AudioContext clock (no setTimeout, no
@@ -55,18 +65,20 @@ export type CueOptions = {
   gainDb?: number;
   /** Extra rate multiplier applied on top of the jitter. */
   rate?: number;
-  /** Which buffer to use when both exist; default is the recording, else the synthesis. */
-  prefer?: "file" | "synth";
 };
 
-export type RecordingInfo = { source: "synth" | "file"; recordingUnavailable: boolean };
+/**
+ * Where one version of a sound stands: not asked for yet, being rendered or decoded, ready to play
+ * (a silence is ready with nothing to play), or failed (its render or every decode failed).
+ */
+export type VariantState = "absent" | "pending" | "ready" | "failed";
 
-/** Which buffers exist for a sound right now: the sound test page lists « Fichier » and « Généré » from this. */
-export type Availability = { synth: boolean; file: boolean };
+/** One buffer the engine started: which sound, which version, which take, when (audio clock). */
+export type PlayedSound = { id: SoundId; variant: VariantKey; take: number; at: number };
 
 export type RenderSound = (
   recipe: SynthRecipe,
-  variant: number,
+  take: number,
   sampleRate: number,
 ) => Promise<AudioBufferLike | undefined>;
 
@@ -74,33 +86,49 @@ export type Decoder = (url: string) => Promise<AudioBufferLike>;
 
 export type EngineOptions = {
   backend: AudioBackend;
-  /** Renders one synthesized variant; undefined (or a rejection) leaves that sound silent. */
+  /** Renders one take of a recipe; undefined (or a rejection) leaves that take out. */
   render: RenderSound;
+  /** Fetches and decodes a recorded file; default: fetch, then the backend's decoder. */
+  decode?: Decoder;
   /** Random source in [0, 1) for the jitter; injectable for tests. */
   random?: () => number;
   catalogue?: Record<SoundId, SoundDef>;
+  /** The version of each sound the game plays (choices.ts); default: DEFAULT_CHOICES. */
+  choices?: Choices;
+  /** Told of every buffer started (debug builds publish it to the e2e specs). */
+  onPlay?: (played: PlayedSound) => void;
 };
 
 export interface AudioEngine {
   /** Resolves once the resume it asked for has settled (never rejects): status() is then current. */
   unlock(): Promise<void>;
   now(): number;
+  /** Plays the chosen version of a sound (its takes round-robin). Fire-and-forget. */
   cue(id: SoundId, at?: number, opts?: CueOptions): void;
-  scheduleClops(offsetsMs: number[], t0: number): void;
+  /** One hoof clop per offset; `variant` plays that version instead of the chosen one (the page). */
+  scheduleClops(offsetsMs: number[], t0: number, variant?: VariantKey): void;
+  /** Plays one version once, rendering it first when needed; the choice does not change (the page). */
+  play(id: SoundId, variant: VariantKey, at?: number): void;
+  /** New choices: the newly chosen versions are prepared, the previous ones play until they are ready. */
+  setChoices(next: Choices): void;
+  choices(): Choices;
+  /** The version cue() plays right now (undefined while none is ready). */
+  activeVariant(id: SoundId): VariantKey | undefined;
   setMix(mix: Mix): void;
-  loadRecordings(decode?: Decoder): Promise<void>;
-  recordings(): Record<SoundId, RecordingInfo>;
-  availability(id: SoundId): Availability;
+  availability(id: SoundId, variant: VariantKey): VariantState;
   retryResume(): void;
   status(): EngineStatus;
   onStatus(listener: (status: EngineStatus) => void): () => void;
-  /** Resolves once every synthesized sound has been rendered (never rejects). */
+  /** Resolves once the chosen version of every sound has been prepared (never rejects). */
   whenReady(): Promise<void>;
 }
 
 type Voice = { handle: VoiceHandle; at: number; end: number };
+type Take = { buffer: AudioBufferLike; take: number };
 
 const EXTENSION_ORDER = [".m4a", ".mp3"];
+/** A version asked for by the page while it was not ready yet starts this far ahead of now. */
+const LATE_LEAD_S = 0.03;
 
 function extensionRank(file: string): number {
   const rank = EXTENSION_ORDER.findIndex((ext) => file.toLowerCase().endsWith(ext));
@@ -111,6 +139,13 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   const { backend, render } = options;
   const random = options.random ?? Math.random;
   const catalogue = options.catalogue ?? SOUNDS;
+  const decode: Decoder =
+    options.decode ??
+    (async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+      return backend.decode(await response.arrayBuffer());
+    });
 
   let unlocked = false;
   let rendered = false;
@@ -118,12 +153,15 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   let lastStatus: EngineStatus = "pending";
   const statusListeners = new Set<(status: EngineStatus) => void>();
 
-  const synthBuffers = new Map<SoundId, AudioBufferLike[]>();
-  const fileBuffers = new Map<SoundId, AudioBufferLike>();
-  const info = Object.fromEntries(
-    SOUND_IDS.map((id) => [id, { source: "synth", recordingUnavailable: false }]),
-  ) as Record<SoundId, RecordingInfo>;
-  const rounds = new Map<SoundId, number>();
+  /** The version each sound should play (what was chosen), and the one it plays now (ready). */
+  const chosen: Choices = { ...DEFAULT_CHOICES, ...options.choices };
+  const active = new Map<SoundId, VariantKey>();
+
+  const slot = (id: SoundId, variant: VariantKey) => `${id}:${variant}`;
+  const takes = new Map<string, Take[]>();
+  const states = new Map<string, VariantState>();
+  const loading = new Map<string, Promise<void>>();
+  const rounds = new Map<string, number>();
 
   let voices: Voice[] = [];
   let mix: Mix = { ...DEFAULT_MIX };
@@ -172,15 +210,70 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     backend.setBusGain("sfx", gains.sfx, undefined, rampSeconds);
   }
 
-  function bufferFor(id: SoundId, prefer?: "file" | "synth"): AudioBufferLike | undefined {
-    const file = fileBuffers.get(id);
-    if (file && prefer !== "synth") return file;
-    const variants = synthBuffers.get(id);
-    if (!variants || variants.length === 0) return file;
-    if (prefer === "file" && file) return file;
-    const round = rounds.get(id) ?? 0;
-    rounds.set(id, round + 1);
-    return variants[round % variants.length];
+  function stateOf(id: SoundId, variant: VariantKey): VariantState {
+    return states.get(slot(id, variant)) ?? "absent";
+  }
+
+  /** Renders the takes of a generated version, or decodes the first file that works (.m4a, .mp3). */
+  async function load(source: VariantSource): Promise<Take[]> {
+    if (source.kind === "silence") return [];
+    if (source.kind === "synth") {
+      const rendered = await Promise.all(
+        Array.from({ length: source.takes }, (_, take) =>
+          render(source.recipe, take, backend.sampleRate).then(
+            (buffer) => (buffer ? { buffer, take } : undefined),
+            () => undefined,
+          ),
+        ),
+      );
+      return rendered.filter((take): take is Take => take !== undefined);
+    }
+    const candidates = [...source.files].sort((a, b) => extensionRank(a) - extensionRank(b));
+    for (const url of candidates) {
+      try {
+        return [{ buffer: await decode(url), take: 0 }];
+      } catch {
+        // This format cannot be decoded here (Chromium has no AAC): try the next candidate.
+      }
+    }
+    return [];
+  }
+
+  /** Prepares one version once (later calls share the same promise); never rejects. */
+  function prepare(id: SoundId, variant: VariantKey): Promise<void> {
+    const key = slot(id, variant);
+    const running = loading.get(key);
+    if (running) return running;
+    const def = variantOf(id, variant, catalogue);
+    states.set(key, "pending");
+    const done = (def ? load(def.source) : Promise.resolve<Take[]>([])).then(
+      (list) => {
+        const ok = def !== undefined && (def.source.kind === "silence" || list.length > 0);
+        takes.set(key, list);
+        states.set(key, ok ? "ready" : "failed");
+      },
+      () => {
+        states.set(key, "failed");
+      },
+    );
+    loading.set(key, done);
+    return done;
+  }
+
+  /** Makes the chosen version of `id` the one cue() plays, once it is ready; a failed one falls back to « a ». */
+  async function activate(id: SoundId, variant: VariantKey): Promise<void> {
+    await prepare(id, variant);
+    if (chosen[id] !== variant) return; // chosen again meanwhile: that call decides
+    if (stateOf(id, variant) === "ready") {
+      active.set(id, variant);
+      return;
+    }
+    if (variant !== "a" && !active.has(id)) {
+      await prepare(id, "a");
+      if (chosen[id] === variant && stateOf(id, "a") === "ready" && !active.has(id)) {
+        active.set(id, "a");
+      }
+    }
   }
 
   function stopVoice(voice: Voice): void {
@@ -205,73 +298,85 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     }
   }
 
-  function cue(id: SoundId, at?: number, opts: CueOptions = {}): void {
+  /** Starts the next take of one prepared version. */
+  function playVariant(id: SoundId, variant: VariantKey, at?: number, opts: CueOptions = {}): void {
     // A suspended or interrupted context would queue the sound and burst it out on resume.
     if (!unlocked || backend.state() !== "running") return;
-    const buffer = bufferFor(id, opts.prefer);
-    if (!buffer) return;
+    const list = takes.get(slot(id, variant));
+    if (!list || list.length === 0) return;
+    const round = rounds.get(slot(id, variant)) ?? 0;
+    rounds.set(slot(id, variant), round + 1);
+    const chosenTake = list[round % list.length] as Take;
     const now = backend.now();
     const start = Math.max(at ?? now, now);
     const rate = (1 + (random() * 2 - 1) * RATE_JITTER) * (opts.rate ?? 1);
     const gainDb = (random() * 2 - 1) * GAIN_JITTER_DB + (opts.gainDb ?? 0);
-    const handle = backend.play(buffer, start, { rate, gainDb, bus: catalogue[id].bus });
-    admit({ handle, at: start, end: start + buffer.duration / rate });
+    const handle = backend.play(chosenTake.buffer, start, {
+      rate,
+      gainDb,
+      bus: catalogue[id].bus,
+    });
+    admit({ handle, at: start, end: start + chosenTake.buffer.duration / rate });
+    options.onPlay?.({ id, variant, take: chosenTake.take, at: start });
   }
 
-  function scheduleClops(offsetsMs: number[], t0: number): void {
-    // hopTimeline() already spaces its clops; this is the engine's own guarantee against a buzz.
+  function cue(id: SoundId, at?: number, opts: CueOptions = {}): void {
+    const variant = active.get(id);
+    if (variant !== undefined) playVariant(id, variant, at, opts);
+  }
+
+  /** The offsets kept after MIN_CLOP_GAP_MS: hopTimeline() already spaces them, this is the guarantee. */
+  function spaced(offsetsMs: number[]): number[] {
+    const kept: number[] = [];
     let last = Number.NEGATIVE_INFINITY;
     for (const offset of [...offsetsMs].sort((a, b) => a - b)) {
       if (offset - last < MIN_CLOP_GAP_MS - 1e-9) continue;
       last = offset;
-      cue("sabot", t0 + offset / 1000);
+      kept.push(offset);
     }
+    return kept;
+  }
+
+  function scheduleClops(offsetsMs: number[], t0: number, variant?: VariantKey): void {
+    const offsets = spaced(offsetsMs);
+    if (variant === undefined) {
+      for (const offset of offsets) cue("sabot", t0 + offset / 1000);
+      return;
+    }
+    if (!unlocked) return;
+    const run = (start: number) => {
+      for (const offset of offsets) playVariant("sabot", variant, start + offset / 1000);
+    };
+    if (stateOf("sabot", variant) === "ready") run(t0);
+    else void prepare("sabot", variant).then(() => run(Math.max(t0, backend.now() + LATE_LEAD_S)));
+  }
+
+  function play(id: SoundId, variant: VariantKey, at?: number): void {
+    if (!unlocked) return;
+    if (stateOf(id, variant) === "ready") playVariant(id, variant, at);
+    else
+      void prepare(id, variant).then(() =>
+        playVariant(id, variant, Math.max(at ?? 0, backend.now() + LATE_LEAD_S)),
+      );
   }
 
   async function renderAll(): Promise<void> {
-    await Promise.all(
-      SOUND_IDS.map(async (id) => {
-        const def = catalogue[id];
-        const variants = await Promise.all(
-          Array.from({ length: def.variants }, (_, variant) =>
-            render(def.synth, variant, backend.sampleRate).catch(() => undefined),
-          ),
-        );
-        const done = variants.filter((b): b is AudioBufferLike => b !== undefined);
-        if (done.length > 0) synthBuffers.set(id, done);
-      }),
-    );
+    await Promise.all(SOUND_IDS.map((id) => activate(id, chosen[id])));
     rendered = true;
     updateStatus();
     resolveReady();
   }
 
-  async function loadRecordings(decode?: Decoder): Promise<void> {
-    const decoder: Decoder =
-      decode ??
-      (async (url) => {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-        return backend.decode(await response.arrayBuffer());
-      });
-    await Promise.all(
-      SOUND_IDS.map(async (id) => {
-        const candidates = [...catalogue[id].files].sort(
-          (a, b) => extensionRank(a) - extensionRank(b),
-        );
-        for (const url of candidates) {
-          try {
-            const buffer = await decoder(url);
-            fileBuffers.set(id, buffer);
-            info[id] = { source: "file", recordingUnavailable: false };
-            return;
-          } catch {
-            // This format cannot be decoded here (Chromium has no AAC): try the next candidate.
-          }
-        }
-        info[id] = { source: "synth", recordingUnavailable: true };
-      }),
-    );
+  function setChoices(next: Choices): void {
+    for (const id of SOUND_IDS) {
+      const variant = next[id];
+      if (variant === undefined || !variantOf(id, variant, catalogue)) continue;
+      if (chosen[id] === variant) continue;
+      chosen[id] = variant;
+      if (!unlocked) continue; // the first gesture prepares the chosen versions
+      if (stateOf(id, variant) === "ready") active.set(id, variant);
+      else void activate(id, variant);
+    }
   }
 
   return {
@@ -286,16 +391,15 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
     now: () => backend.now(),
     cue,
     scheduleClops,
+    play,
+    setChoices,
+    choices: () => ({ ...chosen }),
+    activeVariant: (id) => active.get(id),
     setMix(next) {
       mix = { ...next };
       if (unlocked) applyMix(MIX_RAMP_S);
     },
-    loadRecordings,
-    recordings: () => ({ ...info }),
-    availability: (id) => ({
-      synth: (synthBuffers.get(id)?.length ?? 0) > 0,
-      file: fileBuffers.has(id),
-    }),
+    availability: stateOf,
     retryResume() {
       if (unlocked && backend.state() !== "running") void resumeNow();
     },
@@ -310,14 +414,12 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
 
 // --- Web shell: one engine for the whole app, created inside the first user gesture. ---
 
-function renderSynth(
-  recipe: SynthRecipe,
-  variant: number,
-  sampleRate: number,
-): Promise<AudioBuffer> {
+function renderSynth(recipe: SynthRecipe, take: number, sampleRate: number): Promise<AudioBuffer> {
   switch (recipe) {
     case "hoof":
-      return renderHoof(variant, sampleRate);
+      return renderHoof(take, sampleRate);
+    case "hoof-terre":
+      return renderHoofTerre(take, sampleRate);
     case "neigh-sortie":
       return renderNeigh("sortie", sampleRate);
     case "neigh-ruade":
@@ -339,18 +441,18 @@ function renderSynth(
   }
 }
 
-/** Renders one synthesized sound; debug builds also report its duration and peak to the e2e specs. */
+/** Renders one take of a recipe; debug builds also report its duration and peak to the e2e specs. */
 async function renderRecipe(
   recipe: SynthRecipe,
-  variant: number,
+  take: number,
   sampleRate: number,
 ): Promise<AudioBufferLike | undefined> {
-  const buffer = await renderSynth(recipe, variant, sampleRate);
+  const buffer = await renderSynth(recipe, take, sampleRate);
   if (DEBUG && window.__tocDebug) {
     let peak = 0;
     for (const sample of buffer.getChannelData(0)) peak = Math.max(peak, Math.abs(sample));
     const sounds = window.__tocDebug.audio.sounds ?? {};
-    sounds[`${recipe}#${variant}`] = { duration: buffer.duration, peak };
+    sounds[`${recipe}#${take}`] = { duration: buffer.duration, peak };
     window.__tocDebug.audio.sounds = sounds;
   }
   return buffer;
@@ -367,6 +469,24 @@ const ACTIVATION_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const
 let backend: WebAudioBackend | undefined;
 let createFailed = false;
 let pendingMix: Mix | undefined;
+/** Choices set before the first gesture (the page): the engine starts with them. */
+let pendingChoices: Choices | undefined;
+
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Debug builds: every buffer started, with its version and take, for the e2e specs. */
+function publishPlayed(played: PlayedSound): void {
+  if (!window.__tocDebug) return;
+  const log = window.__tocDebug.audio.played ?? [];
+  log.push(played);
+  window.__tocDebug.audio.played = log;
+}
 /** The resume the last unlock() asked for; settled (never rejects). */
 let resuming: Promise<void> = Promise.resolve();
 const shellListeners = new Set<(status: EngineStatus) => void>();
@@ -454,7 +574,12 @@ export function unlock(): AudioContext | undefined {
   if (!engine) {
     try {
       const created = new WebAudioBackend();
-      const made = createAudioEngine({ backend: created, render: renderRecipe });
+      const made = createAudioEngine({
+        backend: created,
+        render: renderRecipe,
+        choices: pendingChoices ?? loadChoices(browserStorage()),
+        onPlay: DEBUG ? publishPlayed : undefined,
+      });
       backend = created;
       engine = made;
       createFailed = false;
@@ -523,27 +648,39 @@ export function now(): number {
 }
 
 /**
- * Schedule one hoof clop per offset (milliseconds after `t0`, a time on the AudioContext clock).
- * Scheduling on the audio clock keeps the cadence tight while the main thread is animating.
+ * Schedule one hoof clop per offset (milliseconds after `t0`, a time on the AudioContext clock), in
+ * the chosen version, or in `variant` (the sound test page). Scheduling on the audio clock keeps the
+ * cadence tight while the main thread is animating.
  */
-export function scheduleClops(offsetsMs: number[], t0: number): void {
+export function scheduleClops(offsetsMs: number[], t0: number, variant?: VariantKey): void {
   if (DEBUG && window.__tocDebug) {
     const recorded = [...offsetsMs];
     window.__tocDebug.audio.scheduled = recorded;
     window.__tocDebug.audio.history.push(recorded);
   }
-  engine?.scheduleClops(offsetsMs, t0);
+  engine?.scheduleClops(offsetsMs, t0, variant);
 }
 
-/** Play one sound now (or at audio-clock time `at`), with jitter. Fire-and-forget. */
+/** Play the chosen version of one sound now (or at audio-clock time `at`), with jitter. Fire-and-forget. */
 export function cue(id: SoundId, at?: number, opts?: CueOptions): void {
   if (DEBUG && window.__tocDebug) {
-    // Debug builds: the e2e specs read which neighs were asked for, and when on the audio clock.
+    // Debug builds: the e2e specs read which sounds were asked for, in which version, and when.
     const log = window.__tocDebug.audio.cues ?? [];
-    log.push({ id, at: at ?? now(), requestedAt: now() });
+    log.push({ id, at: at ?? now(), requestedAt: now(), variant: engine?.activeVariant(id) });
     window.__tocDebug.audio.cues = log;
   }
   engine?.cue(id, at, opts);
+}
+
+/** The sound test page: plays one version once (rendered on demand), without changing the choice. */
+export function play(id: SoundId, variant: VariantKey, at?: number): void {
+  engine?.play(id, variant, at);
+}
+
+/** New choices (a pick on #/sons): heard at once in the game on this device. Safe before unlock. */
+export function setChoices(next: Choices): void {
+  pendingChoices = { ...next };
+  engine?.setChoices(next);
 }
 
 /** Apply the sound settings. Safe before unlock: the mix is applied when the engine starts. */
@@ -561,18 +698,9 @@ export function setMix(mix: Mix): void {
   else pauseKeepAlive();
 }
 
-/** Try the recorded files of every sound ([.m4a, .mp3]); a sound whose decode fails stays synthesized. */
-export function loadRecordings(decode?: Decoder): Promise<void> {
-  return engine ? engine.loadRecordings(decode) : Promise.resolve();
-}
-
-export function recordings(): Record<SoundId, RecordingInfo> | undefined {
-  return engine?.recordings();
-}
-
-/** Which buffers (synthesized, recorded) exist for a sound; both false until it is rendered, or if rendering failed. */
-export function availability(id: SoundId): Availability {
-  return engine ? engine.availability(id) : { synth: false, file: false };
+/** Where one version of a sound stands; « absent » before the first gesture. */
+export function availability(id: SoundId, variant: VariantKey): VariantState {
+  return engine ? engine.availability(id, variant) : "absent";
 }
 
 export function status(): EngineStatus {

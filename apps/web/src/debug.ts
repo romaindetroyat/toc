@@ -13,8 +13,10 @@ declare global {
         scheduled: number[];
         history: number[][];
         /** Every sound other than the clops that the game asked for: id, audio-clock time, request time. */
-        cues?: { id: string; at: number; requestedAt: number }[];
-        /** Rendered synthesized sounds, keyed `recipe#variant`: duration in seconds and peak amplitude. */
+        cues?: { id: string; at: number; requestedAt: number; variant?: string }[];
+        /** Every buffer the engine started (clops included): sound, version, take, audio-clock time. */
+        played?: { id: string; variant: string; take: number; at: number }[];
+        /** Rendered synthesized sounds, keyed `recipe#take`: duration in seconds and peak amplitude. */
         sounds?: Record<string, { duration: number; peak: number }>;
         /** The bus gains the last mix asked for: 0 or 1 for master and effects. */
         gains?: { master: number; sfx: number };

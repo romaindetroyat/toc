@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import { etatParam } from "./position.ts";
 
 type TocWindow = Window & { __tocDebug?: { audio: { scheduled: number[] } } };
 
@@ -365,4 +366,65 @@ test.describe("crédits et licences", () => {
     await page.locator("[data-sheet-layer]").click({ position: { x: 4, y: 4 } });
     await expect(dialog).toBeHidden();
   });
+});
+
+// --- La page « à choix » (recette 3 de Romain, 2026-10-15, test 29) ---
+
+type Played = { id: string; variant: string; take: number; at: number };
+const played = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __tocDebug?: { audio: { played?: Played[] } } }).__tocDebug?.audio
+        .played ?? [],
+  );
+
+test("sons : choisir la version B des sabots la fait entendre dans la partie", async ({ page }) => {
+  await page.goto("/#/sons");
+  // B is heard on the page first (rendered on demand), then chosen.
+  await page.getByRole("button", { name: "Écouter Sabots, version B" }).click();
+  await expect(page.getByText("Son prêt")).toBeVisible();
+  await expect
+    .poll(async () => (await played(page)).filter((p) => p.id === "sabot" && p.variant === "b"))
+    .toHaveLength(4); // the 4-cell cadence
+  const group = page.getByRole("radiogroup", { name: "Mon choix pour Sabots" });
+  await expect(group.getByRole("radio", { name: "A" })).toHaveAttribute("aria-checked", "true");
+  await group.getByRole("radio", { name: "B" }).click();
+  await expect(group.getByRole("radio", { name: "B" })).toHaveAttribute("aria-checked", "true");
+  expect(
+    JSON.parse((await page.evaluate(() => localStorage.getItem("toc.soundchoices.v1"))) ?? "{}"),
+  ).toEqual({ sabot: "b" });
+
+  // A game on the same device: one move of the Dame, its clops in version B.
+  await page.evaluate(() => {
+    const w = window as unknown as { __tocDebug?: { audio: { played?: unknown[] } } };
+    if (w.__tocDebug) w.__tocDebug.audio.played = [];
+  });
+  const etat = {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+    hands: { bleu: ["12H"] },
+  };
+  await page.goto(`/#/partie?etat=${etatParam(etat)}`);
+  await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+  await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "idle");
+  await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
+  await page.locator('[data-hit="bleu0"]').click({ force: true });
+  await page.getByRole("button", { name: "Jouer", exact: true }).click();
+  await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:22", {
+    timeout: 10_000,
+  });
+  await expect
+    .poll(async () => (await played(page)).filter((p) => p.id === "sabot").length)
+    .toBeGreaterThan(0);
+  const clops = (await played(page)).filter((p) => p.id === "sabot");
+  expect(clops.every((p) => p.variant === "b")).toBe(true);
+
+  // The pick is kept on this device.
+  await page.goto("/#/sons");
+  await page.reload();
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Mon choix pour Sabots" })
+      .getByRole("radio", { name: "B" }),
+  ).toHaveAttribute("aria-checked", "true");
 });

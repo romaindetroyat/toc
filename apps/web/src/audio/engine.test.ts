@@ -1,7 +1,14 @@
 import { hopTimeline, MIN_CLOP_GAP_MS } from "@toc/board";
 import { describe, expect, it } from "vitest";
 import { type AudioBufferLike, FakeBackend } from "./backend.ts";
-import { createAudioEngine, MAX_VOICES } from "./engine.ts";
+import { type Choices, effectiveChoices } from "./choices.ts";
+import {
+  createAudioEngine,
+  type Decoder,
+  MAX_VOICES,
+  type PlayedSound,
+  type RenderSound,
+} from "./engine.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId } from "./sounds.ts";
 import { normalize } from "./synth.ts";
 
@@ -26,14 +33,22 @@ async function fakeRender(recipe: string, variant: number): Promise<AudioBufferL
 }
 
 async function setup(
-  options: { random?: () => number; catalogue?: Record<SoundId, SoundDef> } = {},
+  options: {
+    random?: () => number;
+    catalogue?: Record<SoundId, SoundDef>;
+    choices?: Partial<Choices>;
+    decode?: Decoder;
+    render?: RenderSound;
+  } = {},
 ) {
   const backend = new FakeBackend();
   const engine = createAudioEngine({
     backend,
-    render: fakeRender,
+    render: options.render ?? fakeRender,
     random: options.random ?? mulberry32(7),
     catalogue: options.catalogue,
+    choices: effectiveChoices(options.choices ?? {}),
+    decode: options.decode,
   });
   engine.unlock();
   await engine.whenReady();
@@ -57,7 +72,24 @@ describe("catalogue", () => {
       ].sort(),
     );
     for (const id of SOUND_IDS) expect(SOUNDS[id].bus).toBe("sfx");
-    expect(Object.values(SOUNDS).map((def) => def.synth)).not.toContain("ambience");
+    const recipes = Object.values(SOUNDS).flatMap((def) =>
+      def.variants.map((v) => (v.source.kind === "synth" ? v.source.recipe : v.source.kind)),
+    );
+    expect(recipes).not.toContain("ambience");
+  });
+
+  it("gives every sound a version « a », today's sound, and keys its versions a to d in order", () => {
+    for (const id of SOUND_IDS) {
+      const keys = SOUNDS[id].variants.map((v) => v.key);
+      expect(keys[0], id).toBe("a");
+      expect(keys, id).toEqual(["a", "b", "c", "d"].slice(0, keys.length));
+    }
+    expect(SOUNDS.sabot.variants[0]?.source).toEqual({ kind: "synth", recipe: "hoof", takes: 3 });
+    expect(SOUNDS["carte-pose"].variants[0]?.source).toEqual({
+      kind: "synth",
+      recipe: "card-pose",
+      takes: 1,
+    });
   });
 });
 
@@ -222,62 +254,165 @@ describe("mix", () => {
   });
 });
 
-describe("recordings", () => {
-  const withFiles = (files: string[]): Record<SoundId, SoundDef> => ({
-    ...SOUNDS,
-    "carte-pose": { ...SOUNDS["carte-pose"], files },
+describe("versions and choices", () => {
+  /** Lets the test settle every pending render and decode. */
+  const flush = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+
+  it("renders only the chosen version of each sound at unlock: sabot b's three takes, not a's", async () => {
+    const asked: string[] = [];
+    const { backend, engine } = await setup({
+      choices: { sabot: "b" },
+      render: async (recipe, take) => {
+        asked.push(`${recipe}#${take}`);
+        return fakeRender(recipe, take);
+      },
+    });
+    expect(asked.filter((tag) => tag.startsWith("hoof"))).toEqual([
+      "hoof-terre#0",
+      "hoof-terre#1",
+      "hoof-terre#2",
+    ]);
+    expect(asked).toHaveLength(12); // 3 takes of the hoof + 9 sounds of one take
+    engine.cue("sabot");
+    engine.scheduleClops([0, 100, 200], 1);
+    expect(backend.plays.map((p) => tagOf(p.buffer))).toEqual([
+      "hoof-terre#0",
+      "hoof-terre#1",
+      "hoof-terre#2",
+      "hoof-terre#0",
+    ]);
+    expect(engine.activeVariant("sabot")).toBe("b");
   });
 
-  it("selects the mp3 when the m4a cannot be decoded", async () => {
-    const { backend, engine } = await setup({
-      catalogue: withFiles(["/audio/carte-pose.mp3", "/audio/carte-pose.m4a"]),
+  it("setChoices prepares the new version and plays the previous one until it is ready", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    const { backend, engine } = await setup({
+      choices: { sabot: "b" },
+      render: async (recipe, take) => {
+        if (recipe === "hoof") await gate;
+        return fakeRender(recipe, take);
+      },
+    });
+    engine.setChoices(effectiveChoices({ sabot: "a" }));
+    expect(engine.choices().sabot).toBe("a");
+    expect(engine.availability("sabot", "a")).toBe("pending");
+    engine.cue("sabot");
+    expect(tagOf(backend.plays[0]?.buffer)).toBe("hoof-terre#0");
+    release();
+    await flush();
+    expect(engine.availability("sabot", "a")).toBe("ready");
+    engine.cue("sabot");
+    expect(tagOf(backend.plays[1]?.buffer)).toBe("hoof#0");
+  });
+
+  it("a version already prepared is played at once after setChoices", async () => {
+    const { backend, engine } = await setup();
+    engine.play("sabot", "b");
+    await flush();
+    engine.setChoices(effectiveChoices({ sabot: "b" }));
+    engine.cue("sabot");
+    expect(tagOf(backend.plays.at(-1)?.buffer)).toBe("hoof-terre#1"); // the round robin goes on
+  });
+
+  it("setChoices ignores a version the sound does not have", async () => {
+    const { engine } = await setup();
+    engine.setChoices({ ...effectiveChoices({}), "carte-pose": "d" });
+    expect(engine.choices()["carte-pose"]).toBe("a");
+  });
+
+  it("play renders a version on demand and plays it once, without changing the choice", async () => {
+    const played: PlayedSound[] = [];
+    const backend = new FakeBackend();
+    const engine = createAudioEngine({
+      backend,
+      render: fakeRender,
+      random: () => 0.5,
+      onPlay: (sound) => played.push(sound),
+    });
+    engine.unlock();
+    await engine.whenReady();
+    expect(engine.availability("sabot", "b")).toBe("absent");
+    engine.play("sabot", "b");
+    expect(engine.availability("sabot", "b")).toBe("pending");
+    await flush();
+    expect(backend.plays.map((p) => tagOf(p.buffer))).toEqual(["hoof-terre#0"]);
+    expect(played).toEqual([{ id: "sabot", variant: "b", take: 0, at: expect.any(Number) }]);
+    expect(engine.choices().sabot).toBe("a");
+    engine.cue("sabot");
+    expect(tagOf(backend.plays[1]?.buffer)).toBe("hoof#0");
+  });
+
+  it("scheduleClops with a version plays that version's cadence (the page's version buttons)", async () => {
+    const { backend, engine } = await setup();
+    engine.scheduleClops([0, 100], 2, "b");
+    await flush();
+    expect(backend.plays.map((p) => tagOf(p.buffer))).toEqual(["hoof-terre#0", "hoof-terre#1"]);
+    expect(backend.plays.map((p) => p.at)).toEqual([2, 2.1]);
+  });
+
+  it("nothing is played or prepared by play() before unlock", () => {
+    const backend = new FakeBackend();
+    const engine = createAudioEngine({ backend, render: fakeRender, random: () => 0.5 });
+    engine.play("sabot", "b");
+    expect(engine.availability("sabot", "b")).toBe("absent");
+    expect(backend.plays).toHaveLength(0);
+  });
+
+  const withFile = (files: string[]): Record<SoundId, SoundDef> => ({
+    ...SOUNDS,
+    "carte-pose": {
+      bus: "sfx",
+      variants: [
+        ...SOUNDS["carte-pose"].variants,
+        { key: "b", source: { kind: "file", files, licence: "carte-pose-b" } },
+        { key: "c", source: { kind: "silence" } },
+      ],
+    },
+  });
+
+  it("a file version tries the m4a, then the mp3", async () => {
     const tried: string[] = [];
-    await engine.loadRecordings(async (url) => {
-      tried.push(url);
-      if (url.endsWith(".m4a")) throw new Error("EncodingError");
-      return Object.assign({ duration: 0.3 }, { tag: url });
+    const { backend, engine } = await setup({
+      catalogue: withFile(["/audio/carte-pose.mp3", "/audio/carte-pose.m4a"]),
+      choices: { "carte-pose": "b" },
+      decode: async (url) => {
+        tried.push(url);
+        if (url.endsWith(".m4a")) throw new Error("EncodingError");
+        return Object.assign({ duration: 0.3 }, { tag: url });
+      },
     });
     expect(tried).toEqual(["/audio/carte-pose.m4a", "/audio/carte-pose.mp3"]);
-    expect(engine.recordings()["carte-pose"]).toEqual({
-      source: "file",
-      recordingUnavailable: false,
-    });
+    expect(engine.availability("carte-pose", "b")).toBe("ready");
     engine.cue("carte-pose");
     expect(tagOf(backend.plays[0]?.buffer)).toBe("/audio/carte-pose.mp3");
   });
 
-  it("keeps the synthesized buffer and flags the sound when both decodes fail", async () => {
+  it("a chosen file version that cannot be decoded falls back to « a »", async () => {
     const { backend, engine } = await setup({
-      catalogue: withFiles(["/audio/carte-pose.m4a", "/audio/carte-pose.mp3"]),
+      catalogue: withFile(["/audio/carte-pose.m4a", "/audio/carte-pose.mp3"]),
+      choices: { "carte-pose": "b" },
+      decode: async () => {
+        throw new Error("EncodingError");
+      },
     });
-    await engine.loadRecordings(async () => {
-      throw new Error("EncodingError");
-    });
-    expect(engine.recordings()["carte-pose"]).toEqual({
-      source: "synth",
-      recordingUnavailable: true,
-    });
+    expect(engine.availability("carte-pose", "b")).toBe("failed");
     engine.cue("carte-pose");
     expect(tagOf(backend.plays[0]?.buffer)).toBe("card-pose#0");
   });
 
-  it("does not try the m4a when the first candidate already works", async () => {
-    const { engine } = await setup({ catalogue: withFiles(["/audio/carte-pose.m4a"]) });
-    const tried: string[] = [];
-    await engine.loadRecordings(async (url) => {
-      tried.push(url);
-      return { duration: 0.3 };
+  it("a silence version is ready and plays nothing", async () => {
+    const { backend, engine } = await setup({
+      catalogue: withFile([]),
+      choices: { "carte-pose": "c" },
     });
-    expect(tried).toEqual(["/audio/carte-pose.m4a"]);
-  });
-
-  it("marks sounds without any recorded file as synthesized", async () => {
-    const { engine } = await setup();
-    await engine.loadRecordings(async () => {
-      throw new Error("never called");
-    });
-    expect(engine.recordings().sabot).toEqual({ source: "synth", recordingUnavailable: true });
+    expect(engine.availability("carte-pose", "c")).toBe("ready");
+    engine.cue("carte-pose");
+    expect(backend.plays).toHaveLength(0);
   });
 });
 
@@ -355,9 +490,8 @@ describe("no ambience (removed on 2026-10-14)", () => {
     }
   });
 
-  it("never starts a voice by itself: unlock, render and recordings play nothing", async () => {
+  it("never starts a voice by itself: unlock and render play nothing", async () => {
     const { backend, engine } = await setup();
-    await engine.loadRecordings(async () => ({ duration: 8 }));
     backend.setState("suspended");
     engine.retryResume();
     await Promise.resolve();
@@ -374,7 +508,7 @@ describe("no ambience (removed on 2026-10-14)", () => {
 });
 
 describe("availability", () => {
-  it("tells which buffers exist: none before unlock, the synthesis once rendered, a failed recipe stays absent", async () => {
+  it("tells where a version stands: absent before unlock, ready once rendered, a failed recipe stays failed", async () => {
     const backend = new FakeBackend();
     const engine = createAudioEngine({
       backend,
@@ -384,23 +518,12 @@ describe("availability", () => {
       },
       random: () => 0.5,
     });
-    expect(engine.availability("sabot")).toEqual({ synth: false, file: false });
+    expect(engine.availability("sabot", "a")).toBe("absent");
     engine.unlock();
     await engine.whenReady();
-    expect(engine.availability("sabot")).toEqual({ synth: true, file: false });
-    expect(engine.availability("hennissement-ruade")).toEqual({ synth: false, file: false });
-  });
-
-  it("reports a decoded recording as a file buffer next to the synthesis", async () => {
-    const { engine } = await setup({
-      catalogue: {
-        ...SOUNDS,
-        "carte-pose": { ...SOUNDS["carte-pose"], files: ["/audio/pose.m4a"] },
-      },
-    });
-    await engine.loadRecordings(async () => ({ duration: 0.2 }));
-    expect(engine.availability("carte-pose")).toEqual({ synth: true, file: true });
-    expect(engine.availability("carte-donne")).toEqual({ synth: true, file: false });
+    expect(engine.availability("sabot", "a")).toBe("ready");
+    expect(engine.availability("sabot", "b")).toBe("absent");
+    expect(engine.availability("hennissement-ruade", "a")).toBe("failed");
   });
 });
 

@@ -2,9 +2,11 @@
 
 const HOOF_SECONDS = 0.12;
 
-/** Deterministic noise: a fixed-seed LCG so every render is identical. */
-function fillNoise(data: Float32Array): void {
-  let s = 0x2545f491;
+const NOISE_SEED = 0x2545f491;
+
+/** Deterministic noise: a seeded LCG so every render is identical (each take may use its own seed). */
+function fillNoise(data: Float32Array, seed = NOISE_SEED): void {
+  let s = seed >>> 0;
   for (let i = 0; i < data.length; i++) {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     data[i] = (s / 4294967296) * 2 - 1;
@@ -48,6 +50,127 @@ export async function renderHoof(variant: number, sampleRate = 44100): Promise<A
   thump.stop(HOOF_SECONDS);
 
   return ctx.startRendering();
+}
+
+// --- Hoof versions B to D (recette 3 de Romain, 2026-10-15: « Page d'essai à choix ») ---
+//
+// A real clop is rarely one strike: the heel lands, then the toe, 15 to 40 ms later (the « clip-clop »).
+// Each version below is two strikes of the same surface, the second softer, with its own noise seed
+// per take, so the three takes of a version differ in grain and in rhythm, not only in pitch.
+
+type Strike = {
+  /** Start of the strike, in seconds. */
+  at: number;
+  /** Level of the whole strike (the toe is softer than the heel). */
+  level: number;
+};
+
+/** The heel and toe strikes of one take: the gap and the toe's level move from take to take. */
+function strikes(take: number, gapMs: [number, number, number], toe: number): Strike[] {
+  return [
+    { at: 0, level: 1 },
+    { at: (gapMs[take % 3] as number) / 1000, level: toe - 0.08 * (take % 3) },
+  ];
+}
+
+/** A noise burst through a band-pass, with a fast attack and an exponential decay. */
+function noiseHit(
+  ctx: OfflineAudioContext,
+  out: AudioNode,
+  hit: {
+    at: number;
+    seed: number;
+    freq: number;
+    q: number;
+    gain: number;
+    decay: number;
+    attack?: number;
+  },
+): void {
+  const source = ctx.createBufferSource();
+  const buffer = ctx.createBuffer(
+    1,
+    Math.ceil((hit.decay + 0.02) * ctx.sampleRate),
+    ctx.sampleRate,
+  );
+  fillNoise(buffer.getChannelData(0), hit.seed);
+  source.buffer = buffer;
+  const band = ctx.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = hit.freq;
+  band.Q.value = hit.q;
+  const env = ctx.createGain();
+  const attack = hit.attack ?? 0.002;
+  env.gain.setValueAtTime(0, hit.at);
+  env.gain.linearRampToValueAtTime(hit.gain, hit.at + attack);
+  env.gain.exponentialRampToValueAtTime(0.001, hit.at + hit.decay);
+  source.connect(band).connect(env).connect(out);
+  source.start(hit.at);
+}
+
+/** A sine whose pitch falls (a thump) or holds (a ring), with an exponential decay. */
+function toneHit(
+  ctx: OfflineAudioContext,
+  out: AudioNode,
+  hit: { at: number; from: number; to: number; gain: number; decay: number },
+): void {
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(hit.from, hit.at);
+  if (hit.to !== hit.from) osc.frequency.exponentialRampToValueAtTime(hit.to, hit.at + hit.decay);
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0, hit.at);
+  env.gain.linearRampToValueAtTime(hit.gain, hit.at + 0.002);
+  env.gain.exponentialRampToValueAtTime(0.001, hit.at + hit.decay);
+  osc.connect(env).connect(out);
+  osc.start(hit.at);
+  osc.stop(hit.at + hit.decay + 0.01);
+}
+
+const HOOF_PEAK = 0.85;
+
+/**
+ * B, « sur la terre »: a hoof on packed earth. Soft and low: noise through a wide band-pass around
+ * 700 to 820 Hz (Q 0.9) with a 5 ms attack and a 110 ms decay, under a low-pass at 2 kHz that takes
+ * the click out, a deep thump falling from 120 to 45 Hz, and a faint gritty tail (crumbs of earth,
+ * high band, very low). Takes: the band moves by 60 Hz, the heel-toe gap by 8 ms.
+ */
+export async function renderHoofTerre(take: number, sampleRate = 44100): Promise<AudioBuffer> {
+  const seconds = 0.22;
+  const buffer = await renderToBuffer(Math.ceil(seconds * sampleRate), sampleRate, (ctx) => {
+    const soft = ctx.createBiquadFilter();
+    soft.type = "lowpass";
+    soft.frequency.value = 2000;
+    soft.connect(ctx.destination);
+    for (const [n, strike] of strikes(take, [34, 26, 42], 0.62).entries()) {
+      noiseHit(ctx, soft, {
+        at: strike.at,
+        seed: 0x9e3779b1 + take * 977 + n * 131,
+        freq: 700 + 60 * take,
+        q: 0.9,
+        gain: 0.9 * strike.level,
+        decay: 0.11,
+        attack: 0.005,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 120,
+        to: 45,
+        gain: 0.9 * strike.level,
+        decay: 0.12,
+      });
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at + 0.012,
+        seed: 0x1234567 + take * 31 + n,
+        freq: 3500,
+        q: 0.7,
+        gain: 0.06 * strike.level,
+        decay: 0.09,
+      });
+    }
+  });
+  normalize(buffer.getChannelData(0), HOOF_PEAK);
+  return buffer;
 }
 
 // --- Normalisation (pure, tested in Node) ---
