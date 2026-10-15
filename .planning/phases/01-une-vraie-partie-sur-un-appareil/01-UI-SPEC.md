@@ -840,7 +840,7 @@ Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Rom
 - **Couleurs du galet** = la palette de la maquette (`PALETTE`) : HEX bleu `#1F4FA8`, jaune `#E3A90C`, rouge `#C3271D`, vert `#1F8A3C` ; LIGHT `#5C86D4`, `#F7D35A`, `#EE6B5E`, `#5CC27A` ; ON blanc, sauf l’encre sur le jaune ; INK `#2A1A0E` ; CREAM `#FBF4E2`. Les sprites des cavaliers et les pastilles des places ne changent pas.
 - **Le tapis** en largeur : une ellipse de demi-axes 600 et 224 (boîte de 1200 × 448, centrée en (1600 ; 800)). Talon (1450 ; 800), défausse (1750 ; 800), cartes de 139,2 × 194,8. En hauteur, il reste le rectangle arrondi de 720 × 840, de rayon 88.
 - **Le dessin** est dans sa propre couche svg (`will-change: transform`) ; les animations ne le touchent jamais.
-- **Les cavaliers de Romain** (`apps/web/src/assets/plateau/cav-<couleur>.png`, 157 × 209, copiés tels quels de la maquette) : un par couleur, dans le coin du côté vers lequel sa couleur part, à 0,6 du chemin vers le coin de la superellipse, haut de 2,6 pas, opacité 0,85, jamais une cible. Leur ligne de licence est `plateau-cavaliers`.
+- **Les cavaliers de Romain** (`apps/web/src/assets/plateau/cav-<couleur>.png`, 157 × 209, copiés tels quels de la maquette) : un par couleur, dans le coin du côté vers lequel sa couleur part, à 0,6 du chemin vers le coin de la superellipse, haut de 2,6 pas, opacité 0,85, jamais une cible (tournés vers leur camp depuis le 2026-10-15, addendum « Recette 3 »). Leur ligne de licence est `plateau-cavaliers`.
 - **Ce que l’addendum remplace** :
   - la scène, la palette, les liens, les rails, les flèches et la bande du C+ ;
   - le panneau latéral de la mise en page en paysage ;
@@ -887,3 +887,22 @@ Comparaison honnête, pour la recette de Romain :
 | long-text | interactive-control: consigne dans la barre compacte | ✅ covered | 64 px (trois lignes) ou 56 px (deux lignes), puis le texte défile à l’intérieur |
 | empty | static-content: écran plus haut que large | ✅ covered | L’invitation à tourner l’écran remplace le plateau ; la partie est gardée telle quelle |
 | populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain à la fin de la phase (plan 01-41) : les douze points dérivés ci-dessus, le galet en largeur sur l’iPhone et sur l’ordinateur, la taille des cavaliers |
+
+## Addendum 2026-10-15 — Recette 3 de Romain
+
+Source : la recette refaite par Romain le 2026-10-15 (01-UAT.md, tests 23 à 30) et ses choix aux questions posées ensuite (01-CONTEXT.md, section « Recette 3 de Romain »). Cet addendum tient une sous-section par changement : d’abord les mots de Romain, puis ce qui est « à confirmer par Romain ». Il s’ouvre ici avec le plan 01-44 ; les plans 01-45 à 01-53 y ajoutent les leurs. Ce qu’il ne dit pas reste régi par les addendums précédents.
+
+### Les cavaliers du galet tournés vers leur camp
+
+**Les mots de Romain** (recette 3, test 25) : « Les chevaux gravés sur le plateau sont tous orientés de la même façon mais je voudrais les tourner pour que les sabots soient dirigés vers chaque camp ».
+
+**Son choix** le 2026-10-15, entre le quart de tour par côté et une orientation en biais vers le centre du camp : « Quart de tour (Recommandé) ». Chaque cavalier tourne d’un quart de tour selon le côté de sa couleur, comme les cartes du tapis : 0° en bas (inchangé), 90° à gauche, 180° en haut (vu tête en bas depuis le bas), 270° à droite. Ses sabots pointent vers le bord de son propre camp.
+
+**À confirmer par Romain** (recette de fin de phase, plan 01-54) : le sens des quatre cavaliers sur son iPhone et sur son ordinateur, ou un autre angle s’il le préfère.
+
+**Faits techniques (sans confirmation)** :
+- L’angle vient de `riderBox(color, k)` (`packages/board/src/scene.ts`) : c’est l’angle que `seatCard` donne à la carte de la même place (`ROT`, 0, 90, 180 ou 270).
+- Le cavalier tourne autour du centre de son image : `boardArt` le dessine en (−w/2 ; −h/2) avec `translate(centre) rotate(angle)`, sans `rotate` à 0°. Le jeu (`BoardArt.svelte`, attribut `data-rider-angle`) et les images des règles (`artSvg`) lisent la même forme.
+- Le coin, le centre, la taille (2,6 pas de haut), l’opacité 0,85 et la couleur ne changent pas ; les dessins `cav-<couleur>.png` de Romain ne sont pas retouchés, et aucun cavalier ne devient une cible.
+- Dégagement mesuré pour les quatre places k : au moins 1,29 pas entre l’empreinte tournée et chaque case de l’anneau, de maison ou d’écurie (cases comptées comme des disques d’un demi-pas), comme avant. Tournés à 90° ou 270°, les cavaliers de gauche et de droite font 278 × 209 unités et restent au-dessus ou au-dessous du tapis (celui du haut finit vers y 561, le tapis commence à y 576). `scene.test.ts` le vérifie pour chaque k.
+- Les 118 images de RULES.md (`docs/regles/`) sont redessinées avec les cavaliers tournés ; deux rendus successifs sont identiques octet pour octet.
