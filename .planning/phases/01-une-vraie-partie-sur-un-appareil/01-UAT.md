@@ -143,7 +143,7 @@ expected: Un cheval qui peut atteindre une case vide de sa maison y entre.
 result: issue
 reported: "J'ai l'impression que l'entrée dans la zone d'arrivée ne fonctionne pas toujours : si l'on peut atteindre une case vide de la zone d'arrivée, il faut que ce soit le seul coup à jouer"
 severity: major
-note: "Question posée ensuite, « que doit-on interdire ? », choix de Romain : « Seulement pour ce cheval »."
+note: "Question posée ensuite, « que doit-on interdire ? », choix de Romain : « Seulement pour ce cheval ». Puis, pour un 9 joué sur un cheval qu'un 2 ferait rentrer : « Oui, autorisé » (« Seulement la carte qui le fait rentrer pile est obligée de le faire rentrer. Avec le 9, il peut continuer son tour. ») ; et sur le compte qui dépasse ou la case occupée : « Oui, on garde »."
 
 ### 27. Recette 3 (2026-10-15) : un seul cheval pour la carte choisie
 expected: Quand un seul cheval peut jouer la carte, le joueur n'a pas à le toucher.
@@ -239,6 +239,7 @@ blocked: 0
   artifacts: [apps/web/src/audio/engine.ts, apps/web/src/i18n/fr/reglages.ts, apps/web/src/i18n/fr/sons.ts, apps/web/e2e/audio.spec.ts]
   missing: ["Poser audioSession.type = 'playback' avant de créer l'AudioContext, dans le premier geste", "Sur iPhone et iPad, lancer dans le même geste un élément audio muet en boucle (WAV de silence généré par le code, en data URI), mis en pause quand la page est cachée ou quand « Son » est coupé, relancé au geste suivant", "Textes d'aide mis à jour", "Recette sur le vrai iPhone de Romain, interrupteur sur silencieux"]
   debug_session: ""
+  decision: "Romain, 2026-10-15, sur la musique d'une autre app interrompue tant que le jeu est à l'écran : « Oui, ça me va » (aucun réglage)"
 - gap_id: G-01-24
   truth: "Sur l'iPhone tenu en largeur, le plateau prend toute la hauteur de l'écran ; la main et les boutons sont sur les côtés du galet, les infos dans une petite pastille"
   status: failed
@@ -260,17 +261,18 @@ blocked: 0
   artifacts: [packages/board/src/scene.ts, packages/board/src/art.ts, packages/board/src/scene.test.ts, packages/board/src/art.test.ts, apps/web/src/board/BoardArt.svelte, docs/regles]
   missing: ["Chaque cavalier tourné d'un quart de tour selon le côté de sa couleur (0° en bas, 90° à gauche, 180° en haut, 270° à droite), toujours hors des cases, des écuries, des maisons et du tapis ; images des règles redessinées (rendu déterministe)"]
   debug_session: ""
+  decision: "Romain, 2026-10-15 : « Quart de tour (Recommandé) »"
 - gap_id: G-01-26
-  truth: "Un cheval qui peut entrer dans une case vide de sa maison avec une des cartes de la main ne dépasse pas son entrée ; le joueur peut toujours jouer un autre cheval ou une autre carte"
+  truth: "La carte qui peut faire entrer un cheval pile sur une case vide de sa maison ne le joue que pour le faire entrer (avec le 7 : il entre ou ne bouge pas) ; les autres cartes restent libres sur ce cheval, et les autres chevaux aussi"
   status: failed
   reason: "User reported: J'ai l'impression que l'entrée dans la zone d'arrivée ne fonctionne pas toujours : si l'on peut atteindre une case vide de la zone d'arrivée, il faut que ce soit le seul coup à jouer"
   severity: major
   test: 26
   root_cause: "Pas d'erreur du moteur. Diagnostic du planificateur sur 300 parties entre ordinateurs de niveau 1 (graine 7) : 4123 entrées, et 8685 fois un cheval passe devant son carré 16 sans entrer. Chaque fois que le compte de la carte jouée tombait sur une case vide sans cheval rentré à sauter, le cheval est entré (0 exception). Les passages viennent du compte qui dépasse la maison (6104, 70 %), de la case visée occupée (2402, 28 %) ou d'un cheval rentré sur le chemin (179, 2 %, G2). Mais 1415 de ces chevaux auraient pu rentrer avec une autre carte de la même main, et 285 fois un 7 a été partagé de façon à faire dépasser sa maison à un cheval qu'un autre partage faisait entrer. La règle actuelle (D-01, D-02, G14, packages/engine/src/path.ts walk()) ne rend l'entrée obligatoire que pour le compte de la carte jouée."
   artifacts: [packages/engine/src/path.ts, packages/engine/src/legal.ts, packages/engine/src/seven.ts, packages/engine/src/apply.ts, packages/engine/src/rules.ts, packages/engine/src/types.ts, packages/engine/scenarios/prises-maison.ts, RULES.md, .planning/REQUIREMENTS.md]
-  missing: ["Choix de Romain : « Seulement pour ce cheval ». Règle G16 (constante KNIGHT_MUST_ENTER, réglable comme G14 et G15) : un cheval qu'une carte de la main fait entrer ne dépasse son entrée avec aucune carte ni aucun pas du 7 ; le 4 et le Valet ne sont pas concernés ; une carte qui ne ferait que lui faire dépasser sa maison n'est pas jouable (raison « must-enter ») ; la règle ne rend jamais une main injouable", "RULES.md (R-13, Décisions de Romain G16), scénarios R-13.22 à R-13.27 et leurs images, REQUIREMENTS.md RULE-15 ; rules-trace reste vert"]
+  missing: ["Règle G16 jugée carte par carte (constante KNIGHT_MUST_ENTER, réglable comme G14 et G15) : la carte qui peut faire entrer un cheval pile sur une case vide ne le joue que pour entrer. Pour une carte ordinaire, c'est déjà D-02 ; le 4 et le Valet ne sont pas concernés ; avec le 7, si un partage peut faire entrer ce cheval, le 7 le fait entrer ou ne le bouge pas (à confirmer : il ne s'arrête pas avant sa maison) ; la règle ne rend jamais le 7 injouable ; les autres cartes restent libres sur ce cheval", "RULES.md (R-13, Décisions de Romain G16), scénarios R-13.22 à R-13.27 et leurs images, REQUIREMENTS.md RULE-15 ; rules-trace reste vert"]
   debug_session: ""
-  decision: "Romain, 2026-10-15, à la question « que doit-on interdire ? » : « Seulement pour ce cheval »"
+  decision: "Romain, 2026-10-15, à la question « que doit-on interdire ? » : « Seulement pour ce cheval » ; puis, à « ton cheval est juste devant son arrivée et tu as en main un 2 (qui le fait rentrer) et un 9. Peux-tu jouer le 9 sur ce cheval pour lui faire refaire un tour ? » : « Oui, autorisé » (« Seulement la carte qui le fait rentrer pile est obligée de le faire rentrer. Avec le 9, il peut continuer son tour. ») ; sur le compte qui dépasse et la case occupée : « Oui, on garde »"
 - gap_id: G-01-27
   truth: "Quand un seul cheval peut jouer la carte choisie, il est choisi tout seul et l'aperçu s'affiche avec « Jouer » (sauf le Valet, et la question « Sortir » ou « Avancer » de l'As et du Roi)"
   status: failed
