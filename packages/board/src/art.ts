@@ -300,14 +300,24 @@ export function boardArt(k: number): Art {
     dash: [0.16 * s, 0.12 * s],
   });
 
-  // Romain's ink riders, one per colour, in the corner of the side its colour sets off towards.
+  // Romain's ink riders, one per colour, in the corner of the side its colour sets off towards,
+  // turned about their centre by their side's quarter turn so the hooves point to their own camp
+  // (Romain, 2026-10-15). The bottom rider (angle 0) keeps a rotate-free transform.
   for (const c of COLORS) {
+    const { x, y, w, h, angle } = riderBox(c, k);
     shapes.push({
       kind: "image",
       role: "rider",
       color: c,
-      ...riderBox(c, k),
+      x: -w / 2,
+      y: -h / 2,
+      w,
+      h,
       opacity: 0.85,
+      transform:
+        angle === 0
+          ? { translate: [x + w / 2, y + h / 2] }
+          : { translate: [x + w / 2, y + h / 2], rotate: angle },
     });
   }
 

@@ -167,7 +167,8 @@
         transform={transformOf(shape.transform)}
       />
     {:else if shape.kind === "image"}
-      <!-- The box already has the picture's 157:209 ratio, hence preserveAspectRatio none. -->
+      <!-- The box already has the picture's 157:209 ratio, hence preserveAspectRatio none. The
+           rider is turned about its centre toward its camp (Romain, 2026-10-15). -->
       <image
         href={RIDERS[shape.color]}
         x={shape.x}
@@ -176,7 +177,9 @@
         height={shape.h}
         preserveAspectRatio="none"
         opacity={shape.opacity}
+        transform={transformOf(shape.transform)}
         data-rider={shape.color}
+        data-rider-angle={shape.transform?.rotate ?? 0}
         aria-hidden="true"
         pointer-events="none"
       />

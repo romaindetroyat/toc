@@ -385,12 +385,32 @@ describe("no overlap", () => {
         expect(r.w).toBeCloseTo((r.h * 157) / 209, 6);
         const centre: Point = [r.x + r.w / 2, r.y + r.h / 2];
         expect(corner[sceneSideOf(c, k)]?.(centre)).toBe(true);
-        return box(r.x, r.y, r.w, r.h);
+        // The turned footprint: w and h swap at 90° and 270°, about the same centre.
+        const [w, h] = r.angle % 180 === 0 ? [r.w, r.h] : [r.h, r.w];
+        const turned = box(centre[0] - w / 2, centre[1] - h / 2, w, h);
+        // Still in its corner: the whole turned picture stays on its side of both axes.
+        for (const p of (turned as Extract<Outline, { kind: "poly" }>).pts) {
+          expect(corner[sceneSideOf(c, k)]?.(p)).toBe(true);
+        }
+        return turned;
       });
       for (const rider of riders) {
         expect(meet(rider, felt)).toBe(false);
         for (const place of places) expect(meet(rider, place)).toBe(false);
       }
+    }
+  });
+
+  it("turns each rider by its seat card's quarter turn, hooves toward its camp", () => {
+    // Romain, 2026-10-15: « Quart de tour (Recommandé) »; 0 bottom, 90 left, 180 top, 270 right.
+    const bySide = { bottom: 0, left: 90, top: 180, right: 270 } as const;
+    for (const k of KS) {
+      for (const c of COLORS) {
+        expect(riderBox(c, k).angle).toBe(seatCard(c, k).angle);
+        expect(riderBox(c, k).angle).toBe(bySide[sceneSideOf(c, k)]);
+      }
+      expect(riderBox(bottomOf(k), k).angle).toBe(0);
+      expect(riderBox(PARTNER[bottomOf(k)], k).angle).toBe(180);
     }
   });
 

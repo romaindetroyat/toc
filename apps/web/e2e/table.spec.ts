@@ -115,6 +115,32 @@ test("table: les couleurs prennent leur côté, rien ne tourne", async ({ page }
   }
 });
 
+test("table: les cavaliers du galet tournés vers leur camp, sabots vers chaque bord", async ({
+  page,
+}) => {
+  // Romain, 2026-10-15: « Quart de tour (Recommandé) ». The seats go clockwise from the bottom:
+  // the next colour on the left, the partner at the top, the colour after it on the right.
+  for (const bottom of ["bleu", "vert"] as const) {
+    await sit(page, bottom);
+    const left = nextOf(bottom);
+    const top = partnerOf(bottom);
+    const right = nextOf(top);
+    for (const [color, angle] of [
+      [bottom, 0],
+      [left, 90],
+      [top, 180],
+      [right, 270],
+    ] as const) {
+      const rider = page.locator(`[data-board-art] image[data-rider="${color}"]`);
+      await expect(rider).toHaveCount(1);
+      await expect(rider, `${color} rider`).toHaveAttribute("data-rider-angle", String(angle));
+      const transform = await rider.getAttribute("transform");
+      if (angle === 0) expect(transform ?? "").not.toContain("rotate");
+      else expect(transform ?? "").toContain(`rotate(${angle})`);
+    }
+  }
+});
+
 test("table: les cavaliers regardent dans le sens de la marche, tête gardée sur les déplacements verticaux", async ({
   page,
 }) => {

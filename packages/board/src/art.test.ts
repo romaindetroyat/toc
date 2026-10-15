@@ -154,7 +154,18 @@ describe("boardArt", () => {
         expect(rider?.kind).toBe("image");
         expect(rider?.opacity).toBe(0.85);
         if (rider?.kind === "image") {
-          expect({ x: rider.x, y: rider.y, w: rider.w, h: rider.h }).toEqual(riderBox(c, k));
+          // Drawn about its centre: the same centre and size as riderBox, turned by its angle.
+          const r = riderBox(c, k);
+          expect(rider.w).toBe(r.w);
+          expect(rider.h).toBe(r.h);
+          expect(rider.x).toBeCloseTo(-r.w / 2, 9);
+          expect(rider.y).toBeCloseTo(-r.h / 2, 9);
+          const t = rider.transform?.translate;
+          expect(t?.[0]).toBeCloseTo(r.x + r.w / 2, 9);
+          expect(t?.[1]).toBeCloseTo(r.y + r.h / 2, 9);
+          if (r.angle === 0) expect(rider.transform).not.toHaveProperty("rotate");
+          else expect(rider.transform?.rotate).toBe(r.angle);
+          expect(rider.transform?.scale).toBeUndefined();
         }
       }
       // The dots stand on the places of the knights.
@@ -270,6 +281,23 @@ describe("artSvg", () => {
     });
     expect(svg.match(/<image /g)).toHaveLength(1);
     expect(svg).toContain('href="a&quot;&lt;b&gt;.png"');
+  });
+
+  it("writes the riders turned toward their camps, the bottom one without a rotate", () => {
+    const art = boardArt(0);
+    const svg = artSvg(art, {
+      width: 10,
+      height: 10,
+      fontFamily: "x",
+      images: { bleu: "b.png", jaune: "j.png", rouge: "r.png", vert: "v.png" },
+    });
+    const transformOfImage = (href: string) =>
+      svg.match(new RegExp(`<image href="${href}"[^>]* transform="([^"]*)"`))?.[1];
+    // bleu at the bottom, jaune on the left, rouge at the top, vert on the right (k = 0).
+    expect(transformOfImage("b.png")).toMatch(/^translate\([^)]*\)$/);
+    expect(transformOfImage("j.png")).toMatch(/^translate\([^)]*\) rotate\(90\)$/);
+    expect(transformOfImage("r.png")).toMatch(/^translate\([^)]*\) rotate\(180\)$/);
+    expect(transformOfImage("v.png")).toMatch(/^translate\([^)]*\) rotate\(270\)$/);
   });
 
   it("escapes text content and attribute values", () => {

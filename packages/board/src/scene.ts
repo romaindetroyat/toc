@@ -420,17 +420,29 @@ export function boardOutline(): { outline: Point[]; outer: Point[] } {
   };
 }
 
-/** The box of a colour's rider picture: in the corner of the side its colour sets off towards. */
-export function riderBox(color: Color, k: number): { x: number; y: number; w: number; h: number } {
+/**
+ * The box of a colour's rider picture, in the corner of the side its colour sets off towards, and
+ * the quarter turn it is drawn with. x, y, w and h describe the upright picture (157:209) around
+ * its centre; `angle` turns it about that centre by its seat frame's ROT, the angle seatCard gives
+ * the same seat's felt card: 0 at the bottom, 90 on the left, 180 at the top, 270 on the right.
+ * Romain, 2026-10-15: « Les chevaux gravés sur le plateau sont tous orientés de la même façon mais
+ * je voudrais les tourner pour que les sabots soient dirigés vers chaque camp », then « Quart de
+ * tour (Recommandé) ». The hooves of each rider thus point to the edge of its own camp.
+ */
+export function riderBox(
+  color: Color,
+  k: number,
+): { x: number; y: number; w: number; h: number; angle: 0 | 90 | 180 | 270 } {
   const g = GEOMETRY;
   const rider = MOCKUP.rider;
-  const corner = g.corners[quarterOf(color, k)] as Point;
+  const q = quarterOf(color, k);
+  const corner = g.corners[q] as Point;
   const [cx, cy] = g.scene.centre;
   const x = cx + rider.f * (corner[0] - cx);
   const y = cy + rider.f * (corner[1] - cy);
   const h = rider.h * g.scene.step;
   const w = (h * RIDER_PICTURE.w) / RIDER_PICTURE.h;
-  return { x: x - w / 2, y: y - h / 2, w, h };
+  return { x: x - w / 2, y: y - h / 2, w, h, angle: ROT[q] as 0 | 90 | 180 | 270 };
 }
 
 /** Where a seat's last card lies on the felt and how it is turned to face its seat. */
