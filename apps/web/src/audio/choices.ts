@@ -85,8 +85,13 @@ export function saveChoices(storage: StorageLike | null, picks: Picks): boolean 
 
 /**
  * The choices as French plain text, one line « Sabots : B » per sound in the page's order, with a
- * no-break space before the colon: what Romain sends to make his choices everyone's.
+ * no-break space before the colon: what Romain sends to make his choices everyone's. `ids` limits
+ * the list to the sounds the page shows (the heard ones, ENABLED_SOUNDS); default: every sound.
  */
-export function choicesAsText(choices: Choices, names: Record<SoundId, string>): string {
-  return SOUND_IDS.map((id) => `${names[id]} : ${choices[id].toUpperCase()}`).join("\n");
+export function choicesAsText(
+  choices: Choices,
+  names: Record<SoundId, string>,
+  ids: readonly SoundId[] = SOUND_IDS,
+): string {
+  return ids.map((id) => `${names[id]} : ${choices[id].toUpperCase()}`).join("\n");
 }

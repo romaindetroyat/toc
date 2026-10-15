@@ -12,6 +12,9 @@ export const sons = {
   stateFailed: "Le son n’a pas pu démarrer. Touche l’écran pour réessayer.",
   silentSwitchHint:
     "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté.",
+  /** Shown while some sounds are silenced (ENABLED_SOUNDS): Romain, 2026-10-15, « Oui, que les sabots ». */
+  mutedNote:
+    "Les hennissements et les sons des cartes sont coupés pour l’instant : dans la partie, on n’entend que les sabots.",
 
   sections: {
     sabots: "Sabots",
