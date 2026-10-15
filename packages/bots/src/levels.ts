@@ -42,8 +42,8 @@ export const TROTTEUR_TEMPERATURE = 20;
 export const GALOPEUR_TEMPERATURE = 8;
 /**
  * Level 4, Pur-sang. Ladder 2026-10-15: `--a 4 --b 3 --games 400 --seed 1` → 265 / 400, p̂ 66.3 %,
- * Wilson lower bound 61.5 % (pairs 80 / 105 / 15). PASS. The narrow step: plan 03-04 may soften it
- * once level 5 has its search (5 → 4 must pass the same bar).
+ * Wilson lower bound 61.5 % (pairs 80 / 105 / 15). PASS. Kept by plan 03-04: level 5 beat it 81.8 %
+ * on the first 400-game run, so it was not softened; 4 → 3 re-run on 2026-10-15 gave the same 265 / 400.
  */
 export const PUR_SANG_TEMPERATURE = 3;
 
@@ -70,9 +70,26 @@ export type Budget = { plies: number };
 export const CHAMPION_KEEP = 6;
 /** Plies rolled out after each kept candidate, every seat playing the noiseless policy (one round). */
 export const CHAMPION_PLIES = 4;
-/** Imagined deals the default budget pays for when CHAMPION_KEEP candidates are kept. */
-export const CHAMPION_WORLDS = 12;
-/** Level 5's default budget: each kept candidate costs its own apply plus CHAMPION_PLIES per deal. */
+/**
+ * Imagined deals the default budget pays for when CHAMPION_KEEP candidates are kept. Calibrated on
+ * 2026-10-15 with `node tools/bench-bots.mjs --level 5 --check` (40 fixed positions, 12 of them hard 7s,
+ * 3 repeats; ceiling p95 ≤ 250 ms and max ≤ 600 ms on this machine, the phone's 1 s / 2 s over 3 to 5):
+ * - 12 deals (360 units): p50 64.2 ms, p95 258.8 ms, max 691.3 ms — FAIL;
+ * - 11 deals (330 units): p95 244.0 ms, max 550.9 ms — passes by 6 ms, within the run-to-run noise;
+ * - 10 deals (300 units): p95 235.5 / 215.7 / 234.0 ms, max 444.7 / 492.5 / 458.9 ms over three runs —
+ *   kept, the most deals that pass with a margin. CHAMPION_PLIES stays 4 (more plies cost the same).
+ */
+export const CHAMPION_WORLDS = 10;
+/**
+ * Level 5's default budget: each kept candidate costs its own apply plus CHAMPION_PLIES per deal
+ * (6 × 10 × 5 = 300 units). Ladder runs against level 4 (seed 1, 4 workers):
+ * - probe, 360 units (12 deals), 100 games: 78 / 100, p̂ 78.0 %, Wilson 95 % [68.9 %, 85.0 %];
+ * - probe, 300 units, 100 games: 85 / 100, p̂ 85.0 %, Wilson 95 % [76.7 %, 90.7 %] — above 62 %, so
+ *   none of plan 03-04's levers (card counting, K and N, level 4's T) was needed;
+ * - confirmation 2026-10-15, 300 units: `node tools/ladder.mjs --a 5 --b 4 --games 400 --seed 1`
+ *   → 327 / 400, p̂ 81.8 %, Wilson 95 % lower bound 77.7 % (pairs 133 / 61 / 6). PASS, first run
+ *   (record: .planning/phases/03-l-ordinateur-la-force-choisie/03-04-ladder-5-4.txt).
+ */
 export const CHAMPION_BUDGET: Readonly<Budget> = {
   plies: CHAMPION_KEEP * CHAMPION_WORLDS * (1 + CHAMPION_PLIES),
 };
