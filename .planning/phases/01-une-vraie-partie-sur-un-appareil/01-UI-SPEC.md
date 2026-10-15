@@ -238,9 +238,11 @@ Unplayable card reason (shown in the prompt line when the player taps a dimmed c
 | Helper, Son | « Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté. » (Révisé le 2026-10-15, plan 01-49 : le jeu se fait entendre en mode silencieux, voir l’addendum « Recette 3 de Romain », « Le son en mode silencieux » ; le même texte en tête de « Test des sons ») |
 | Links | « Tester les sons », « Crédits et licences », « Abandonner la partie » (in-game only), « Fermer » |
 | Sound test title | « Test des sons » |
-| Sound test intro | « Écoute chaque son et note-le. Tes notes restent sur cet appareil. » |
-| Rating | « À écouter » · « Bon » · « À changer » |
-| Copy notes | button « Copier mes notes » → toast « Notes copiées. » ; failure: « Impossible de copier. Sélectionne le texte ci-dessous. » |
+| Sound test intro | « Écoute les versions de chaque son et choisis ta préférée. Ton choix compte tout de suite dans tes parties, sur cet appareil. Pour qu’il compte pour tout le monde, touche « Copier mes choix » et envoie-les. » (Révisé le 2026-10-15, plan 01-51 : la page « à choix », voir l’addendum « Recette 3 de Romain », « La page d’essai des sons à choix ») |
+| Version button | « A » … « D », accessible name « Écouter {nom}, version {X} » ; under it what the version is when it has a name (Sabots : « actuel », « sur la terre », « sur les pavés », « sur le bois ») and its source (« Généré par le code », or « Fichier libre (CC0) » with « auteur · licence » ; « Son indisponible » when it cannot be prepared) |
+| Choice | label « Mon choix », radio group « Mon choix pour {nom} », options « A » … « D » (the ratings « À écouter · Bon · À changer » are gone since 01-51) |
+| Copy choices | button « Copier mes choix » → toast « Choix copiés. » ; failure: « Impossible de copier. Sélectionne le texte ci-dessous. » and the list in a read-only text box « Mes choix » |
+| Hoof cadence | row « Cadence de ton choix », buttons « 1 » « 4 » « 7 » « 13 » (accessible names « Écouter 1 case », « Écouter 4 cases »…), then the distance slider |
 | Audio state | « Son prêt » / « Son en attente : touche l’écran » |
 
 Card names: As, 2 … 10, Valet, Dame, Roi + « de cœur / de carreau / de pique / de trèfle » (used in aria-labels and toasts).
@@ -371,17 +373,17 @@ Dimmed board (walnut at 70%) stays visible behind a centred panel (`#4A2F1A`, ra
 
 Bottom sheet on compact (slides up 250ms, max height 90dvh, drag handle not required), centred dialog 480 wide on larger screens; padding 24, row gap 24. Rows: **Son** switch (master, default on); **Bruitages** switch (default on); **Réduire les animations** switch (initial value from `prefers-reduced-motion`, then the user choice wins). There is no ambience row any more (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri » — the « Ambiance » switch and the « Volume de l’ambiance » slider are gone). Links: « Tester les sons », « Crédits et licences »; in game also the destructive text button « Abandonner la partie » at the bottom. Persistence: `localStorage` key `toc.settings.v1` `{ sound, sfx, reduceMotion, fast, lastColor }` (an older stored object with `ambience` / `ambienceVolume` still loads; those keys are ignored and dropped at the next save), every access in try/catch; if storage is unavailable, keep in memory and say nothing. Changes apply instantly; there is no Save button.
 
-### Sound test screen (for Romain, D-22)
+### Sound test screen « à choix » (for Romain, D-22; Révisé le 2026-10-15, plan 01-51)
 
-Full screen, scrollable. Header: title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone sound hint (the « Helper, Son » sentence since 01-49). Sections and rows (no « Ambiance » section: the ambience was removed on 2026-10-14):
+Full screen, scrollable. Header: « Retour », title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone sound hint (the « Helper, Son » sentence since 01-49), the intro « Écoute les versions de chaque son et choisis ta préférée… ». Any tap on the page unlocks the audio. Sections and rows (no « Ambiance » section: the ambience was removed on 2026-10-14):
 
 | Section | Rows |
 |---------|------|
-| Sabots | « 1 case », « 4 cases », « 7 cases », « 13 cases » + a distance slider 1–13 with a play button that plays the real cadence curve |
+| Sabots | « Sabots » (versions A–D and the choice), then « Cadence de ton choix » (buttons « 1 », « 4 », « 7 », « 13 »: the real cadence of a move of that many cells, in the chosen version), then the distance slider 1–13 with its play button |
 | Hennissements | « Sortie de l’écurie », « Prise : ruade », « Prise : plainte », « Entrée dans la maison », « 4e cheval rentré (joyeux) », « Échange au Valet (surpris) » |
 | Cartes | « Donne », « Poser une carte », « Échange de carte » |
 
-Each row: play button 44 × 44, the sound name (Body), a source tag (« Fichier libre (CC0) » / « Généré par le code » plus author + licence line from `LICENSES.md`), a segmented rating « À écouter · Bon · À changer » (default « À écouter »). If both a recorded and a generated version exist, the row shows two play buttons « Fichier » and « Généré » for A/B comparison. Footer: « Copier mes notes » copies a French plain-text list `nom : note` to the clipboard. Ratings persist in `toc.soundnotes.v1`.
+Each sound row: the sound name (Body); one 44 × 44 round play button per version, « A » to « D », each playing that version once (a hoof version plays the cadence of a 4-cell move); under each button what the version is, when it has a name, and its source line (« Généré par le code », or for a recorded version « Fichier libre (CC0) » plus « auteur · licence » from its own row of `LICENSES.md`); for the generated versions, the sound's own row « auteur · licence » once under the buttons; then « Mon choix » and a segmented radio group « Mon choix pour {nom} » A–D (arrow keys move and select, one tab stop). The button of the chosen version has a 3 px cream ring. A pick is saved on the device at once (`localStorage` « toc.soundchoices.v1 », only the sounds picked) and passed to the audio engine: the game plays it from the next sound on, on this device. A damaged or hostile stored value gives the defaults, without error; the old ratings (`toc.soundnotes.v1`) are ignored. Footer: « Copier mes choix » copies one French line per sound, in page order, « Sabots : B » (U+00A0 before the colon), plain text only; then « Crédits et licences ». The hooves have four versions; the neighs and the cards keep their one version « A » (their versions, plans 01-52 and 01-53, are deferred: Romain, 2026-10-15, « laisse les sons de côté sauf les sabots des chevaux »).
 
 ---
 
@@ -488,7 +490,7 @@ All motion is `transform`/`opacity` through the Web Animations API on `<g>` wrap
 | Valet swap | Short surprised neigh | Take-off |
 | Deal / card played / exchange | Card sounds (deal riffle, card down, card slide) | With the matching animation |
 
-Rules: no ambience loop ever plays (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri »); the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; inside that same tap, `navigator.audioSession.type = "playback"` is set before the `AudioContext` is created, where the browser has the Audio Session API (01-49); on an iPhone or iPad the same tap also starts a hidden, looping, silent `<audio>` element (a WAV generated by the code as a data URI: no file, no network request; no controls, no AirPlay), which keeps the page in the playback category so the ringer switch does not mute the game; it is paused when the page is hidden and while « Son » is off, and only a gesture on a visible page with « Son » on starts it again; it never exists on a computer (see the addendum « Recette 3 de Romain », « Le son en mode silencieux »); formats AAC `.m4a` primary (+ `.mp3` fallback), decoded once on first unlock; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
+Rules: no ambience loop ever plays (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri »); the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; inside that same tap, `navigator.audioSession.type = "playback"` is set before the `AudioContext` is created, where the browser has the Audio Session API (01-49); on an iPhone or iPad the same tap also starts a hidden, looping, silent `<audio>` element (a WAV generated by the code as a data URI: no file, no network request; no controls, no AirPlay), which keeps the page in the playback category so the ringer switch does not mute the game; it is paused when the page is hidden and while « Son » is off, and only a gesture on a visible page with « Son » on starts it again; it never exists on a computer (see the addendum « Recette 3 de Romain », « Le son en mode silencieux »); each sound plays its chosen version (the device's pick on `#/sons`, else `DEFAULT_CHOICES` in `apps/web/src/audio/choices.ts`, today all « A »); only the chosen versions are prepared at the first gesture, another version is rendered when the page first plays it, and a newly chosen version replaces the previous one only once it is ready (a chosen version that cannot be prepared falls back to « A ») (01-51); a recorded version tries AAC `.m4a` first (+ `.mp3` fallback), decoded once; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
 
 ---
 
@@ -1081,3 +1083,41 @@ Plan 01-50 (gap G-01-30). Elle remplace la section « End-of-game screen » de �
 | long-text | static-content: noms des cavaliers | ✅ covered | Noms de chevaux courts de la liste fixe ; 112 px au plus, « … » au-delà |
 | loading | media: images des cavaliers | ✅ covered | Les mêmes fichiers que les pions, déjà chargés par le plateau ; le nom reste lisible sans l’image (son texte de remplacement est la couleur) |
 | populated | la planche, points à confirmer | 🧪 backstop | Recette de Romain (plan 01-54) : la planche lui plaît-elle, dans le style du galet, sur son iPhone et son ordinateur, ou que changer |
+
+### La page d’essai des sons à choix
+
+Plan 01-51 (gap G-01-29). Elle remplace la section « Sound test screen » de « Layout and Screens » (désormais « Sound test screen « à choix » ») et les lignes du test des sons du tableau « Réglages, sound test, credits » ; elle complète les règles de l’« Audio UX Contract ».
+
+**Les mots de Romain** (recette 3, test 29) : « les sons ne sont pas bons, il faut les retravailler ». **Son choix** : « Page d'essai à choix (Recommandé) ». Puis, le 2026-10-15 : « laisse les sons de côté sauf les sabots des chevaux » (les versions des hennissements et des cartes, plans 01-52 et 01-53, sont reportées).
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) :
+- la page `#/sons` fait entendre plusieurs versions de chaque son (aujourd’hui les quatre versions des sabots ; les hennissements et les cartes gardent leur seule version « A ») ;
+- pour chaque son, Romain choisit sa version (« Mon choix ») ; son choix est gardé sur son appareil et vaut tout de suite dans ses parties, sur cet appareil ;
+- « Copier mes choix » copie la liste (« Sabots : B », un son par ligne) qu’il envoie au développeur ; recopiée dans `DEFAULT_CHOICES`, elle devient le choix de tous ;
+- tant qu’il n’a rien choisi, le jeu garde les sons d’avant : chaque son a pour version « A » le son actuel, et `DEFAULT_CHOICES` choisit « A » partout ;
+- chaque version est générée par le code, ou est un enregistrement CC0 (ou domaine public) avec sa propre ligne dans `assets/audio/LICENSES.md` (CLAUDE.md, « Sons »).
+
+**Les quatre versions des sabots**, toutes générées par le code, chacune en trois prises jouées à tour de rôle (le grain et le rythme changent d’une prise à l’autre, pas seulement la hauteur) :
+
+| Version | Ce qu’elle est | Recette (`apps/web/src/audio/synth.ts`) |
+|---------|----------------|------------------------------------------|
+| A, « actuel » | le sabot d’avant 01-51 | `hoof` : un bruit filtré autour de 1,4 kHz et un coup sourd de 170 à 60 Hz, une seule frappe |
+| B, « sur la terre » | un sabot sur la terre battue : doux, grave, mat | `hoof-terre` : bruit filtré large vers 700–820 Hz, attaque de 5 ms, 110 ms de décroissance, passe-bas à 2 kHz, coup sourd de 120 à 45 Hz, un léger grain de terre ; talon puis pince |
+| C, « sur les pavés » | un fer sur les pavés : clair, dur, qui tinte | `hoof-paves` : claquement filtré étroit vers 2,2–2,6 kHz en 50 ms, une pointe à 5 kHz, le tintement du fer (3,1 kHz et 4,4 kHz, bas), un coup court de 150 à 80 Hz ; talon puis pince |
+| D, « sur le bois » | un sabot sur un plancher ou un pont : un toc creux | `hoof-bois` : deux résonances (Q 6) vers 450 Hz et 1,1 kHz qui sonnent 90 et 60 ms, les notes de la planche, un léger clic, pas de coup sourd ; talon puis pince |
+
+**Faits techniques (sans confirmation)** :
+- `apps/web/src/audio/sounds.ts` : un son est une liste de versions « a » à « d » ; une version est `{ kind: "synth", recipe, takes }`, `{ kind: "file", files, licence }` (l’id de sa ligne de `LICENSES.md`) ou `{ kind: "silence" }`.
+- `apps/web/src/audio/choices.ts` : `DEFAULT_CHOICES`, `parseChoices` (seuls les sons connus avec une de leurs propres versions), `loadChoices` / `saveChoices` sous « toc.soundchoices.v1 » (chaque accès au stockage dans un try/catch), `choicesAsText`.
+- `apps/web/src/audio/engine.ts` : les tampons sont rangés par son et par version ; `setChoices` prépare la version choisie et garde la précédente jusqu’à ce qu’elle soit prête ; `play(id, version)` joue une version une fois, rendue à la demande ; `scheduleClops(…, version)` joue la cadence d’une version. Les builds de débogage publient chaque tampon joué (son, version, prise) et une estimation de la brillance de chaque prise rendue.
+- **Les preuves** (`apps/web/e2e/sons.spec.ts`, les deux projets) : choisir B sur la page fait jouer B aux sabots d’un coup de la partie, et le choix reste après rechargement ; la page, ses versions, ses choix, les flèches, un stockage abîmé, les sources, les licences, « Copier mes choix » ; les quatre versions mesurées différentes (B plus mate que A, C plus claire, D à part), et leurs trois prises aussi.
+- **Vérifié à l’oreille seulement** (recette de Romain, plan 01-54) : quelle version des sabots lui plaît.
+
+#### UI Considerations (page d’essai des sons à choix)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| overflow | static-content: quatre versions sur un téléphone | ✅ covered | Les versions passent à la ligne (au moins 96 px chacune) ; boutons et choix mesurés à 44 px au moins sur les deux projets |
+| error | stored-data: « toc.soundchoices.v1 » abîmé ou hostile | ✅ covered | Les choix par défaut, sans erreur (choices.test, sons.spec) |
+| loading | media: une version entendue pour la première fois | ✅ covered | Rendue à la demande puis jouée ; « Son indisponible » si elle échoue |
+| populated | les versions des sabots | 🧪 backstop | Recette de Romain (plan 01-54) : il écoute les quatre versions, en choisit une, l’entend dans une partie et envoie ses choix |

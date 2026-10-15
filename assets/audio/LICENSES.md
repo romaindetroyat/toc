@@ -5,6 +5,7 @@ Ce registre trace la provenance de tout ce que le jeu embarque : un son, une pol
 Règles pour ajouter une ligne :
 
 - Un fichier enregistré (CC0 ou équivalent) a sa propre ligne, avec l’adresse de la page d’origine (Freesound, OpenGameArt…) et le nom de l’auteur. Une licence à vérifier fichier par fichier ne se déduit jamais d’un lot.
+- Un son a plusieurs versions (« a » à « d », page `#/sons`). Sa ligne « Généré par le code » couvre toutes ses versions générées par le code. Chaque version enregistrée a sa propre ligne de type `son` : son id est l’identifiant `licence` de la version dans le catalogue, elle donne l’adresse de la page d’origine et l’auteur, et sa colonne `fichier` couvre chacun des fichiers de la version. Un test le vérifie.
 - La colonne `fichier` donne le nom du fichier, son chemin depuis la racine du dépôt, ou un dossier terminé par une barre oblique (tous les fichiers du dossier sont alors couverts). Les textes de licence (`OFL-*.txt`, `LGPL-*.txt`, `LICENSE*`) n’ont pas besoin de ligne.
 - Une ligne ne contient ni barre verticale ni balise : tout est affiché comme du texte.
 - Types utilisés : `son`, `police`, `icônes`, `plateau`, `cavaliers`, `cartes`.

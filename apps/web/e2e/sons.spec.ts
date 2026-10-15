@@ -43,7 +43,7 @@ test.describe("page de test des sons à choix", () => {
     // 10 sounds + the hoof cadence and the distance rows (no ambience since 2026-10-14).
     await expect(page.locator("li.row")).toHaveCount(12);
     await expect(page.locator("li.row[data-sound]")).toHaveCount(10);
-    // One choice per sound; the hooves have four versions, the other sounds one until 01-52 and 01-53.
+    // One choice per sound; the hooves have four versions, the other sounds one (01-52 and 01-53 deferred).
     await expect(page.getByRole("radiogroup")).toHaveCount(10);
     await expect(page.getByRole("radiogroup", { name: /^Mon choix pour / })).toHaveCount(10);
     await expect(sabots(page).getByRole("radio")).toHaveText(["A", "B", "C", "D"]);
