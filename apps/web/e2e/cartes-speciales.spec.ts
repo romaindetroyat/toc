@@ -336,7 +336,8 @@ test("le 7 : « Tout annuler » rend la main, rien n’a bougé", async ({ page 
 test("le 7 : un nombre de pas qui empêcherait de finir est grisé et s’explique au toucher", async ({
   page,
 }) => {
-  // bleu0 is four cells from the home: only 3 or 7 steps leave a 7 that can be finished.
+  // bleu0 is four cells from the home with home slots 1 to 3 taken: only 3 steps leave a 7 that can be
+  // finished. 7 steps would send it past its home, which G16 forbids since a split of this 7 brings it home.
   await openPosition(page, {
     turn: "bleu",
     pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
@@ -346,7 +347,7 @@ test("le 7 : un nombre de pas qui empêcherait de finir est grisé et s’expliq
   await tap(page, "bleu0");
   await expect(chip(page, 1)).toHaveAttribute("aria-disabled", "true");
   await expect(chip(page, 3)).toHaveAttribute("aria-disabled", "false");
-  await expect(chip(page, 7)).toHaveAttribute("aria-disabled", "false");
+  await expect(chip(page, 7)).toHaveAttribute("aria-disabled", "true");
 
   // A chip that is off is still tappable (aria-disabled): Playwright needs force to try it.
   await chip(page, 1).click({ force: true });
