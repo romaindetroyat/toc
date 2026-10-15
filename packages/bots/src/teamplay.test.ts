@@ -286,3 +286,63 @@ describe("fewer and fewer mistakes (D-05)", () => {
     expect(two).toBeGreaterThan(1 / scored.length);
   });
 });
+
+describe("level 5, the Champion, plays for its team (BOT-03, D-04)", () => {
+  /** A small fixed budget: the search runs, the tests stay fast and deterministic. */
+  const champion = (view: PlayerView) =>
+    chooseAction(view, "bleu", 5, [5, 4, 3, 2], { plies: 120 });
+
+  it("se protéger: takes its threatened knight out of reach", () => {
+    // bleu0 at cell 25 with jaune0 three cells behind it; bleu1 at cell 45, nobody behind.
+    const view = playView(
+      { bleu: [{ p: 25 }, { p: 45 }, "S", "S"], jaune: [{ p: 4 }, "S", "S", "S"] },
+      ["12H"],
+    );
+    const thought = champion(view);
+    expect(thought.units).toBeGreaterThan(0);
+    expect(thought.action).toEqual({ t: "move", card: "12H", pawn: "bleu0" });
+  });
+
+  it("aider le partenaire: eats the opponent knight that threatens its partner's knight", () => {
+    // rouge0 (the partner) at cell 14; jaune0 four cells behind it, at cell 10. bleu0 at cell 5 eats
+    // jaune0 with the 5; the 5 could instead advance bleu1 (cell 30), or the 2 either knight.
+    const view = playView(
+      {
+        bleu: [{ p: 5 }, { p: 30 }, "S", "S"],
+        rouge: [{ p: 50 }, "S", "S", "S"],
+        jaune: [{ p: 64 }, "S", "S", "S"],
+      },
+      ["5H", "2S"],
+    );
+    const thought = champion(view);
+    expect(thought.units).toBeGreaterThan(0);
+    expect(thought.action).toEqual({ t: "move", card: "5H", pawn: "bleu0" });
+  });
+
+  it("rentrer: enters its home with the exact count rather than advancing elsewhere", () => {
+    const view = playView({ bleu: [{ p: 67 }, { p: 20 }, "S", "S"] }, ["5H"]);
+    const thought = champion(view);
+    expect(thought.units).toBeGreaterThan(0);
+    expect(thought.action).toEqual({ t: "move", card: "5H", pawn: "bleu0" });
+  });
+
+  it("gives the As or the Roi to a partner whose knights wait in the stable, the 4 just past its exit", () => {
+    const stable: Pawns = { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] };
+    const give = (view: PlayerView) => champion(view).action;
+    expect(give(exchangeView(stable, ["1S", "9S", "6D", "3C"], ["2H", "5H", "8H", "10H"]))).toEqual(
+      { t: "give", card: "1S" },
+    );
+    expect(
+      give(exchangeView(stable, ["13S", "9S", "6D", "3C"], ["2H", "5H", "8H", "10H"])),
+    ).toEqual({ t: "give", card: "13S" });
+    expect(
+      give(
+        exchangeView(
+          { bleu: [{ p: 10 }, { p: 30 }, "S", "S"], rouge: [{ p: 1 }, "S", "S", "S"] },
+          ["4H", "6S", "9D", "10C"],
+          ["2H", "5H", "8H", "12H"],
+        ),
+      ),
+    ).toEqual({ t: "give", card: "4H" });
+  });
+});

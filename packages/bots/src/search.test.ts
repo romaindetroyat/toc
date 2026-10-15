@@ -8,6 +8,7 @@ import {
   type Color,
   type GameState,
   newGame,
+  PARTNER,
   type PlayerView,
   type Rng,
   scenarioState,
@@ -18,7 +19,7 @@ import { candidatesFor } from "./candidates.ts";
 import { determinize } from "./determinize.ts";
 import { scoreCandidates } from "./evaluate.ts";
 import { giveScores } from "./exchange.ts";
-import { hiddenCounts, unknownCards } from "./knowledge.ts";
+import { hiddenCounts, partnerHolds, unknownCards } from "./knowledge.ts";
 import { CHAMPION_BUDGET } from "./levels.ts";
 import { playGame } from "./match.ts";
 import { chooseAction, createThinker } from "./thinker.ts";
@@ -64,20 +65,26 @@ describe("knowledge: what the seat does not see", () => {
       const unknown = unknownCards(view);
       const counts = hiddenCounts(view);
       const others = COLORS.filter((c) => c !== seat).reduce((n, c) => n + view.handSizes[c], 0);
-      expect(unknown.length).toBe(others + view.talonSize);
+      // The card the seat passed is known while its partner holds it (givenToPartner).
+      const passed = partnerHolds(view);
+      const known = passed === null ? 0 : 1;
+      if (passed !== null) expect(state.hands[PARTNER[seat]]).toContain(passed);
+      expect(unknown.length).toBe(others - known + view.talonSize);
       expect(counts.talon).toBe(view.talonSize);
       expect(counts.hands[seat]).toBe(0);
+      expect(counts.hands[PARTNER[seat]]).toBe(view.handSizes[PARTNER[seat]] - known);
       const seen = new Set([
         ...view.hand,
         ...view.discard,
         ...COLORS.flatMap((c) => view.posed[c]),
       ]);
       for (const card of unknown) expect(seen.has(card)).toBe(false);
+      if (passed !== null) expect(unknown).not.toContain(passed);
       expect(new Set(unknown).size).toBe(unknown.length);
       // Every card actually hidden from the seat is in the pool.
       for (const color of COLORS) {
         if (color === seat) continue;
-        for (const card of state.hands[color]) expect(unknown).toContain(card);
+        for (const card of state.hands[color]) if (card !== passed) expect(unknown).toContain(card);
       }
       for (const card of state.talon) expect(unknown).toContain(card);
     }
@@ -110,6 +117,26 @@ describe("determinize: a world consistent with the view", () => {
       expect(all.length).toBe(52);
       expect(new Set(all).size).toBe(52);
     }
+  });
+
+  it("puts the card the seat passed in its partner's hand while the partner has not played it", () => {
+    let checked = 0;
+    let rng: Rng = [8, 6, 4, 2];
+    for (const { state, seat } of sampleStates(120, 2)) {
+      const view = viewFor(state, seat);
+      const passed = view.givenToPartner;
+      if (state.phase !== "play" || passed === null) continue;
+      const [world, after] = determinize(view, seat, rng);
+      rng = after;
+      if (state.hands[PARTNER[seat]].includes(passed)) {
+        expect(world.hands[PARTNER[seat]]).toContain(passed);
+        checked++;
+      } else {
+        // Played or laid down: it is public now, in the discard or on the felt.
+        expect(world.hands[PARTNER[seat]]).not.toContain(passed);
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
   });
 
   it("is deterministic: the same rng gives the same world and the same rng after", () => {

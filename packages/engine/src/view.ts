@@ -4,7 +4,7 @@
 // kind 'view' makes it a type error to hand a GameState to code that must stay blind (bots).
 
 import type { GameEvent } from "./events.ts";
-import type { Color, PawnId } from "./topology.ts";
+import { type Color, PARTNER, type PawnId } from "./topology.ts";
 import type { CardId, GameState, Pawn, PlayerView } from "./types.ts";
 
 function perColor<T>(make: (color: Color) => T): Record<Color, T> {
@@ -17,7 +17,10 @@ function copyPawns(pawns: Record<PawnId, Pawn>): Record<PawnId, Pawn> {
   return copy;
 }
 
-/** What `seat` may know of `state`. Every field is a copy: the view shares nothing with the state. */
+/**
+ * What `seat` may know of `state`. Every field is a copy: the view shares nothing with the state. This
+ * is the only builder of a PlayerView.
+ */
 export function viewFor(state: GameState, seat: Color): PlayerView {
   return {
     kind: "view",
@@ -36,6 +39,10 @@ export function viewFor(state: GameState, seat: Color): PlayerView {
     phase: state.phase,
     given: state.given[seat],
     received: state.received[seat],
+    // The seat's own give: state.given[seat] while the exchange is open (null before it chooses), then
+    // the partner's received card once the gives have crossed (state.given is reset to null and
+    // state.received to null again at the next deal). Never another seat's choice.
+    givenToPartner: state.given[seat] ?? state.received[PARTNER[seat]],
     hasGiven: perColor((color) => state.given[color] !== null),
     captures: { ...state.captures },
     winner: state.winner,

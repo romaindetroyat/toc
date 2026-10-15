@@ -2,7 +2,8 @@
 // sees. The unknown cards (knowledge.ts) are shuffled with the bot's own sfc32 and dealt to the other
 // seats by their public hand sizes, the rest forming the talon in random order. Every public field is
 // copied from the view, the seat's own hand and exchange choice too, so viewFor(world, seat) equals the
-// view. It is a uniform draw over the hidden layouts consistent with the view: no inference from the
+// view. The card the seat passed to its partner (givenToPartner) is placed in the partner's hand while
+// the partner has not played it: the seat knows it is there. It is a uniform draw over the hidden layouts consistent with the view: no inference from the
 // opponents' past choices, and the partner's hand is unknown like the opponents' (D-10: a human partner
 // is treated like a computer one).
 // This is the one file of the bots that names the full state: it builds an imagined one, from the view
@@ -15,6 +16,7 @@ import {
   type Color,
   type GameState,
   next,
+  PARTNER,
   type Pawn,
   type PawnId,
   type PlayerView,
@@ -22,7 +24,7 @@ import {
   shuffle,
   sortHand,
 } from "@toc/engine";
-import { hiddenCounts, unknownCards } from "./knowledge.ts";
+import { hiddenCounts, partnerHolds, unknownCards } from "./knowledge.ts";
 
 /** An imagined game state, built from a PlayerView by determinize. */
 export type World = GameState;
@@ -43,11 +45,13 @@ function copyPawns(pawns: Record<PawnId, Pawn>): Record<PawnId, Pawn> {
  */
 export function determinize(view: PlayerView, seat: Color, rng: Rng): [World, Rng] {
   const counts = hiddenCounts(view);
+  const passed = partnerHolds(view);
   let [pool, r] = shuffle(unknownCards(view), rng);
   const hands = perColor((color): CardId[] => {
     if (color === seat) return view.hand.slice();
     const cards = pool.slice(0, counts.hands[color]);
     pool = pool.slice(counts.hands[color]);
+    if (passed !== null && color === PARTNER[seat]) cards.push(passed);
     return sortHand(cards);
   });
   const talon = pool;
@@ -64,8 +68,13 @@ export function determinize(view: PlayerView, seat: Color, rng: Rng): [World, Rn
       given[color] = hand[Math.min(hand.length - 1, Math.floor(u * hand.length))] ?? null;
     }
   }
-  // The other seats' received cards only label a card in hand and stay unknown.
-  const received = perColor((color): CardId | null => (color === seat ? view.received : null));
+  // The seat's own give, once crossed, is its partner's received card (state.received); the other seats'
+  // received cards only label a card in hand and stay unknown.
+  const received = perColor((color): CardId | null => {
+    if (color === seat) return view.received;
+    if (color === PARTNER[seat] && view.given === null) return view.givenToPartner;
+    return null;
+  });
 
   const seed: number[] = [];
   for (let i = 0; i < 4; i++) {

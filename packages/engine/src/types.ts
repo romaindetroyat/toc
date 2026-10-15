@@ -138,6 +138,13 @@ export type PlayerView = {
   given: CardId | null;
   /** Card the viewer received at the last exchange. */
   received: CardId | null;
+  /**
+   * The card the viewer passed to its partner at this deal's exchange: its own choice while the
+   * exchange is open, the card now on the partner's side once the four gives have crossed, null before
+   * it chooses and at a new deal. It is what a human remembers of his own give (D-10, BOT-04), never
+   * another seat's card.
+   */
+  givenToPartner: CardId | null;
   /** Who has already chosen a card to give (public: « il reste à choisir »). */
   hasGiven: Record<Color, boolean>;
   captures: Record<Team, number>;

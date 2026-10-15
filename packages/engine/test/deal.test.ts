@@ -406,8 +406,11 @@ describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
     stages.push(state);
     for (const stage of stages) {
       for (const seat of COLORS) {
-        const json = JSON.stringify(viewFor(stage, seat));
+        const view = viewFor(stage, seat);
+        const json = JSON.stringify(view);
+        // The seat knows its own cards and the card it passed to its partner (givenToPartner).
         const mine = new Set<string>(stage.hands[seat]);
+        if (view.givenToPartner !== null) mine.add(view.givenToPartner);
         for (const other of COLORS) {
           if (other === seat) continue;
           for (const card of stage.hands[other]) {
@@ -461,6 +464,58 @@ describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
     view.hand.pop();
     view.discard.push("1S");
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+describe("viewFor: givenToPartner, the card the seat passed (D-10, BOT-04)", () => {
+  it("is null before the seat chooses, its own choice during the exchange, hidden from the others", () => {
+    let { state } = startGame({ firstDealer: "bleu" }, SEED);
+    for (const seat of COLORS) expect(viewFor(state, seat).givenToPartner).toBeNull();
+    const card = state.hands.rouge[2] as CardId;
+    state = giveCard(state, "rouge", card).state;
+    expect(viewFor(state, "rouge").givenToPartner).toBe(card);
+    for (const seat of ["bleu", "jaune", "vert"] as const) {
+      expect(viewFor(state, seat).givenToPartner).toBeNull();
+    }
+  });
+
+  it("is the card the seat passed once the gives have crossed, and null again at the next deal", () => {
+    const { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const gift = Object.fromEntries(COLORS.map((c) => [c, state.hands[c][0]])) as Record<
+      Color,
+      CardId
+    >;
+    const played = exchangeAll(state).state;
+    for (const seat of COLORS) {
+      const view = viewFor(played, seat);
+      expect(view.givenToPartner).toBe(gift[seat]);
+      expect(view.givenToPartner).toBe(played.received[PARTNER[seat]]);
+      expect(played.hands[PARTNER[seat]]).toContain(view.givenToPartner);
+    }
+    const next = endDeal(emptyHands(played)).state;
+    expect(next.phase).toBe("exchange");
+    for (const seat of COLORS) expect(viewFor(next, seat).givenToPartner).toBeNull();
+  });
+
+  it("never equals another seat's give, through the deals of a game", () => {
+    let { state } = startGame({ firstDealer: "jaune" }, [9, 8, 7, 6]);
+    for (let deal = 0; deal < 4; deal++) {
+      const gift: Partial<Record<Color, CardId>> = {};
+      // The seats give one after the other; after each give every view is checked.
+      for (const giver of COLORS) {
+        const card = state.hands[giver][deal % state.hands[giver].length] as CardId;
+        gift[giver] = card;
+        state = giveCard(state, giver, card).state;
+        for (const seat of COLORS) {
+          const own = viewFor(state, seat).givenToPartner;
+          expect(own).toBe(gift[seat] ?? null);
+          for (const other of COLORS) {
+            if (other !== seat && gift[other] !== undefined) expect(own).not.toBe(gift[other]);
+          }
+        }
+      }
+      state = endDeal(emptyHands(state)).state;
+    }
   });
 });
 
