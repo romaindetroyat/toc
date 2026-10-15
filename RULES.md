@@ -375,6 +375,18 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-13.20](docs/regles/R-13.20.webp)
 - R-13.21 — Placé par le Valet devant son carré 16, le pion entre au compte exact
   ![R-13.21](docs/regles/R-13.21.webp)
+- R-13.22 — Avec une autre carte que celle qui le fait rentrer, le cheval peut dépasser sa maison
+  ![R-13.22](docs/regles/R-13.22.webp)
+- R-13.23 — Le 7 qui peut faire rentrer un cheval le fait rentrer ou ne le bouge pas
+  ![R-13.23](docs/regles/R-13.23.webp)
+- R-13.24 — Avec le 7, le cheval peut s’arrêter sur son carré 16 puis entrer au pas suivant
+  ![R-13.24](docs/regles/R-13.24.webp)
+- R-13.25 — Le 4 peut encore reculer un cheval que le 2 ferait rentrer
+  ![R-13.25](docs/regles/R-13.25.webp)
+- R-13.26 — Seul sur le parcours, le cheval que le 7 ne peut pas faire rentrer dépasse sa maison
+  ![R-13.26](docs/regles/R-13.26.webp)
+- R-13.27 — Case visée occupée : le cheval ne peut pas rentrer, il dépasse sa maison
+  ![R-13.27](docs/regles/R-13.27.webp)
 
 ### R-14 Main injouable
 

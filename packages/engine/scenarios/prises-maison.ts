@@ -655,4 +655,129 @@ export const r13: Scenario[] = [
     },
     flags: ["G1", "G14"],
   },
+  {
+    id: "R-13.22",
+    rule: "R-13",
+    title: "Avec une autre carte que celle qui le fait rentrer, le cheval peut dépasser sa maison",
+    before: {
+      pawns: { bleu: [{ p: 70 }, "S", "S", "S"] },
+      hands: { bleu: ["2S", "9S"] },
+      turn: "bleu",
+    },
+    expect: {
+      legalInclude: [
+        { t: "move", card: "2S", pawn: "bleu0" },
+        { t: "move", card: "9S", pawn: "bleu0" },
+      ],
+    },
+    flags: ["G16"],
+  },
+  {
+    id: "R-13.23",
+    rule: "R-13",
+    title: "Le 7 qui peut faire rentrer un cheval le fait rentrer ou ne le bouge pas",
+    before: {
+      pawns: { bleu: [{ p: 68 }, { p: 10 }, "S", "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    expect: {
+      legalInclude: [
+        {
+          t: "seven",
+          card: "7S",
+          plan: [
+            { pawn: "bleu0", steps: 3 },
+            { pawn: "bleu1", steps: 4 },
+          ],
+        },
+        { t: "seven", card: "7S", plan: [{ pawn: "bleu1", steps: 7 }] },
+      ],
+      legalExclude: [
+        { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
+        {
+          t: "seven",
+          card: "7S",
+          plan: [
+            { pawn: "bleu0", steps: 2 },
+            { pawn: "bleu1", steps: 5 },
+          ],
+        },
+      ],
+    },
+    flags: ["G16", "seven"],
+  },
+  {
+    id: "R-13.24",
+    rule: "R-13",
+    title: "Avec le 7, le cheval peut s’arrêter sur son carré 16 puis entrer au pas suivant",
+    before: {
+      pawns: { bleu: [{ p: 68 }, { p: 10 }, "S", "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: {
+      t: "seven",
+      card: "7S",
+      plan: [
+        { pawn: "bleu0", steps: 2 },
+        { pawn: "bleu1", steps: 1 },
+        { pawn: "bleu0", steps: 4 },
+      ],
+    },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ h: 3 }, { p: 11 }, "S", "S"] } },
+    },
+    flags: ["G16", "seven", "G5"],
+  },
+  {
+    id: "R-13.25",
+    rule: "R-13",
+    title: "Le 4 peut encore reculer un cheval que le 2 ferait rentrer",
+    before: {
+      pawns: { bleu: [{ p: 70 }, "S", "S", "S"] },
+      hands: { bleu: ["2S", "4S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "4S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: 66 }, "S", "S", "S"] } },
+    },
+    flags: ["G16"],
+  },
+  {
+    id: "R-13.26",
+    rule: "R-13",
+    title: "Seul sur le parcours, le cheval que le 7 ne peut pas faire rentrer dépasse sa maison",
+    before: {
+      pawns: { bleu: [{ p: 70 }, "S", "S", "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: 77 }, "S", "S", "S"] } },
+    },
+    flags: ["G16", "seven"],
+  },
+  {
+    id: "R-13.27",
+    rule: "R-13",
+    title: "Case visée occupée : le cheval ne peut pas rentrer, il dépasse sa maison",
+    before: {
+      pawns: { bleu: [{ p: 70 }, { h: 1 }, "S", "S"] },
+      hands: { bleu: ["2S", "5S"] },
+      turn: "bleu",
+    },
+    expect: {
+      legalInclude: [
+        { t: "move", card: "2S", pawn: "bleu0" },
+        { t: "move", card: "5S", pawn: "bleu0" },
+      ],
+    },
+    flags: ["G16"],
+  },
 ];
