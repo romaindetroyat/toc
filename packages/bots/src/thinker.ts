@@ -21,8 +21,18 @@ import { randomLegal } from "./randomLegal.ts";
 /** Work, not time: one unit = one apply and one policy call inside a search (level 5, plan 03-04). */
 export type Budget = { plies: number };
 
-/** A decision: the action, the rng after it, how hard the choice was (0 to 1) and how many options. */
-export type Thought = { action: Action; rng: Rng; difficulty: number; candidates: number };
+/**
+ * A decision: the action, the rng after it, how hard the choice was (0 to 1), how many options, and the
+ * work spent in units (levels 1 to 4: one unit per candidate scored; plan 03-04 counts level 5's
+ * rollout plies). The ladder reports the units of each side.
+ */
+export type Thought = {
+  action: Action;
+  rng: Rng;
+  difficulty: number;
+  candidates: number;
+  units: number;
+};
 
 export type Thinker = {
   /** Runs up to `units` more work; true when the decision is final. */
@@ -80,7 +90,13 @@ function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thoug
     // The exchange (and a won game, where randomLegal reports there is nothing to play).
     const [action, after] = randomLegal(view, seat, rng);
     const options = new Set(view.hand).size;
-    return { action, rng: after, difficulty: difficultyOf(options, 0), candidates: options };
+    return {
+      action,
+      rng: after,
+      difficulty: difficultyOf(options, 0),
+      candidates: options,
+      units: options,
+    };
   }
 
   const candidates = candidatesFor(view, seat);
@@ -88,19 +104,20 @@ function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thoug
   const sorted = [...scores].sort((a, b) => b - a);
   const gap = sorted.length > 1 ? (sorted[0] as number) - (sorted[1] as number) : 0;
   const difficulty = difficultyOf(candidates.length, gap);
+  const units = candidates.length;
 
   if (level === 1) {
     const [action, after] = randomLegal(view, seat, rng);
-    return { action, rng: after, difficulty, candidates: candidates.length };
+    return { action, rng: after, difficulty, candidates: candidates.length, units };
   }
   const only = candidates[0];
   if (only === undefined) throw new Error(`chooseAction: ${seat} has no action to play`);
   if (candidates.length === 1) {
-    return { action: only.action, rng: [...rng], difficulty: 0, candidates: 1 };
+    return { action: only.action, rng: [...rng], difficulty: 0, candidates: 1, units };
   }
   const [index, after] = pickIndex(scores, level, rng);
   const chosen = candidates[index] ?? only;
-  return { action: chosen.action, rng: after, difficulty, candidates: candidates.length };
+  return { action: chosen.action, rng: after, difficulty, candidates: candidates.length, units };
 }
 
 /**

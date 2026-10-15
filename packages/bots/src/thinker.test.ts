@@ -128,6 +128,7 @@ describe("chooseAction levels 2 to 5", () => {
         rng: [9, 8, 7, 6],
         difficulty: 0,
         candidates: 1,
+        units: 1,
       });
     }
   });
