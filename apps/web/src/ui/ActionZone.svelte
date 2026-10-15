@@ -315,9 +315,21 @@
 {#snippet givingList()}
   <ul class="givers" data-givers>
     {#each givers as giver (giver.color)}
+      {@const breathing = !giver.done && giver.color === thinking}
+      <!-- The thinking sign (D-12): the computer player choosing its card breathes, its hourglass
+           swelling and its name fading; with reduced motion a fixed « … » follows the name. -->
       <li data-giver={giver.color} data-done={giver.done}>
-        <Icon name={giver.done ? "check" : "hourglass"} size={16} />
-        <span>{giver.name}</span>
+        <span
+          class="giver-icon"
+          class:respire={breathing}
+          data-thinking={breathing ? giver.color : undefined}
+        >
+          <Icon name={giver.done ? "check" : "hourglass"} size={16} />
+        </span>
+        <span class:respire-texte={breathing}>{giver.name}</span>
+        {#if breathing}
+          <span class="respire-mark" aria-hidden="true">…</span>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -353,6 +365,7 @@
        (in the compact prompt row, one line: the full text stays in the region and in the title). -->
   <section
     class="zone"
+    class:still={settings.reduceMotion}
     class:bar
     class:row={part === "prompt"}
     aria-live="polite"
@@ -471,6 +484,12 @@
 
   .givers li[data-done="true"] {
     color: var(--creme);
+  }
+
+  /* The giver's icon in its own box, so that it can breathe about its centre. */
+  .giver-icon {
+    flex: none;
+    display: inline-flex;
   }
 
   .buttons {

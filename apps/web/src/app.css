@@ -252,3 +252,71 @@ button {
   white-space: nowrap;
   border: 0;
 }
+
+/*
+ * The thinking sign (03-UI-SPEC « Thinking sign », D-12): while a computer player thinks, its sign
+ * breathes. A glyph swells to 1.12 and fades to 0.7 and back over 1.6 s; a text only fades. It starts
+ * at rest and stops at once (no transition): transform and opacity only, no layout shift, never amber.
+ * With reduced motion (the in-app switch, class « still » on the component root, or the system's
+ * prefers-reduced-motion) nothing moves and a fixed « … » (.respire-mark) follows the name instead.
+ */
+@keyframes respire {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 0.7;
+  }
+}
+
+@keyframes respire-texte {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.respire {
+  animation: respire 1600ms ease-in-out infinite;
+  transform-origin: center;
+}
+
+.respire-texte {
+  animation: respire-texte 1600ms ease-in-out infinite;
+}
+
+.respire-mark {
+  display: none;
+  color: var(--creme-attenuee);
+  font-size: var(--label-size);
+  font-weight: 700;
+  line-height: var(--label-line);
+}
+
+.still .respire,
+.still .respire-texte {
+  animation: none;
+}
+
+.still .respire-mark {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .respire,
+  .respire-texte {
+    animation: none;
+  }
+
+  .respire-mark {
+    display: inline;
+  }
+}

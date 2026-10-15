@@ -787,6 +787,7 @@
             {render}
             human={session.human}
             names={session.names}
+            thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
             onabandon={abandon}
           />
