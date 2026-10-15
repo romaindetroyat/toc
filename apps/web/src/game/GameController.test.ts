@@ -1,11 +1,13 @@
-import { randomLegal } from "@toc/bots";
+import { chooseAction, randomLegal } from "@toc/bots";
 import {
   type Action,
   type CardId,
   COLORS,
   type Color,
   type GameEvent,
+  next,
   type PlayerView,
+  type Rng,
   type Scenario,
 } from "@toc/engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,10 +15,10 @@ import { BOT_NAMES } from "./botNames.ts";
 import { createGame, type GameDirector, type Speed } from "./GameController.ts";
 import source from "./GameController.ts?raw";
 
-// The real bot, wrapped so the tests can see what it was called with.
+// The real bot entry point, wrapped so the tests can see what it was called with.
 vi.mock("@toc/bots", async (importOriginal) => {
   const original = await importOriginal<typeof import("@toc/bots")>();
-  return { ...original, randomLegal: vi.fn(original.randomLegal) };
+  return { ...original, chooseAction: vi.fn(original.chooseAction) };
 });
 
 const SEED: [number, number, number, number] = [11, 22, 33, 44];
@@ -77,7 +79,7 @@ const sizes = (view: PlayerView) => view.handSizes;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.mocked(randomLegal).mockClear();
+  vi.mocked(chooseAction).mockClear();
 });
 
 afterEach(() => {
@@ -210,7 +212,7 @@ describe("bots: think delay and view-only play (D-18)", () => {
     game.submit({ t: "move", card: "5H", pawn: "bleu0" });
     await vi.runAllTimersAsync();
 
-    const calls = vi.mocked(randomLegal).mock.calls;
+    const calls = vi.mocked(chooseAction).mock.calls;
     expect(calls.map((c) => c[1])).toEqual(["jaune", "rouge", "vert"]);
     for (const [view, seat] of calls) {
       expect(view.kind).toBe("view");
@@ -367,10 +369,79 @@ describe("bots: think delay and view-only play (D-18)", () => {
   });
 });
 
+describe("bots: each seat plays at its level (BOT-01)", () => {
+  it("calls the bot of every seat with that seat's level and its own view", async () => {
+    const director = fakeDirector();
+    const levels = { jaune: 1, rouge: 5, vert: 2 } as const;
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      levels,
+      director,
+    });
+    game.start();
+    await vi.runAllTimersAsync();
+    expect(game.submit({ t: "give", card: game.view().hand[0] as CardId })).toEqual({ ok: true });
+    await vi.runAllTimersAsync();
+
+    const calls = vi.mocked(chooseAction).mock.calls;
+    // The three gives, then the play of the first deal up to the human's turn.
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    for (const [view, seat, level] of calls) {
+      expect(seat).not.toBe("bleu");
+      expect(level).toBe(levels[seat as keyof typeof levels]);
+      expect(view.kind).toBe("view");
+      expect(view.seat).toBe(seat);
+      expect(view).not.toHaveProperty("hands");
+    }
+    expect(new Set(calls.map((c) => c[1]))).toEqual(new Set(["jaune", "rouge", "vert"]));
+    game.dispose();
+  });
+
+  it("plays every seat at Galopeur (3) when no level is given", async () => {
+    const { game } = newGameFor("test");
+    game.start();
+    await vi.runAllTimersAsync();
+    const calls = vi.mocked(chooseAction).mock.calls;
+    expect(calls).toHaveLength(3);
+    expect(calls.map((c) => c[2])).toEqual([3, 3, 3]);
+    game.dispose();
+  });
+
+  it("gives Galopeur to a seat the levels leave out, and keeps the bot rng it returns", async () => {
+    const director = fakeDirector();
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      levels: { jaune: 4 },
+      director,
+    });
+    game.start();
+    await vi.runAllTimersAsync();
+    const calls = vi.mocked(chooseAction).mock.calls;
+    expect(calls.map((c) => [c[1], c[2]])).toEqual([
+      ["jaune", 4],
+      ["rouge", 3],
+      ["vert", 3],
+    ]);
+    // Each call starts from the rng the previous one returned, after the one draw of the think delay.
+    const results = vi.mocked(chooseAction).mock.results;
+    for (let i = 1; i < calls.length; i++) {
+      const previous = results[i - 1]?.value as { rng: Rng };
+      expect(calls[i]?.[3]).toEqual(next(previous.rng)[1]);
+    }
+    game.dispose();
+  });
+});
+
 describe("bots: a failing bot step is reported, never swallowed", () => {
   it("stops the loop and calls the error listeners once with the error", async () => {
     const boom = new Error("bot step failed");
-    vi.mocked(randomLegal).mockImplementationOnce(() => {
+    vi.mocked(chooseAction).mockImplementationOnce(() => {
       throw boom;
     });
     vi.spyOn(console, "error").mockImplementation(() => {});

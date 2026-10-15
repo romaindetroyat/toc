@@ -6,8 +6,10 @@ const radio = (page: Page, name: string) => page.getByRole("radio", { name, exac
 
 test("lancement: Bleu préselectionné, partenaire et adversaires affichés", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("radiogroup", { name: "Choisis ta couleur" })).toBeVisible();
-  await expect(page.getByRole("radio")).toHaveCount(4);
+  const colours = page.getByRole("radiogroup", { name: "Choisis ta couleur" });
+  await expect(colours).toBeVisible();
+  // The four colour tiles (the strength pickers of phase 3 are radio groups of their own).
+  await expect(colours.getByRole("radio")).toHaveCount(4);
   await expect(radio(page, "Bleu")).toHaveAttribute("aria-checked", "true");
 
   // The partner tile (RULE-01: bleu + rouge) is tagged, and the summary names the pairs.
@@ -16,7 +18,7 @@ test("lancement: Bleu préselectionné, partenaire et adversaires affichés", as
   await expect(page.locator(".sr-only", { hasText: "Adversaires : Jaune + Vert" })).toBeAttached();
 
   // Every tile is at least 128 x 128.
-  for (const tile of await page.getByRole("radio").all()) {
+  for (const tile of await colours.getByRole("radio").all()) {
     const box = await tile.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(128);
     expect(box?.height).toBeGreaterThanOrEqual(128);

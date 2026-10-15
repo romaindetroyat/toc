@@ -4,7 +4,14 @@
 // The stored value is untrusted (the user, or another script on the origin, can edit it): every
 // field is validated on its own and anything unexpected falls back to its default (T-01-01).
 
+import { type BotLevel, DEFAULT_BOT_LEVEL, parseBotLevel } from "@toc/bots";
 import { COLORS, type Color } from "@toc/engine";
+
+/**
+ * The computer's strength per role, not per colour (03-UI-SPEC « Persistence »): « mon partenaire est
+ * Champion » survives a change of colour. left is the next seat clockwise, right the previous one.
+ */
+export type BotLevels = { partner: BotLevel; left: BotLevel; right: BotLevel };
 
 export type Settings = {
   /** Master sound switch. */
@@ -15,6 +22,8 @@ export type Settings = {
   /** Fast-forward the bots. */
   fast: boolean;
   lastColor: Color;
+  /** The strength of each computer seat, remembered per role (D-03). */
+  botLevels: BotLevels;
 };
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
@@ -23,6 +32,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   reduceMotion: false,
   fast: false,
   lastColor: "bleu",
+  botLevels: { partner: DEFAULT_BOT_LEVEL, left: DEFAULT_BOT_LEVEL, right: DEFAULT_BOT_LEVEL },
 };
 
 export const STORAGE_KEY = "toc.settings.v1";
@@ -38,6 +48,21 @@ function colour(value: unknown, fallback: Color): Color {
   return COLORS.find((color) => color === value) ?? fallback;
 }
 
+/** An own property of an untrusted value, if it is a plain object (not an array). */
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/** Each role on its own: a missing, mistyped or out-of-range level is Galopeur (3), silently. */
+function levels(value: unknown): BotLevels {
+  const source = record(value);
+  const level = (role: keyof BotLevels): BotLevel =>
+    (Object.hasOwn(source, role) ? parseBotLevel(source[role]) : null) ?? DEFAULT_BOT_LEVEL;
+  return { partner: level("partner"), left: level("left"), right: level("right") };
+}
+
 /**
  * Settings from an untrusted value. A missing (or mistyped) `reduceMotion` takes the system
  * preference, so the preference initialises it and an explicit user choice then wins. Keys that are
@@ -45,10 +70,7 @@ function colour(value: unknown, fallback: Color): Color {
  * 2026-10-14) are ignored, and the next save drops them.
  */
 export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Settings {
-  const source: Record<string, unknown> =
-    typeof raw === "object" && raw !== null && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
+  const source = record(raw);
   const own = (key: keyof Settings): unknown =>
     Object.hasOwn(source, key) ? source[key] : undefined;
 
@@ -58,6 +80,7 @@ export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Sett
     reduceMotion: bool(own("reduceMotion"), prefersReducedMotion),
     fast: bool(own("fast"), DEFAULT_SETTINGS.fast),
     lastColor: colour(own("lastColor"), DEFAULT_SETTINGS.lastColor),
+    botLevels: levels(own("botLevels")),
   };
 }
 

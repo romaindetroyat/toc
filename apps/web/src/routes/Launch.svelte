@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { COLORS, type Color, PARTNER } from "@toc/engine";
+  import type { BotLevel } from "@toc/bots";
+  import { COLORS, type Color, nextColor, PARTNER } from "@toc/engine";
   import { unlock } from "../audio/engine.ts";
+  import { bots } from "../i18n/fr/bots.ts";
   import { launch } from "../i18n/fr/launch.ts";
   import { reglages } from "../i18n/fr/reglages.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
+  import type { BotLevels } from "../settings/settings.ts";
   import ColorTile from "../ui/ColorTile.svelte";
-  import SeatChip from "../ui/SeatChip.svelte";
   import SettingsSheet from "../ui/SettingsSheet.svelte";
+  import StrengthPicker from "../ui/StrengthPicker.svelte";
 
   // Default selection: the colour used last time, Bleu on a first visit, so « Jouer la partie »
   // is never disabled (settings.lastColor is already validated and falls back to Bleu).
@@ -21,6 +24,18 @@
 
   const partner = $derived(PARTNER[selected]);
   const opponents = $derived(COLORS.filter((color) => color !== selected && color !== partner));
+  // The computer seats in the order of the section (D-01): the partner, the opponent on the left on
+  // the board (the next seat clockwise), then the one on the right. Levels are kept per role, so a
+  // change of colour moves the rows' chips and keeps their levels.
+  const rows = $derived<{ role: keyof BotLevels; color: Color }[]>([
+    { role: "partner", color: partner },
+    { role: "left", color: nextColor(selected) },
+    { role: "right", color: nextColor(partner) },
+  ]);
+
+  function setLevel(role: keyof BotLevels, level: BotLevel) {
+    updateSettings({ botLevels: { ...settings.botLevels, [role]: level } });
+  }
 
   function select(color: Color) {
     selected = color;
@@ -77,26 +92,20 @@
     </div>
   </section>
 
-  <section class="teams">
-    <p class="team">
-      <span class="sr-only">{launch.yourTeam(seats[selected].name, seats[partner].name)}</span>
-      <span class="visual" aria-hidden="true">
-        <span class="label">{launch.yourTeamLabel}</span>
-        <SeatChip color={selected} />
-        <span class="plus">+</span>
-        <SeatChip color={partner} />
-      </span>
-    </p>
-    <p class="team">
-      <span class="sr-only">{launch.opponents(opponents.map((color) => seats[color].name))}</span>
-      <span class="visual" aria-hidden="true">
-        <span class="label">{launch.opponentsLabel}</span>
-        {#each opponents as color, i (color)}
-          {#if i > 0}<span class="plus">+</span>{/if}
-          <SeatChip {color} />
-        {/each}
-      </span>
-    </p>
+  <section class="strength" aria-labelledby="strength-heading">
+    <p class="sr-only">{launch.yourTeam(seats[selected].name, seats[partner].name)}</p>
+    <p class="sr-only">{launch.opponents(opponents.map((color) => seats[color].name))}</p>
+    <h2 id="strength-heading" class="t-heading">{bots.heading}</h2>
+    <div class="rows">
+      {#each rows as row (row.role)}
+        <StrengthPicker
+          color={row.color}
+          role={row.role}
+          value={settings.botLevels[row.role]}
+          onchange={(level) => setLevel(row.role, level)}
+        />
+      {/each}
+    </div>
     <p class="note">{launch.note}</p>
   </section>
 
@@ -154,38 +163,19 @@
     gap: 16px;
   }
 
-  .teams {
+  .strength {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    align-items: center;
   }
 
-  .team {
-    margin: 0;
-  }
-
-  .visual {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .label {
-    font-size: var(--label-size);
-    font-weight: 700;
-    line-height: var(--label-line);
-  }
-
-  .plus {
-    color: var(--creme-attenuee);
-    font-weight: 700;
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
   }
 
   .note {
-    margin: 8px 0 0;
+    margin: var(--space-md) 0 0;
     color: var(--creme-attenuee);
     text-align: center;
   }

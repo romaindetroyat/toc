@@ -3,10 +3,11 @@
 // computer players with a human-like think delay, and hands every engine event to the Director.
 //
 // Nothing is ever played for the human: his give, his play and his dead-hand discard happen only
-// through submit() (D-19, D-20). Bots see only viewFor(state, bot), and the deck and bot seeds come
-// from the browser's secure random source (T-01-21, T-01-22).
+// through submit() (D-19, D-20). Each bot plays at the level of its seat (phase 3, BOT-01) through the
+// single bot entry point chooseAction, which is given viewFor(state, bot) only (BOT-04), and the deck
+// and bot seeds come from the browser's secure random source (T-01-21, T-01-22).
 
-import { randomLegal } from "@toc/bots";
+import { type BotLevel, chooseAction, DEFAULT_BOT_LEVEL } from "@toc/bots";
 import {
   type Action,
   apply,
@@ -48,6 +49,8 @@ export type CreateGameOptions = {
   speed?: Speed | (() => Speed);
   /** A position to start from instead of a new game (debug builds: scenario and etat parameters). */
   scenario?: Scenario["before"];
+  /** The level of each computer seat; a seat without one plays at Galopeur (3). */
+  levels?: Partial<Record<Color, BotLevel>>;
   director: GameDirector;
 };
 
@@ -127,6 +130,7 @@ export function createGame(options: CreateGameOptions): GameController {
   const { director, scenario } = options;
   const human = humanSeat(options.human, scenario);
   const seed = options.seed ?? randomSeed();
+  const levels: Partial<Record<Color, BotLevel>> = { ...options.levels };
   let botRng: Rng = options.botSeed ?? randomSeed();
   const speedOf: () => Speed =
     typeof options.speed === "function"
@@ -224,10 +228,15 @@ export function createGame(options: CreateGameOptions): GameController {
           setThinking(null);
           continue;
         }
-        const [action, rng] = randomLegal(viewFor(state, bot), bot, botRng);
-        botRng = rng;
+        const thought = chooseAction(
+          viewFor(state, bot),
+          bot,
+          levels[bot] ?? DEFAULT_BOT_LEVEL,
+          botRng,
+        );
+        botRng = thought.rng;
         setThinking(null);
-        play(bot, action);
+        play(bot, thought.action);
       }
     } catch (error) {
       // The loop cannot go on: a silent console line would leave the board locked on a bot's turn

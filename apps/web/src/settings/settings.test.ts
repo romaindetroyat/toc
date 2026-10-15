@@ -35,6 +35,7 @@ describe("parseSettings", () => {
       reduceMotion: true,
       fast: true,
       lastColor: "vert",
+      botLevels: { partner: 5, left: 1, right: 4 },
     };
     expect(parseSettings(JSON.parse(JSON.stringify(valid)), false)).toEqual(valid);
   });
@@ -67,6 +68,7 @@ describe("parseSettings", () => {
       reduceMotion: true,
       fast: true,
       lastColor: "jaune",
+      botLevels: { partner: 3, left: 3, right: 3 },
     });
     expect(Object.hasOwn(parsed, "ambience")).toBe(false);
     expect(Object.hasOwn(parsed, "ambienceVolume")).toBe(false);
@@ -110,6 +112,57 @@ describe("parseSettings", () => {
       false,
     );
     expect(Object.keys(parsed).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
+  });
+});
+
+describe("parseSettings: the computer's strength per role (D-03)", () => {
+  it("gives Galopeur (3) to every seat when nothing is stored", () => {
+    expect(DEFAULT_SETTINGS.botLevels).toEqual({ partner: 3, left: 3, right: 3 });
+    expect(parseSettings({}, false).botLevels).toEqual({ partner: 3, left: 3, right: 3 });
+  });
+
+  it("keeps the five levels and falls back to 3 for each bad seat on its own", () => {
+    expect(
+      parseSettings({ botLevels: { partner: 5, left: "2", right: 99 } }, false).botLevels,
+    ).toEqual({ partner: 5, left: 3, right: 3 });
+    for (const bad of [0, 6, 2.5, "3", null, true, [], {}, Number.NaN]) {
+      expect(
+        parseSettings({ botLevels: { partner: bad, left: 1, right: 2 } }, false).botLevels,
+      ).toEqual({ partner: 3, left: 1, right: 2 });
+    }
+    for (const level of [1, 2, 3, 4, 5]) {
+      expect(
+        parseSettings({ botLevels: { partner: 1, left: 1, right: level } }, false).botLevels.right,
+      ).toBe(level);
+    }
+  });
+
+  it("gives 3 to every seat when botLevels is not an object", () => {
+    for (const bad of ["x", [], null, 4, [5, 5, 5]]) {
+      expect(parseSettings({ botLevels: bad }, false).botLevels).toEqual({
+        partner: 3,
+        left: 3,
+        right: 3,
+      });
+    }
+  });
+
+  it("keeps only the three roles, and reads no inherited key", () => {
+    const parsed = parseSettings(
+      { botLevels: { partner: 2, left: 4, right: 5, evil: 1, __proto__: { partner: 1 } } },
+      false,
+    );
+    expect(parsed.botLevels).toEqual({ partner: 2, left: 4, right: 5 });
+    expect(Object.keys(parsed.botLevels).sort()).toEqual(["left", "partner", "right"]);
+    const inherited = parseSettings({ botLevels: Object.create({ partner: 5 }) }, false);
+    expect(inherited.botLevels.partner).toBe(3);
+  });
+
+  it("loads an object stored in phase 1 (no botLevels, the old ambience keys)", () => {
+    const old = { sound: true, sfx: true, ambience: true, ambienceVolume: 30, lastColor: "rouge" };
+    const parsed = parseSettings(JSON.parse(JSON.stringify(old)), false);
+    expect(parsed.lastColor).toBe("rouge");
+    expect(parsed.botLevels).toEqual({ partner: 3, left: 3, right: 3 });
   });
 });
 
@@ -157,7 +210,12 @@ describe("saveSettings", () => {
 
   it("survives a save then a load", () => {
     const storage = fakeStorage();
-    const chosen: Settings = { ...DEFAULT_SETTINGS, lastColor: "vert", sfx: false };
+    const chosen: Settings = {
+      ...DEFAULT_SETTINGS,
+      lastColor: "vert",
+      sfx: false,
+      botLevels: { partner: 2, left: 5, right: 1 },
+    };
     saveSettings(storage, chosen);
     expect(loadSettings(storage, false)).toEqual(chosen);
   });
