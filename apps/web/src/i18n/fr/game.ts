@@ -176,6 +176,16 @@ export const game = {
     captures: (us: number, them: number) => `Chevaux mangés : nous ${us}, eux ${them}`,
     replay: "Rejouer",
     changeColour: "Changer de couleur",
+    /** The human's own knight on the end plank (plan 01-50). */
+    you: "Toi",
+    /** Above the winning knights after a defeat. */
+    opponents: "L’équipe adverse",
+    /** Under the two numbers of the score, ours first. */
+    us: "Nous",
+    them: "Eux",
+    /** The score as a screen reader says it: the knights home of each team. */
+    score: (us: number, them: number) =>
+      `Score : nous ${us} chevaux rentrés sur 8, eux ${them} sur 8`,
   },
 
   failures: {

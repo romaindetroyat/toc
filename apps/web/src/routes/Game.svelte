@@ -379,6 +379,23 @@
   const render = $derived(session?.render ?? null);
   /** The end screen is up: the rest of the game screen is inert behind it. */
   const ended = $derived(render !== null && render.phase === "won" && render.winner !== null);
+  /** The end plank's score: the knights home of the human's team (« nous ») and of the other. */
+  const endScore = $derived.by(() => {
+    const score = { nous: 0, eux: 0 };
+    if (render === null || session === undefined) return score;
+    const ours = teamOf(session.human);
+    for (const color of COLORS) {
+      if (teamOf(color) === ours) score.nous += render.homeCounts[color];
+      else score.eux += render.homeCounts[color];
+    }
+    return score;
+  });
+  /** The names on the end plank: the human's own knight is « Toi ». */
+  const endNames = $derived(
+    session === undefined
+      ? undefined
+      : ({ ...session.names, [session.human]: copy.end.you } as Record<Color, string>),
+  );
   const ui = $derived(session?.ui ?? { kind: "waiting" as const });
   const view = $derived(session?.view);
 
@@ -925,10 +942,12 @@
         <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
       {/if}
 
-      {#if ended && render.winner !== null}
+      {#if ended && render.winner !== null && endNames !== undefined}
         <EndScreen
           won={render.winner === teamOf(session.human)}
           winner={render.winner}
+          score={endScore}
+          names={endNames}
           stats={session.stats}
           onreplay={replay}
           onchange={changeColour}

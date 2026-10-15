@@ -32,6 +32,35 @@ async function checkInfo(page: Page, check: (info: Locator) => Promise<void>) {
   await expect(sheet).toHaveCount(0);
 }
 
+/**
+ * The end plank (plan 01-50), once its entrance is over: it lies wholly inside the window and never
+ * scrolls.
+ */
+async function plankInView(page: Page): Promise<Locator> {
+  const plank = page.locator("[data-end-plank]");
+  await expect(plank).toBeVisible();
+  await plank.evaluate((el) =>
+    Promise.all(
+      (el.closest("[data-end-screen]") ?? el)
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    ),
+  );
+  const box = await plank.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box, "the plank has a box").not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if (box === null || viewport === null) return plank;
+  const where = `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)} x ${Math.round(box.height)} in ${viewport.width} x ${viewport.height}`;
+  expect(box.x, where).toBeGreaterThanOrEqual(0);
+  expect(box.y, where).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, where).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height, where).toBeLessThanOrEqual(viewport.height);
+  const scroll = await plank.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(scroll, "the plank does not scroll").toBeLessThanOrEqual(0);
+  return plank;
+}
+
 /** Chooses the first card of the hand and passes it to the partner. */
 async function exchange(page: Page) {
   await expect(zone(page)).toHaveAttribute("data-state", "exchange");
@@ -171,7 +200,7 @@ test("main injouable : rien ne se pose seul, « Poser mes cartes » étale la ma
 
 test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » revient au départ", async ({
   page,
-}) => {
+}, testInfo) => {
   // R-16.4: Bleu's four knights are home and the 5 brings Rouge's last knight home (RULE-17, RULE-18).
   await openGame(page, "scenario=R-16.4&vitesse=test");
   // The partner is a horse picked at random: « ceux de Marengo » or « ceux d’Ourasi ».
@@ -188,11 +217,40 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
 
   const end = page.locator("[data-end-screen]");
   await expect(end).toBeVisible();
+  await expect(end).toHaveAttribute("data-result", "win");
   await expect(end.getByRole("heading", { name: "Victoire !" })).toBeVisible();
   await expect(end).toContainText("Ton équipe a rentré ses 8 chevaux.");
   await expect(end).toContainText(/Donnes jouées\s*: 0/);
   await expect(end).toContainText(/Chevaux mangés\s*: nous 0, eux 0/);
   await expect(page.getByRole("button", { name: "Rejouer" })).toBeFocused();
+
+  // The plank (plan 01-50): the score « nous – eux », 8 for us; Bleu (« Toi ») and Rouge, each on its
+  // disc with Romain's knight; the two buttons; all of it inside the window, phone and computer.
+  const plank = await plankInView(page);
+  await expect(plank).toHaveAttribute("role", "dialog");
+  const score = plank.locator("[data-end-score]");
+  await expect(score.locator('[data-score="nous"] .number')).toHaveText("8");
+  await expect(score.locator('[data-score="eux"] .number')).toHaveText("0");
+  await expect(score).toContainText("Nous");
+  await expect(score).toContainText("Eux");
+  await expect(score).toContainText(/Score\s*: nous 8 chevaux rentrés sur 8, eux 0 sur 8/);
+  const knights = plank.locator("[data-end-knight]");
+  await expect(knights).toHaveCount(2);
+  await expect(knights.nth(0)).toHaveAttribute("data-end-knight", "bleu");
+  await expect(knights.nth(0).locator("figcaption")).toHaveText("Toi");
+  await expect(knights.nth(1)).toHaveAttribute("data-end-knight", "rouge");
+  await expect(knights.nth(1).locator("figcaption")).not.toHaveText("Toi");
+  for (const color of ["bleu", "rouge"]) {
+    const img = plank.locator(`[data-end-knight="${color}"] img`);
+    await expect(img).toHaveAttribute("src", `./cavaliers/${color}.webp`);
+    expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(
+      true,
+    );
+  }
+  await expect(plank.getByText("L’équipe adverse", { exact: true })).toHaveCount(0);
+  await expect(plank.getByRole("button", { name: "Rejouer" })).toBeVisible();
+  await expect(plank.getByRole("button", { name: "Changer de couleur" })).toBeVisible();
+  await page.screenshot({ path: `test-results/fin-victoire-${testInfo.project.name}.png` });
 
   // The game behind the panel is inert: none of its controls can take the focus, and after a tap on
   // the dimmed board Tab stays in the panel.
