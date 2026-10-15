@@ -222,6 +222,9 @@ Unplayable card reason (shown in the prompt line when the player taps a dimmed c
 | End, loss | Display « Défaite » + « L’équipe adverse a rentré ses 8 chevaux. » |
 | End stats | « Donnes jouées : {n} » · « Chevaux mangés : nous {a}, eux {b} » |
 | End buttons | « Rejouer » (primary), « Changer de couleur » (secondary) |
+| End plank, names | the human's own knight « Toi » ; the others by their horse names (plan 01-50) |
+| End plank, defeat | « L’équipe adverse » (Label 700) above the winning knights |
+| End plank, score | « {n} – {m} » with « Nous » and « Eux » under the numbers; read as « Score : nous {n} chevaux rentrés sur 8, eux {m} sur 8 » |
 | Board image failed | « Le plateau n’a pas pu se charger. » + « Réessayer » |
 | Audio failed | toast « Le son n’a pas pu démarrer. La partie reste jouable sans son. » + action « Réessayer » |
 
@@ -359,6 +362,8 @@ Card rank/suit is unreadable at phone scale (160 units ≈ 24px wide at 390px). 
 Walnut background; centred column, max width 480. Top to bottom: Display « TOC » (Caveat) with the tagline (Body muted); heading « Choisis ta couleur »; 2 × 2 grid of colour tiles (each ≥ 128 × 128, gap 16): oak-textured tile with the pawn knight in that colour (pawn sprite at 64px), the colour name (Label 700) and its glyph chip. Selected tile: 3px amber outline + `check` icon top-right; the partner's tile gets a dashed crème outline and the tag « Partenaire ». Below: team summary (two seat-chip pairs), note, then « Jouer la partie » (primary, full width, 48 high) and « Réglages » (text button). Default selection: last used colour from `localStorage`, otherwise Bleu, so « Jouer » is never disabled. Tiles are `role="radiogroup"` / `radio`.
 
 ### End-of-game screen
+
+*Remplacé le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « La planche de fin de partie ». Le texte ci-dessous est l’ancien panneau.*
 
 Dimmed board (walnut at 70%) stays visible behind a centred panel (`#4A2F1A`, radius 16, padding 24). Display « Victoire ! » or « Défaite » (Caveat); winning team as two seat chips; the sentence; the two stat lines; « Rejouer » (primary) and « Changer de couleur » (secondary). On win, the winning team's 8 knights hop in place once (reduced motion: none). Focus lands on « Rejouer ».
 
@@ -1042,3 +1047,37 @@ Plan 01-49 (gap G-01-23). Il complète les règles de l’« Audio UX Contract �
 |----------|------------|--------|---------------------|
 | hidden | static-content: élément `<audio data-audio-keepalive>` | ✅ covered | Caché (`hidden`, `aria-hidden`), sans contrôles ni AirPlay ; absent sur ordinateur ; vérifié dans audio.spec |
 | populated | iPhone en mode silencieux | 🧪 backstop | Recette de Romain (plan 01-54) : les sons s’entendent interrupteur sur silencieux, dans Safari et installée |
+
+### La planche de fin de partie
+
+Plan 01-50 (gap G-01-30). Elle remplace la section « End-of-game screen » de « Layout and Screens » (l’ancien panneau en noyer de 400 px, avec les pastilles des places).
+
+**Les mots de Romain** (recette 3, test 30) : « Le panneau de victoire défaite est moche ».
+
+**Dérivé du planificateur, à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54). Elle a été dessinée dans le jeu, sans maquette à part. Chaque point est repris sous son numéro dans la recette :
+
+1. **La planche.** Au-dessus du plateau assombri (noyer à 70 %), une planche dans le bois du galet : face en chêne (`PALETTE.board`, #E9D5AE) avec un veinage dessiné (des filets de `PALETTE.track` à faible opacité, en dégradés), un cœur un peu plus clair en haut, un bord de 6 px en noyer (`PALETTE.rim`, #4A2E18), un filet de 1 px (`PALETTE.outlineLine`) à 4 px à l’intérieur du bord, des coins de 28 px, et une ombre dessinée comme une copie décalée de 6 px vers le bas, nette, en encre à 45 %. Le texte est à l’encre du galet (`PALETTE.ink`, #2A1A0E).
+2. **Le titre.** « Victoire ! » ou « Défaite » en Caveat 700 de 44 px, à l’encre. Sur une victoire, un trait ambre dessiné au pinceau le souligne. Dessous, la phrase de toujours (« Ton équipe a rentré ses 8 chevaux. » ou « L’équipe adverse a rentré ses 8 chevaux. »), en Body.
+3. **L’équipe gagnante.** Ses deux cavaliers côte à côte, chacun l’image de cavalier de Romain (celle des pions, 57 px de haut) debout sur un disque de 68 px de sa couleur du galet (`PALETTE.hex`, avec un reflet `PALETTE.light`), cerclé d’encre, et une silhouette à l’encre décalée de 2 px derrière le cavalier pour le détacher du disque (un masque, jamais un filtre). Sous chacun, son nom en Label 700 : « Toi » pour le joueur, puis son partenaire ; après une défaite, les noms des deux ordinateurs, sous la ligne « L’équipe adverse ». « Toi » vient toujours en premier.
+4. **Le score.** « nous – eux », les chevaux rentrés de chaque équipe (8 pour les gagnants), en Caveat 700 de 28 px (Display), chiffres tabulaires, « Nous » et « Eux » en Label sous chaque nombre, dans un cartouche crème creusé (bord de 1 px `PALETTE.outlineLine`). Lu : « Score : nous n chevaux rentrés sur 8, eux m sur 8 ».
+5. **Les chiffres de la partie.** « Donnes jouées : n · Chevaux mangés : nous a, eux b », en Label, couleur `PALETTE.track` (≈ 6,9:1 sur le chêne) ; sur le téléphone, une ligne par chiffre.
+6. **Les boutons.** « Rejouer » en ambre (le bouton principal de toujours) et « Changer de couleur » en secondaire sur le bois (contour noyer de 2 px, texte à l’encre), au moins 48 px de haut, tous deux avec la même ombre nette de 3 px, qui s’enfonce au toucher. Ce qu’ils font ne change pas. L’anneau du focus garde son écart noyer de 2 px dessiné sur le chêne, pour rester visible.
+7. **La mise en page.** Sur l’ordinateur, une colonne de 520 px au plus, centrée. Quand la fenêtre a moins de 600 px de haut (le téléphone tenu en largeur), deux colonnes de 680 px au plus, séparées par un filet : le titre, la phrase et l’équipe à gauche ; le score, les chiffres et les boutons à droite. Hauteur au plus 100dvh − 16 px ; la planche ne défile jamais.
+8. **Le mouvement.** La planche descend de 12 px en apparaissant, en 300 ms, et le voile en même temps. Avec « Réduire les animations » (ou le réglage du système), un seul fondu de 150 ms. Les cavaliers de l’équipe gagnante sautent toujours une fois sur le plateau derrière (inchangé).
+
+**Exception de typographie.** Le titre de la planche, en Caveat 700 de 44 px, est le seul texte au-dessus de Display (28 px). Comme les numéros des cases du galet, c’est un élément du dessin : un titre écrit à la main sur la planche, pas une taille d’interface. Le reste de la planche garde les quatre tailles et les deux graisses.
+
+**Faits techniques (sans confirmation)** :
+- `apps/web/src/ui/EndScreen.svelte` : les props `won`, `winner`, `score: { nous, eux }`, `names`, `stats`, `onreplay`, `onchange`. Les couleurs viennent de `PALETTE` (`@toc/board`), passées en variables CSS. Aucun filtre CSS ou SVG, aucune ombre floue : les ombres sont des `box-shadow` sans flou, le veinage des `repeating-linear-gradient`, la silhouette du cavalier un `mask` de son image.
+- `Game.svelte` calcule le score depuis `render.homeCounts` (les chevaux rentrés de chaque couleur, la même source que la pastille et la barre d’infos) et passe `session.names`, la couleur du joueur devenant « Toi ».
+- Le dialogue ne change pas : `role="dialog"`, `aria-modal`, le titre comme nom et la phrase comme description, le focus sur « Rejouer », Tab gardé entre les deux boutons, le jeu derrière `inert`.
+- **Les preuves** (`apps/web/e2e/partie.spec.ts`, les deux projets) : la victoire (score 8 pour « Nous », Bleu « Toi » puis Rouge, leurs images chargées, le focus) et la défaite (« L’équipe adverse », Jaune et Vert, 5 – 8, le fondu seul de 150 ms en mouvement réduit), la planche entière dans la fenêtre et sans défilement à 750 × 342, 1280 × 800 et 480 × 320. `finition.spec.ts` vérifie le 8 de l’équipe gagnante à la fin d’une partie entière. Captures : `apps/web/test-results/fin-victoire-{phone,desktop}.png`, `fin-defaite-{phone,desktop}.png`, `fin-defaite-480x320-{phone,desktop}.png`.
+
+#### UI Considerations (planche de fin de partie)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| overflow | static-content: la planche sur un petit téléphone | ✅ covered | Deux colonnes sous 600 px de haut ; mesurée sans défilement à 750 × 342 et 480 × 320 |
+| long-text | static-content: noms des cavaliers | ✅ covered | Noms de chevaux courts de la liste fixe ; 112 px au plus, « … » au-delà |
+| loading | media: images des cavaliers | ✅ covered | Les mêmes fichiers que les pions, déjà chargés par le plateau ; le nom reste lisible sans l’image (son texte de remplacement est la couleur) |
+| populated | la planche, points à confirmer | 🧪 backstop | Recette de Romain (plan 01-54) : la planche lui plaît-elle, dans le style du galet, sur son iPhone et son ordinateur, ou que changer |

@@ -275,6 +275,77 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
   await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
 });
 
+test("fin de partie : « Défaite », l’équipe adverse et son score, la planche dans chaque fenêtre", async ({
+  page,
+}, testInfo) => {
+  // Bleu holds only a 2 with two knights in the stable: the hand is dead and is posed. Vert then plays
+  // the 5 that brings its last knight home; Jaune is home already, so Jaune and Vert win. Bleu and
+  // Rouge have 2 + 3 knights home: the score reads 5 – 8. Reduced motion: the plank only fades in.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const position = {
+    pawns: {
+      bleu: [{ h: 2 }, { h: 3 }, "S", "S"],
+      rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { p: 30 }],
+      jaune: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      vert: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
+    },
+    hands: { bleu: ["2S"], vert: ["5S"] },
+    turn: "bleu",
+  };
+  await openGame(page, `etat=${etatParam(position)}&vitesse=test`);
+  await expect(zone(page)).toHaveAttribute("data-state", "deadHand");
+  await page.getByRole("button", { name: "Poser mes cartes" }).click();
+
+  const end = page.locator("[data-end-screen]");
+  await expect(end).toBeVisible();
+  await expect(end).toHaveAttribute("data-result", "loss");
+  await expect(end.getByRole("heading", { name: "Défaite" })).toBeVisible();
+  await expect(end).toContainText("L’équipe adverse a rentré ses 8 chevaux.");
+  await expect(page.getByRole("button", { name: "Rejouer" })).toBeFocused();
+
+  // With reduced motion, a 150 ms fade and nothing that moves.
+  const motion = await page.locator("[data-end-plank]").evaluate((el) =>
+    el.getAnimations().map((animation) => ({
+      duration: animation.effect?.getTiming().duration,
+      moves: (animation.effect as KeyframeEffect | null)
+        ?.getKeyframes()
+        .some((frame) => frame.transform !== undefined && frame.transform !== "none"),
+    })),
+  );
+  expect(motion.length).toBeGreaterThan(0);
+  for (const animation of motion) expect(animation).toEqual({ duration: 150, moves: false });
+
+  const plank = await plankInView(page);
+  await expect(plank.getByText("L’équipe adverse", { exact: true })).toBeVisible();
+  const knights = plank.locator("[data-end-knight]");
+  await expect(knights).toHaveCount(2);
+  for (const color of ["jaune", "vert"]) {
+    const knight = plank.locator(`[data-end-knight="${color}"]`);
+    await expect(knight.locator("img")).toHaveAttribute("src", `./cavaliers/${color}.webp`);
+    await expect(knight.locator("figcaption")).not.toHaveText("Toi");
+    await expect(knight.locator("figcaption")).not.toHaveText("");
+  }
+  const score = plank.locator("[data-end-score]");
+  await expect(score.locator('[data-score="nous"] .number')).toHaveText("5");
+  await expect(score.locator('[data-score="eux"] .number')).toHaveText("8");
+  await expect(score).toContainText(/Score\s*: nous 5 chevaux rentrés sur 8, eux 8 sur 8/);
+  await expect(plank).toContainText(/Donnes jouées\s*: 0/);
+  await page.screenshot({ path: `test-results/fin-defaite-${testInfo.project.name}.png` });
+
+  // The smallest phone held sideways, and back: the plank still fits, Tab still stays in it.
+  await page.setViewportSize({ width: 480, height: 320 });
+  await plankInView(page);
+  await page.screenshot({ path: `test-results/fin-defaite-480x320-${testInfo.project.name}.png` });
+  await expect(page.locator("[data-layout]")).toHaveAttribute("inert", "");
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Tab");
+    const inPanel = await page.evaluate(
+      () => document.activeElement?.closest("[data-end-plank]") !== null,
+    );
+    expect(inPanel, `Tab ${i + 1} stays on the plank`).toBe(true);
+  }
+});
+
 test("fin de partie : « Rejouer » ouvre une nouvelle partie avec la même couleur", async ({
   page,
 }) => {

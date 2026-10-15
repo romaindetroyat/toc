@@ -565,6 +565,10 @@ test.describe("sans le son", () => {
     expect(plays).toBeGreaterThan(20);
     const end = page.locator("[data-end-screen]");
     await expect(end.getByRole("heading", { name: /^(Victoire !|Défaite)$/ })).toBeVisible();
+    // The end plank (plan 01-50): the winning team has its 8 knights home on the score.
+    const won = (await end.getAttribute("data-result")) === "win";
+    await expect(end.locator(`[data-score="${won ? "nous" : "eux"}"] .number`)).toHaveText("8");
+    await expect(end.locator("[data-end-knight] img")).toHaveCount(2);
     // The sound stayed off all along.
     const gains = await page.evaluate(
       () =>
