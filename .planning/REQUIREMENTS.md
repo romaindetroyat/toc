@@ -9,34 +9,34 @@
 
 Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Chaque couleur a une écurie (4 places), une case de sortie (losange 18), une case d'entrée (carré 16, deux cases avant sa sortie) et une maison de 4 cases. Équipes : jaune + vert contre rouge + bleu.
 
-- [ ] **RULE-01** : Une partie se joue à 4 places en 2 équipes ; les partenaires sont face à face (jaune + vert, rouge + bleu).
-- [ ] **RULE-02** : Un jeu de 52 cartes sans joker est mélangé côté serveur (aléa cryptographique) puis distribué en donnes de 5, 4 et 4 cartes ; on rebat ensuite et le donneur change à chaque paquet.
-- [ ] **RULE-03** : À chaque donne, chaque joueur voit sa main puis passe une carte face cachée à son partenaire ; l'échange a lieu même si la main deviendra injouable.
-- [ ] **RULE-04** : Les joueurs jouent à tour de rôle dans le sens horaire ; jouer une carte jouable est obligatoire.
-- [ ] **RULE-05** : L'As sort un pion de l'écurie sur sa case de sortie, ou avance un pion de 1.
-- [ ] **RULE-06** : Le Roi sort un pion, ou avance un pion de 13.
-- [ ] **RULE-07** : La Dame avance de 12 ; 10, 9, 8, 6, 5, 3 et 2 avancent du nombre indiqué ; le 5 ne fait avancer que ses propres pions.
-- [ ] **RULE-08** : Le 4 fait reculer un pion de 4 cases, y compris un pion qui vient de sortir et se trouve sur sa case de sortie ; on n'entre jamais dans sa maison en reculant.
-- [ ] **RULE-09** : Le Valet échange un de ses pions du parcours avec le pion d'un autre joueur (adversaire ou partenaire) sur le parcours ; on ne peut pas échanger deux de ses propres pions, ni un pion de l'écurie ou de la maison, ni un pion protégé sur sa sortie.
-- [ ] **RULE-10** : Le 7 se répartit entre ses pions en sous-déplacements dont la somme fait exactement 7 ; s'il est impossible de jouer les 7 pas en entier, le 7 est injouable.
-- [ ] **RULE-11** : Le 7 mange tout pion adverse ou partenaire qu'il dépasse ou sur lequel il s'arrête ; il peut dépasser ses propres pions sans les manger.
-- [ ] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
-- [ ] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
-- [ ] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
-- [ ] **RULE-15** : Un pion doit avoir fait le tour complet pour entrer dans sa maison par sa case d'entrée, au compte exact jusqu'à une case vide, sans sauter un pion déjà rentré ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact.
-- [ ] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
-- [ ] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
-- [ ] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
+- [x] **RULE-01** : Une partie se joue à 4 places en 2 équipes ; les partenaires sont face à face (jaune + vert, rouge + bleu).
+- [x] **RULE-02** : Un jeu de 52 cartes sans joker est mélangé côté serveur (aléa cryptographique) puis distribué en donnes de 5, 4 et 4 cartes ; on rebat ensuite et le donneur change à chaque paquet.
+- [x] **RULE-03** : À chaque donne, chaque joueur voit sa main puis passe une carte face cachée à son partenaire ; l'échange a lieu même si la main deviendra injouable.
+- [x] **RULE-04** : Les joueurs jouent à tour de rôle dans le sens horaire ; jouer une carte jouable est obligatoire.
+- [x] **RULE-05** : L'As sort un pion de l'écurie sur sa case de sortie, ou avance un pion de 1.
+- [x] **RULE-06** : Le Roi sort un pion, ou avance un pion de 13.
+- [x] **RULE-07** : La Dame avance de 12 ; 10, 9, 8, 6, 5, 3 et 2 avancent du nombre indiqué ; le 5 ne fait avancer que ses propres pions.
+- [x] **RULE-08** : Le 4 fait reculer un pion de 4 cases, y compris un pion qui vient de sortir et se trouve sur sa case de sortie ; on n'entre jamais dans sa maison en reculant.
+- [x] **RULE-09** : Le Valet échange un de ses pions du parcours avec le pion d'un autre joueur (adversaire ou partenaire) sur le parcours ; on ne peut pas échanger deux de ses propres pions, ni un pion de l'écurie ou de la maison, ni un pion protégé sur sa sortie.
+- [x] **RULE-10** : Le 7 se répartit entre ses pions en sous-déplacements dont la somme fait exactement 7 ; s'il est impossible de jouer les 7 pas en entier, le 7 est injouable.
+- [x] **RULE-11** : Le 7 mange tout pion adverse qu'il dépasse ou sur lequel il s'arrête ; il dépasse ses propres pions et ceux de son partenaire sans les manger, et ne mange le pion du partenaire que s'il s'arrête sur lui (décision G15 du 2026-10-14).
+- [x] **RULE-12** : S'arrêter sur un pion adverse ou partenaire le mange (retour à son écurie) ; on ne peut jamais s'arrêter sur un de ses propres pions.
+- [x] **RULE-13** : Un pion arrêté sur la case de sortie de sa propre couleur est protégé et infranchissable : aucun pion ne peut le dépasser, le manger ni l'échanger ; un pion d'une autre couleur sur cette case est un pion normal.
+- [x] **RULE-14** : Sortir un pion sur sa case de sortie occupée par un pion d'une autre couleur mange ce pion ; c'est impossible si son propre pion y est déjà.
+- [x] **RULE-15** : Un pion entre dans sa maison par sa case d'entrée (carré 16) dès qu'il l'atteint ou la franchit en avançant, même sans avoir fait le tour complet (après un recul avec le 4 ou un échange au Valet ; décision G14 du 2026-10-14), au compte exact jusqu'à une case vide, en sautant les pions déjà rentrés (décision G17 du 2026-10-15, qui remplace « sans sauter un pion déjà rentré ») ; on n'y entre jamais en reculant ; si le compte ne tombe pas juste (ou si la case visée est occupée), il dépasse son entrée et repart pour un tour ; si le compte tombe juste, l'entrée est obligatoire ; un pion rentré peut encore avancer dans la maison au compte exact sur une case vide, en sautant ceux devant lui (G17) ; avec le 7, un pion qu'un partage du 7 peut faire entrer dans une case vide n'est bougé que pour y entrer (décision G16 du 2026-10-15).
+- [x] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
+- [x] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
+- [x] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
 - [ ] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
-- [ ] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
+- [x] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
 
 ### Jouer un tour (PLAY)
 
-- [ ] **PLAY-01** : Le joueur voit sa main et, quand c'est son tour, les cartes jouables et les pions concernés sont mis en évidence.
-- [ ] **PLAY-02** : Le joueur choisit une carte puis un pion (ou une cible), voit un aperçu du trajet et des pions qui seraient mangés, puis confirme son coup.
-- [ ] **PLAY-03** : Avec le 7, le joueur répartit les pas entre ses pions à l'aide d'un assistant pas à pas qui affiche le reste à jouer, puis confirme en une fois.
-- [ ] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
-- [ ] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
+- [x] **PLAY-01** : Le joueur voit sa main et, quand c'est son tour, les cartes jouables et les pions concernés sont mis en évidence.
+- [x] **PLAY-02** : Le joueur choisit une carte puis un pion (ou une cible), voit un aperçu du trajet et des pions qui seraient mangés, puis confirme son coup.
+- [x] **PLAY-03** : Avec le 7, le joueur répartit les pas entre ses pions à l'aide d'un assistant pas à pas qui affiche le reste à jouer, puis confirme en une fois.
+- [x] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
+- [x] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
 - [ ] **PLAY-06** : Une aide en français rappelle les règles et l'effet de chaque carte à tout moment.
 - [ ] **PLAY-07** : À la fin de la partie, l'équipe gagnante est annoncée et les joueurs peuvent relancer une revanche à la même table.
 
@@ -73,12 +73,12 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Rendu et ambiance (FX)
 
-- [ ] **FX-01** : Le plateau original (4 quarts) est affiché assemblé, net et lisible sur téléphone en portrait comme sur grand écran.
-- [ ] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
-- [ ] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
-- [ ] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
-- [ ] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
-- [ ] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
+- [x] **FX-01** : Le plateau « galet » dessiné par le code (décision de Romain du 2026-10-14, à la place des 4 quarts) est affiché en largeur sur ordinateur et sur un téléphone tenu en largeur, net et lisible sur les deux.
+- [x] **FX-02** : Les pions sont des cavaliers d'échecs en « fausse 3D » (ombre, dégradés, reflets) aux 4 couleurs.
+- [x] **FX-03** : Les pions s'animent quand ils sortent de l'écurie, avancent case par case, mangent, sont mangés (retour à l'écurie), entrent dans la maison et sont échangés au Valet.
+- [x] **FX-04** : La durée d'un déplacement dépend de la distance parcourue, et les bruits de sabots suivent la même cadence.
+- [x] **FX-05** : Des bruitages accompagnent les actions (hennissements à la sortie et lors des prises, sons de cartes) ; ils sont libres de droits ou générés, avec la licence de chaque fichier tracée.
+- [x] **FX-06** : Le joueur peut couper le son et réduire les animations ; le jeu reste entièrement jouable sans son.
 
 ### Application (APP)
 
@@ -115,31 +115,31 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RULE-01 | Phase 1 | Pending |
-| RULE-02 | Phase 1 | Pending |
-| RULE-03 | Phase 1 | Pending |
-| RULE-04 | Phase 1 | Pending |
-| RULE-05 | Phase 1 | Pending |
-| RULE-06 | Phase 1 | Pending |
-| RULE-07 | Phase 1 | Pending |
-| RULE-08 | Phase 1 | Pending |
-| RULE-09 | Phase 1 | Pending |
-| RULE-10 | Phase 1 | Pending |
-| RULE-11 | Phase 1 | Pending |
-| RULE-12 | Phase 1 | Pending |
-| RULE-13 | Phase 1 | Pending |
-| RULE-14 | Phase 1 | Pending |
-| RULE-15 | Phase 1 | Pending |
-| RULE-16 | Phase 1 | Pending |
-| RULE-17 | Phase 1 | Pending |
-| RULE-18 | Phase 1 | Pending |
+| RULE-01 | Phase 1 | Complete |
+| RULE-02 | Phase 1 | Complete |
+| RULE-03 | Phase 1 | Complete |
+| RULE-04 | Phase 1 | Complete |
+| RULE-05 | Phase 1 | Complete |
+| RULE-06 | Phase 1 | Complete |
+| RULE-07 | Phase 1 | Complete |
+| RULE-08 | Phase 1 | Complete |
+| RULE-09 | Phase 1 | Complete |
+| RULE-10 | Phase 1 | Complete |
+| RULE-11 | Phase 1 | Complete |
+| RULE-12 | Phase 1 | Complete |
+| RULE-13 | Phase 1 | Complete |
+| RULE-14 | Phase 1 | Complete |
+| RULE-15 | Phase 1 | Complete |
+| RULE-16 | Phase 1 | Complete |
+| RULE-17 | Phase 1 | Complete |
+| RULE-18 | Phase 1 | Complete |
 | RULE-19 | Phase 2 | Pending |
-| RULE-20 | Phase 1 | Pending |
-| PLAY-01 | Phase 1 | Pending |
-| PLAY-02 | Phase 1 | Pending |
-| PLAY-03 | Phase 1 | Pending |
-| PLAY-04 | Phase 1 | Pending |
-| PLAY-05 | Phase 1 | Pending |
+| RULE-20 | Phase 1 | Complete |
+| PLAY-01 | Phase 1 | Complete |
+| PLAY-02 | Phase 1 | Complete |
+| PLAY-03 | Phase 1 | Complete |
+| PLAY-04 | Phase 1 | Complete |
+| PLAY-05 | Phase 1 | Complete |
 | PLAY-06 | Phase 5 | Pending |
 | PLAY-07 | Phase 2 | Pending |
 | NET-01 | Phase 2 | Pending |
@@ -161,12 +161,12 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | HIST-02 | Phase 5 | Pending |
 | HIST-03 | Phase 5 | Pending |
 | HIST-04 | Phase 5 | Pending |
-| FX-01 | Phase 1 | Pending |
-| FX-02 | Phase 1 | Pending |
-| FX-03 | Phase 1 | Pending |
-| FX-04 | Phase 1 | Pending |
-| FX-05 | Phase 1 | Pending |
-| FX-06 | Phase 1 | Pending |
+| FX-01 | Phase 1 | Complete |
+| FX-02 | Phase 1 | Complete |
+| FX-03 | Phase 1 | Complete |
+| FX-04 | Phase 1 | Complete |
+| FX-05 | Phase 1 | Complete |
+| FX-06 | Phase 1 | Complete |
 | APP-01 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
 | APP-03 | Phase 4 | Pending |
@@ -180,4 +180,4 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ---
 *Requirements defined: 2026-10-13*
-*Last updated: 2026-10-13 after roadmap creation*
+*Last updated: 2026-10-14 after the UAT (G14, G15, plateau galet, paysage obligatoire, écran compact)*

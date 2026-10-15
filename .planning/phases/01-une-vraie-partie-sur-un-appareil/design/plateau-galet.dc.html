@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Plateau TOC en bois</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Nunito:wght@700;800;900&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#5A3B23}a:hover{color:#3A2414}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+<svg viewBox="{{viewBox}}" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%">
+<defs>
+<filter id="toc-grain" x="0" y="0" width="100%" height="100%">
+<feTurbulence type="fractalNoise" baseFrequency="{{grainFreq}}" numOctaves="3" seed="11"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.42  0 0 0 0 0.27  0 0 0 0 0.13  0 0 0 1.25 -0.42"></feColorMatrix>
+</filter>
+<filter id="toc-felt" x="0" y="0" width="100%" height="100%">
+<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"></feTurbulence>
+<feColorMatrix type="matrix" values="0 0 0 0 0.05  0 0 0 0 0.16  0 0 0 0 0.09  0 0 0 0.6 -0.2"></feColorMatrix>
+</filter>
+<clipPath id="toc-board-clip"><path d="{{outline}}"></path></clipPath>
+<clipPath id="toc-felt-clip"><path d="{{feltPath}}"></path></clipPath>
+<radialGradient id="toc-felt-light" cx="50%" cy="42%" r="65%">
+<stop offset="0" stop-color="#2E7A4E"></stop>
+<stop offset="1" stop-color="#174A2F"></stop>
+</radialGradient>
+</defs>
+<path d="{{outerRim}}" fill="#4A2E18"></path>
+<path d="{{outline}}" fill="#E9D5AE"></path>
+<rect x="0" y="0" width="{{W}}" height="{{H}}" filter="url(#toc-grain)" clip-path="url(#toc-board-clip)"></rect>
+<path d="{{outline}}" fill="none" stroke="#7A5634" stroke-width="{{rimLine}}" stroke-opacity="0.55"></path>
+<polyline points="{{track}}" fill="none" stroke="#5B3A20" stroke-opacity="0.28" stroke-width="{{trackW}}" stroke-linejoin="round"></polyline>
+<path d="{{feltPath}}" fill="url(#toc-felt-light)"></path>
+<g clip-path="url(#toc-felt-clip)">
+<rect x="0" y="0" width="{{W}}" height="{{H}}" filter="url(#toc-felt)" opacity="0.5"></rect>
+</g>
+<path d="{{feltPath}}" fill="none" stroke="#4A2E18" stroke-width="{{feltRim}}"></path>
+<path d="{{feltStitch}}" fill="none" stroke="#E9D5AE" stroke-opacity="0.45" stroke-width="{{stitchW}}" stroke-dasharray="{{stitchDash}}"></path>
+</svg>
+<sc-for list="{{riders}}" as="r" hint-placeholder-count="4">
+<img src="{{r.src}}" alt="" style="{{r.style}}">
+</sc-for>
+<sc-for list="{{dots}}" as="d" hint-placeholder-count="32">
+<div style="{{d.style}}"></div>
+</sc-for>
+<sc-for list="{{cells}}" as="c" hint-placeholder-count="72">
+<div style="{{c.style}}"><span style="{{c.labelStyle}}">{{c.label}}</span></div>
+</sc-for>
+<sc-for list="{{cards}}" as="k" hint-placeholder-count="5">
+<div style="{{k.style}}"><span style="{{k.rankStyle}}">{{k.rank}}</span><span style="{{k.suitStyle}}">{{k.suit}}</span></div>
+</sc-for>
+<sc-for list="{{backs}}" as="t" hint-placeholder-count="1">
+<div style="{{t.style}}"><div style="{{t.inner}}"></div></div>
+</sc-for>
+<sc-for list="{{knights}}" as="n" hint-placeholder-count="16">
+<img src="{{n.src}}" alt="{{n.alt}}" style="{{n.style}}">
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","options":["pc-coussin","pc-galet","tel-coussin","tel-galet"],"default":"pc-coussin"},"size":{"editor":"int","min":240,"max":2400,"default":1600,"unit":"px"},"maCouleur":{"editor":"enum","options":["bleu","jaune","rouge","vert"],"default":"bleu"},"pions":{"editor":"boolean","default":true},"$preview":{"width":1600,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const variant = this.props.variant ?? 'pc-coussin';
+    const size = Number(this.props.size ?? 1600);
+    const me = this.props.maCouleur ?? 'bleu';
+    const showPawns = this.props.pions ?? true;
+
+    const CFG = {
+      'pc-coussin': { W: 1600, H: 800, n: 4.2, wave: 0.018, felt: 'ellipse' },
+      'pc-galet': { W: 1600, H: 800, n: 3.2, wave: 0, felt: 'ellipse' },
+      'tel-coussin': { W: 1000, H: 1500, n: 4.2, wave: 0.018, felt: 'rect' },
+      'tel-galet': { W: 1000, H: 1500, n: 2.8, wave: 0, felt: 'rect' },
+    };
+    const cfg = CFG[variant] ?? CFG['pc-coussin'];
+    const W = cfg.W;
+    const H = cfg.H;
+    const portrait = H > W;
+
+    const COLORS = ['bleu', 'jaune', 'rouge', 'vert'];
+    const EXIT = { bleu: 0, jaune: 18, rouge: 36, vert: 54 };
+    const HEX = { bleu: '#1F4FA8', jaune: '#E3A90C', rouge: '#C3271D', vert: '#1F8A3C' };
+    const LIGHT = { bleu: '#5C86D4', jaune: '#F7D35A', rouge: '#EE6B5E', vert: '#5CC27A' };
+    const ON = { bleu: '#FFFFFF', jaune: '#2A1A0E', rouge: '#FFFFFF', vert: '#FFFFFF' };
+    const KNIGHT = {
+      bleu: '/_blob/06a5c7da8578ccd1c371dac63aa231cb',
+      jaune: '/_blob/e170a193583caa5c0e0b68d03ccb00ec',
+      rouge: '/_blob/2c4bcfb6df78eb064a3692958c822069',
+      vert: '/_blob/97db15a8a60b80e3985ceccd517493b7',
+    };
+    const RIDER = {
+      bleu: '/_blob/d161f239b92e05a194c427f4c938a96a',
+      jaune: '/_blob/51fa997bacdaeec0234a15db836f7369',
+      rouge: '/_blob/f2d7e8b70dad01e62174c0b092be811d',
+      vert: '/_blob/a015114481243aa59d6ffa0539229ba9',
+    };
+    const INK = '#2A1A0E';
+    const CREAM = '#FBF4E2';
+    const DISC = 0.84;
+
+    const k = size / W;
+    const px = (v) => (v * k).toFixed(2) + 'px';
+    const f1 = (v) => v.toFixed(1);
+    const cx = W / 2;
+    const cy = H / 2;
+    const sp = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
+
+    // The ring: a superellipse with a light wave, walked clockwise on screen from the bottom centre.
+    const shape = (a, b, steps) => {
+      const out = [];
+      for (let j = 0; j <= steps; j++) {
+        const th = ((90 + (360 * j) / steps) * Math.PI) / 180;
+        const w = 1 - cfg.wave + cfg.wave * Math.cos(8 * (th - Math.PI / 2));
+        out.push([cx + a * w * sp(Math.cos(th), 2 / cfg.n), cy + b * w * sp(Math.sin(th), 2 / cfg.n)]);
+      }
+      return out;
+    };
+    let s = 50;
+    let pts = [];
+    let ringA = 0;
+    let ringB = 0;
+    for (let it = 0; it < 6; it++) {
+      const m = 22 + 0.5 * DISC * s;
+      ringA = cx - m;
+      ringB = cy - m;
+      pts = shape(ringA, ringB, 1440);
+      let P = 0;
+      for (let j = 1; j < pts.length; j++) P += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
+      s = P / 72;
+    }
+    const cum = [0];
+    for (let j = 1; j < pts.length; j++) cum.push(cum[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
+    const at = (d) => {
+      for (let j = 1; j < pts.length; j++) {
+        if (d <= cum[j] + 1e-6) {
+          const f = (d - cum[j - 1]) / (cum[j] - cum[j - 1] || 1);
+          return [pts[j - 1][0] + f * (pts[j][0] - pts[j - 1][0]), pts[j - 1][1] + f * (pts[j][1] - pts[j - 1][1])];
+        }
+      }
+      return pts[pts.length - 1];
+    };
+    const pathOf = (list) => 'M' + list.map((p) => f1(p[0]) + ' ' + f1(p[1])).join(' L') + ' Z';
+
+    const meIdx = Math.max(0, COLORS.indexOf(me));
+    const seat = [0, 1, 2, 3].map((q) => COLORS[(meIdx + q) % 4]);
+    const T = [[-1, 0], [0, -1], [1, 0], [0, 1]];
+    const N = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    const ROT = [0, 90, 180, 270];
+    const startIdx = (EXIT[seat[0]] + 71) % 72;
+    const colorOfExit = (i) => COLORS.find((c) => EXIT[c] === ((i % 72) + 72) % 72);
+
+    const cellPos = {};
+    for (let j = 0; j < 72; j++) cellPos[(startIdx + j) % 72] = at(j * s);
+    const C = [
+      [cx, cellPos[EXIT[seat[0]]][1]],
+      [cellPos[EXIT[seat[1]]][0], cy],
+      [cx, cellPos[EXIT[seat[2]]][1]],
+      [cellPos[EXIT[seat[3]]][0], cy],
+    ];
+    const frame = (q, ta, na) => [C[q][0] + T[q][0] * ta * s + N[q][0] * na * s, C[q][1] + T[q][1] * ta * s + N[q][1] * na * s];
+
+    // Cells: cream discs ringed in ink, handwritten numbers with a slight hand tilt
+    const cells = [];
+    for (let i = 0; i < 72; i++) {
+      const [x, y] = cellPos[i];
+      const m = i % 18;
+      const tilt = ((i * 37) % 13) - 6;
+      let d = DISC * s;
+      let style;
+      let label;
+      let labelStyle;
+      if (m === 0) {
+        const c = colorOfExit(i);
+        d = 0.8 * s;
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${HEX[c]}; border: ${px(0.06 * s)} solid ${INK}; transform: rotate(45deg); border-radius: ${px(0.1 * s)}; display: flex; align-items: center; justify-content: center; box-shadow: 0 ${px(0.05 * s)} ${px(0.1 * s)} rgba(42,26,14,0.35)`;
+        label = '18';
+        labelStyle = `transform: rotate(-45deg); font: 700 ${px(0.52 * s)}/1 Caveat, cursive; color: ${ON[c]}`;
+      } else if (m === 16) {
+        const c = colorOfExit(i + 2);
+        d = 0.86 * s;
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${HEX[c]}; border: ${px(0.06 * s)} solid ${INK}; border-radius: ${px(0.12 * s)}; display: flex; align-items: center; justify-content: center; box-shadow: 0 ${px(0.05 * s)} ${px(0.1 * s)} rgba(42,26,14,0.35)`;
+        label = '16';
+        labelStyle = `font: 700 ${px(0.56 * s)}/1 Caveat, cursive; color: ${ON[c]}; transform: rotate(${tilt}deg)`;
+      } else {
+        style = `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; background: ${CREAM}; border: ${px(0.065 * s)} solid ${INK}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 ${px(-0.06 * s)} ${px(0.08 * s)} rgba(120,80,40,0.25), 0 ${px(0.03 * s)} ${px(0.06 * s)} rgba(42,26,14,0.25)`;
+        label = String(m);
+        labelStyle = `font: 700 ${px(0.58 * s)}/1 Caveat, cursive; color: ${INK}; transform: translateY(${px(-0.02 * s)}) rotate(${tilt}deg)`;
+      }
+      cells.push({ style, label, labelStyle });
+    }
+
+    // Home dots (4, leaving the carré 16 towards the centre, a little askew) and stable dots (2 x 2 beside the exit)
+    const dots = [];
+    const lanePos = {};
+    const holePos = {};
+    const dot = (x, y, c, d, hollow) => {
+      const bg = hollow
+        ? `background: ${CREAM}; border: ${px(0.1 * s)} solid ${HEX[c]}`
+        : `background: radial-gradient(circle at 35% 30%, ${LIGHT[c]} 0%, ${HEX[c]} 62%); border: ${px(0.05 * s)} solid ${INK}`;
+      dots.push({ style: `position: absolute; box-sizing: border-box; left: ${px(x - d / 2)}; top: ${px(y - d / 2)}; width: ${px(d)}; height: ${px(d)}; border-radius: 50%; ${bg}; box-shadow: 0 ${px(0.04 * s)} ${px(0.08 * s)} rgba(42,26,14,0.3)` });
+    };
+    for (let q = 0; q < 4; q++) {
+      const c = seat[q];
+      const carre = cellPos[(EXIT[c] + 70) % 72];
+      const dir = [(2 * N[q][0] - T[q][0]) / Math.sqrt(5), (2 * N[q][1] - T[q][1]) / Math.sqrt(5)];
+      lanePos[c] = [];
+      for (let kk = 1; kk <= 4; kk++) {
+        const p = [carre[0] + dir[0] * kk * 1.05 * s, carre[1] + dir[1] * kk * 1.05 * s];
+        lanePos[c].push(p);
+        dot(p[0], p[1], c, 0.8 * s, true);
+      }
+      holePos[c] = [];
+      for (const [ta, na] of [[2.4, 2.0], [3.5, 2.0], [2.4, 3.1], [3.5, 3.1]]) {
+        const p = frame(q, ta, na);
+        holePos[c].push(p);
+        dot(p[0], p[1], c, 0.84 * s, false);
+      }
+    }
+
+    // His ink riders, one in each corner, on the side its colour sets off towards
+    const riders = [];
+    const cornerTh = [135, 225, 315, 45];
+    for (let q = 0; q < 4; q++) {
+      const th = (cornerTh[q] * Math.PI) / 180;
+      const rx = cx + ringA * sp(Math.cos(th), 2 / cfg.n);
+      const ry = cy + ringB * sp(Math.sin(th), 2 / cfg.n);
+      const f = portrait ? 0.66 : 0.6;
+      const x = cx + f * (rx - cx);
+      const y = cy + f * (ry - cy);
+      const h = (portrait ? 2.5 : 2.6) * s;
+      const w = (h * 157) / 209;
+      riders.push({ src: RIDER[seat[q]], style: `position: absolute; left: ${px(x - w / 2)}; top: ${px(y - h / 2)}; width: ${px(w)}; height: ${px(h)}; opacity: 0.85; pointer-events: none` });
+    }
+
+    // The felt: an ellipse on a computer, a rounded square on a phone
+    let feltPath;
+    let feltStitch;
+    let fw;
+    let fh;
+    if (cfg.felt === 'ellipse') {
+      fw = 300;
+      fh = 112;
+      const e = (rx, ry) => {
+        const out = [];
+        for (let j = 0; j < 96; j++) {
+          const a = (2 * Math.PI * j) / 96;
+          out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+        }
+        return pathOf(out);
+      };
+      feltPath = e(fw, fh);
+      feltStitch = e(fw - 14, fh - 14);
+    } else {
+      fw = 180;
+      fh = 210;
+      const rr = (hw, hh, r) => `M${f1(cx - hw + r)} ${f1(cy - hh)} H${f1(cx + hw - r)} Q${f1(cx + hw)} ${f1(cy - hh)} ${f1(cx + hw)} ${f1(cy - hh + r)} V${f1(cy + hh - r)} Q${f1(cx + hw)} ${f1(cy + hh)} ${f1(cx + hw - r)} ${f1(cy + hh)} H${f1(cx - hw + r)} Q${f1(cx - hw)} ${f1(cy + hh)} ${f1(cx - hw)} ${f1(cy + hh - r)} V${f1(cy - hh + r)} Q${f1(cx - hw)} ${f1(cy - hh)} ${f1(cx - hw + r)} ${f1(cy - hh)} Z`;
+      feltPath = rr(fw, fh, 44);
+      feltStitch = rr(fw - 14, fh - 14, 34);
+    }
+
+    const cards = [];
+    const backs = [];
+    const SAMPLE = [['7', '♥'], ['R', '♠'], ['4', '♣'], ['V', '♦']];
+    const cw = 1.3 * s;
+    const ch = cw * 1.4;
+    const card = (x, y, rot, rank, suit, scale) => {
+      const w = cw * scale;
+      const h = ch * scale;
+      const red = suit === '♥' || suit === '♦';
+      cards.push({
+        style: `position: absolute; box-sizing: border-box; left: ${px(x - w / 2)}; top: ${px(y - h / 2)}; width: ${px(w)}; height: ${px(h)}; background: #FFFDF7; border: ${px(0.05 * s)} solid #8A6A4A; border-radius: ${px(0.14 * s)}; transform: rotate(${rot}deg); box-shadow: 0 ${px(0.06 * s)} ${px(0.12 * s)} rgba(0,0,0,0.35)`,
+        rank, suit,
+        rankStyle: `position: absolute; left: ${px(0.1 * s)}; top: ${px(0.04 * s)}; font: 900 ${px(0.4 * s * scale)}/1 Nunito, system-ui, sans-serif; color: ${red ? '#B3261E' : '#1E1A16'}`,
+        suitStyle: `position: absolute; left: 0; right: 0; top: ${px(h * 0.4)}; text-align: center; font: 700 ${px(0.7 * s * scale)}/1 Georgia, serif; color: ${red ? '#B3261E' : '#1E1A16'}`,
+      });
+    };
+    const back = (x, y, scale) => {
+      const w = cw * scale;
+      const h = ch * scale;
+      backs.push({
+        style: `position: absolute; box-sizing: border-box; left: ${px(x - w / 2)}; top: ${px(y - h / 2)}; width: ${px(w)}; height: ${px(h)}; background: #6B4428; border: ${px(0.05 * s)} solid #FFFDF7; border-radius: ${px(0.12 * s)}; box-shadow: 0 ${px(0.06 * s)} ${px(0.12 * s)} rgba(0,0,0,0.35)`,
+        inner: `position: absolute; inset: ${px(0.1 * s)}; border: ${px(0.035 * s)} solid #D9B27A; border-radius: ${px(0.07 * s)}`,
+      });
+    };
+    for (let q = 0; q < 4; q++) {
+      const half = q % 2 === 0 ? fh : fw;
+      const off = q % 2 === 1 && cfg.felt === 'ellipse' ? fw - 110 : half - 0.5 * ch - 6;
+      card(cx - N[q][0] * off, cy - N[q][1] * off, ROT[q], SAMPLE[q][0], SAMPLE[q][1], 1);
+    }
+    if (cfg.felt === 'ellipse') {
+      back(cx - 75, cy, 0.95);
+      card(cx + 75, cy, 0, '9', '♠', 0.95);
+    } else {
+      back(cx, cy - 0.55 * ch, 0.82);
+      card(cx, cy + 0.55 * ch, 0, '9', '♠', 0.82);
+    }
+
+    // A few knights to judge the scale
+    const knights = [];
+    const RING_AT = { bleu: 6, jaune: 29, rouge: 50, vert: 63 };
+    const HOME_AT = { bleu: 1, vert: 2 };
+    const knight = (c, x, y, w) => {
+      const h = (w * 570) / 330;
+      knights.push({ y, src: KNIGHT[c], alt: `Cheval ${c}`, style: `position: absolute; left: ${px(x - w / 2)}; top: ${px(y - h + 0.28 * w)}; width: ${px(w)}; height: ${px(h)}; pointer-events: none; filter: drop-shadow(0 ${px(0.04 * s)} ${px(0.05 * s)} rgba(0,0,0,0.35))` });
+    };
+    if (showPawns) {
+      for (const c of COLORS) {
+        let left = 4;
+        const r = cellPos[RING_AT[c]];
+        knight(c, r[0], r[1], 0.95 * s);
+        left--;
+        if (HOME_AT[c] !== undefined) {
+          const h = lanePos[c][HOME_AT[c]];
+          knight(c, h[0], h[1], 0.82 * s);
+          left--;
+        }
+        for (let j = 0; j < left; j++) {
+          const h = holePos[c][j];
+          knight(c, h[0], h[1], 0.78 * s);
+        }
+      }
+      knights.sort((a, b) => a.y - b.y);
+    }
+
+    const rimPts = shape(ringA + 0.5 * DISC * s + 20, ringB + 0.5 * DISC * s + 20, 360);
+    const outerPts = shape(ringA + 0.5 * DISC * s + 21.5, ringB + 0.5 * DISC * s + 21.5, 360);
+    return {
+      rootStyle: `position: relative; width: ${size}px; height: ${(H * k).toFixed(2)}px; font-family: Nunito, system-ui, sans-serif`,
+      viewBox: `0 0 ${W} ${H}`,
+      W, H,
+      grainFreq: portrait ? '0.0045 0.085' : '0.0028 0.075',
+      outline: pathOf(rimPts),
+      outerRim: pathOf(outerPts.map((p) => [cx + (p[0] - cx) * 1.0, cy + (p[1] - cy) * 1.0])),
+      rimLine: f1(0.06 * s),
+      track: pts.filter((_, j) => j % 4 === 0).map((p) => f1(p[0]) + ',' + f1(p[1])).join(' '),
+      trackW: f1(0.07 * s),
+      feltPath, feltStitch,
+      feltRim: f1(0.12 * s),
+      stitchW: f1(0.04 * s),
+      stitchDash: `${f1(0.16 * s)} ${f1(0.12 * s)}`,
+      cells, dots, riders, cards, backs, knights,
+    };
+  }
+}
+</script>
+</body>
+</html>

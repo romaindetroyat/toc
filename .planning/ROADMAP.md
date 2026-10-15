@@ -12,9 +12,9 @@ Le parcours part du cœur du jeu. On écrit d'abord les règles maison, que Roma
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Une vraie partie sur un appareil** - Règles validées, moteur, plateau original, cavaliers animés et bruitages, partie complète contre l'ordinateur
+- [x] **Phase 1: Une vraie partie sur un appareil** *(close le 2026-10-15 à la demande de Romain, « Close, essais restants notés » ; essais restants dans 01-UAT.md)* - Règles validées, moteur, plateau galet, cavaliers animés et bruitages, partie complète contre l'ordinateur
 - [ ] **Phase 2: Jouer en ligne entre proches** - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, chat, revanche et reprise
-- [ ] **Phase 3: L'ordinateur à la force choisie** - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
+- [ ] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
 - [ ] **Phase 4: Comptes, amis et application installable** - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
 - [ ] **Phase 5: Suivi, apprentissage et finition** - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
 
@@ -28,67 +28,164 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: RULE-01, RULE-02, RULE-03, RULE-04, RULE-05, RULE-06, RULE-07, RULE-08, RULE-09, RULE-10, RULE-11, RULE-12, RULE-13, RULE-14, RULE-15, RULE-16, RULE-17, RULE-18, RULE-20, PLAY-01, PLAY-02, PLAY-03, PLAY-04, PLAY-05, FX-01, FX-02, FX-03, FX-04, FX-05, FX-06
 **Success Criteria** (what must be TRUE):
   1. Romain a relu et validé RULES.md. Chaque règle y est numérotée et illustrée par un scénario, et tous les scénarios passent en test automatique contre le moteur, y compris les cas limites : sortie protégée, 7 qui mange, 4 en arrière, Valet, entrée exacte dans la maison.
-  2. Sur un téléphone en portrait comme sur un grand écran, un joueur fait une partie complète sur le plateau original assemblé contre trois joueurs gérés par l'ordinateur, qui jouent un coup légal au hasard. La partie enchaîne les donnes de 5, 4 puis 4 cartes, avec un donneur qui change. Une main injouable est posée. Un joueur dont les 4 pions sont rentrés continue avec les pions de son partenaire. La partie se termine par la victoire de l'équipe qui rentre ses 8 pions.
+  2. Sur un téléphone tenu en largeur comme sur un grand écran, un joueur fait une partie complète sur le plateau galet contre trois joueurs gérés par l'ordinateur, qui jouent un coup légal au hasard. La partie enchaîne les donnes de 5, 4 puis 4 cartes, avec un donneur qui change. Une main injouable est posée. Un joueur dont les 4 pions sont rentrés continue avec les pions de son partenaire. La partie se termine par la victoire de l'équipe qui rentre ses 8 pions.
   3. Quand c'est son tour, le joueur voit ses cartes jouables et les pions concernés mis en évidence, et seuls les coups permis par RULES.md lui sont proposés. Il passe une carte à son partenaire en début de donne et voit qui doit encore choisir. Avec l'As ou le Roi, il choisit entre sortir et avancer. Il répartit le 7 avec l'assistant pas à pas. Avant de confirmer un coup, il voit l'aperçu du trajet et des pions qui seraient mangés.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 24 plans
+**Plans:** 53/55 plans executed (01-42 to 01-54: gap closure after Romain's re-test of 2026-10-15: rule G16 for the 7, riders turned to their camp, one-knight auto-select, slower deal, full-height board on the phone, silent-mode sound, end plank, sound test page with choices; 01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Squelette jouable : validation des paquets, traceur « Jouer la partie » → plateau → cavalier qui bondit au son des sabots
+- [x] 01-01-PLAN.md — Squelette jouable : validation des paquets, traceur « Jouer la partie » → plateau → cavalier qui bondit au son des sabots
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01-02-PLAN.md — Plateau net et juste sur tous les écrans : srcset, chargement, erreur, overlay de géométrie, garde-fous en tests
-- [ ] 01-03-PLAN.md — Contrat du moteur (types, événements) et règles R-01 à R-08 avec leurs scénarios
-- [ ] 01-04-PLAN.md — Moteur audio complet : sabots sur l’horloge audio, hennissements, cartes, ambiance
+- [x] 01-02-PLAN.md — Plateau net et juste sur tous les écrans : srcset, chargement, erreur, overlay de géométrie, garde-fous en tests
+- [x] 01-03-PLAN.md — Contrat du moteur (types, événements) et règles R-01 à R-08 avec leurs scénarios
+- [x] 01-04-PLAN.md — Moteur audio complet : sabots sur l’horloge audio, hennissements, cartes, ambiance
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 01-05-PLAN.md — Règles R-09 à R-16, points à valider et images des scénarios
-- [ ] 01-06-PLAN.md — Choix de la couleur mémorisé, polices, icônes et jetons de style
+- [x] 01-05-PLAN.md — Règles R-09 à R-16, points à valider et images des scénarios
+- [x] 01-06-PLAN.md — Choix de la couleur mémorisé, polices, icônes et jetons de style
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 01-07-PLAN.md — Romain valide RULES.md et choisit la source des figures des cartes ; constantes de règles nommées
-- [ ] 01-08-PLAN.md — Plateau tourné vers le joueur et seize cavaliers Staunton
-- [ ] 01-09-PLAN.md — Page « Test des sons » pour Romain
+- [x] 01-07-PLAN.md — Romain valide RULES.md et choisit la source des figures des cartes ; constantes de règles nommées
+- [x] 01-08-PLAN.md — Plateau tourné vers le joueur et seize cavaliers Staunton
+- [x] 01-09-PLAN.md — Page « Test des sons » pour Romain
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 01-10-PLAN.md — Moteur : paquet, donnes 5/4/4, échange, vue par place
-- [ ] 01-11-PLAN.md — Licences tracées et feuille « Crédits et licences »
+- [x] 01-10-PLAN.md — Moteur : paquet, donnes 5/4/4, échange, vue par place
+- [x] 01-11-PLAN.md — Licences tracées et feuille « Crédits et licences »
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 01-12-PLAN.md — Moteur : un seul chemin pour les déplacements, tour de jeu, scénarios en tests
+- [x] 01-12-PLAN.md — Moteur : un seul chemin pour les déplacements, tour de jeu, scénarios en tests
 
 **Wave 7** *(blocked on Wave 6 completion)*
-- [ ] 01-13-PLAN.md — Moteur : le 7 réparti et l’état de rendu
+- [x] 01-13-PLAN.md — Moteur : le 7 réparti et l’état de rendu
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 01-14-PLAN.md — Ordinateur de niveau 1, propriétés du moteur, parties en auto-jeu
+- [x] 01-14-PLAN.md — Ordinateur de niveau 1, propriétés du moteur, parties en auto-jeu
 
 **Wave 9** *(blocked on Wave 8 completion)*
-- [ ] 01-15-PLAN.md — Contrôleur de partie, metteur en scène et interaction du tour
+- [x] 01-15-PLAN.md — Contrôleur de partie, metteur en scène et interaction du tour
 
 **Wave 10** *(blocked on Wave 9 completion)*
-- [ ] 01-16-PLAN.md — Écran de jeu : main en éventail, carte → cheval → aperçu → « Jouer »
+- [x] 01-16-PLAN.md — Écran de jeu : main en éventail, carte → cheval → aperçu → « Jouer »
 
 **Wave 11** *(blocked on Wave 10 completion)*
-- [ ] 01-17-PLAN.md — La table : bandeau, tapis, échange de carte, main posée, fin de partie
+- [x] 01-17-PLAN.md — La table : bandeau, tapis, échange de carte, main posée, fin de partie
 
 **Wave 12** *(blocked on Wave 11 completion)*
-- [ ] 01-18-PLAN.md — As/Roi « Sortir ou avancer », Valet en deux touches, chevaux serrés
-- [ ] 01-19-PLAN.md — Les cavaliers s’animent et hennissent
-- [ ] 01-20-PLAN.md — Figures traditionnelles des cartes, licences vérifiées
+- [x] 01-18-PLAN.md — As/Roi « Sortir ou avancer », Valet en deux touches, chevaux serrés
+- [x] 01-19-PLAN.md — Les cavaliers s’animent et hennissent
+- [x] 01-20-PLAN.md — Figures traditionnelles des cartes, licences vérifiées
 
 **Wave 13** *(blocked on Wave 12 completion)*
-- [ ] 01-21-PLAN.md — Le 7 réparti pas à pas, partie complète au doigt, cibles de 44 px
-- [ ] 01-22-PLAN.md — Les cartes bougent aussi ; avance rapide, animations réduites, onglet caché
+- [x] 01-21-PLAN.md — Le 7 réparti pas à pas, partie complète au doigt, cibles de 44 px
+- [x] 01-22-PLAN.md — Les cartes bougent aussi ; avance rapide, animations réduites, onglet caché
 
 **Wave 14** *(blocked on Wave 13 completion)*
-- [ ] 01-23-PLAN.md — « Réglages » : couper le son, régler l’ambiance, réduire les animations
+- [x] 01-23-PLAN.md — « Réglages » : couper le son, régler l’ambiance, réduire les animations
 
 **Wave 15** *(blocked on Wave 14 completion)*
-- [ ] 01-24-PLAN.md — Abandonner, pannes de son, tapis en grand, finition et vérifications
+- [x] 01-24-PLAN.md — Abandonner, pannes de son, tapis en grand, finition et vérifications
+
+**Wave 16** *(gap closure, UAT test 6)*
+- [x] 01-25-PLAN.md — Règles : entrer dans la maison sans avoir fait le tour complet (G14)
+
+**Wave 17** *(gap closure, UAT test 7; blocked on Wave 16 completion)*
+- [x] 01-26-PLAN.md — Règles : le 7 dépasse le partenaire sans le manger (G15)
+
+**Wave 18** *(gap closure, UAT test 5; blocked on Wave 17 completion)*
+- [x] 01-27-PLAN.md — Jouer au clavier sur ordinateur : chiffres, lettres, Entrée, Échap, aide « ? »
+
+**Wave 19** *(gap closure, UAT test 5; blocked on Wave 18 completion)*
+- [x] 01-28-PLAN.md — Les raccourcis se voient sur ordinateur, jamais sur téléphone
+
+**Wave 20** *(gap closure, UAT test 4, plateau C+; blocked on Wave 19 completion)*
+- [x] 01-29-PLAN.md — La géométrie du plateau C+ et les images des règles ; le contrat d’interface et ce que Romain a décidé
+
+**Wave 21** *(gap closure, UAT tests 3 and 4; blocked on Wave 20 completion)*
+- [x] 01-30-PLAN.md — Le plateau C+ dans la partie : un plateau 2:3 dessiné, chaque cavalier à sa place
+
+**Wave 22** *(gap closure, UAT test 4; blocked on Wave 21 completion)*
+- [x] 01-31-PLAN.md — Halos, aperçus, lettres, marqueurs et cibles sur les cavaliers de C+
+
+*(01-29 to 01-31 built board C+; Romain rejected it once he saw it in the game, 2026-10-14, and chose the wooden « galet » board: in landscape on the computer, in portrait on the iPhone. The C+ plans 01-32 to 01-36 were dropped; the numbers are reused below.)*
+
+**Wave 23** *(gap closure, UAT tests 3 and 4, plateau galet; blocked on Wave 22 completion)*
+- [x] 01-32-PLAN.md — Les deux plateaux galet dans packages/board ; traceur : le galet en largeur dans la vraie partie à 1280 × 800, un cavalier bondit jusqu’à sa case
+
+**Wave 24** *(gap closure, UAT test 4; blocked on Wave 23 completion)*
+- [x] 01-33-PLAN.md — Les cavaliers de Romain sur les plateaux, les images des règles sur le galet, la licence, le contrat d’interface « Plateau galet » et le journal des décisions
+
+*(Then, the same day, Romain: « Pour la version iphone, oblige à jouer en format paysage, ça permettra d’utiliser le même plateau », « Oui, paysage obligatoire ». One board, the landscape galet, on the computer and on the phone held sideways; 01-34 to 01-41 were replanned for it.)*
+
+**Wave 25** *(gap closure, UAT tests 3 and 4; blocked on Wave 24 completion)*
+- [x] 01-34-PLAN.md — Le galet en largeur devient le seul plateau du jeu : les cavaliers, leurs halos, aperçus, marques et cibles dessus
+
+**Wave 26** *(gap closure, UAT test 4; blocked on Wave 25 completion)*
+- [x] 01-35-PLAN.md — Le tapis et ses cartes sur le galet en largeur
+
+**Wave 27** *(gap closure, UAT tests 4 and 5; blocked on Wave 26 completion)*
+- [x] 01-36-PLAN.md — Sur ordinateur, le galet en largeur et la barre du bas ; les trois modes d’écran
+
+**Wave 28** *(gap closure, UAT tests 3 and 4, « Compacter l'écran »; blocked on Wave 27 completion)*
+- [x] 01-37-PLAN.md — Sur le téléphone tenu en largeur, la barre compacte
+
+**Wave 29** *(gap closure, UAT test 4, « paysage obligatoire »; blocked on Wave 28 completion)*
+- [x] 01-38-PLAN.md — « Tourne ton téléphone », et les tests du téléphone tenu en largeur
+
+**Wave 30** *(gap closure, UAT test 4; blocked on Wave 29 completion)*
+- [x] 01-39-PLAN.md — Le plateau image et ses outils quittent le jeu ; la licence du plateau et les documents du projet
+
+**Wave 31** *(gap closure, UAT tests 3 and 4; blocked on Wave 30 completion)*
+- [x] 01-40-PLAN.md — Un seul plateau dans le code, le galet en largeur, et les numéros des images des règles en Caveat
+
+**Wave 32** *(gap closure, UAT tests 3 and 4; blocked on Wave 31 completion)*
+- [x] 01-41-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
+
+**Wave 33** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 32 completion)*
+- [x] 01-42-PLAN.md — Règle G16, la carte qui peut faire rentrer un cheval le fait rentrer (moteur)
+
+**Wave 34** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 33 completion)*
+- [x] 01-43-PLAN.md — Règle G16 dans RULES.md, ses scénarios et leurs images
+
+**Wave 35** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 34 completion)*
+- [x] 01-44-PLAN.md — Les cavaliers à l'encre du galet, sabots vers leur camp
+
+**Wave 36** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 35 completion)*
+- [x] 01-45-PLAN.md — Un seul cheval pour la carte : directement l'aperçu et « Jouer »
+
+**Wave 37** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 36 completion)*
+- [x] 01-46-PLAN.md — La donne un peu moins rapide
+
+**Wave 38** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 37 completion)*
+- [x] 01-47-PLAN.md — Le plateau sur toute la hauteur du téléphone (1/2) : le cadre et chaque état du tour
+
+**Wave 39** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 38 completion)*
+- [x] 01-48-PLAN.md — Le plateau sur toute la hauteur du téléphone (2/2) : chaque état prouvé, toute la suite, le contrat
+
+**Wave 40** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 39 completion)*
+- [x] 01-49-PLAN.md — Le son de l'iPhone en mode silencieux
+
+**Wave 41** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 40 completion)*
+- [x] 01-50-PLAN.md — La planche de fin de partie, dans le bois du galet
+
+**Wave 42** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 41 completion)*
+- [x] 01-51-PLAN.md — La page d'essai des sons à choix, et les sabots en quatre versions
+
+**Wave 43** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 42 completion)*
+- [ ] 01-52-PLAN.md — Les hennissements en trois ou quatre versions *(reporté le 2026-10-15, Romain : « laisse les sons de côté sauf les sabots des chevaux »)*
+
+**Wave 44** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 43 completion)*
+- [ ] 01-53-PLAN.md — Les sons de cartes en trois ou quatre versions, et les sons de fin de partie *(reporté le 2026-10-15, Romain : « laisse les sons de côté sauf les sabots des chevaux »)*
+
+**Wave 45** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 44 completion)*
+- [x] 01-54-PLAN.md — Toutes les vérifications après la recette 3, puis la recette 4 de Romain
+
+**Wave 46** *(gap closure, Romain's report of 2026-10-15 on entering the home; blocked on Wave 45 completion)*
+- [x] 01-55-PLAN.md — Règle G17 : un cheval saute les chevaux déjà rentrés dans sa maison
 
 **UI hint**: yes
 
@@ -112,7 +209,7 @@ Plans:
 
 **Goal**: Chaque place tenue par l'ordinateur joue à la force choisie, du niveau 1 (un coup légal au hasard) au niveau 5 (un vrai jeu d'équipe). L'ordinateur ne triche jamais et joue à un rythme naturel.
 **Mode:** mvp
-**Depends on**: Phase 2
+**Depends on**: Phase 1 (avancée avant la phase 2 le 2026-10-15 ; la table en ligne de la phase 2 reprendra le choix de force)
 **Requirements**: BOT-01, BOT-02, BOT-03, BOT-04, BOT-05
 **Success Criteria** (what must be TRUE):
   1. Le créateur de la table choisit une force de 1 à 5 pour chaque place tenue par l'ordinateur, et chaque place joue à sa force.
@@ -162,7 +259,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 0/TBD | Not started | - |
+| 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |

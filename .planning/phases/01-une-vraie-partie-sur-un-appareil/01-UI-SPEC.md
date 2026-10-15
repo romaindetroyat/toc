@@ -165,7 +165,7 @@ Register: tutoiement, warm, short sentences, first person for the player's own o
 | Exchange, done | « Échange fait. Tu as reçu {Carte} de {Partenaire}. » ; tag on the card: « Reçue » |
 | Own turn, no selection | « À toi de jouer. Choisis une carte. » |
 | Card selected | « Choisis un cheval. » |
-| Only one pawn can play | « Un seul cheval peut jouer cette carte : touche-le. » |
+| Only one pawn can play | (aucune consigne : le cheval est choisi et l’aperçu s’affiche, recette 3) |
 | As / Roi, both possible | « Que veux-tu faire ? » + buttons « Sortir un cheval » and « Avancer de 1 » (As) / « Avancer de 13 » (Roi) |
 | Valet | « Valet : touche ton cheval, puis celui à échanger. » then « Maintenant, touche le cheval à échanger. » |
 | Preview, advance | « {Carte} : avance de {n} cases. » |
@@ -222,6 +222,9 @@ Unplayable card reason (shown in the prompt line when the player taps a dimmed c
 | End, loss | Display « Défaite » + « L’équipe adverse a rentré ses 8 chevaux. » |
 | End stats | « Donnes jouées : {n} » · « Chevaux mangés : nous {a}, eux {b} » |
 | End buttons | « Rejouer » (primary), « Changer de couleur » (secondary) |
+| End plank, names | the human's own knight « Toi » ; the others by their horse names (plan 01-50) |
+| End plank, defeat | « L’équipe adverse » (Label 700) above the winning knights |
+| End plank, score | « {n} – {m} » with « Nous » and « Eux » under the numbers; read as « Score : nous {n} chevaux rentrés sur 8, eux {m} sur 8 » |
 | Board image failed | « Le plateau n’a pas pu se charger. » + « Réessayer » |
 | Audio failed | toast « Le son n’a pas pu démarrer. La partie reste jouable sans son. » + action « Réessayer » |
 
@@ -230,14 +233,16 @@ Unplayable card reason (shown in the prompt line when the player taps a dimmed c
 | Element | Copy |
 |---------|------|
 | Sheet title | « Réglages » |
-| Rows | « Son » (master), « Bruitages », « Ambiance », « Volume de l’ambiance », « Réduire les animations » |
+| Rows | « Son » (master), « Bruitages », « Réduire les animations » (« Ambiance » and « Volume de l’ambiance » removed: Révisé par Romain le 2026-10-14, « Arrête le son d’ambiance, c’est pourri ») |
 | Helper, reduce motion | « Les déplacements sont instantanés, sans bonds, ruades ni effets. » |
-| Helper, Son | « Pas de son sur iPhone ? Vérifie que l’interrupteur de sonnerie, sur le côté, n’est pas en mode silencieux. » |
+| Helper, Son | « Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté. » (Révisé le 2026-10-15, plan 01-49 : le jeu se fait entendre en mode silencieux, voir l’addendum « Recette 3 de Romain », « Le son en mode silencieux » ; le même texte en tête de « Test des sons ») |
 | Links | « Tester les sons », « Crédits et licences », « Abandonner la partie » (in-game only), « Fermer » |
 | Sound test title | « Test des sons » |
-| Sound test intro | « Écoute chaque son et note-le. Tes notes restent sur cet appareil. » |
-| Rating | « À écouter » · « Bon » · « À changer » |
-| Copy notes | button « Copier mes notes » → toast « Notes copiées. » ; failure: « Impossible de copier. Sélectionne le texte ci-dessous. » |
+| Sound test intro | « Écoute les versions de chaque son et choisis ta préférée. Ton choix compte tout de suite dans tes parties, sur cet appareil. Pour qu’il compte pour tout le monde, touche « Copier mes choix » et envoie-les. » (Révisé le 2026-10-15, plan 01-51 : la page « à choix », voir l’addendum « Recette 3 de Romain », « La page d’essai des sons à choix ») |
+| Version button | « A » … « D », accessible name « Écouter {nom}, version {X} » ; under it what the version is when it has a name (Sabots : « actuel », « sur la terre », « sur les pavés », « sur le bois ») and its source (« Généré par le code », or « Fichier libre (CC0) » with « auteur · licence » ; « Son indisponible » when it cannot be prepared) |
+| Choice | label « Mon choix », radio group « Mon choix pour {nom} », options « A » … « D » (the ratings « À écouter · Bon · À changer » are gone since 01-51) |
+| Copy choices | button « Copier mes choix » → toast « Choix copiés. » ; failure: « Impossible de copier. Sélectionne le texte ci-dessous. » and the list in a read-only text box « Mes choix » |
+| Hoof cadence | row « Cadence de ton choix », buttons « 1 » « 4 » « 7 » « 13 » (accessible names « Écouter 1 case », « Écouter 4 cases »…), then the distance slider |
 | Audio state | « Son prêt » / « Son en attente : touche l’écran » |
 
 Card names: As, 2 … 10, Valet, Dame, Roi + « de cœur / de carreau / de pique / de trèfle » (used in aria-labels and toasts).
@@ -360,24 +365,25 @@ Walnut background; centred column, max width 480. Top to bottom: Display « TOC 
 
 ### End-of-game screen
 
+*Remplacé le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « La planche de fin de partie ». Le texte ci-dessous est l’ancien panneau.*
+
 Dimmed board (walnut at 70%) stays visible behind a centred panel (`#4A2F1A`, radius 16, padding 24). Display « Victoire ! » or « Défaite » (Caveat); winning team as two seat chips; the sentence; the two stat lines; « Rejouer » (primary) and « Changer de couleur » (secondary). On win, the winning team's 8 knights hop in place once (reduced motion: none). Focus lands on « Rejouer ».
 
 ### Réglages sheet
 
-Bottom sheet on compact (slides up 250ms, max height 90dvh, drag handle not required), centred dialog 480 wide on larger screens; padding 24, row gap 24. Rows: **Son** switch (master, default on); **Bruitages** switch (default on); **Ambiance** switch (default on) + **Volume de l’ambiance** slider (0–100, default 30; slider thumb 44px target); **Réduire les animations** switch (initial value from `prefers-reduced-motion`, then the user choice wins). Links: « Tester les sons », « Crédits et licences »; in game also the destructive text button « Abandonner la partie » at the bottom. Persistence: `localStorage` key `toc.settings.v1` `{ sound, sfx, ambience, ambienceVolume, reduceMotion, fast, lastColor }`, every access in try/catch; if storage is unavailable, keep in memory and say nothing. Changes apply instantly; there is no Save button.
+Bottom sheet on compact (slides up 250ms, max height 90dvh, drag handle not required), centred dialog 480 wide on larger screens; padding 24, row gap 24. Rows: **Son** switch (master, default on); **Bruitages** switch (default on); **Réduire les animations** switch (initial value from `prefers-reduced-motion`, then the user choice wins). There is no ambience row any more (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri » — the « Ambiance » switch and the « Volume de l’ambiance » slider are gone). Links: « Tester les sons », « Crédits et licences »; in game also the destructive text button « Abandonner la partie » at the bottom. Persistence: `localStorage` key `toc.settings.v1` `{ sound, sfx, reduceMotion, fast, lastColor }` (an older stored object with `ambience` / `ambienceVolume` still loads; those keys are ignored and dropped at the next save), every access in try/catch; if storage is unavailable, keep in memory and say nothing. Changes apply instantly; there is no Save button.
 
-### Sound test screen (for Romain, D-22)
+### Sound test screen « à choix » (for Romain, D-22; Révisé le 2026-10-15, plan 01-51)
 
-Full screen, scrollable. Header: title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone silent-switch hint. Sections and rows:
+Full screen, scrollable. Header: « Retour », title, audio state line (« Son prêt » / « Son en attente : touche l’écran »), the iPhone sound hint (the « Helper, Son » sentence since 01-49), the intro « Écoute les versions de chaque son et choisis ta préférée… ». Any tap on the page unlocks the audio. Sections and rows (no « Ambiance » section: the ambience was removed on 2026-10-14):
 
 | Section | Rows |
 |---------|------|
-| Sabots | « 1 case », « 4 cases », « 7 cases », « 13 cases » + a distance slider 1–13 with a play button that plays the real cadence curve |
+| Sabots | « Sabots » (versions A–D and the choice), then « Cadence de ton choix » (buttons « 1 », « 4 », « 7 », « 13 »: the real cadence of a move of that many cells, in the chosen version), then the distance slider 1–13 with its play button |
 | Hennissements | « Sortie de l’écurie », « Prise : ruade », « Prise : plainte », « Entrée dans la maison », « 4e cheval rentré (joyeux) », « Échange au Valet (surpris) » |
 | Cartes | « Donne », « Poser une carte », « Échange de carte » |
-| Ambiance | « Ambiance (boucle) » with play/stop and the volume slider |
 
-Each row: play button 44 × 44, the sound name (Body), a source tag (« Fichier libre (CC0) » / « Généré par le code » plus author + licence line from `LICENSES.md`), a segmented rating « À écouter · Bon · À changer » (default « À écouter »). If both a recorded and a generated version exist, the row shows two play buttons « Fichier » and « Généré » for A/B comparison. Footer: « Copier mes notes » copies a French plain-text list `nom : note` to the clipboard. Ratings persist in `toc.soundnotes.v1`.
+Each sound row: the sound name (Body); one 44 × 44 round play button per version, « A » to « D », each playing that version once (a hoof version plays the cadence of a 4-cell move); under each button what the version is, when it has a name, and its source line (« Généré par le code », or for a recorded version « Fichier libre (CC0) » plus « auteur · licence » from its own row of `LICENSES.md`); for the generated versions, the sound's own row « auteur · licence » once under the buttons; then « Mon choix » and a segmented radio group « Mon choix pour {nom} » A–D (arrow keys move and select, one tab stop). The button of the chosen version has a 3 px cream ring. A pick is saved on the device at once (`localStorage` « toc.soundchoices.v1 », only the sounds picked) and passed to the audio engine: the game plays it from the next sound on, on this device. A damaged or hostile stored value gives the defaults, without error; the old ratings (`toc.soundnotes.v1`) are ignored. Footer: « Copier mes choix » copies one French line per sound, in page order, « Sabots : B » (U+00A0 before the colon), plain text only; then « Crédits et licences ». The hooves have four versions; the neighs and the cards keep their one version « A » (their versions, plans 01-52 and 01-53, are deferred: Romain, 2026-10-15, « laisse les sons de côté sauf les sabots des chevaux »).
 
 ---
 
@@ -418,7 +424,7 @@ Board → pointer behaviour: tapping a non-candidate pawn or empty board while a
 
 1. Own turn: playable cards raised, others dimmed. Nothing is ever played automatically, even with one legal move; that move is only emphasised (D-19).
 2. Tap card → playable pawns get halos (As/Roi: first the mode choice if both modes are possible; « Sortir » needs no pawn tap: the preview shows the exit to the diamond 18 directly).
-3. Tap pawn → preview (path, captures, ghost) and the description line; for Valet, a second tap on the target.
+3. Tap pawn → preview (path, captures, ghost) and the description line; for Valet, a second tap on the target. A single candidate skips the pawn tap (recette 3, test 27): when only one knight can play the card (after « Avancer » for an As/Roi that asked), the card tap opens its preview at once, and a 7 with a single split opens its assistant already filled (« Tout est réparti. »). « Jouer » still confirms (D-19); the Valet always takes its two taps. See the addendum « Recette 3 de Romain », « Un seul cheval pour la carte ».
 4. « Jouer » confirms → input is locked until the animation queue is idle (inputs not queued; PITFALLS 12), then the next turn starts.
 5. There is no undo after confirmation (REQUIREMENTS out of scope); only before.
 
@@ -461,7 +467,7 @@ All motion is `transform`/`opacity` through the Web Animations API on `<g>` wrap
 | Valet swap (D-13) | Two crossing arcs, 2 bounds each, 900ms total, simultaneous | Surprised neigh at take-off |
 | Enter home (D-14, pawns 1–3) | Hops as normal, final settle 150ms | Sober; joyful short neigh |
 | 4th pawn home (D-14) | Rear 500ms + particle burst 700ms (8 small stars/circles, crème and amber, transform+opacity only) | Joyful neigh, light |
-| Deal | 20 cards fly from talon to seats, stagger 40ms, 250ms each; own cards flip to face-up | Card sounds |
+| Deal | 20 cards fly from talon to seats, stagger 55ms, 300ms each (révisé le 2026-10-15, recette 3 : 40 ms et 250 ms avant); own cards flip to face-up with the same 300ms and 55ms | Card sounds |
 | Dead hand posed | 350ms per card, 60ms stagger | |
 | Card played | Card flies from hand to its felt slot, 300ms | Card sound |
 | Win | Winning team's 8 knights hop in place once, 600ms | |
@@ -483,9 +489,8 @@ All motion is `transform`/`opacity` through the Web Animations API on `<g>` wrap
 | Enter home | Joyful short neigh; the 4th pawn: longer joyful neigh | Final settle / rear-up |
 | Valet swap | Short surprised neigh | Take-off |
 | Deal / card played / exchange | Card sounds (deal riffle, card down, card slide) | With the matching animation |
-| Ambiance | Light countryside/stable loop, 1.5s fade-in after unlock, paused when the page is hidden | Own volume (default 30%) and own switch |
 
-Rules: the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; formats AAC `.m4a` primary (+ `.mp3` fallback), decoded once on first unlock; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
+Rules: no ambience loop ever plays (Révisé par Romain le 2026-10-14 : « Arrête le son d’ambiance, c’est pourri »); the `AudioContext` is created and resumed inside the « Jouer la partie » tap and retried on any later gesture while `state !== 'running'`; inside that same tap, `navigator.audioSession.type = "playback"` is set before the `AudioContext` is created, where the browser has the Audio Session API (01-49); on an iPhone or iPad the same tap also starts a hidden, looping, silent `<audio>` element (a WAV generated by the code as a data URI: no file, no network request; no controls, no AirPlay), which keeps the page in the playback category so the ringer switch does not mute the game; it is paused when the page is hidden and while « Son » is off, and only a gesture on a visible page with « Son » on starts it again; it never exists on a computer (see the addendum « Recette 3 de Romain », « Le son en mode silencieux »); each sound plays its chosen version (the device's pick on `#/sons`, else `DEFAULT_CHOICES` in `apps/web/src/audio/choices.ts`, today all « A »); only the chosen versions are prepared at the first gesture, another version is rendered when the page first plays it, and a newly chosen version replaces the previous one only once it is ready (a chosen version that cannot be prepared falls back to « A ») (01-51); a recorded version tries AAC `.m4a` first (+ `.mp3` fallback), decoded once; polyphony capped (voice pool, steal oldest); nothing in the game loop ever awaits audio; the game is fully playable muted. Recorded files are CC0 where found; otherwise sounds are generated by code (Web Audio synthesis); every file has a row in `assets/audio/LICENSES.md`, mirrored on the « Crédits et licences » screen.
 
 ---
 
@@ -507,7 +512,7 @@ Rules: the `AudioContext` is created and resumed inside the « Jouer la partie �
 | `Toast` | Transient messages (audio failure, notes copied) | one at a time, 4s, replaced not stacked |
 | `Sheet`, `Dialog` | Réglages, Tapis, Crédits, confirmations | open, closing; focus trap; backdrop tap closes (not for the abandon dialog) |
 | `EndScreen` | Result | win, loss |
-| `SettingsSheet`, `Switch`, `Slider`, `Segmented` | Settings and sound test controls | on/off, disabled, focus |
+| `SettingsSheet`, `Switch`, `Segmented` | Settings and sound test controls (`Slider` removed with the ambience volume, 2026-10-14) | on/off, disabled, focus |
 | `SoundTestScreen`, `SoundRow` | Romain's listening page | idle, playing, decoding, unavailable, rated |
 | `IconButton` | Gear, fast-forward, undo, close | default, pressed (`aria-pressed`), disabled |
 
@@ -534,7 +539,7 @@ Applicable state considerations resolved: 22 covered, 2 backstop, 1 unresolved
 | error | interactive-control: sound rows | ✅ covered | Failed decode shows « Son indisponible » and, when a generated fallback exists, the « Généré » button remains usable |
 | error | interactive-control: audio start | ✅ covered | Toast « Le son n’a pas pu démarrer. La partie reste jouable sans son. » with « Réessayer »; game continues muted |
 | error | form: Réglages | ✅ covered | Unavailable `localStorage` falls back to in-memory settings silently; no blocking error |
-| partial | form: Réglages | ✅ covered | « Ambiance » off disables and dims the volume slider without hiding it; « Son » off dims the other two switches |
+| partial | form: Réglages | ✅ covered | « Son » off dims « Bruitages » (the ambience switch and volume slider were removed on 2026-10-14) |
 | overflow | list-collection: 7 plan rows | ✅ covered | At most 7 micro-moves; the plan list scrolls vertically inside the panel when it exceeds 3 rows |
 | zero-one-many | list-collection: 7 plan rows | ✅ covered | Zero steps shows only the counter « Reste 7 »; one or more steps list « Cheval {A–D} : {n} pas » rows |
 | overflow | list-collection: disambiguation tray | ✅ covered | Maximum 4 chips, each 44 wide, always fits |
@@ -599,3 +604,520 @@ Third-party assets are not registry blocks but are still gated: fonts (Nunito, C
 - [x] Dimension 7 Inventory Provenance: PASS
 
 **Approval:** approved 2026-10-13 (2nd pass; FLAGs: « Rejouer » / « Fermer » single-word labels, pawn hit radius 22px to be read as a 44px diameter)
+
+---
+
+## Addendum 2026-10-14 — Raccourcis clavier (ordinateur)
+
+Source: 01-UAT.md test 5 (Romain: « La jouabilité : OK en version iphone, un peu trop d'aller-retours de souris sur ordinateur. Des raccourcis claviers seraient les bienvenus »). This addendum is the contract for plan 01-27 (the shortcuts and the help sheet) and plan 01-28 (the key hints and the Réglages link). It extends « Keyboard and assistive (baseline, Phase 1) »; nothing of that baseline changes (Tab order, arrow keys in the hand, Entrée/Espace on the focused control, French accessible names).
+
+### Key map
+
+| Key | When | Effect | Reducer event |
+|-----|------|--------|---------------|
+| « 1 » to « 5 » | His turn (idle, finished prompt, a card or a knight being chosen, preview, dead hand), the hand not held back by the deal | The n-th card of the hand from the left (the sorted fan) | `tapCard` |
+| « 1 » to « 5 » | Exchange | The n-th card from the left as the card to pass | `selectGive` |
+| « A » to « D » | A card is selected (card's knights, Valet's own knight or target, 7 assistant, preview) | The lit knight with that letter (`knightLetter`) | `tapPawn`; two lit knights or more with that letter (different colours) → `tapAt` with those knights, the tray opens |
+| « A » to « D » | Tray (« Lequel ? ») | The chip with that letter (`trayLetters`) | `chooseTrayOption` |
+| « Entrée » | Preview | « Jouer » / « Jouer quand même » | `confirm` |
+| « Entrée » | 7 assistant at « Tout est réparti. » (nothing left) | The 7's « Jouer » | `confirm` |
+| « Entrée » | Exchange with a chosen card | « Passer cette carte » | `give` |
+| « Entrée » | Dead hand | « Poser mes cartes » | `pose` |
+| « Échap » | Any flow with something chosen | One step back (table below) | `back` |
+| « S » / « A » | As/Roi question « Que veux-tu faire ? » (no knight is lit, so « A » has one meaning only) | « Sortir un cheval » / « Avancer de 1 » or « Avancer de 13 » | `chooseExit` / `chooseAdvance` |
+| « 1 » to « 7 » | 7 assistant (not in its tray) | That many steps for the selected knight; a count the engine does not offer shows the existing refusal notice | `pickSteps` |
+| « Retour arrière » | 7 assistant with at least one step given | « Retirer le dernier pas » | `undoLast` |
+| « P » | Exchange with a chosen card / dead hand | « Passer cette carte » / « Poser mes cartes » | `give` / `pose` |
+| « ? » | Always (game screen) | Opens the sheet « Raccourcis clavier » | none (UI only) |
+
+### Rules
+
+- Every shortcut is a `turnUi` reducer event (`reduceTurnUi`), never an engine action: no new legality path, and a move is only submitted by the confirm step the player triggers (D-19, D-20).
+- Shortcuts are ignored while a sheet or dialog is open (Réglages, « Sur le tapis », the abandon confirmation, the help sheet), when the focus is in a form field or during IME composition, with Ctrl, Cmd or Alt held, on key auto-repeat, and once the end screen is up (the screen behind stays inert).
+- Digits are read from the physical key (`event.code` Digit1..Digit9, Numpad1..Numpad9), so the top row of a French AZERTY keyboard works without Shift (key « & » with code Digit1 is « 1 »). Letters are read from the typed character (`event.key`, case-insensitive).
+- « Entrée » plays only when the focus is on nothing, on the chosen card or on the previewed knight; on any other focused control (« Annuler ce coup », « Sur le tapis », another card or knight) it keeps its native meaning.
+- Tab, the arrow keys and Espace are not shortcuts: they keep the baseline behaviour.
+
+### « Échap » goes back one step
+
+| From | To |
+|------|----|
+| Tray | The flow it was opened from |
+| Preview of a Valet swap | The targets of his chosen knight |
+| Preview of an exit chosen with « Sortir » (As/Roi with both modes) | The As/Roi question |
+| Any other preview | The card's lit knights |
+| Valet, target choice | His own knight choice |
+| Card selected after « Avancer » (As/Roi with both modes) | The As/Roi question |
+| Card selected, Valet's first tap, As/Roi question | Nothing selected |
+| 7 assistant | Unselect the knight; else take back the last step; else drop the card |
+| Exchange with a chosen card | No card chosen |
+
+### Key hints (built in plan 01-28)
+
+- Visible only under `@media (hover: hover) and (pointer: fine)`, never on phones.
+- Style: Label 14px / 700, walnut background `#2B1D12`, crème text `#FFF8E1` and a 1px crème border (readable on cards and on every button style), radius 4, minimum 20 × 20, padding 0 4px, never amber.
+- The hint is `aria-hidden` and `pointer-events: none`; every button that shows one also carries `aria-keyshortcuts` and an `aria-label` equal to its visible label, so neither its accessible name nor the label read by the existing specs changes.
+- Placement: every hint is a small corner badge over the top-right corner of its host; the host keeps its size, so nothing in the layout moves at any screen size.
+  - the digit on each card (his turn and the exchange);
+  - a letter disc above each lit knight (same style as the tray letters);
+  - the key on « Jouer » / « Jouer quand même » (« Entrée »), « Sortir un cheval » (« S »), « Avancer de … » (« A »), « Passer cette carte » (« Entrée »), « Poser mes cartes » (« P »), « Choisir un autre cheval » (« Échap »: `closeTray` and `back` both return to the tray's flow), the 7's « Jouer » (« Entrée ») and « Retirer le dernier pas » (« ⌫ »); the 7 step chips already show their digit.
+- Rule: a button shows a key (badge and `aria-keyshortcuts`) only when pressing that key does exactly what clicking the button does. « Annuler ce coup » and « Changer de carte » therefore carry no key: they drop the card in one go (back to nothing selected), while « Échap » goes back one step (from a preview to the card's lit knights, from the Valet's target to his own knight, after « Avancer » to the As/Roi question).
+
+### Help sheet « Raccourcis clavier »
+
+- Opened by « ? » or by the link « Raccourcis clavier » added to the Réglages links (in a game, fine pointer only; nested like « Crédits et licences », plan 01-28).
+- Content: title « Raccourcis clavier », intro « Sur ordinateur, tu peux jouer sans la souris. », one row per shortcut (key cap, then what it does), button « Fermer »; Échap closes it.
+- Key caps: Label 14px / 700 inside `<kbd>`, crème border, walnut fill, never amber.
+- No button is added to the info bar: on a computer the info bar sits in the narrow right panel of the landscape layout and has no room to spare.
+
+### UI Considerations (addendum)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| empty, loading, error | static-content: help sheet « Raccourcis clavier » | ✅ covered | Dismissed: a static list from the French catalogue, rendered synchronously, never empty |
+| long-text | static-content: help sheet rows | ✅ covered | Each row's text wraps under its key cap; the sheet body scrolls vertically like every sheet |
+| overflow | interactive-control: key hints | ✅ covered | Dismissed: one short label each (a digit, a letter, « Entrée », « Échap », « ⌫ »), a corner badge that never resizes its host |
+| populated | interactive-control: keyboard play | 🧪 backstop | Romain re-runs UAT test 5 on a computer: a game played with the keyboard, without the mouse back-and-forth |
+
+## Addendum 2026-10-14 — Plateau C+
+
+Remplacé par l’addendum « Plateau galet » ci-dessous (Romain, 2026-10-14). Sa section « Écran compact » reste la référence des détails que la barre compacte du téléphone tenu en largeur reprend du dock (rangée de la main, cartes compactes, colonne des boutons).
+
+Source : recette, test 4 (01-UAT.md). Romain : « La visibilité en version iphone n’est pas très bonne. On va changer le plateau de jeu pour avoir son propre camp centré en bas, le camp du partenaire centré en haut, les rappels de règles (petits cadres entre les camps) sont inutiles car impossibles à voir. » Puis, le 2026-10-14 : « On part sur le plateau C+ pour le moment ». Le C+ est la planche « C+ · Portrait avec les idées du 01 » de https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A ; sa source est `design/plateau-maquette.dc.html` (`renderVals()`, variante « portrait », `idees01` vrai).
+
+Cet addendum est le contrat des plans 01-30 à 01-36. La géométrie et le dessin de C+ sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-29). Les images de RULES.md (`docs/regles/`) sont déjà dessinées sur C+.
+
+### Décidé par Romain (Révisé par Romain le 2026-10-14)
+
+- **Le plateau C+**, en portrait :
+  - 72 cases bord à bord, numérotées de 1 à 17 après chaque losange ;
+  - le losange « 18 » de chaque sortie, dans sa couleur ;
+  - le carré « 16 » de chaque entrée, dans la couleur de la maison qu’il ouvre ;
+  - un pointillé de l’écurie vers la sortie ;
+  - un rail de couleur du carré 16 dans la maison ;
+  - des flèches discrètes du sens de la marche, près des coins ;
+  - les cases de maison teintées et les trous des écuries ;
+  - le tapis vert au milieu.
+- **Aucun cadre de rappel des règles** sur le plateau.
+- **Son propre camp centré en bas**, le camp de son partenaire centré en haut.
+- **« Compacter l’écran »** : sur téléphone en portrait, le bandeau d’infos est plus fin, les boutons d’action passent sur la rangée de la main, la main est un peu plus basse et moins haute, pour que le plateau grandisse (au moins 300 px de large sur un iPhone 13 dans Safari).
+
+### Dérivé de la maquette ou du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris dans la recette de fin de phase (plan 01-36).
+
+- **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut le partenaire, à droite le précédent. Aucune rotation CSS : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k)`, avec k = `quarterTurnsFor(couleur du joueur)`).
+- **La taille des cavaliers de la maquette.** 0,92 s sur l’anneau, 0,8 s dans une maison, 0,72 s dans une écurie (s = le pas entre deux cases). Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier). Un changement de zone règle la taille en 150 ms, sans transition en mouvement réduit. Les halos, les lettres, les repères et les zones de toucher suivent le cavalier de sa zone.
+- **Les cartes du tapis.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon est au-dessus du centre, la défausse en dessous. Cartes de 1,3 s × 1,82 s. Tout le tapis reste le bouton « Sur le tapis ».
+- **L’écran compact** : ses détails et ses objectifs de taille (section « Écran compact (téléphone en portrait) » ci-dessous).
+
+### Faits techniques (sans confirmation)
+
+- **Scène.** viewBox `0 0 2000 3000` = la maquette × 2 (`SCENE.scale` = 2). Pas s ≈ 126,16 unités (63,078 dans la maquette, itéré 6 fois jusqu’au périmètre / 72). Anneau : colonnes x = 87,51 et 1912,49, rangées y = 87,51 et 2912,49, coins de rayon s. Tapis : x de 690,9 à 1309,1, y de 705,2 à 2294,8. Talon (1000 ; 1354,9), défausse (1000 ; 1645,1), cartes de 164,0 × 229,6. Dernière carte de chaque place : en bas (1000 ; 2143,4), en haut (1000 ; 856,6), à gauche (842,3 ; 1500), à droite (1157,7 ; 1500).
+- **Cavaliers.** Le sprite reste de 110 × 190 (`KNIGHT`). Échelles (`knightScale`) : anneau 1,0551, maison 0,9175, écurie 0,8257. Un cavalier de l’anneau mesure donc environ 116 unités de large, l’empreinte pour laquelle les constantes des plans 01-08 à 01-28 ont été réglées.
+- **Couleurs du dessin** = la palette C+ (`PALETTE`) : bleu `#2C68B0`, jaune `#D9A20F`, rouge `#C23B2B`, vert `#2F8743`, leurs teintes, encre `#4A2F1B`, crème `#FBF5E6`, chêne `#E8D3A6`, bordure en noyer `#5A3B23`, anneau `#D2AF77`, tapis `#1F5A3B`. Les sprites des cavaliers et les pastilles des places ne changent pas.
+- **Ce que l’addendum remplace** :
+  - la scène carrée de 2560 et son exception « Board units » (Spacing Scale) ;
+  - « Board assembly » et « Board delivery » (assemblage des quarts, image composée, `layout.json`) ;
+  - la colonne de rotation par quarts de tour du tableau des couleurs des joueurs ;
+  - les états de chargement et d’erreur de l’image du plateau et leurs textes (« Le plateau n’a pas pu se charger. », « Réessayer ») ;
+  - les positions de la section « Tapis » ;
+  - la règle responsive carrée (`B = min(100vw, 100dvh − chrome, 880px)`) ;
+  - le carré du tapis (x/y 853..1707).
+- **Règle responsive.** La largeur du plateau vaut :
+  - en portrait : min(100vw − 32 px − insets, (100dvh − chrome − insets) / (1,5 + head room), 880 px / 1,5) ;
+  - en paysage : min((100dvh − 32 px − insets) / (1,5 + head room), 100vw − 368 px − insets).
+
+  En portrait, 32 px = les marges extérieures de 16 px à gauche et à droite. En paysage, 32 px = la marge extérieure de 16 px en haut et en bas (aucune sur un écran de 400 px de haut ou moins) ; 368 px = le panneau de 320 px, l’écart de 16 px et deux marges extérieures de 16 px. La hauteur du plateau est 1,5 fois sa largeur.
+- **Head room.** 0,0466 de la largeur (`SCENE.headRoom`) reste libre au-dessus du plateau : la tête d’un cavalier levé de la rangée du haut y dépasse de 93 unités.
+- **Typographie, exception.** Les numéros imprimés des cases sont un élément du dessin (`aria-hidden`, Nunito 800 ou 900, 0,36 à 0,4 s). Comme les numéros de l’ancien plateau imprimé, ils échappent au minimum de 14 px et à la règle des deux graisses. Le texte d’interface posé dans la scène (badges, lettres, « D ») garde 14 px et plus.
+
+### Écran compact (téléphone en portrait) — « Compacter l’écran » (Romain, 2026-10-14)
+
+Contrat du plan 01-33. « Compacter l’écran » est la décision de Romain ; les détails ci-dessous sont ceux du planificateur, à confirmer par Romain.
+
+- **Où.** En portrait sous 600 px de large. Le portrait large et le paysage gardent la mise en page de 01-30.
+- **Bandeau d’infos : 44 px.** Deux lignes en Label 14 sur une hauteur de ligne de 20 px, pastilles d’équipe de 20 px, roue des réglages de 44 × 44.
+- **Le dock.** Sous le plateau, un seul dock remplace le bandeau de la zone d’action et la zone de la main.
+- **Trois hauteurs partagées.** Ce sont des propriétés CSS communes à la mise en page, au dock et à l’éventail, pour que la formule du plateau et les boîtes affichées ne puissent pas diverger :
+  - `--info` 44 px ;
+  - `--prompt-row` 56 px : la consigne, la ligne du bot, les donneurs de l’échange ou les pastilles du choix « Lequel ? » (44 × 56) ; `aria-live` ; Label 14 sur trois lignes au plus, un texte plus long défile à l’intérieur comme aujourd’hui ;
+  - `--hand-row` 92 px : à partir de 375 px de large, l’éventail à gauche et les boutons de l’état en colonne d’environ 96 px à droite. Chaque bouton fait au moins 44 px de haut, son libellé est en Label 14 gras, sur deux lignes au plus. Deux boutons sont empilés, l’unique bouton principal en bas. « Avance rapide » n’a que son icône (44 × 44) et garde son `aria-label`. La colonne est réservée dans tous les états.
+- **Sous 375 px de large**, une rangée `--buttons-row` de 48 px s’insère entre les deux. Elle fait exactement 48 px : c’est un maximum strict, le chrome ne grandit jamais.
+- **Marges du dock** 12 px, écart 8 px.
+- **Cartes compactes** de 64 × 90.
+- **La boîte de l’éventail.** Dans le dock, la boîte de l’éventail fait exactement `--hand-row` de haut (au lieu de la hauteur de carte + 36 px de l’éventail normal). Le haut de la carte levée reste dedans. Le bas des cartes passe sous le bord inférieur de l’écran, coupé. Chaque carte montre au moins ses 56 px du haut (indices et symbole) et chaque tranche visible fait au moins 44 px de large avec cinq cartes.
+- **L’assistant du 7** remplace tout le dock et tient dans sa hauteur fixe : un en-tête de 34 px avec « Reste n », le plan sur une ligne qui défile horizontalement, les sept pastilles de pas (44 × 44) sur une rangée qui défile horizontalement quand elle fait moins de 332 px, puis la rangée des boutons.
+- **Inchangés** : les textes, l’ordre du focus (Réglages → cavaliers allumés → boutons d’action → cartes de la main), les raccourcis clavier et leurs aides (01-27, 01-28), les cibles de 44 px, la règle du choix « Lequel ? », un seul bouton principal.
+- **Chrome** = 44 + 56 + 92 = 192 px à partir de 375 px de large ; 44 + 56 + 48 + 92 = 240 px en dessous.
+
+#### Objectifs de taille
+
+Vérifiés en e2e dans l’émulation Chromium de Playwright (insets à 0), calculés avec la formule, avec une marge :
+
+| Fenêtre | Calcul | Largeur du plateau attendue |
+|---------|--------|-----------------------------|
+| 390 × 664 (fenêtre émulée de l’iPhone 13) | (664 − 192) / 1,5466 ≈ 305 px | au moins 300 px |
+| 375 × 667 | ≈ 307 px | au moins 295 px |
+| 390 × 844 | limitée par la largeur : 358 px | au moins 350 px |
+| 390 × 763 (hauteur que garde l’app iPhone 13 installée, après ses insets) | limitée par la largeur : 358 px | au moins 350 px |
+| 320 × 480, assistant du 7 ouvert compris | (480 − 240) / 1,5466 ≈ 155 px | au moins 150 px |
+| 480 × 320 (paysage) | ≈ 112 px | au moins 105 px |
+| 1280 × 800 (paysage) | (800 − 32) / 1,5466 ≈ 497 px | au moins 470 px |
+
+À 390 × 664, les cavaliers de l’anneau font environ 18 px et les cases sont à environ 19 px l’une de l’autre : +22 % pour les cavaliers et +13 % pour les cases par rapport à l’ancien plateau carré à cette taille.
+
+En paysage, rien ne change : la hauteur du plateau est celle de l’écran moins la marge extérieure de 16 px en haut et en bas (32 px en tout, aucune sur un écran de 400 px de haut ou moins), et sa largeur vaut au plus celle de l’écran moins 368 px (le panneau de 320 px, l’écart de 16 px et deux marges extérieures de 16 px).
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- iPhone 13 en app installée (390 × 844, insets de 47 px en haut et 34 px en bas) : limité par la largeur, 358 px, l’objectif tient.
+- Dans Safari avec ses barres, les insets sont supposés à 0 (≈ 305 px). Si Safari y annonçait l’inset du bas de 34 px, on tomberait à ≈ 283 px, sous l’objectif de 300 px.
+
+### UI Considerations (addendum C+)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| loading, error | media: board drawing | ✅ covered | Écartés : le plateau est du code, rien ne se charge. Les états « chargement » et « erreur » de l’image du plateau et leurs textes disparaissent |
+| long-text | static-content: numéros des cases | ✅ covered | Un ou deux chiffres par case ; exception typographique du dessin ci-dessus |
+| long-text | interactive-control: consigne dans la rangée de 56 px | ✅ covered | Trois lignes au plus, puis le texte défile à l’intérieur |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain dans 01-UAT à la fin de la phase (plan 01-36) : C+ sur iPhone, les places par couleur, la taille des cavaliers, les cartes du tapis et l’écran compact |
+
+## Addendum 2026-10-14 — Plateau galet
+
+Source : recette, test 4 (01-UAT.md, la ligne « decision »), puis le message de Romain du 2026-10-14 sur le téléphone en largeur. Maquette : `design/plateau-galet.dc.html` ; artefact https://claude.ai/artifact/5Z4nttzgv3VvxfbifroU1A, page « Plateaux en bois », planches « Ordinateur · galet », « iPhone · galet » et « Sur les écrans ».
+
+Cet addendum remplace l’addendum « Plateau C+ ». Il est le contrat des plans qui suivent 01-33 (01-34 à 01-41, replanifiés après la décision du paysage obligatoire). La géométrie et le dessin des deux plateaux galet sont des données pures dans `packages/board/src/scene.ts` et `packages/board/src/art.ts` (plan 01-32). Les cavaliers de Romain sont livrés dans `apps/web/src/assets/plateau/` et les images de RULES.md sont dessinées sur le galet en largeur (plan 01-33).
+
+### Décidé par Romain (Révisé par Romain le 2026-10-14)
+
+Seuls ses mots, tels que 01-UAT.md et son message les rapportent.
+
+- **Le C+ est abandonné**, après l’avoir vu dans le jeu : « Bon, ben ça ne marche pas ce plateau, c’est trop laid. » Ses reproches : « trop plat, sans charme » et « la forme ». Et : « Il faut une version iphone et une version ordinateur, mais avec des graphismes adaptés. Là, on ne voit rien sur ordi ».
+- **Le plateau galet en bois** de `design/plateau-galet.dc.html` : « J’aime bien le galet », dit après la « correction des transparences du tapis ». Puis « galet partout », noté alors comme l’ordinateur en largeur (planche « Ordinateur · galet ») et l’iPhone en hauteur (planche « iPhone · galet »).
+- **Le paysage obligatoire**, le même jour : « Pour la version iphone, oblige à jouer en format paysage, ça permettra d’utiliser le même plateau », puis « Oui, paysage obligatoire ». Il n’y a donc plus qu’un plateau, le galet en largeur, sur l’ordinateur comme sur le téléphone. Le galet en hauteur ne sert plus au jeu.
+- **Toujours valables**, de ses mots précédents :
+  - son propre camp centré en bas, celui de son partenaire centré en haut ;
+  - aucun cadre de rappel des règles sur le plateau ;
+  - « Compacter l’écran » sur le téléphone ;
+  - pas d’ambiance sonore.
+
+### Dérivé de la maquette ou du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (maquette ou planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-41).
+
+1. **Le tapis : sa texture et sa forme.** La texture de bruit du tapis est coupée au tapis seul : c’est ainsi qu’est lue la « correction des transparences du tapis » de la maquette. Le tapis est l’ellipse verte de la planche « Ordinateur · galet ». Le rectangle arrondi de la planche « iPhone · galet » ne sert plus au jeu.
+2. **Les places par couleur.** En bas le joueur humain, à gauche le joueur suivant dans le sens horaire, en haut son partenaire, à droite le précédent. Aucune rotation : le dessin ne tourne jamais, ce sont les couleurs qui prennent leur côté (`bottomOf(k)`, `sceneXY(place, k)`, k = `quarterTurnsFor(couleur du joueur)`).
+3. **La taille des cavaliers du galet.** 0,95 pas sur l’anneau, 0,82 dans une maison, 0,78 dans une écurie. Les pieds sont 0,28 w sous le centre de la case (w = la largeur du cavalier).
+4. **Les cartes du tapis et les piles.** Chaque carte est tournée vers sa place (0, 90, 180 ou 270°, plus l’inclinaison fixe de ±4°). Le talon et la défausse sont de part et d’autre du centre, à l’échelle 0,95. Les cartes font 1,3 × 1,82 pas. Tout le tapis est le bouton « Sur le tapis », dans la forme du tapis.
+5. **L’écran plus haut que large.** Safari ne sait pas bloquer l’orientation : en portrait, le téléphone montre une invitation à le tourner, « Tourne ton téléphone », à la place du plateau. Le passage se fait en direct, sans recharger : les mouvements en cours sautent à leur fin, la partie est gardée telle quelle et reprend dès que l’écran est de nouveau en largeur. Pendant ce temps, les joueurs de l’ordinateur attendent. Une fenêtre d’ordinateur plus haute que large montre la même invitation, avec « Élargis la fenêtre ». Le texte de l’invitation, dérivé et à confirmer : le titre « Tourne ton téléphone » sur un téléphone et « Élargis la fenêtre » sur un ordinateur, et sous le titre la ligne « La partie t’attend. Elle reprend dès que l’écran est en largeur. »
+6. **Les modes d’écran et leurs seuils.** Le plateau est en largeur partout. « barre » : en largeur à partir de 960 × 600. « barre compacte » : les autres écrans en largeur (téléphone tenu en largeur, petite fenêtre). « tourner » : tout écran plus haut que large (point 5). Le galet en hauteur, le « dock » en portrait de l’addendum C+ et la pile de 01-24 ne servent plus au jeu.
+7. **La barre du bas sur ordinateur.** Le plateau prend la largeur. Dessous, une barre de 160 px :
+   - à gauche, les infos, environ 240 px : la ligne du tour, la ligne du donneur, les pastilles d’équipe et la roue des réglages ;
+   - au milieu, la main en cartes normales de 88 × 124 ;
+   - à droite, la zone d’action, au moins 320 px ;
+   - l’assistant du 7 prend la place de la main et de la zone d’action.
+
+   Largeur du plateau = min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (0,5 + head room), 1600 px). Cela donne environ 1227 px à 1280 × 800, au lieu des 1280 de la planche « Sur les écrans » : il faut garder la place des têtes des cavaliers de la rangée du haut et celle de la barre de 160 px.
+8. **La barre compacte (téléphone tenu en largeur, petites fenêtres).** *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».* Révisé par le planificateur le 2026-10-14, après 01-33, pour approcher des cases d’environ 20 px sur l’iPhone 13 tenu en largeur : la barre de 136 px n’en donnait qu’environ 15. C’est ainsi que s’applique « Compacter l’écran » au téléphone en largeur (plan 01-37) :
+   - les infos dans une colonne de 96 px à gauche du plateau : la roue des réglages, la ligne du tour, la ligne du donneur et les deux pastilles d’équipe, les unes sous les autres ; les lignes peuvent passer à la ligne. Comme sous 360 px de large, les mots « Tour de » y sont masqués à l’écran et restent lus par les lecteurs d’écran, pour que tout tienne dans les 200 px qu’un écran de 320 px de haut laisse à côté du plateau ;
+   - à partir de 640 px de large, une seule rangée de 64 px sous le plateau, d’un bord de l’écran à l’autre, avec des marges de 12 px : la main à gauche (240 px), la consigne au milieu (Label 14, trois lignes au plus, un texte plus long défile à l’intérieur), les boutons de l’état côte à côte à droite, dans une zone d’environ 184 px gardée dans tous les états ;
+   - sous 640 px de large, deux rangées : 56 px (la consigne à gauche, les boutons à droite) et 64 px (la main) ;
+   - largeur du plateau = min(100vw − 108 px − insets, (100dvh − barre − insets) / (0,5 + head room)), avec une barre de 64 px ou de 120 px ; 108 px = la colonne de 96 px et la marge de 12 px à droite du plateau ;
+   - l’assistant du 7 et le choix « Lequel ? » tiennent dans la barre, sans jamais la rendre plus haute :
+     - sur une rangée, l’assistant met à gauche une ligne de 20 px (le titre, « Reste n », la consigne et le plan, qui défile de côté) au-dessus des pastilles de pas, et à droite ses trois boutons ;
+     - sur deux rangées, la ligne et le plan sont dans la rangée de 56 px, les pastilles et les boutons dans celle de 64 px ;
+     - les pastilles de pas défilent de côté quand la place manque et gardent leurs 44 × 44 ;
+     - le choix « Lequel ? » met ses pastilles de 44 × 56 à la place de la consigne et « Choisir un autre cheval » à la place des boutons. Dans l’assistant sur une rangée, il prend toute la rangée et la ligne de 20 px s’efface le temps du choix (20 + 56 px ne tiennent pas dans 64) ;
+   - les infos restent visibles.
+9. **Ce que la barre compacte garde du dock** (section « Écran compact » de l’addendum C+). *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».* Elle gardait :
+   - les cartes compactes de 64 × 90 en une rangée plate (ni rotation ni décalage vers le bas), leur haut 8 px sous le bord haut de la barre, la carte choisie montée de 8 px ;
+   - au moins les 56 px du haut de chaque carte visibles (indices et symbole), le bas coupé au bord bas de la barre ;
+   - avec cinq cartes, des tranches d’au moins 44 px (une main d’au moins 240 px) ;
+   - des boutons d’au moins 44 px de haut, en Label 14 gras sur deux lignes au plus, un seul bouton principal au plus, « Avance rapide » avec son icône et son libellé ;
+   - inchangés : les textes, l’ordre du focus (Réglages → cavaliers allumés → tapis → boutons d’action → cartes de la main), les raccourcis clavier et leurs aides, les cibles de 44 px et la règle du choix « Lequel ? ».
+10. **Les objectifs de taille et les appareils réels** (section « Objectifs de taille » ci-dessous). *Remplacé sur le téléphone le 2026-10-15 : voir l’addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone ».*
+11. **Les images des règles sur le galet en largeur.** Les 112 images de RULES.md (`docs/regles/<id>.webp`) montrent le plateau du jeu, le galet en largeur, cavaliers compris. « avant » est au-dessus de « après » : deux plateaux 2:1 empilés font une image carrée de 1200 × 1200, chaque moitié de 1200 × 600, la place dont c’est le tour en bas.
+12. **Les ombres sans flou.** Les ombres CSS de la maquette sont dessinées comme des copies décalées, sans filtre de flou.
+
+### Faits techniques (sans confirmation)
+
+- **Scènes** = la maquette × 2, citées de `scene.ts` :
+  - en largeur (le plateau du jeu) : 3200 × 1600, pas ≈ 107,05, head room ≈ 0,0217 de la largeur ;
+  - en hauteur : 2000 × 3000, pas ≈ 108,37, head room ≈ 0,0354. Cette géométrie, qui ne servait plus au jeu, a été retirée du code par le plan 01-40.
+- **Couleurs du galet** = la palette de la maquette (`PALETTE`) : HEX bleu `#1F4FA8`, jaune `#E3A90C`, rouge `#C3271D`, vert `#1F8A3C` ; LIGHT `#5C86D4`, `#F7D35A`, `#EE6B5E`, `#5CC27A` ; ON blanc, sauf l’encre sur le jaune ; INK `#2A1A0E` ; CREAM `#FBF4E2`. Les sprites des cavaliers et les pastilles des places ne changent pas.
+- **Le tapis** en largeur : une ellipse de demi-axes 600 et 224 (boîte de 1200 × 448, centrée en (1600 ; 800)). Talon (1450 ; 800), défausse (1750 ; 800), cartes de 139,2 × 194,8. En hauteur, il reste le rectangle arrondi de 720 × 840, de rayon 88.
+- **Le dessin** est dans sa propre couche svg (`will-change: transform`) ; les animations ne le touchent jamais.
+- **Les cavaliers de Romain** (`apps/web/src/assets/plateau/cav-<couleur>.png`, 157 × 209, copiés tels quels de la maquette) : un par couleur, dans le coin du côté vers lequel sa couleur part, à 0,6 du chemin vers le coin de la superellipse, haut de 2,6 pas, opacité 0,85, jamais une cible (tournés vers leur camp depuis le 2026-10-15, addendum « Recette 3 »). Leur ligne de licence est `plateau-cavaliers`.
+- **Ce que l’addendum remplace** :
+  - la scène, la palette, les liens, les rails, les flèches et la bande du C+ ;
+  - le panneau latéral de la mise en page en paysage ;
+  - la règle responsive du C+ ;
+  - pour le jeu, le galet en hauteur et les mises en page en portrait (le « dock » et la pile de 01-24).
+- **Typographie, exception.** Les numéros des cases sont un élément du dessin, en Caveat 700 de 0,52 à 0,58 pas (`aria-hidden`). Ils échappent au minimum de 14 px et à la règle des deux graisses. Le texte d’interface posé dans la scène (badges, lettres, « D ») garde 14 px et plus.
+- **Clavier.** L’addendum « Raccourcis clavier » ne change pas. Sur ordinateur, les infos sont dans la zone gauche de la barre, et aucun bouton n’y est ajouté.
+
+### Objectifs de taille
+
+Vérifiés en e2e dans l’émulation Chromium de Playwright (insets à 0). Hauteur du plateau = (0,5 + head room) × largeur, avec head room ≈ 0,0217, soit 0,5217 × largeur. Le pas vaut largeur × 107,05 / 3200, et un cavalier de l’anneau 0,95 pas.
+
+| Fenêtre | Mode | Calcul | Largeur du plateau attendue | Pas |
+|---------|------|--------|-----------------------------|-----|
+| 844 × 390 | barre compacte (64 px) | min(844 − 108, (390 − 64) / 0,5217) ≈ 625 px | au moins 610 px | ≈ 20,9 px |
+| 750 × 342 (la fenêtre « iPhone 13 landscape » de Playwright) | barre compacte (64 px) | min(642, 278 / 0,5217) ≈ 533 px | au moins 520 px | ≈ 17,8 px |
+| 667 × 375 | barre compacte (64 px) | min(559, 311 / 0,5217 ≈ 596) ≈ 559 px | au moins 545 px | ≈ 18,7 px |
+| 568 × 320 | barre compacte (120 px) | min(460, 200 / 0,5217) ≈ 383 px | au moins 370 px | ≈ 12,8 px |
+| 480 × 320 | barre compacte (120 px) | min(372, 383) ≈ 372 px | au moins 360 px | ≈ 12,4 px |
+| 1024 × 640 | barre | (640 − 160) / 0,5217 ≈ 920 px | au moins 900 px | ≈ 30,8 px |
+| 1280 × 800 | barre | (800 − 160) / 0,5217 ≈ 1227 px | au moins 1200 px | ≈ 41 px |
+| 1440 × 900 | barre | limitée par la largeur : 1440 − 32 = 1408 px | au moins 1390 px | ≈ 47,1 px |
+| 390 × 844, 375 × 667, 320 × 480 (portrait) | tourner | aucun plateau : l’invitation à tourner l’écran | — | — |
+
+Cavaliers de l’anneau : ≈ 19,9 px à 844 × 390, ≈ 16,9 px à 750 × 342, ≈ 11,8 px à 480 × 320, ≈ 39 px à 1280 × 800.
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- iPhone 13 en app installée, tenu en largeur : écran de 844 × 390, encoche de 47 px de chaque côté et inset du bas de 21 px, soit 750 × 369 utiles. min(844 − 94 − 108, (390 − 21 − 64) / 0,5217) ≈ 585 px de large, des cases à ≈ 19,6 px l’une de l’autre : l’objectif d’environ 20 px est atteint.
+- iPhone 13 dans Safari, tenu en largeur : la hauteur visible dépend des barres de Safari et n’est pas connue ici.
+  - Si elle vaut 342 px, comme dans la fenêtre de Playwright : ≈ 533 px (pas ≈ 17,8 px).
+  - Si Safari annonce aussi l’inset du bas de 21 px : ≈ 493 px (pas ≈ 16,5 px).
+  - Romain la mesure sur son iPhone pendant la recette (plan 01-41).
+
+Comparaison honnête, pour la recette de Romain :
+- La barre de 136 px de 01-33 (une rangée de 44 px sur une rangée de main de 92 px) aurait donné ≈ 487 px à 844 × 390 (pas ≈ 16,3 px) et ≈ 447 px sur l’iPhone 13 installé (pas ≈ 15 px). La barre révisée donne ≈ 625 px (pas ≈ 20,9 px) et ≈ 585 px (pas ≈ 19,6 px).
+- Le galet en hauteur aurait donné, sur l’iPhone 13 en portrait dans Safari (390 × 664), un plateau d’environ 307 px de large, un pas d’environ 16,7 px et des cavaliers d’environ 15,8 px. Le galet en largeur fait mieux tenu en largeur, et c’est le même plateau que sur l’ordinateur.
+- Sur un petit téléphone tenu en largeur (480 × 320), tout est plus petit : un pas de 12,4 px.
+
+### UI Considerations (addendum galet)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| loading, error | media: board drawing | ✅ covered | Écartés : le plateau est du code. Les cavaliers de Romain sont quatre petits fichiers livrés avec l’app ; le plateau est dessiné sans eux le temps qu’ils arrivent (décor, jamais une cible) |
+| long-text | interactive-control: consigne dans la barre compacte | ✅ covered | 64 px (trois lignes) ou 56 px (deux lignes), puis le texte défile à l’intérieur |
+| empty | static-content: écran plus haut que large | ✅ covered | L’invitation à tourner l’écran remplace le plateau ; la partie est gardée telle quelle |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain à la fin de la phase (plan 01-41) : les douze points dérivés ci-dessus, le galet en largeur sur l’iPhone et sur l’ordinateur, la taille des cavaliers |
+
+## Addendum 2026-10-15 — Recette 3 de Romain
+
+Source : la recette refaite par Romain le 2026-10-15 (01-UAT.md, tests 23 à 30) et ses choix aux questions posées ensuite (01-CONTEXT.md, section « Recette 3 de Romain »). Cet addendum tient une sous-section par changement : d’abord les mots de Romain, puis ce qui est « à confirmer par Romain ». Il s’ouvre ici avec le plan 01-44 ; les plans 01-45 à 01-53 y ajoutent les leurs. Ce qu’il ne dit pas reste régi par les addendums précédents.
+
+### Les cavaliers du galet tournés vers leur camp
+
+**Les mots de Romain** (recette 3, test 25) : « Les chevaux gravés sur le plateau sont tous orientés de la même façon mais je voudrais les tourner pour que les sabots soient dirigés vers chaque camp ».
+
+**Son choix** le 2026-10-15, entre le quart de tour par côté et une orientation en biais vers le centre du camp : « Quart de tour (Recommandé) ». Chaque cavalier tourne d’un quart de tour selon le côté de sa couleur, comme les cartes du tapis : 0° en bas (inchangé), 90° à gauche, 180° en haut (vu tête en bas depuis le bas), 270° à droite. Ses sabots pointent vers le bord de son propre camp.
+
+**À confirmer par Romain** (recette de fin de phase, plan 01-54) : le sens des quatre cavaliers sur son iPhone et sur son ordinateur, ou un autre angle s’il le préfère.
+
+**Faits techniques (sans confirmation)** :
+- L’angle vient de `riderBox(color, k)` (`packages/board/src/scene.ts`) : c’est l’angle que `seatCard` donne à la carte de la même place (`ROT`, 0, 90, 180 ou 270).
+- Le cavalier tourne autour du centre de son image : `boardArt` le dessine en (−w/2 ; −h/2) avec `translate(centre) rotate(angle)`, sans `rotate` à 0°. Le jeu (`BoardArt.svelte`, attribut `data-rider-angle`) et les images des règles (`artSvg`) lisent la même forme.
+- Le coin, le centre, la taille (2,6 pas de haut), l’opacité 0,85 et la couleur ne changent pas ; les dessins `cav-<couleur>.png` de Romain ne sont pas retouchés, et aucun cavalier ne devient une cible.
+- Dégagement mesuré pour les quatre places k : au moins 1,29 pas entre l’empreinte tournée et chaque case de l’anneau, de maison ou d’écurie (cases comptées comme des disques d’un demi-pas), comme avant. Tournés à 90° ou 270°, les cavaliers de gauche et de droite font 278 × 209 unités et restent au-dessus ou au-dessous du tapis (celui du haut finit vers y 561, le tapis commence à y 576). `scene.test.ts` le vérifie pour chaque k.
+- Les 118 images de RULES.md (`docs/regles/`) sont redessinées avec les cavaliers tournés ; deux rendus successifs sont identiques octet pour octet.
+
+### Un seul cheval pour la carte
+
+**Les mots de Romain** (recette 3, test 27) : « Quand il ne reste qu’un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet évidemment ».
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) : quand un seul cheval peut jouer la carte choisie, il est choisi tout seul et l’aperçu s’affiche avec « Jouer ». Le jeu ne joue toujours pas à la place du joueur (D-19) : il faut toujours toucher « Jouer ». La règle vaut dès qu’un seul cheval peut jouer la carte, même s’il en reste d’autres sur le plateau.
+
+**Les cas** :
+- **Une carte ordinaire, le 4, la Dame, le Roi ou l’As qui ne peut que sortir** : un seul coup possible avec cette carte, et toucher la carte (ou son chiffre au clavier) montre tout de suite le trajet, l’ombre, les prises et la phrase du coup, avec « Jouer » et « Annuler ce coup ». Le cheval porte la marque du cheval choisi ; pour une sortie, les autres chevaux de l’écurie restent éclairés. La consigne « Un seul cheval peut jouer cette carte : touche-le. » n’existe plus : quand plusieurs chevaux sont éclairés, la consigne reste « Choisis un cheval. ».
+- **L’As et le Roi** : quand sortir et avancer sont possibles tous les deux, la question « Que veux-tu faire ? » est toujours posée. Après « Avancer », un seul cheval sur l’anneau donne tout de suite son aperçu ; plusieurs chevaux s’éclairent comme avant.
+- **Le Valet** : il demande toujours les deux chevaux, le sien puis celui à échanger, même avec un seul échange possible.
+- **Le 7** : s’il n’a qu’un seul partage possible (en pratique un seul cheval qui peut bouger, ou un partage imposé par G16 et G12), l’assistant s’ouvre déjà rempli : « Tout est réparti. » (reste 0), la ligne du partage, les trajets et les ombres, et son « Jouer » actif. Avec deux partages ou plus, il s’ouvre vide, comme avant.
+- **Échap, « Annuler ce coup », « Changer de carte »** : un pas en arrière depuis un aperçu venu tout seul repose la carte (rien de choisi), puisqu’il n’y avait pas de cheval à choisir. Après « Avancer » de l’As ou du Roi, Échap revient à la question. Sur le 7 rempli tout seul, Échap, « Retirer le dernier pas » (⌫) et « Tout annuler » reposent la carte. Ces lignes remplacent, pour ces cas, celles du tableau « Échap revient d’un pas » de l’addendum « Raccourcis clavier ».
+- **Clavier** : sur ordinateur, le chiffre de la carte puis Entrée jouent le coup d’un cheval seul, sans lettre. Les lettres A à D servent toujours à choisir parmi plusieurs chevaux éclairés.
+
+**Faits techniques (sans confirmation)** :
+- Le réducteur `turnUi` (`apps/web/src/game/turnUi.ts`) ouvre l’aperçu avec `auto: true` quand la carte a un seul candidat de mouvement (après la question de l’As ou du Roi) ; il remplit le 7 quand `sevenPlans(view, siège, carte, 2)` du moteur ne rend qu’un partage. Le moteur ne change pas.
+- Un pas automatique ne rend jamais d’action : seuls « Jouer » (`confirm`), « Passer cette carte » et « Poser mes cartes » en rendent une (D-19, D-20) ; `turnUi.test.ts` le vérifie (describe « un seul cheval pour la carte (recette 3, test 27) »).
+- Toucher à nouveau le cheval seul dans son aperçu le laisse tel quel ; Échap depuis cet aperçu ne repasse jamais par un état « carte choisie » qui rouvrirait le même aperçu.
+
+### La donne un peu moins rapide
+
+**Les mots de Romain** (recette 3, test 28) : « La distribution de cartes est un tout petit peu trop rapide ».
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) : chaque carte de la donne vole 300 ms au lieu de 250, et 55 ms séparent deux cartes au lieu de 40. Les 20 cartes d’une première donne se posent en ≈ 1,35 s au lieu de ≈ 1,01 s (300 + 19 × 55 = 1 345 ms) ; les 16 cartes des donnes suivantes en ≈ 1,13 s. Les cartes du joueur se retournent ensuite avec les mêmes 300 ms et 55 ms. En « Avance rapide », tout reste multiplié par 0,4 : 120 ms par carte, 22 ms d’intervalle (≈ 0,54 s pour 20 cartes). « Réduire les animations » garde son unique fondu de 150 ms. Romain peut demander un autre rythme, plus lent ou plus rapide.
+
+**Faits techniques (sans confirmation)** :
+- Une seule source de vérité : `MOTION.dealCard` (300) et `MOTION.dealStagger` (55) dans `packages/board/src/motion.ts`, avec les mots de Romain en commentaire. Seules ces deux constantes changent ; aucun autre temps de mouvement ne bouge.
+- `dealFlights` (`apps/web/src/board/cardFx.ts`) en tire le délai n × 55 ms et la durée de 300 ms de chaque carte, `HandFan.svelte` le retournement des cartes du joueur, et `cardsDuration(count, "deal", mode)` (lu par `eventDuration` pour le rythme du Director et des robots) la durée de la donne. Le Director attend que les cartes se posent avant la suite : le bruit de la donne, le bandeau et le rythme des robots suivent la donne sans aucun nombre écrit en dur.
+- `motion.test.ts`, `cardFx.test.ts` et les deux tests de la donne de `e2e/animations.spec.ts` (vitesse normale et « Avance rapide ») mesurent ces valeurs ; la capture de la donne fige toujours les 20 cartes en vol avant le chargement de la page.
+
+### Le plateau sur toute la hauteur du téléphone
+
+Plans 01-47 (la mise en page) et 01-48 (chaque état prouvé, ce contrat). Il remplace, pour le téléphone tenu en largeur et les petites fenêtres, les points 8, 9 et 10 de l’addendum « Plateau galet » (la barre compacte de 01-37). L’ordinateur ne change pas : sa barre de 160 px (point 7 du même addendum) garde ses largeurs, ≈ 1227 px de plateau à 1280 × 800.
+
+#### Décidé par Romain
+
+- **Ses mots** (recette 3, test 24, révise D-07) : « Le plateau de jeu est trop petit sur iphone ».
+- **Son choix**, à la question posée ensuite : « Plateau sur toute la hauteur (Recommandé) ».
+
+#### Dérivé du planificateur, à confirmer par Romain
+
+Conséquence de mise en œuvre (planificateur), à confirmer par Romain. Chaque point est repris, sous son numéro, dans la recette de fin de phase (plan 01-54).
+
+1. **La ligne de consigne.** Une seule ligne de 24 px au-dessus du plateau, centrée sur lui : la consigne, le dernier coup des ordinateurs, ou, pendant le 7, « Reste n » en ambre suivi de la consigne et du partage, joints par « · ». En Label 14 crème. Un texte trop long finit par « … » ; le texte entier reste dans la région lue par les lecteurs d’écran et dans le titre (au survol). Une prise d’un cheval de son équipe passe en tête de ligne, pour que « … » ne la coupe jamais. Pendant « Lequel ? », la ligne dit « Lequel de ces chevaux ? » (texte nouveau). Pendant l’attente de l’échange, les trois donneurs (sablier ou coche) prennent la place de la ligne.
+2. **Les deux bandes.** Une bande d’au moins 60 px de chaque côté du galet, sur toute la hauteur : les coins arrondis du galet ne laissent pas de place aux cartes sans couvrir des cases de l’anneau. Le plateau est centré et les bandes prennent ce qui reste ; aux cinq tailles visées le plateau est limité par la largeur et chaque bande fait exactement 60 px.
+3. **La main en colonne.** En bas de la bande de gauche : des cartes de 52 × 73, chacune montrant au moins ses 44 px du haut (son indice), la dernière entière ; cinq cartes font 4 × 44 + 73 = 249 px, et la boîte garde cette hauteur pour ne jamais sauter quand une carte part. La carte choisie avance de 6 px vers le plateau et garde sa place dans la pile. Les cartes injouables sont couvertes d’un voile noyer opaque (des cartes à 40 % laissaient voir celle du dessous). Une main vide montre « Plus de cartes » ; la phrase qui suit est lue, pas affichée. Les flèches haut et bas parcourent la colonne.
+4. **La pastille et sa feuille.** En haut de la bande de gauche, un bouton de 52 × 44 : le point du tour (ambre quand c’est à toi), la pastille de la place dont c’est le tour, et dessous « n–m », les chevaux rentrés de « nous » et d’« eux », en chiffres tabulaires. Son nom lu : « Infos de la partie : {la ligne du tour}, nous n sur 8, eux m sur 8 ». Un toucher ouvre la feuille « Infos de la partie » : la ligne du tour, le donneur, « Donne n sur 3 », les deux pastilles d’équipe, et « Fermer » ; Échap la ferme.
+5. **« Réglages » et « Avance rapide » en haut à droite.** La roue (44 × 44) en haut de la bande de droite, puis, pendant que l’ordinateur joue, « Avance rapide » en icône seule (44 × 44, bouton à bascule, son nom et son titre « Avance rapide »).
+6. **Les boutons de l’état.** En bas de la bande de droite, empilés à 4 px : 58 px de large (« Annuler » mesure 52,4 px en Label 14 gras et ne tenait pas dans 52), au moins 48 px de haut, deux lignes au plus. Un seul bouton principal au plus, le plus bas. Exception gardée de 01-36 : la question de l’As et du Roi garde ses deux boutons ambre, « Sortir » et « +n ».
+7. **Les libellés courts.** Dans ce mode seulement ; le nom lu et le titre gardent le libellé entier :
+
+   | Libellé entier | Libellé court |
+   |----------------|---------------|
+   | Annuler ce coup | Annuler |
+   | Changer de carte | Autre carte |
+   | Choisir un autre cheval | Autre cheval |
+   | Passer cette carte | Passer |
+   | Poser mes cartes | Poser |
+   | Sortir un cheval | Sortir |
+   | Avancer de n | +n |
+   | Jouer quand même | Jouer (l’avertissement reste dans la ligne de consigne) |
+   | Retirer le dernier pas | Retour |
+   | Tout annuler | Effacer |
+   | Jouer | Jouer (inchangé) |
+
+8. **Le 7 dans les bandes.** Le titre « Le 7 : répartis tes pas » n’est plus que le nom de la région. La ligne « Reste n · consigne · partage » est dans la ligne de consigne. Les pastilles de pas du cheval choisi (44 × 44, à 4 px) prennent la place de la main, en colonne ; quand la bande est trop courte pour les sept (déjà à 750 × 342, où les pastilles 6 et 7 sont sous le bord, et à 480 × 320), la colonne défile et chaque pastille garde ses 44 × 44. « Retour », « Effacer » et « Jouer » sont en bas de la bande de droite.
+9. **« Lequel ? » dans les bandes.** Les pastilles A à D (44 × 56) prennent la place de la main (ou des pastilles de pas) dans la bande de gauche, et « Autre cheval » la place des boutons dans la bande de droite.
+10. **Le message (toast) sur le tapis.** Il est centré sur le tapis, au plus 3/4 de la largeur du plateau (et 480 px), jamais sur une bande ni sur la rangée du bas de l’anneau.
+11. **Le badge « +n » de l’aperçu.** Sur une case de la rangée du haut, il est descendu juste assez pour rester sur le plateau : il ne monte plus dans la ligne de consigne (vu par 01-47 à 750 × 342, corrigé par 01-48). La tête d’un cavalier levé de la rangée du haut peut, elle, monter dans cette ligne : c’est sa place.
+12. **Les petits téléphones.** Limités par leur largeur, ils perdent 2 à 3 % : 547 px au lieu de 559 à 667 × 375, 360 px au lieu de 372 à 480 × 320. Tous les autres gagnent (tableau ci-dessous).
+
+#### Faits techniques (sans confirmation)
+
+- **Le mode** s’appelle `compact` (`data-chrome="compact"`, `COMPACT_QUERY` dans `apps/web/src/ui/screen.svelte.ts`, la même requête qu’avant : en largeur, sous 960 × 600). Les deux autres modes ne changent pas : `bar` (l’ordinateur) et `rotate` (« Tourne ton téléphone »).
+- **La formule** (`Game.svelte`, bloc `compact`) : largeur du plateau = max(0, min(100vw − 2 × 60 px − insets, (100dvh − 24 px − insets) / 0,5)). Variables `--strip: 60px`, `--strip-button: 58px`, `--prompt-row: 24px`, `--board-size`. Pas de head room propre (`--head-room: 0`) : la ligne de consigne en tient lieu. La grille : colonnes `minmax(60px, 1fr) plateau minmax(60px, 1fr)`, rangées `1fr / 24px / plateau / 1fr`, la ligne et le plateau gardés ensemble et centrés dans la hauteur.
+- **Les composants en parties** : `ActionZone` (`part` = prompt | buttons | fast), `SevenPanel` (line | chips | buttons, dans une région `[data-seven-panel]` en `display: contents`), `PawnTray` (chips | close), `HandFan` (`compact`, la colonne de `columnLayout` dans `cards/fan.ts`), `InfoBar` (forme `pill`), `SettingsButton.svelte`.
+- **L’ordre du focus** (l’ordre du DOM) : la pastille, « Réglages », « Avance rapide », les cavaliers éclairés, le tapis, les pastilles du 7 ou de « Lequel ? », les boutons de l’état, la main. `e2e/finition.spec.ts` vérifie que la pastille vient d’abord, puis « Réglages ».
+- **Le badge « +n »** : `badgeAt(y, size)` dans `apps/web/src/board/Overlay.svelte` garde le haut du rond (21 px de rayon et son trait) au-dessus du bord haut de la scène ; partout, sur l’ordinateur aussi.
+- **Les preuves** (`apps/web/e2e/compact.spec.ts`) : le traceur de la Dame et celui du 7 à 750 × 342 ; « chaque état du tour, plateau sur toute la hauteur » à 750 × 342 et 480 × 320 (aucune carte, deux chevaux éclairés, l’aperçu venu tout seul, la question de l’As et du Roi, les deux touchers du Valet, « Lequel ? » seul et dans le 7, le 7 et ses pastilles, l’échange et son attente, la main morte, la main posée, l’attente des ordinateurs) : chaque contrôle dans l’écran, jamais sur le plateau, d’au moins 44 × 44, trois boutons d’état au plus, un seul principal (sauf l’As et le Roi), une ligne de consigne d’une ligne, aucun défilement de la page ; puis les cinq tailles.
+
+#### Objectifs de taille
+
+Mesurés en e2e dans l’émulation Chromium de Playwright (insets à 0), plan 01-48. Le pas vaut largeur × 107,05 / 3200.
+
+| Fenêtre | Calcul | Mesuré | Objectif | Avant (barre compacte de 01-37) | Pas |
+|---------|--------|--------|----------|---------------------------------|-----|
+| 844 × 390 | min(844 − 120 = 724, (390 − 24) / 0,5 = 732) | 724 px | au moins 710 | 625 px | ≈ 24,2 px |
+| 750 × 342 (la fenêtre « iPhone 13 landscape » de Playwright) | min(630, 636) | 630 px | au moins 615 | 533 px | ≈ 21,1 px |
+| 667 × 375 | min(547, 702) | 547 px | au moins 535 | 559 px | ≈ 18,3 px |
+| 568 × 320 | min(448, 592) | 448 px | au moins 435 | 383 px | ≈ 15,0 px |
+| 480 × 320 | min(360, 592) | 360 px | au moins 350 | 372 px | ≈ 12,0 px |
+
+À chaque taille, les deux bandes mesurent 60 px et la ligne de consigne 24 px, juste au-dessus du plateau. Captures : `apps/web/test-results/galet-emulation-{844x390,750x342,667x375,568x320,480x320}.png` (une carte choisie, son aperçu affiché).
+
+Appareils réels, calculés et laissés à la recette de Romain (non vérifiés en e2e) :
+- **iPhone 13 dans Safari, tenu en largeur** : 844 × 342 visibles, encoche de 47 px de chaque côté et inset du bas de 21 px. min(844 − 94 − 120 = 630, (342 − 21 − 24) / 0,5 = 594) ≈ **594 px** de large au lieu de ≈ 493, des cases à ≈ **19,9 px** l’une de l’autre.
+- **iPhone 13 en app installée, tenu en largeur** : 844 × 390, mêmes insets. min(630, (390 − 21 − 24) / 0,5 = 690) ≈ **630 px** au lieu de ≈ 585, des cases à ≈ **21,1 px**.
+- Romain dit, pendant la recette (plan 01-54), quelle largeur il voit et si la main, les boutons et la pastille se prennent bien au pouce.
+
+#### UI Considerations (plateau sur toute la hauteur)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| long-text | interactive-control: ligne de consigne | ✅ covered | Une ligne de 24 px, « … » à la fin ; le texte entier dans la région aria-live et le titre ; l’avertissement d’une prise de son équipe en tête |
+| long-text | interactive-control: boutons de la bande de droite | ✅ covered | Libellés courts de 58 px de large, deux lignes au plus ; le nom lu et le titre gardent le libellé entier |
+| overflow | interactive-control: pastilles de pas du 7 | ✅ covered | Colonne qui défile dans la bande de gauche, chaque pastille de 44 × 44 (750 × 342 et 480 × 320) |
+| overlap | static-content: badge « +n » d’une case du haut | ✅ covered | Descendu pour rester sur le plateau ; vérifié dans chaque état de compact.spec |
+| empty | static-content: main vide | ✅ covered | « Plus de cartes » dans la colonne, la phrase suivante lue seulement |
+| populated | small boards, points à confirmer | 🧪 backstop | Recette de Romain (plan 01-54) : les douze points ci-dessus, la largeur vue sur son iPhone (≈ 594 px dans Safari, ≈ 630 px installée), la prise au pouce |
+
+### Le son en mode silencieux
+
+Plan 01-49 (gap G-01-23). Il complète les règles de l’« Audio UX Contract » et remplace l’aide « Helper, Son » du tableau « Réglages, sound test, credits ».
+
+**Les mots de Romain** (recette 3, test 23) : « Les sons ne fonctionnent pas sur iphone en mode silencieux (pas volume au minimum, mais silencieux, pas de sonnerie) ».
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) : au premier toucher (« Jouer la partie », ou le premier toucher d’une partie ouverte directement), le jeu passe la session audio de l’iPhone en lecture (« playback ») avant de créer le son. Sur iPhone et iPad, le même toucher lance en boucle un son muet, joué par un élément audio caché de la page : le son d’une page qui joue un média n’est pas coupé par l’interrupteur de sonnerie, et les sabots, les hennissements et les cartes passent avec lui. Le son muet s’arrête quand l’app passe en arrière-plan (ou que le téléphone se verrouille) et quand « Son » est coupé ; il reprend au toucher suivant, la page visible et « Son » allumé.
+
+**Sa réponse** le 2026-10-15, à la question de savoir si le jeu peut interrompre la musique d’une autre app pour se faire entendre en mode silencieux : « Oui, ça me va ». Aucun réglage n’est ajouté pour cela : comme toute app qui sonne en mode silencieux, la partie arrête la musique d’une autre app tant qu’elle est à l’écran.
+
+**Le texte d’aide** (Réglages, sous « Son », et en tête de « Test des sons ») : « Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté. » Il ne demande plus de quitter le mode silencieux. Dans le code, une espace fine insécable précède « ? » (`reglages.ts`, `sons.ts`).
+
+**Faits techniques (sans confirmation)** :
+- `apps/web/src/audio/keepAlive.ts` : `silentWavDataUri()` (un WAV mono 16 bits de 0,5 s à 8 000 Hz, tous les échantillons à 0, en data URI base64 : aucun fichier, aucune requête réseau), `isAppleTouch()` (un iPhone, un iPad ou un iPod d’après le user agent, ou un iPad sous iPadOS qui se dit « MacIntel » avec un écran tactile), `createKeepAlive()` (l’élément `<audio data-audio-keepalive>` caché, en boucle, `preload="auto"`, `playsinline`, `x-webkit-airplay="deny"`, `disableRemotePlayback`, `aria-hidden`, sans `controls` ; un `play()` refusé est ignoré).
+- `unlock()` (`apps/web/src/audio/engine.ts`) règle `navigator.audioSession.type` avant `new WebAudioBackend()` (avant 01-49, c’était après : trop tard sur l’iPhone de Romain), puis, sur iPhone et iPad, crée et lance le son muet si « Son » est allumé. Les touchers suivants (pointerup, touchend, click, keydown) le relancent quand la page est visible et « Son » allumé ; `visibilitychange` vers caché le met en pause ; `setMix` le met en pause quand « Son » se coupe et le relance quand il revient (ce toucher est un geste).
+- Sans l’Audio Session API, sans `<audio>` ou sans son, le jeu reste jouable (FX-06) : rien de tout cela n’est attendu par la boucle du jeu.
+- **Testé hors appareil** (`apps/web/e2e/audio.spec.ts`, Chromium de Playwright) : le type de session relevé à la construction de l’`AudioContext` est « playback » (une Audio Session API factice est posée quand le navigateur n’en a pas) ; sur le projet « phone » (user agent d’iPhone), l’élément existe, boucle, a pour source un WAV en data URI et joue après le toucher, s’arrête page cachée et ne reprend qu’au toucher suivant, s’arrête quand « Son » est coupé et reprend quand il revient ; sur le projet « desktop », il n’existe pas. `keepAlive.test.ts` vérifie l’en-tête et le silence du WAV, la détection et l’élément.
+- **Vérifié sur l’appareil seulement** (recette de Romain, plan 01-54) : que l’iPhone, interrupteur sur silencieux, fasse entendre les sabots, les hennissements et les cartes dans Safari et dans l’app installée, et que la musique d’une autre app s’arrête pendant la partie ; aucune émulation ne reproduit l’interrupteur de sonnerie.
+
+#### UI Considerations (son en mode silencieux)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| hidden | static-content: élément `<audio data-audio-keepalive>` | ✅ covered | Caché (`hidden`, `aria-hidden`), sans contrôles ni AirPlay ; absent sur ordinateur ; vérifié dans audio.spec |
+| populated | iPhone en mode silencieux | 🧪 backstop | Recette de Romain (plan 01-54) : les sons s’entendent interrupteur sur silencieux, dans Safari et installée |
+
+### La planche de fin de partie
+
+Plan 01-50 (gap G-01-30). Elle remplace la section « End-of-game screen » de « Layout and Screens » (l’ancien panneau en noyer de 400 px, avec les pastilles des places).
+
+**Les mots de Romain** (recette 3, test 30) : « Le panneau de victoire défaite est moche ».
+
+**Dérivé du planificateur, à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54). Elle a été dessinée dans le jeu, sans maquette à part. Chaque point est repris sous son numéro dans la recette :
+
+1. **La planche.** Au-dessus du plateau assombri (noyer à 70 %), une planche dans le bois du galet : face en chêne (`PALETTE.board`, #E9D5AE) avec un veinage dessiné (des filets de `PALETTE.track` à faible opacité, en dégradés), un cœur un peu plus clair en haut, un bord de 6 px en noyer (`PALETTE.rim`, #4A2E18), un filet de 1 px (`PALETTE.outlineLine`) à 4 px à l’intérieur du bord, des coins de 28 px, et une ombre dessinée comme une copie décalée de 6 px vers le bas, nette, en encre à 45 %. Le texte est à l’encre du galet (`PALETTE.ink`, #2A1A0E).
+2. **Le titre.** « Victoire ! » ou « Défaite » en Caveat 700 de 44 px, à l’encre. Sur une victoire, un trait ambre dessiné au pinceau le souligne. Dessous, la phrase de toujours (« Ton équipe a rentré ses 8 chevaux. » ou « L’équipe adverse a rentré ses 8 chevaux. »), en Body.
+3. **L’équipe gagnante.** Ses deux cavaliers côte à côte, chacun l’image de cavalier de Romain (celle des pions, 57 px de haut) debout sur un disque de 68 px de sa couleur du galet (`PALETTE.hex`, avec un reflet `PALETTE.light`), cerclé d’encre, et une silhouette à l’encre décalée de 2 px derrière le cavalier pour le détacher du disque (un masque, jamais un filtre). Sous chacun, son nom en Label 700 : « Toi » pour le joueur, puis son partenaire ; après une défaite, les noms des deux ordinateurs, sous la ligne « L’équipe adverse ». « Toi » vient toujours en premier.
+4. **Le score.** « nous – eux », les chevaux rentrés de chaque équipe (8 pour les gagnants), en Caveat 700 de 28 px (Display), chiffres tabulaires, « Nous » et « Eux » en Label sous chaque nombre, dans un cartouche crème creusé (bord de 1 px `PALETTE.outlineLine`). Lu : « Score : nous n chevaux rentrés sur 8, eux m sur 8 ».
+5. **Les chiffres de la partie.** « Donnes jouées : n · Chevaux mangés : nous a, eux b », en Label, couleur `PALETTE.track` (≈ 6,9:1 sur le chêne) ; sur le téléphone, une ligne par chiffre.
+6. **Les boutons.** « Rejouer » en ambre (le bouton principal de toujours) et « Changer de couleur » en secondaire sur le bois (contour noyer de 2 px, texte à l’encre), au moins 48 px de haut, tous deux avec la même ombre nette de 3 px, qui s’enfonce au toucher. Ce qu’ils font ne change pas. L’anneau du focus garde son écart noyer de 2 px dessiné sur le chêne, pour rester visible.
+7. **La mise en page.** Sur l’ordinateur, une colonne de 520 px au plus, centrée. Quand la fenêtre a moins de 600 px de haut (le téléphone tenu en largeur), deux colonnes de 680 px au plus, séparées par un filet : le titre, la phrase et l’équipe à gauche ; le score, les chiffres et les boutons à droite. Hauteur au plus 100dvh − 16 px ; la planche ne défile jamais.
+8. **Le mouvement.** La planche descend de 12 px en apparaissant, en 300 ms, et le voile en même temps. Avec « Réduire les animations » (ou le réglage du système), un seul fondu de 150 ms. Les cavaliers de l’équipe gagnante sautent toujours une fois sur le plateau derrière (inchangé).
+
+**Exception de typographie.** Le titre de la planche, en Caveat 700 de 44 px, est le seul texte au-dessus de Display (28 px). Comme les numéros des cases du galet, c’est un élément du dessin : un titre écrit à la main sur la planche, pas une taille d’interface. Le reste de la planche garde les quatre tailles et les deux graisses.
+
+**Faits techniques (sans confirmation)** :
+- `apps/web/src/ui/EndScreen.svelte` : les props `won`, `winner`, `score: { nous, eux }`, `names`, `stats`, `onreplay`, `onchange`. Les couleurs viennent de `PALETTE` (`@toc/board`), passées en variables CSS. Aucun filtre CSS ou SVG, aucune ombre floue : les ombres sont des `box-shadow` sans flou, le veinage des `repeating-linear-gradient`, la silhouette du cavalier un `mask` de son image.
+- `Game.svelte` calcule le score depuis `render.homeCounts` (les chevaux rentrés de chaque couleur, la même source que la pastille et la barre d’infos) et passe `session.names`, la couleur du joueur devenant « Toi ».
+- Le dialogue ne change pas : `role="dialog"`, `aria-modal`, le titre comme nom et la phrase comme description, le focus sur « Rejouer », Tab gardé entre les deux boutons, le jeu derrière `inert`.
+- **Les preuves** (`apps/web/e2e/partie.spec.ts`, les deux projets) : la victoire (score 8 pour « Nous », Bleu « Toi » puis Rouge, leurs images chargées, le focus) et la défaite (« L’équipe adverse », Jaune et Vert, 5 – 8, le fondu seul de 150 ms en mouvement réduit), la planche entière dans la fenêtre et sans défilement à 750 × 342, 1280 × 800 et 480 × 320. `finition.spec.ts` vérifie le 8 de l’équipe gagnante à la fin d’une partie entière. Captures : `apps/web/test-results/fin-victoire-{phone,desktop}.png`, `fin-defaite-{phone,desktop}.png`, `fin-defaite-480x320-{phone,desktop}.png`.
+
+#### UI Considerations (planche de fin de partie)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| overflow | static-content: la planche sur un petit téléphone | ✅ covered | Deux colonnes sous 600 px de haut ; mesurée sans défilement à 750 × 342 et 480 × 320 |
+| long-text | static-content: noms des cavaliers | ✅ covered | Noms de chevaux courts de la liste fixe ; 112 px au plus, « … » au-delà |
+| loading | media: images des cavaliers | ✅ covered | Les mêmes fichiers que les pions, déjà chargés par le plateau ; le nom reste lisible sans l’image (son texte de remplacement est la couleur) |
+| populated | la planche, points à confirmer | 🧪 backstop | Recette de Romain (plan 01-54) : la planche lui plaît-elle, dans le style du galet, sur son iPhone et son ordinateur, ou que changer |
+
+### La page d’essai des sons à choix
+
+Plan 01-51 (gap G-01-29). Elle remplace la section « Sound test screen » de « Layout and Screens » (désormais « Sound test screen « à choix » ») et les lignes du test des sons du tableau « Réglages, sound test, credits » ; elle complète les règles de l’« Audio UX Contract ».
+
+**Les mots de Romain** (recette 3, test 29) : « les sons ne sont pas bons, il faut les retravailler ». **Son choix** : « Page d'essai à choix (Recommandé) ». Puis, le 2026-10-15 : « laisse les sons de côté sauf les sabots des chevaux » (les versions des hennissements et des cartes, plans 01-52 et 01-53, sont reportées).
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) :
+- la page `#/sons` fait entendre plusieurs versions de chaque son (aujourd’hui les quatre versions des sabots ; les hennissements et les cartes gardent leur seule version « A ») ;
+- pour chaque son, Romain choisit sa version (« Mon choix ») ; son choix est gardé sur son appareil et vaut tout de suite dans ses parties, sur cet appareil ;
+- « Copier mes choix » copie la liste (« Sabots : B », un son par ligne) qu’il envoie au développeur ; recopiée dans `DEFAULT_CHOICES`, elle devient le choix de tous ;
+- tant qu’il n’a rien choisi, le jeu garde les sons d’avant : chaque son a pour version « A » le son actuel, et `DEFAULT_CHOICES` choisit « A » partout ;
+- chaque version est générée par le code, ou est un enregistrement CC0 (ou domaine public) avec sa propre ligne dans `assets/audio/LICENSES.md` (CLAUDE.md, « Sons »).
+
+**Les quatre versions des sabots**, toutes générées par le code, chacune en trois prises jouées à tour de rôle (le grain et le rythme changent d’une prise à l’autre, pas seulement la hauteur) :
+
+| Version | Ce qu’elle est | Recette (`apps/web/src/audio/synth.ts`) |
+|---------|----------------|------------------------------------------|
+| A, « actuel » | le sabot d’avant 01-51 | `hoof` : un bruit filtré autour de 1,4 kHz et un coup sourd de 170 à 60 Hz, une seule frappe |
+| B, « sur la terre » | un sabot sur la terre battue : doux, grave, mat | `hoof-terre` : bruit filtré large vers 700–820 Hz, attaque de 5 ms, 110 ms de décroissance, passe-bas à 2 kHz, coup sourd de 120 à 45 Hz, un léger grain de terre ; talon puis pince |
+| C, « sur les pavés » | un fer sur les pavés : clair, dur, qui tinte | `hoof-paves` : claquement filtré étroit vers 2,2–2,6 kHz en 50 ms, une pointe à 5 kHz, le tintement du fer (3,1 kHz et 4,4 kHz, bas), un coup court de 150 à 80 Hz ; talon puis pince |
+| D, « sur le bois » | un sabot sur un plancher ou un pont : un toc creux | `hoof-bois` : deux résonances (Q 6) vers 450 Hz et 1,1 kHz qui sonnent 90 et 60 ms, les notes de la planche, un léger clic, pas de coup sourd ; talon puis pince |
+
+**Faits techniques (sans confirmation)** :
+- `apps/web/src/audio/sounds.ts` : un son est une liste de versions « a » à « d » ; une version est `{ kind: "synth", recipe, takes }`, `{ kind: "file", files, licence }` (l’id de sa ligne de `LICENSES.md`) ou `{ kind: "silence" }`.
+- `apps/web/src/audio/choices.ts` : `DEFAULT_CHOICES`, `parseChoices` (seuls les sons connus avec une de leurs propres versions), `loadChoices` / `saveChoices` sous « toc.soundchoices.v1 » (chaque accès au stockage dans un try/catch), `choicesAsText`.
+- `apps/web/src/audio/engine.ts` : les tampons sont rangés par son et par version ; `setChoices` prépare la version choisie et garde la précédente jusqu’à ce qu’elle soit prête ; `play(id, version)` joue une version une fois, rendue à la demande ; `scheduleClops(…, version)` joue la cadence d’une version. Les builds de débogage publient chaque tampon joué (son, version, prise) et une estimation de la brillance de chaque prise rendue.
+- **Les preuves** (`apps/web/e2e/sons.spec.ts`, les deux projets) : choisir B sur la page fait jouer B aux sabots d’un coup de la partie, et le choix reste après rechargement ; la page, ses versions, ses choix, les flèches, un stockage abîmé, les sources, les licences, « Copier mes choix » ; les quatre versions mesurées différentes (B plus mate que A, C plus claire, D à part), et leurs trois prises aussi.
+- **Vérifié à l’oreille seulement** (recette de Romain, plan 01-54) : quelle version des sabots lui plaît.
+
+#### UI Considerations (page d’essai des sons à choix)
+
+| Category | Element(s) | Status | Resolution / Reason |
+|----------|------------|--------|---------------------|
+| overflow | static-content: quatre versions sur un téléphone | ✅ covered | Les versions passent à la ligne (au moins 96 px chacune) ; boutons et choix mesurés à 44 px au moins sur les deux projets |
+| error | stored-data: « toc.soundchoices.v1 » abîmé ou hostile | ✅ covered | Les choix par défaut, sans erreur (choices.test, sons.spec) |
+| loading | media: une version entendue pour la première fois | ✅ covered | Rendue à la demande puis jouée ; « Son indisponible » si elle échoue |
+| populated | les versions des sabots | 🧪 backstop | Recette de Romain (plan 01-54) : il écoute les quatre versions, en choisit une, l’entend dans une partie et envoie ses choix |

@@ -1,0 +1,32 @@
+// Compile-time debug switch, defined in vite.config.ts. True in the dev server and in builds made
+// with VITE_TOC_DEBUG=1 (the e2e build); false in production, where every `if (DEBUG)` branch
+// is removed by the minifier. Debug-only modules must be loaded with a dynamic import() inside
+// a branch that tests `__TOC_DEBUG__` itself (not the re-exported `DEBUG`): the bundler only drops
+// the module from dist when the condition is a literal at tree-shaking time.
+declare global {
+  /** Same compile-time switch as `DEBUG`, readable without importing this module. */
+  const __TOC_DEBUG__: boolean;
+
+  interface Window {
+    __tocDebug?: {
+      audio: {
+        scheduled: number[];
+        history: number[][];
+        /** Every sound other than the clops that the game asked for: id, audio-clock time, request time. */
+        cues?: { id: string; at: number; requestedAt: number; variant?: string }[];
+        /** Every buffer the engine started (clops included): sound, version, take, audio-clock time. */
+        played?: { id: string; variant: string; take: number; at: number }[];
+        /** Rendered synthesized sounds, keyed `recipe#take`: duration in seconds, peak amplitude and a brightness estimate in Hz. */
+        sounds?: Record<string, { duration: number; peak: number; brightness?: number }>;
+        /** The bus gains the last mix asked for: 0 or 1 for master and effects. */
+        gains?: { master: number; sfx: number };
+        /** iPhone and iPad: the silent looping element of keepAlive.ts (absent on a computer). */
+        keepAlive?: { exists: boolean; playing: boolean };
+        /** navigator.audioSession.type after the unlock, where the browser has the API. */
+        audioSessionType?: string;
+      };
+    };
+  }
+}
+
+export const DEBUG: boolean = __TOC_DEBUG__;
