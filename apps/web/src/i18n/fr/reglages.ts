@@ -10,7 +10,7 @@ export const reglages = {
 
   sound: "Son",
   soundHelper:
-    "Pas de son sur iPhone ? Vérifie que l’interrupteur de sonnerie, sur le côté, n’est pas en mode silencieux.",
+    "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté.",
   sfx: "Bruitages",
   reduceMotion: "Réduire les animations",
   reduceMotionHelper: "Les déplacements sont instantanés, sans bonds, ruades ni effets.",

@@ -71,7 +71,11 @@ test.describe("depuis l’écran de lancement", () => {
     await expect(sheet.getByRole("switch")).toHaveCount(3);
     await expect(sheet.getByRole("slider")).toHaveCount(0);
     await expect(sheet.getByText(/ambiance/i)).toHaveCount(0);
-    await expect(sheet.getByText("Pas de son sur iPhone")).toBeVisible();
+    await expect(
+      sheet.getByText(
+        "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son\u202f? Monte le volume avec les boutons sur le côté.",
+      ),
+    ).toBeVisible();
     await expect(
       sheet.getByText("Les déplacements sont instantanés, sans bonds, ruades ni effets."),
     ).toBeVisible();

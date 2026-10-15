@@ -10,7 +10,7 @@ export const sons = {
   statePending: "Son en attente : touche l’écran",
   stateFailed: "Le son n’a pas pu démarrer. Touche l’écran pour réessayer.",
   silentSwitchHint:
-    "Pas de son sur iPhone ? Vérifie que l’interrupteur de sonnerie, sur le côté, n’est pas en mode silencieux.",
+    "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son ? Monte le volume avec les boutons sur le côté.",
 
   sections: {
     sabots: "Sabots",

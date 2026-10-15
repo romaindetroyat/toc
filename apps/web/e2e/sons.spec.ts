@@ -15,7 +15,11 @@ test.describe("page de test des sons", () => {
     }
     await expect(page.getByRole("heading", { level: 2 })).toHaveCount(3);
     await expect(page.getByText("Écoute chaque son et note-le.")).toBeVisible();
-    await expect(page.getByText("Pas de son sur iPhone")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son\u202f? Monte le volume avec les boutons sur le côté.",
+      ),
+    ).toBeVisible();
 
     // 4 hoof rows + the distance row + 6 neighs + 3 cards (no ambience since 2026-10-14).
     await expect(page.locator("li.row")).toHaveCount(14);
