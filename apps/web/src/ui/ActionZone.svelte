@@ -46,18 +46,25 @@
      */
     bar?: boolean;
     /**
-     * In the compact bar of a phone held sideways (plan 01-37): one row, the prompt at the left in
-     * Label 14 (three lines in the 64 px row, two in the 56 px row, a longer one scrolls inside) and
-     * the state's buttons side by side at the right, in an area of --band-buttons (about 184 px)
-     * kept in every state.
+     * The compact mode of a phone held sideways (plan 01-47): the zone is drawn in parts, each in its
+     * place beside the full-height galet (see `part`). The buttons show short labels; their
+     * accessible names and their titles keep the full ones.
      */
-    band?: boolean;
+    compact?: boolean;
+    /**
+     * What this instance draws. « all » (the computer's bar): the prompt, the buttons and « Avance
+     * rapide » together. In the compact mode: « prompt », the one-line prompt over the board (the
+     * aria-live region, `data-action-zone`); « buttons », the state's buttons stacked at the bottom of
+     * the right strip; « fast », « Avance rapide » as a 44 x 44 icon at the top of that strip.
+     */
+    part?: "all" | "prompt" | "buttons" | "fast";
   };
 
   let {
     ui,
     bar = false,
-    band = false,
+    compact = false,
+    part = "all",
     view,
     human,
     names,
@@ -173,6 +180,21 @@
     return game.preview.captureOne(pawnColor(victims[0] as PawnId));
   }
 
+  /**
+   * The compact prompt row holds one line: the lines follow each other and a longer text ends with
+   * « … » (its full text stays in the region and in the title). The warning of a partner's capture
+   * comes first there, so it is never the part that is cut. The « Lequel ? » chips stand in the left
+   * strip, so the row asks the question.
+   */
+  const rowLines = $derived.by((): string[] => {
+    if (ui.kind === "tray" && hint === null) return [game.tray.question];
+    if (ui.kind === "preview" && ui.partnerCapture && hint === null) {
+      return [game.preview.partnerCapture, ...lines.filter((line) => line !== game.preview.partnerCapture)];
+    }
+    return lines;
+  });
+  const rowText = $derived(rowLines.join(" "));
+
   // One key per displayed state, so the zone cross-fades (150 ms, none under reduced motion).
   const key = $derived(`${ui.kind}|${hint ?? ""}|${missed}|${thinking ?? ""}|${lines.join("/")}`);
   const fadeMs = $derived(settings.reduceMotion ? 0 : 150);
@@ -181,124 +203,208 @@
   );
 </script>
 
-<!-- Action zone (UI-SPEC): one state at a time, an aria-live region, prompt lines never truncated. -->
-<section class="zone" class:bar class:band aria-live="polite" data-action-zone data-state={ui.kind}>
-  {#key key}
-    <div class="content" in:fade={{ duration: fadeMs }}>
-      {#if lines.length > 0}
-        <!-- In the band the givers of the exchange take the prompt's place: the sentence stays for
-             screen readers only. -->
-        <div class="text" class:spoken={band && ui.kind === "exchangeWaiting"}>
-          {#each lines as line, i (i)}
-            <p class:prompt={i === 0}>{line}</p>
-          {/each}
-        </div>
-      {/if}
-
-      {#if ui.kind === "exchangeWaiting"}
-        <ul class="givers" data-givers>
-          {#each givers as giver (giver.color)}
-            <li data-giver={giver.color} data-done={giver.done}>
-              <Icon name={giver.done ? "check" : "hourglass"} size={16} />
-              <span>{giver.name}</span>
-            </li>
-          {/each}
-        </ul>
-      {:else if ui.kind === "modeChoice"}
-        <div class="buttons modes">
-          <button
-            type="button"
-            class="btn btn-primary hinted"
-            data-mode="exit"
-            aria-label={game.turn.exitButton}
-            aria-keyshortcuts="S"
-            onclick={onexit}
-          >
-            {game.turn.exitButton}
-            <KeyHint label={clavier.keys.exit} />
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary hinted"
-            data-mode="advance"
-            aria-label={game.turn.advanceButton(rankOf(ui.card))}
-            aria-keyshortcuts="A"
-            onclick={onadvance}
-          >
-            {game.turn.advanceButton(rankOf(ui.card))}
-            <KeyHint label={clavier.keys.advance} />
-          </button>
-        </div>
-      {:else if ui.kind === "tray"}
-        <PawnTray options={ui.options} {band} onpick={ontrayPick} onclose={ontrayClose} />
-      {:else if ui.kind === "cardSelected" || ui.kind === "jackPick" || ui.kind === "jackTarget"}
-        <!-- « Changer de carte » and « Annuler ce coup » show no key: they drop the card in one go, while
-             Échap only goes back one step (UI-SPEC addendum, key hints). -->
-        <div class="buttons">
-          <button type="button" class="btn btn-secondary" onclick={onchangeCard}>
-            {game.buttons.changeCard}
-          </button>
-        </div>
-      {:else if ui.kind === "preview"}
-        <div class="buttons">
-          <button type="button" class="btn btn-secondary" onclick={oncancel}>
-            {game.buttons.cancel}
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary play hinted"
-            aria-label={ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
-            aria-keyshortcuts="Enter"
-            onclick={onconfirm}
-          >
-            {ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
-            <KeyHint label={clavier.keys.enter} />
-          </button>
-        </div>
-      {:else if ui.kind === "exchange"}
-        <div class="buttons">
-          <button
-            type="button"
-            class="btn btn-primary play hinted"
-            disabled={ui.selected === undefined}
-            aria-label={game.exchange.pass}
-            aria-keyshortcuts="Enter P"
-            onclick={ongive}
-          >
-            {game.exchange.pass}
-            <KeyHint label={clavier.keys.enter} />
-          </button>
-        </div>
-      {:else if ui.kind === "deadHand"}
-        <div class="buttons">
-          <button
-            type="button"
-            class="btn btn-primary play hinted"
-            aria-label={game.dead.pose}
-            aria-keyshortcuts="P Enter"
-            onclick={onpose}
-          >
-            {game.dead.pose}
-            <KeyHint label={clavier.keys.pass} />
-          </button>
-        </div>
-      {/if}
+{#snippet stateButtons()}
+  {#if ui.kind === "modeChoice"}
+    <div class="buttons modes">
+      <button
+        type="button"
+        class="btn btn-primary hinted"
+        data-mode="exit"
+        aria-label={game.turn.exitButton}
+        aria-keyshortcuts="S"
+        title={compact ? game.turn.exitButton : undefined}
+        onclick={onexit}
+      >
+        {compact ? game.compact.exit : game.turn.exitButton}
+        <KeyHint label={clavier.keys.exit} />
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary hinted"
+        data-mode="advance"
+        aria-label={game.turn.advanceButton(rankOf(ui.card))}
+        aria-keyshortcuts="A"
+        title={compact ? game.turn.advanceButton(rankOf(ui.card)) : undefined}
+        onclick={onadvance}
+      >
+        {compact ? game.compact.advance(rankOf(ui.card)) : game.turn.advanceButton(rankOf(ui.card))}
+        <KeyHint label={clavier.keys.advance} />
+      </button>
     </div>
-  {/key}
+  {:else if ui.kind === "tray"}
+    <PawnTray
+      options={ui.options}
+      part={compact ? "close" : "all"}
+      {compact}
+      onpick={ontrayPick}
+      onclose={ontrayClose}
+    />
+  {:else if ui.kind === "cardSelected" || ui.kind === "jackPick" || ui.kind === "jackTarget"}
+    <!-- « Changer de carte » and « Annuler ce coup » show no key: they drop the card in one go, while
+         Échap only goes back one step (UI-SPEC addendum, key hints). -->
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        aria-label={compact ? game.buttons.changeCard : undefined}
+        title={compact ? game.buttons.changeCard : undefined}
+        onclick={onchangeCard}
+      >
+        {compact ? game.compact.changeCard : game.buttons.changeCard}
+      </button>
+    </div>
+  {:else if ui.kind === "preview"}
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        aria-label={compact ? game.buttons.cancel : undefined}
+        title={compact ? game.buttons.cancel : undefined}
+        onclick={oncancel}
+      >
+        {compact ? game.compact.cancel : game.buttons.cancel}
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary play hinted"
+        aria-label={ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
+        aria-keyshortcuts="Enter"
+        title={compact ? (ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play) : undefined}
+        onclick={onconfirm}
+      >
+        {compact
+          ? game.buttons.play
+          : ui.partnerCapture
+            ? game.buttons.playAnyway
+            : game.buttons.play}
+        <KeyHint label={clavier.keys.enter} />
+      </button>
+    </div>
+  {:else if ui.kind === "exchange"}
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn btn-primary play hinted"
+        disabled={ui.selected === undefined}
+        aria-label={game.exchange.pass}
+        aria-keyshortcuts="Enter P"
+        title={compact ? game.exchange.pass : undefined}
+        onclick={ongive}
+      >
+        {compact ? game.compact.pass : game.exchange.pass}
+        <KeyHint label={clavier.keys.enter} />
+      </button>
+    </div>
+  {:else if ui.kind === "deadHand"}
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn btn-primary play hinted"
+        aria-label={game.dead.pose}
+        aria-keyshortcuts="P Enter"
+        title={compact ? game.dead.pose : undefined}
+        onclick={onpose}
+      >
+        {compact ? game.compact.pose : game.dead.pose}
+        <KeyHint label={clavier.keys.pass} />
+      </button>
+    </div>
+  {/if}
+{/snippet}
 
+{#snippet givingList()}
+  <ul class="givers" data-givers>
+    {#each givers as giver (giver.color)}
+      <li data-giver={giver.color} data-done={giver.done}>
+        <Icon name={giver.done ? "check" : "hourglass"} size={16} />
+        <span>{giver.name}</span>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#if part === "fast"}
+  <!-- The compact mode: « Avance rapide » at the top of the right strip, its icon only. -->
   {#if showFast}
     <button
       type="button"
-      class="fast"
+      class="fast icon-only"
       aria-pressed={settings.fast}
       aria-label={game.fast}
+      title={game.fast}
+      data-fast
       onclick={() => updateSettings({ fast: !settings.fast })}
     >
       <Icon name="fast-forward" />
-      <span class="fast-label">{game.fast}</span>
     </button>
   {/if}
-</section>
+{:else if part === "buttons"}
+  <!-- The compact mode: the state's buttons, stacked at the bottom of the right strip, the primary
+       one lowest. The prompt is read from the prompt row's live region. -->
+  <div class="stack" data-action-buttons data-state={ui.kind}>
+    {#key key}
+      <div class="stack-content" in:fade={{ duration: fadeMs }}>
+        {@render stateButtons()}
+      </div>
+    {/key}
+  </div>
+{:else}
+  <!-- Action zone (UI-SPEC): one state at a time, an aria-live region, prompt lines never truncated
+       (in the compact prompt row, one line: the full text stays in the region and in the title). -->
+  <section
+    class="zone"
+    class:bar
+    class:row={part === "prompt"}
+    aria-live="polite"
+    data-action-zone
+    data-state={ui.kind}
+  >
+    {#key key}
+      <div class="content" in:fade={{ duration: fadeMs }}>
+        {#if part === "prompt"}
+          {#if ui.kind === "exchangeWaiting"}
+            <!-- The givers take the line's place; the sentence stays for screen readers only. -->
+            <p class="spoken">{rowText}</p>
+            {@render givingList()}
+          {:else if rowLines.length > 0}
+            <p class="line" title={rowText} data-prompt-line>
+              {#each rowLines as line, i (i)}{#if i > 0}{" "}{/if}<span class:prompt={i === 0}
+                  >{line}</span
+                >{/each}
+            </p>
+          {/if}
+        {:else}
+          {#if lines.length > 0}
+            <div class="text">
+              {#each lines as line, i (i)}
+                <p class:prompt={i === 0}>{line}</p>
+              {/each}
+            </div>
+          {/if}
+
+          {#if ui.kind === "exchangeWaiting"}
+            {@render givingList()}
+          {:else}
+            {@render stateButtons()}
+          {/if}
+        {/if}
+      </div>
+    {/key}
+
+    {#if showFast && part === "all"}
+      <button
+        type="button"
+        class="fast"
+        aria-pressed={settings.fast}
+        aria-label={game.fast}
+        onclick={() => updateSettings({ fast: !settings.fast })}
+      >
+        <Icon name="fast-forward" />
+        <span class="fast-label">{game.fast}</span>
+      </button>
+    {/if}
+  </section>
+{/if}
 
 <style>
   .zone {
@@ -477,98 +583,110 @@
   }
 
   /*
-   * The compact bar (a phone held sideways): the zone is its row (64 or 56 px). The prompt is at the
-   * left and the buttons' area of --band-buttons at the right, the same in every state, so a prompt
-   * never moves when the buttons change. « Avance rapide » takes that area while the computer plays.
+   * The compact mode (a phone held sideways, plan 01-47). The prompt row: one line of Label 14 in
+   * cream, centred over the board, a longer text ending with « … ».
    */
-  .zone.band {
+  .zone.row {
+    display: block;
     height: 100%;
     min-height: 0;
     max-height: none;
-    padding: 0;
-    gap: 0;
+    padding: 0 var(--space-xs);
   }
 
-  .band .content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--band-buttons, 184px);
+  .row .content {
+    display: flex;
+    flex-wrap: nowrap;
     align-items: center;
-    column-gap: var(--space-sm);
-    width: 100%;
+    justify-content: center;
     height: 100%;
-    min-height: 0;
   }
 
-  /* Label 14; three lines in the 64 px row, two in the 56 px row, then the text scrolls inside. */
-  .band .text {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: center;
-    max-height: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .band .text p {
+  .row .line {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--creme-attenuee);
     font-size: var(--label-size);
     line-height: var(--label-line);
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .band .text.spoken {
+  .row .line .prompt {
+    color: var(--creme);
+  }
+
+  .row .spoken {
     position: absolute;
     width: 1px;
     height: 1px;
+    margin: 0;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
   }
 
-  .band .givers {
-    grid-column: 1;
-    grid-row: 1;
-    gap: 0 var(--space-sm);
-    max-height: 100%;
-    overflow-y: auto;
-  }
-
-  .band .buttons {
-    grid-column: 2;
-    grid-row: 1;
+  .row .givers {
+    flex: 0 1 auto;
     flex-wrap: nowrap;
-    justify-content: flex-end;
-    margin-left: 0;
-    gap: var(--space-sm);
+    min-width: 0;
+    overflow: hidden;
+    gap: 0 var(--space-md);
   }
 
-  /* Label 14 bold on two lines at most, at least 44 px high. */
-  .band .buttons .btn {
-    flex: 1 1 0;
+  .row .givers li {
+    flex: none;
+  }
+
+  /* The buttons' column: --strip-button wide (56 px: « Annuler » is 52.4 px in Label 14 bold),
+     stacked 4 px apart at the bottom of the right strip, at least 48 px high each, Label 14 bold on
+     two lines at most. A computer's key badges sit astride each button's top edge: 12 px apart then,
+     so a badge never covers the button above. */
+  .stack,
+  .stack-content,
+  .stack .buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+  }
+
+  .stack .buttons {
+    flex-wrap: nowrap;
+    margin: 0;
+  }
+
+  .stack .btn {
+    width: var(--strip-button, 56px);
     min-width: 0;
-    padding: 0 var(--space-sm);
+    min-height: var(--button-height);
+    padding: 2px 0;
     font-size: var(--label-size);
+    letter-spacing: -0.01em;
     line-height: 1.2;
     text-align: center;
+    overflow-wrap: normal;
   }
 
-  .band .play {
+  @media (hover: hover) and (pointer: fine) {
+    .stack,
+    .stack-content,
+    .stack .buttons {
+      gap: 12px;
+    }
+  }
+
+  .stack .play {
     min-width: 0;
   }
 
-  .band .modes {
-    flex-wrap: nowrap;
-  }
-
-  .band .fast {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    width: var(--band-buttons, 184px);
-    transform: translateY(-50%);
-  }
-
-  .band .fast-label {
-    display: inline;
+  /* « Avance rapide » at the top of the right strip: its icon only, 44 x 44. */
+  .fast.icon-only {
+    width: var(--touch);
+    min-width: var(--touch);
+    padding: 0;
   }
 
   @media (min-width: 600px) {

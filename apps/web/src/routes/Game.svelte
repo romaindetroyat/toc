@@ -54,6 +54,7 @@
   import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
   import { screen } from "../ui/screen.svelte.ts";
@@ -367,8 +368,11 @@
 
   /** A computer screen (landscape from 960 x 600): the board across the width, the bar under it. */
   const bar = $derived(screen.chrome === "bar");
-  /** Any other landscape screen (a phone held sideways): the info beside the board, the compact bar under it. */
-  const band = $derived(screen.chrome === "compact-bar");
+  /**
+   * Any other landscape screen (a phone held sideways): the galet on the full height under a 24 px
+   * prompt row, the hand and the buttons in two 60 px strips at its sides (plan 01-47).
+   */
+  const compact = $derived(screen.chrome === "compact");
 
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
@@ -678,6 +682,49 @@
   });
 </script>
 
+{#snippet zone(part: "all" | "prompt" | "buttons" | "fast")}
+  {#if session !== undefined && view !== undefined}
+    <ActionZone
+      {ui}
+      {bar}
+      {compact}
+      {part}
+      {view}
+      human={session.human}
+      names={session.names}
+      hint={session.hint}
+      {missed}
+      thinking={session.thinking}
+      lastPlay={session.lastPlay}
+      onconfirm={() => send({ t: "confirm" })}
+      oncancel={() => send({ t: "cancel" })}
+      onchangeCard={() => send({ t: "changeCard" })}
+      ongive={() => send({ t: "give" })}
+      onpose={() => send({ t: "pose" })}
+      onexit={chooseExit}
+      onadvance={() => send({ t: "chooseAdvance" })}
+      ontrayPick={pickTrayOption}
+      ontrayClose={() => send({ t: "closeTray" })}
+    />
+  {/if}
+{/snippet}
+
+{#snippet hand()}
+  {#if session !== undefined && view !== undefined}
+    <HandFan
+      hand={view.hand}
+      mode={handMode}
+      playability={verdicts}
+      selected={selectedCard}
+      {received}
+      {concealed}
+      pace={session.pace}
+      {compact}
+      onpick={pickCard}
+    />
+  {/if}
+{/snippet}
+
 <main
   class="game"
   data-chrome={screen.chrome}
@@ -703,10 +750,17 @@
             {render}
             human={session.human}
             names={session.names}
-            form={bar ? "column" : band ? "side" : "row"}
+            form={bar ? "column" : compact ? "side" : "row"}
             onabandon={abandon}
           />
         </div>
+
+        {#if compact}
+          <!-- The top of the right strip: « Avance rapide » while the computer plays. -->
+          <div class="tools">
+            {@render zone("fast")}
+          </div>
+        {/if}
 
         <div class="stage">
           <Board
@@ -786,7 +840,7 @@
             <SevenPanel
               seven={flow}
               {bar}
-              {band}
+              {compact}
               tray={ui.kind === "tray" ? ui : null}
               {missed}
               onpickSteps={(steps) => send({ t: "pickSteps", steps })}
@@ -797,43 +851,38 @@
               ontrayClose={() => send({ t: "closeTray" })}
             />
           </div>
+        {:else if compact}
+          <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
+               and the hand (or the « Lequel ? » chips) at the bottom of the left one. -->
+          <div class="prompt-row">
+            {@render zone("prompt")}
+          </div>
+          {#if ui.kind === "tray"}
+            <div class="chips">
+              <PawnTray
+                options={ui.options}
+                part="chips"
+                compact
+                onpick={pickTrayOption}
+                onclose={() => send({ t: "closeTray" })}
+              />
+            </div>
+          {/if}
+          <div class="actions">
+            {@render zone("buttons")}
+          </div>
+          {#if ui.kind !== "tray"}
+            <div class="hand">
+              {@render hand()}
+            </div>
+          {/if}
         {:else}
           <div class="action">
-            <ActionZone
-              {ui}
-              {bar}
-              {band}
-              {view}
-              human={session.human}
-              names={session.names}
-              hint={session.hint}
-              {missed}
-              thinking={session.thinking}
-              lastPlay={session.lastPlay}
-              onconfirm={() => send({ t: "confirm" })}
-              oncancel={() => send({ t: "cancel" })}
-              onchangeCard={() => send({ t: "changeCard" })}
-              ongive={() => send({ t: "give" })}
-              onpose={() => send({ t: "pose" })}
-              onexit={chooseExit}
-              onadvance={() => send({ t: "chooseAdvance" })}
-              ontrayPick={pickTrayOption}
-              ontrayClose={() => send({ t: "closeTray" })}
-            />
+            {@render zone("all")}
           </div>
 
           <div class="hand">
-            <HandFan
-              hand={view.hand}
-              mode={handMode}
-              playability={verdicts}
-              selected={selectedCard}
-              {received}
-              {concealed}
-              pace={session.pace}
-              {band}
-              onpick={pickCard}
-            />
+            {@render hand()}
           </div>
         {/if}
       </div>
@@ -876,17 +925,17 @@
    *   info at the left (240 px), the hand in the middle and the action zone at the right (at least
    *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
    *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
-   * - « compact-bar », every other landscape screen (a phone held sideways, a small window): the
-   *   info in a 96 px column at the left of the board, and under them the band across the screen,
-   *   one 64 px row from 640 px wide (the hand, the prompt, the buttons) or two rows below (56 px
-   *   for the prompt and the buttons over 64 px for the hand). The board is
-   *   max(0, min(100vw − 96 px − 12 px − insets, (100dvh − band − insets) / (ratio + head room))),
-   *   band = 64 or 120 px: about 533 px wide at 750 x 342, 625 at 844 x 390, 372 at 480 x 320.
+   * - « compact », every other landscape screen (a phone held sideways, a small window): the board
+   *   on the full height under a 24 px prompt row, max(0, min(100vw − 2 × 60 px − insets,
+   *   (100dvh − 24 px − insets) / ratio)), with a strip of at least 60 px at each side: the info and
+   *   the hand at the left, « Avance rapide » and the state's buttons at the right. About 630 px wide
+   *   at 750 x 342, 724 at 844 x 390, 360 at 480 x 320 (plan 01-47).
    * - « rotate », every screen taller than wide: only the invitation, « Tourne ton téléphone » (or
    *   « Élargis la fenêtre » on a computer). The game is kept behind it, mounted but not displayed
    *   (.play.away), so no layout rule serves a screen taller than wide.
-   * In both landscape modes the DOM order, and so the Tab order, is info, board, actions (or the 7),
-   * hand.
+   * In the bar the DOM order, and so the Tab order, is info, board, actions (or the 7), hand; in the
+   * compact mode it is the info, « Avance rapide », the board, the 7's or the tray's chips, the
+   * buttons, the hand.
    */
 
   /* The game's wrapper takes no box of its own; behind the invitation it is not displayed at all. */
@@ -940,26 +989,27 @@
   }
 
   /*
-   * « compact-bar », every other landscape screen (a phone held sideways, a small window): the info
-   * in a column of --info-col at the left of the board, and under them the band across the screen.
-   * From 640 px wide the band is one row of --band-row: the hand (240 px, five 44 px slices) at the
-   * left, the action zone (the prompt, then the buttons' area of --band-buttons) at the right, with
-   * --band-edge margins and an 8 px gap. The board is centred in the rest of the top row, its right
-   * margin --band-edge. Nothing else has a margin or a padding, so the formula subtracts exactly
-   * what renders, and the band clips at its bottom edge.
+   * « compact », every other landscape screen (a phone held sideways, a small window; Romain's
+   * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: a strip of at least
+   * --strip at each side and the board between them, so the board is centred and the strips take
+   * what is left, max(--strip, (100vw − insets − board) / 2) each. Two rows: the --prompt-row over
+   * the board, then the board's own row; the strips span both. No head room of its own: the prompt
+   * row is that room, a lifted top-row knight's head may rise into it. In the left strip the info at
+   * the top and the hand (or the chips of « Lequel ? » or of the 7) at the bottom; in the right one
+   * « Avance rapide » at the top and the state's buttons at the bottom. Nothing has a margin or a
+   * padding, so the formula subtracts exactly what renders; each strip's bottom item is kept under
+   * what stands at its top.
    */
   @media (orientation: landscape) and (max-width: 959.98px), (orientation: landscape) and (max-height: 599.98px) {
     .game {
-      --info-col: 96px;
-      --band-edge: 12px;
-      --band-row: 64px;
-      --band-buttons: 184px;
-      --band: var(--band-row);
+      --strip: 60px;
+      --strip-button: 56px;
+      --prompt-row: 24px;
       --board-size: max(
         0px,
         min(
-          100vw - var(--info-col) - var(--band-edge) - var(--inset-x),
-          (100dvh - var(--band) - var(--inset-y)) / (var(--board-ratio) + var(--head-room))
+          100vw - 2 * var(--strip) - var(--inset-x),
+          (100dvh - var(--prompt-row) - var(--inset-y)) / var(--board-ratio)
         )
       );
     }
@@ -971,77 +1021,79 @@
       margin: 0;
       padding: 0;
       overflow: clip;
-      column-gap: 0;
-      grid-template-columns: var(--band-edge) 240px var(--space-sm) minmax(0, 1fr) var(--band-edge);
+      gap: 0;
+      grid-template-columns: minmax(var(--strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
+      grid-template-rows: var(--prompt-row) minmax(0, 1fr);
       grid-template-areas:
-        "top top top top top"
-        ". hand . action .";
-      grid-template-rows: minmax(0, 1fr) var(--band-row);
+        "left prompt right"
+        "left stage right";
       align-content: stretch;
-      /* The band: its rows, from one edge of the screen to the other. */
-      background: linear-gradient(
-        to top,
-        var(--bois-sombre) var(--band),
-        transparent var(--band)
-      );
     }
 
-    /* The info and the board share the top row: the info in its column, the board beside it. */
+    /* The top of the left strip. */
     .info {
-      grid-area: top;
-      justify-self: start;
-      align-self: center;
-      width: var(--info-col);
+      grid-area: left;
+      align-self: start;
+      justify-self: center;
+      width: var(--strip);
+      max-height: 88px;
+      overflow: hidden;
+    }
+
+    /* The top of the right strip: the gear, then « Avance rapide ». */
+    .tools {
+      grid-area: right;
+      align-self: start;
+      justify-self: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .prompt-row {
+      grid-area: prompt;
+      min-width: 0;
       min-height: 0;
-      max-height: 100%;
-      overflow-y: auto;
     }
 
     .stage {
-      grid-area: top;
+      grid-area: stage;
       align-self: center;
       min-width: 0;
-      margin: 0 var(--band-edge) 0 var(--info-col);
+      --head-room: 0;
     }
 
-    .action {
-      min-height: 0;
-      max-height: none;
-      overflow: visible;
-    }
-
-    .hand {
+    /* The bottom of the right strip, under the gear and « Avance rapide » (two 44 px targets). */
+    .actions {
+      grid-area: right;
       align-self: end;
-      min-width: 0;
-      padding: 0;
+      justify-self: center;
+      min-height: 0;
+      max-height: calc(100% - 2 * var(--touch) - 3 * var(--space-xs));
     }
 
-    .seven {
-      grid-row: hand;
-      grid-column: hand / action;
+    /* The bottom of the left strip, under the info (44 px). */
+    .hand,
+    .chips {
+      grid-area: left;
+      align-self: end;
+      justify-self: stretch;
       min-width: 0;
       min-height: 0;
-    }
-  }
-
-  /* Below 640 px wide the band has two rows: the action zone (56 px) over the hand (--band-row). */
-  @media (orientation: landscape) and (max-width: 639.98px) {
-    .game {
-      --band: calc(56px + var(--band-row));
+      max-height: calc(100% - var(--touch) - 2 * var(--space-xs));
     }
 
-    .layout {
-      grid-template-columns: var(--band-edge) minmax(0, 1fr) var(--band-edge);
-      grid-template-areas:
-        "top top top"
-        ". action ."
-        ". hand .";
-      grid-template-rows: minmax(0, 1fr) 56px var(--band-row);
+    .chips {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-bottom: var(--space-xs);
     }
 
     .seven {
-      grid-row: action / hand;
-      grid-column: action;
+      grid-area: right;
+      min-width: 0;
+      min-height: 0;
     }
   }
 

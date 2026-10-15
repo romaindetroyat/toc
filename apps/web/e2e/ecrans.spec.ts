@@ -485,7 +485,7 @@ test.describe("redimensionner garde la partie", () => {
 
     for (const [width, height, chrome] of [
       [1024, 640, "bar"],
-      [900, 700, "compact-bar"],
+      [900, 700, "compact"],
       [1280, 800, "bar"],
     ] as const) {
       const what = `${width} × ${height}`;

@@ -22,8 +22,8 @@ describe("screen modes", () => {
     expect(style).toContain(`@media ${bar} {`);
   });
 
-  it("the compact bar's query is every other landscape screen, the same string in the CSS", () => {
-    const compact = constant("COMPACT_BAR_QUERY");
+  it("the compact mode's query is every other landscape screen, the same string in the CSS", () => {
+    const compact = constant("COMPACT_QUERY");
     expect(compact).toBe(
       "(orientation: landscape) and (max-width: 959.98px), (orientation: landscape) and (max-height: 599.98px)",
     );

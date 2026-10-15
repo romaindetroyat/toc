@@ -11,13 +11,16 @@
     onpick: (pawn: PawnId) => void;
     onclose: () => void;
     /**
-     * The compact bar of a phone held sideways (plan 01-37): the chips on one line in the prompt's
-     * place, « Choisir un autre cheval » in the buttons' area (--band-buttons) at the right.
+     * What this instance draws. « all »: the chips and « Choisir un autre cheval » together (the
+     * computer's bar). In the compact mode of a phone held sideways (plan 01-47): « chips », the chips
+     * stacked in the left strip in the hand's place; « close », the button alone, in the right strip.
      */
-    band?: boolean;
+    part?: "all" | "chips" | "close";
+    /** The compact mode: the button's short label « Autre cheval » (its accessible name stays whole). */
+    compact?: boolean;
   };
 
-  let { options, onpick, onclose, band = false }: Props = $props();
+  let { options, onpick, onclose, part = "all", compact = false }: Props = $props();
 
   const letters = $derived(trayLetters(options));
 </script>
@@ -25,37 +28,42 @@
 <!-- Disambiguation tray (UI-SPEC): one chip per knight, 44 wide x 56 high, with the same letter as the
      badge drawn over the knight on the board. It replaces the prompt; « Choisir un autre cheval »
      closes it and the card stays selected. -->
-<div class="tray" class:band data-tray>
-  <ul class="chips">
-    {#each options as pawn, i (pawn)}
-      <li>
-        <button
-          type="button"
-          class="chip"
-          data-tray-option={pawn}
-          aria-label={game.tray.chip(letters[i] ?? "", pawnColor(pawn))}
-          onclick={() => onpick(pawn)}
-        >
-          <svg viewBox="0 0 110 190" width="22" height="38" focusable="false" aria-hidden="true">
-            <use href={`#knight-${pawnColor(pawn)}`} />
-          </svg>
-          <span class="letter" aria-hidden="true">{letters[i]}</span>
-        </button>
-      </li>
-    {/each}
-  </ul>
-  <!-- Échap does what this button does: closeTray and back both return to the tray's flow. -->
-  <button
-    type="button"
-    class="btn btn-secondary other"
-    data-tray-close
-    aria-label={game.buttons.otherHorse}
-    aria-keyshortcuts="Escape"
-    onclick={onclose}
-  >
-    {game.buttons.otherHorse}
-    <KeyHint label={clavier.keys.escape} />
-  </button>
+<div class="tray" class:column={part === "chips"} class:alone={part === "close"} data-tray>
+  {#if part !== "close"}
+    <ul class="chips">
+      {#each options as pawn, i (pawn)}
+        <li>
+          <button
+            type="button"
+            class="chip"
+            data-tray-option={pawn}
+            aria-label={game.tray.chip(letters[i] ?? "", pawnColor(pawn))}
+            onclick={() => onpick(pawn)}
+          >
+            <svg viewBox="0 0 110 190" width="22" height="38" focusable="false" aria-hidden="true">
+              <use href={`#knight-${pawnColor(pawn)}`} />
+            </svg>
+            <span class="letter" aria-hidden="true">{letters[i]}</span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#if part !== "chips"}
+    <!-- Échap does what this button does: closeTray and back both return to the tray's flow. -->
+    <button
+      type="button"
+      class="btn btn-secondary other"
+      data-tray-close
+      aria-label={game.buttons.otherHorse}
+      aria-keyshortcuts="Escape"
+      title={compact ? game.buttons.otherHorse : undefined}
+      onclick={onclose}
+    >
+      {compact ? game.compact.otherHorse : game.buttons.otherHorse}
+      <KeyHint label={clavier.keys.escape} />
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -109,27 +117,34 @@
     margin-left: auto;
   }
 
-  /* In the band: the same two columns as the action zone's, the chips at the left on one line, the
-     button filling the buttons' area, Label 14 bold on two lines at most. */
-  .tray.band {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--band-buttons, 184px);
-    column-gap: var(--space-sm);
+  /* The compact mode's left strip: the chips stacked, 4 px apart, in the hand's place. */
+  .tray.column {
+    flex-direction: column;
     align-items: center;
-    width: 100%;
+    gap: 0;
   }
 
-  .band .chips {
-    flex-wrap: nowrap;
+  .column .chips {
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  /* The compact mode's right strip: « Autre cheval » alone, as wide as the strip's other buttons,
+     two lines at most. */
+  .tray.alone {
+    flex: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .alone .other {
+    width: var(--strip-button, 56px);
     min-width: 0;
-  }
-
-  .band .other {
-    width: 100%;
     margin-left: 0;
-    padding: 0 var(--space-sm);
+    padding: 2px 0;
     font-size: var(--label-size);
+    letter-spacing: -0.01em;
     line-height: 1.2;
     text-align: center;
   }

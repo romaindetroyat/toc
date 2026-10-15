@@ -30,6 +30,13 @@ export const game = {
     teamUs: (n: number) => `Nous ${n}/8`,
     teamThem: (n: number) => `Eux ${n}/8`,
     teamAria: (n: number) => `Ton équipe : ${n} chevaux rentrés sur 8`,
+    /** The compact mode's info pill (plan 01-47): the knights home of « nous » and « eux ». */
+    score: (us: number, them: number) => `${us}–${them}`,
+    /** The pill's accessible name, from the turn line (« À toi de jouer », « Tour de Marengo »). */
+    pillAria: (turn: string, us: number, them: number) =>
+      `Infos de la partie : ${turn}, nous ${us} sur 8, eux ${them} sur 8`,
+    /** The title of the sheet the pill opens. */
+    sheetTitle: "Infos de la partie",
   },
 
   banner: {
@@ -81,6 +88,8 @@ export const game = {
   /** The chips that tell apart knights too close to tap (letters A to D, as over the knights). */
   tray: {
     chip: (letter: string, color: Color) => `Cheval ${letter}, ${colourWord(color)}`,
+    /** The compact prompt row while the chips stand in the left strip (plan 01-47). */
+    question: "Lequel de ces chevaux ?",
   },
 
   bot: {
@@ -94,6 +103,22 @@ export const game = {
     `Tes quatre chevaux sont rentrés. Tu joues avec ceux ${de(partner)}.`,
 
   fast: "Avance rapide",
+
+  /**
+   * The short labels of the compact mode's buttons (plan 01-47, « à confirmer par Romain »): the
+   * buttons are 52 px wide there. Their accessible names and their titles keep the full labels.
+   */
+  compact: {
+    cancel: "Annuler",
+    changeCard: "Autre carte",
+    otherHorse: "Autre cheval",
+    pass: "Passer",
+    pose: "Poser",
+    exit: "Sortir",
+    advance: (n: number) => `+${n}`,
+    undo: "Retour",
+    reset: "Effacer",
+  },
   illegal: "Ce coup n’est pas permis. Choisis-en un autre.",
 
   reasons: {

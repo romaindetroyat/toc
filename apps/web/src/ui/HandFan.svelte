@@ -11,12 +11,11 @@
   import { type CardId, type Playability, sortHand } from "@toc/engine";
   import { tick, untrack } from "svelte";
   import {
-    BAND_CARD,
-    BAND_LIFT,
-    BAND_TOP,
-    bandLayout,
-    bandVisible,
+    COLUMN_CARD,
+    COLUMN_SHIFT,
     cardSize,
+    columnHeight,
+    columnLayout,
     fanLayout,
     fanSpread,
   } from "../cards/fan.ts";
@@ -39,11 +38,12 @@
     pace?: Mode | "test";
     onpick?: (card: CardId) => void;
     /**
-     * The compact bar of a phone held sideways (UI-SPEC addendum « Plateau galet », item 9): a flat
-     * row of 64 x 90 cards in a box exactly --band-row (64 px) high, their top 8 px under its top
-     * edge, the selected card rising 8 px, the lower part cut at the box's bottom edge.
+     * The compact mode of a phone held sideways (UI-SPEC addendum « Recette 3 de Romain », plan
+     * 01-47): a column of 52 x 73 cards in the 60 px strip at the left of the galet, each showing at
+     * least its top 44 px, the last one whole, bottom-aligned in a box that holds five; the selected
+     * card moves 6 px toward the board, nothing turns.
      */
-    band?: boolean;
+    compact?: boolean;
   };
 
   let {
@@ -55,7 +55,7 @@
     concealed = false,
     pace = settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
     onpick,
-    band = false,
+    compact = false,
   }: Props = $props();
 
   let viewportWidth = $state(0);
@@ -63,25 +63,15 @@
   let width = $state(0);
   let active = $state(0);
 
-  // The band's row is laid out from its measured width: until that width has been applied, the slots
-  // take their places without the 200 ms slide (else a card would slide in from the row's centre and
-  // a slice would briefly be narrower than 44 px).
-  let placed = $state(false);
-  $effect(() => {
-    if (!band || width === 0 || placed) return;
-    const frame = requestAnimationFrame(() => {
-      placed = true;
-    });
-    return () => cancelAnimationFrame(frame);
-  });
-
   const cards = $derived(sortHand(hand));
-  const size = $derived(band ? BAND_CARD : cardSize(viewportWidth, viewportHeight));
+  const size = $derived(compact ? COLUMN_CARD : cardSize(viewportWidth, viewportHeight));
+  /** The column's box: the height of five cards (a hand never holds more), so it never jumps. */
+  const columnBox = $derived(columnHeight(Math.max(5, cards.length)));
   // The turned outer cards stay inside the screen: on a 320 px phone the fan spreads a little less.
-  // In the band the row is flat, so it spreads over its whole width.
+  // In the column nothing turns: each card's top comes from columnLayout, its dx stays 0.
   const slots = $derived(
-    band
-      ? bandLayout(cards.length, width)
+    compact
+      ? columnLayout(cards.length, columnBox).map(({ y }) => ({ dx: 0, drop: y, rotation: 0 }))
       : fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
   );
   const interactive = $derived(mode !== "waiting");
@@ -104,11 +94,11 @@
 
   /**
    * Where one card sits: its fan slot, raised by its state (8 px playable, 16 px selected). In the
-   * band only the selected card rises, by 8 px, and nothing turns.
+   * column the card stands at its top (`drop`) and only the selected one moves, 6 px toward the board.
    */
   function transformOf(card: CardId, slot: { dx: number; drop: number; rotation: number }): string {
     const state = stateOf(card);
-    if (band) return `translate(${slot.dx}px, ${state === "selected" ? -BAND_LIFT : 0}px)`;
+    if (compact) return `translate(${state === "selected" ? COLUMN_SHIFT : 0}px, ${slot.drop}px)`;
     if (state === "selected") return `translate(${slot.dx}px, ${slot.drop - 16}px) scale(1.06)`;
     const lift = state === "playable" ? 8 : 0;
     return `translate(${slot.dx}px, ${slot.drop - lift}px) rotate(${slot.rotation}deg)`;
@@ -174,9 +164,14 @@
   const roving = $derived(Math.min(active, Math.max(0, cards.length - 1)));
   let buttons = $state<Record<string, HTMLElement | undefined>>({});
 
-  /** Arrow keys walk through the cards (Entrée and Espace select, as on any button). */
+  /**
+   * Arrow keys walk through the cards (Entrée and Espace select, as on any button); in the column the
+   * up and down arrows do too.
+   */
   function onkeydown(event: KeyboardEvent) {
-    const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const next1 = event.key === "ArrowRight" || (compact && event.key === "ArrowDown");
+    const back1 = event.key === "ArrowLeft" || (compact && event.key === "ArrowUp");
+    const delta = next1 ? 1 : back1 ? -1 : 0;
     if (delta === 0 || cards.length === 0) return;
     event.preventDefault();
     const next = Math.max(0, Math.min(cards.length - 1, roving + delta));
@@ -191,17 +186,16 @@
 <!-- Hand fan (UI-SPEC): 1 to 5 cards, ascending value, rotated about a point below the cards. -->
 <div
   class="fan"
-  class:band
-  class:placed
+  class:compact
   class:still={settings.reduceMotion}
   class:concealed
   role="toolbar"
   tabindex="-1"
   aria-label={game.hand.label}
+  aria-orientation={compact ? "vertical" : undefined}
   style:--card-w="{size.w}px"
   style:--card-h="{size.h}px"
-  style:--band-top={band ? `${BAND_TOP}px` : undefined}
-  style:--band-card-h={band ? `${BAND_CARD.h}px` : undefined}
+  style:--column-box={compact ? `${columnBox}px` : undefined}
   bind:clientWidth={width}
   {onkeydown}
   data-hand
@@ -220,8 +214,7 @@
       <div
         class="slot"
         style:transform={transformOf(card, slot)}
-        style:z-index={stateOf(card) === "selected" ? 10 : i + 1}
-        style:--card-h={band ? `${bandVisible(stateOf(card) === "selected")}px` : undefined}
+        style:z-index={stateOf(card) === "selected" && !compact ? 10 : i + 1}
       >
         <Card
           {card}
@@ -333,62 +326,60 @@
     pointer-events: none;
   }
 
-  /* The compact bar (a phone held sideways): the box is the band's 64 px row. Each card is a flat
-     slot whose height is what shows of it (--card-h on the slot: 56 px, 64 px once selected), so its
-     box ends at the row's bottom edge; the face inside is drawn as a full 64 x 90 card and its lower
-     part is cut there. The top and the height move together, so the bottom edge never moves. */
-  .fan.band {
-    height: var(--band-row, 64px);
+  /* The compact mode (a phone held sideways): the box is the column of five cards, 58 px wide (a
+     card and the 6 px its selection moves toward the board), at the bottom of the strip. Every card
+     is whole, at the top its slot's translate gives; the next one covers all but its top 44 px. In
+     the column the selected card keeps its place in the stack (its outline and its 6 px move tell
+     it), so the cards under it still show their index. */
+  .fan.compact {
+    width: calc(var(--card-w) + 6px);
+    height: var(--column-box);
+    margin: 0 auto;
   }
 
-  .band .slot {
-    top: var(--band-top);
+  .compact .slot {
+    top: 0;
+    left: 0;
     bottom: auto;
-    transition:
-      transform 200ms ease-out,
-      height 200ms ease-out;
+    transform-origin: 50% 50%;
   }
 
-  .band.still .slot,
-  .band:not(.placed) .slot {
-    transition: none;
+  .compact .hint-slot {
+    transform-origin: 0 0;
   }
 
-  /* The card follows its slot's height as it changes (the custom property itself does not animate). */
-  .band .slot :global(.card[data-card]) {
-    height: 100%;
-    border-bottom: 0;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+  /* Smaller middle marks on the smaller card; an unplayable card at 40 %. */
+  .compact .slot :global(.card[data-card] .big),
+  .compact .slot :global(.card[data-card] .letter) {
+    font-size: 30px;
   }
 
-  .band .slot :global(.card[data-card] .middle) {
-    bottom: auto;
-    height: var(--band-card-h);
+  .compact .slot :global(.card[data-card].unplayable) {
+    opacity: 0.4;
   }
 
-  .band .slot :global(.card[data-card] .corner.bottom) {
-    display: none;
+  /* No room for two lines of text in the column: the heading shows, the body is read out. */
+  .compact .empty {
+    padding: 0;
+    justify-content: flex-end;
   }
 
-  .band .empty {
-    padding: 0 var(--space-sm);
-    overflow-y: auto;
-  }
-
-  .band .empty .heading,
-  .band .empty .body {
+  .compact .empty .heading {
     font-size: var(--label-size);
     line-height: var(--label-line);
   }
 
-  .band .empty .body {
-    margin-top: 0;
+  .compact .empty .body {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .slot,
-    .band .slot {
+    .slot {
       transition: none;
     }
   }

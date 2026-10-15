@@ -38,13 +38,13 @@
      * over the plan in the 56 px row, the chips and the buttons in the 64 px row. Its tray takes the
      * chips' place.
      */
-    band?: boolean;
+    compact?: boolean;
   };
 
   let {
     seven,
     bar = false,
-    band = false,
+    compact = false,
     tray,
     missed,
     onpickSteps,
@@ -94,7 +94,7 @@
 <section
   class="panel"
   class:bar
-  class:band
+  class:compact
   class:traying={tray !== null}
   data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
   <!-- In the bar, one line: the title with « Reste n », then the prompt and the plan. -->
@@ -127,7 +127,7 @@
 
   {#if tray !== null}
     <div class="tray">
-      <PawnTray options={tray.options} {band} onpick={ontrayPick} onclose={ontrayClose} />
+      <PawnTray options={tray.options} onpick={ontrayPick} onclose={ontrayClose} />
     </div>
   {:else}
     <!-- In the bar, the step chips and the buttons side by side, or on two rows. -->
@@ -373,7 +373,7 @@
    * left column holds the 20 px line over the 44 px chips, and whose right column holds the three
    * buttons. The tray needs its 56 px chips: it takes the whole row and the line steps aside.
    */
-  .panel.band {
+  .panel.compact {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: 20px var(--touch);
@@ -386,7 +386,7 @@
     overflow: hidden;
   }
 
-  .band .top {
+  .compact .top {
     grid-column: 1;
     grid-row: 1;
     display: flex;
@@ -396,24 +396,24 @@
     height: 20px;
   }
 
-  .band .head {
+  .compact .head {
     flex: none;
     min-height: 0;
     gap: var(--space-xs);
   }
 
-  .band .mini {
+  .compact .mini {
     display: none;
   }
 
-  .band .title,
-  .band .counter {
+  .compact .title,
+  .compact .counter {
     flex: none;
     font-size: var(--label-size);
     line-height: 20px;
   }
 
-  .band .region {
+  .compact .region {
     flex: 1 1 0;
     display: flex;
     align-items: center;
@@ -425,21 +425,21 @@
     white-space: nowrap;
   }
 
-  .band .prompt,
-  .band .rows {
+  .compact .prompt,
+  .compact .rows {
     line-height: 20px;
   }
 
-  .band .rows {
+  .compact .rows {
     display: flex;
     gap: var(--space-sm);
   }
 
-  .band .controls {
+  .compact .controls {
     display: contents;
   }
 
-  .band .chips {
+  .compact .chips {
     grid-column: 1;
     grid-row: 2;
     flex-wrap: nowrap;
@@ -448,11 +448,11 @@
     overflow-y: hidden;
   }
 
-  .band .chips > :global(*) {
+  .compact .chips > :global(*) {
     flex: none;
   }
 
-  .band .buttons {
+  .compact .buttons {
     grid-column: 2;
     grid-row: 1 / -1;
     flex-wrap: nowrap;
@@ -460,25 +460,25 @@
   }
 
   /* Label 14 bold on two lines at most, 48 px high. */
-  .band .buttons .btn {
+  .compact .buttons .btn {
     flex: none;
     width: 88px;
     padding: 0 var(--space-xs);
   }
 
-  .band .buttons .undo {
+  .compact .buttons .undo {
     width: 96px;
   }
 
-  .band .buttons .play {
+  .compact .buttons .play {
     width: 72px;
   }
 
-  .band.traying .top {
+  .compact.traying .top {
     display: none;
   }
 
-  .band .tray {
+  .compact .tray {
     grid-column: 1 / -1;
     grid-row: 1 / -1;
     min-width: 0;
@@ -487,12 +487,12 @@
   /* Below 640 px wide: the line and the plan in the 56 px row, the chips and the buttons in the
      64 px row under it; the tray takes the 64 px row. */
   @media (max-width: 639.98px) {
-    .panel.band {
+    .panel.compact {
       grid-template-rows: 56px var(--band-row, 64px);
       align-content: stretch;
     }
 
-    .band .top {
+    .compact .top {
       grid-column: 1 / -1;
       flex-direction: column;
       align-items: stretch;
@@ -501,23 +501,23 @@
       height: auto;
     }
 
-    .band .region {
+    .compact .region {
       flex: none;
     }
 
-    .band .chips {
+    .compact .chips {
       align-self: center;
     }
 
-    .band .buttons {
+    .compact .buttons {
       grid-row: 2;
     }
 
-    .band.traying .top {
+    .compact.traying .top {
       display: flex;
     }
 
-    .band .tray {
+    .compact .tray {
       grid-row: 2;
     }
   }

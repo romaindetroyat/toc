@@ -118,8 +118,8 @@ test.describe("le tapis en grand", () => {
 // --- Every supported screen size (FX-01) ---
 
 // Every screen is held sideways: from 01-38 a screen taller than wide no longer shows the game
-// (« Tourne ton téléphone », Romain's « paysage obligatoire »). Until 01-37 the four small landscape
-// sizes still use the side panel (compact-bar); 1280 x 800 is the computer's bottom bar (01-36).
+// (« Tourne ton téléphone », Romain's « paysage obligatoire »). The four small landscape sizes are
+// the compact mode (the full-height galet of 01-47); 1280 x 800 is the computer's bottom bar (01-36).
 type Gauge = { name: string; width: number; height: number };
 const SIZES: Gauge[] = [
   { name: "480x320", width: 480, height: 320 },

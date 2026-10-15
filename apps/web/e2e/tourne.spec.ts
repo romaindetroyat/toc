@@ -77,7 +77,7 @@ test.describe("le téléphone tenu debout", () => {
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect(page.locator("[data-board]")).toBeVisible();
     await expect(prompt(page)).toHaveCount(0);
-    await expect(page.locator("main.game")).toHaveAttribute("data-chrome", "compact-bar");
+    await expect(page.locator("main.game")).toHaveAttribute("data-chrome", "compact");
 
     await playDame(page);
     await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:15");

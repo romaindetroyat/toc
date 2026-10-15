@@ -60,45 +60,34 @@ export function fanSpread(n: number, width: number, cardW: number, cardH: number
   return width - 2 * beyond;
 }
 
-// --- The compact bar's hand (UI-SPEC addendum « Plateau galet », items 8 and 9, plan 01-37) ---
+// --- The compact mode's hand column (UI-SPEC addendum « Recette 3 de Romain », plan 01-47) ---
 //
-// On a phone held sideways the hand is a flat row inside the band's 64 px row: compact cards of
-// 64 x 90 with no turn and no drop, their top 8 px under the row's top edge, the selected card
-// rising 8 px. The lower part of every card is cut at the row's bottom edge (the bottom of the
-// screen): what shows is the card's top, its indices and its pip.
+// On a phone held sideways the galet takes the full height and the hand stands in the 60 px strip at
+// its left: a column of 52 x 73 cards, none turned, each overlapping the one above so that every card
+// shows at least its top 44 px (its index), the last one whole, bottom-aligned. The selected card
+// moves 6 px toward the board.
 
-/** The band's card size, px. */
-export const BAND_CARD = { w: 64, h: 90 } as const;
+/** The column's card size, px. */
+export const COLUMN_CARD = { w: 52, h: 73 } as const;
 
-/** The band's hand row, px (the 64 px row of the compact bar). */
-export const BAND_ROW = 64;
+/** The vertical step between two cards of the column, px: what shows of every card but the last. */
+export const COLUMN_STEP = 44;
 
-/** How far under the row's top edge the cards' tops sit, px. */
-export const BAND_TOP = 8;
+/** How far the selected card moves toward the board, px. */
+export const COLUMN_SHIFT = 6;
 
-/** How far the selected card rises, px (its top then meets the row's top edge). */
-export const BAND_LIFT = 8;
-
-/**
- * `n` flat cards in a row `width` px wide: offset = min(56, floor((width − 64) / (n − 1))), no
- * rotation, no drop. One card is centred.
- */
-export function bandLayout(n: number, width: number): FanSlot[] {
-  if (n <= 0) return [];
-  if (n === 1) return [{ dx: 0, drop: 0, rotation: 0 }];
-  const offset = Math.min(56, Math.floor((width - BAND_CARD.w) / (n - 1)));
-  return Array.from({ length: n }, (_, i) => ({
-    dx: (i - (n - 1) / 2) * offset,
-    drop: 0,
-    rotation: 0,
-  }));
+/** The height `count` cards take in the column, px: (count − 1) steps and one whole card. */
+export function columnHeight(count: number): number {
+  return count <= 0 ? 0 : (count - 1) * COLUMN_STEP + COLUMN_CARD.h;
 }
 
 /**
- * The visible height of a card in a row `row` px high, px: from its top (8 px under the row's top,
- * or at it once selected) down to the row's bottom edge, never more than the card itself.
+ * `count` cards in a column box `height` px high: the top of each card, px from the box's top, every
+ * card COLUMN_STEP under the one before, the last one whole and its bottom on the box's bottom edge.
+ * A box lower than the cards need keeps the steps: the top cards then start above it.
  */
-export function bandVisible(selected: boolean, row: number = BAND_ROW): number {
-  const top = selected ? BAND_TOP - BAND_LIFT : BAND_TOP;
-  return Math.max(0, Math.min(BAND_CARD.h, row - top));
+export function columnLayout(count: number, height: number): { y: number }[] {
+  if (count <= 0) return [];
+  const top = height - columnHeight(count);
+  return Array.from({ length: count }, (_, i) => ({ y: top + i * COLUMN_STEP }));
 }
