@@ -460,7 +460,7 @@ All motion is `transform`/`opacity` through the Web Animations API on `<g>` wrap
 | Valet swap (D-13) | Two crossing arcs, 2 bounds each, 900ms total, simultaneous | Surprised neigh at take-off |
 | Enter home (D-14, pawns 1–3) | Hops as normal, final settle 150ms | Sober; joyful short neigh |
 | 4th pawn home (D-14) | Rear 500ms + particle burst 700ms (8 small stars/circles, crème and amber, transform+opacity only) | Joyful neigh, light |
-| Deal | 20 cards fly from talon to seats, stagger 40ms, 250ms each; own cards flip to face-up | Card sounds |
+| Deal | 20 cards fly from talon to seats, stagger 55ms, 300ms each (révisé le 2026-10-15, recette 3 : 40 ms et 250 ms avant); own cards flip to face-up with the same 300ms and 55ms | Card sounds |
 | Dead hand posed | 350ms per card, 60ms stagger | |
 | Card played | Card flies from hand to its felt slot, 300ms | Card sound |
 | Win | Winning team's 8 knights hop in place once, 600ms | |
@@ -925,3 +925,14 @@ Source : la recette refaite par Romain le 2026-10-15 (01-UAT.md, tests 23 à 30)
 - Le réducteur `turnUi` (`apps/web/src/game/turnUi.ts`) ouvre l’aperçu avec `auto: true` quand la carte a un seul candidat de mouvement (après la question de l’As ou du Roi) ; il remplit le 7 quand `sevenPlans(view, siège, carte, 2)` du moteur ne rend qu’un partage. Le moteur ne change pas.
 - Un pas automatique ne rend jamais d’action : seuls « Jouer » (`confirm`), « Passer cette carte » et « Poser mes cartes » en rendent une (D-19, D-20) ; `turnUi.test.ts` le vérifie (describe « un seul cheval pour la carte (recette 3, test 27) »).
 - Toucher à nouveau le cheval seul dans son aperçu le laisse tel quel ; Échap depuis cet aperçu ne repasse jamais par un état « carte choisie » qui rouvrirait le même aperçu.
+
+### La donne un peu moins rapide
+
+**Les mots de Romain** (recette 3, test 28) : « La distribution de cartes est un tout petit peu trop rapide ».
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) : chaque carte de la donne vole 300 ms au lieu de 250, et 55 ms séparent deux cartes au lieu de 40. Les 20 cartes d’une première donne se posent en ≈ 1,35 s au lieu de ≈ 1,01 s (300 + 19 × 55 = 1 345 ms) ; les 16 cartes des donnes suivantes en ≈ 1,13 s. Les cartes du joueur se retournent ensuite avec les mêmes 300 ms et 55 ms. En « Avance rapide », tout reste multiplié par 0,4 : 120 ms par carte, 22 ms d’intervalle (≈ 0,54 s pour 20 cartes). « Réduire les animations » garde son unique fondu de 150 ms. Romain peut demander un autre rythme, plus lent ou plus rapide.
+
+**Faits techniques (sans confirmation)** :
+- Une seule source de vérité : `MOTION.dealCard` (300) et `MOTION.dealStagger` (55) dans `packages/board/src/motion.ts`, avec les mots de Romain en commentaire. Seules ces deux constantes changent ; aucun autre temps de mouvement ne bouge.
+- `dealFlights` (`apps/web/src/board/cardFx.ts`) en tire le délai n × 55 ms et la durée de 300 ms de chaque carte, `HandFan.svelte` le retournement des cartes du joueur, et `cardsDuration(count, "deal", mode)` (lu par `eventDuration` pour le rythme du Director et des robots) la durée de la donne. Le Director attend que les cartes se posent avant la suite : le bruit de la donne, le bandeau et le rythme des robots suivent la donne sans aucun nombre écrit en dur.
+- `motion.test.ts`, `cardFx.test.ts` et les deux tests de la donne de `e2e/animations.spec.ts` (vitesse normale et « Avance rapide ») mesurent ces valeurs ; la capture de la donne fige toujours les 20 cartes en vol avant le chargement de la page.
