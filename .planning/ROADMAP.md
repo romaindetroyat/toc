@@ -218,11 +218,11 @@ Plans:
   4. Les décisions de l'ordinateur ne dépendent que de ce qu'un humain saurait à sa place : sa main, les cartes jouées et la position des pions. Changer les mains cachées des autres joueurs ne change pas son coup.
   5. Avant chaque coup, l'ordinateur marque un temps de réflexion naturel, et il ne dépasse jamais quelques secondes, quel que soit son niveau.
 
-**Plans:** 7 plans (the plans run one after the other on the main tree; the only 400-game 5-vs-4 ladder run, about 12 minutes, is in 03-04; 03-07 runs the full suite and writes 03-UAT.md)
+**Plans:** 1/7 plans executed (the plans run one after the other on the main tree; the only 400-game 5-vs-4 ladder run, about 12 minutes, is in 03-04; 03-07 runs the full suite and writes 03-UAT.md)
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Traceur : la force choisie au lancement, retenue, et jouée dans la partie ; le 7 en quelques plateaux (sevenOutcomes), le paquet des ordinateurs pur
+- [x] 03-01-PLAN.md — Traceur : la force choisie au lancement, retenue, et jouée dans la partie ; le 7 en quelques plateaux (sevenOutcomes), le paquet des ordinateurs pur
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — Les niveaux 2 à 4 : le jeu d'équipe, des erreurs de moins en moins, la carte d'échange, et l'échelle (tools/ladder.mjs) qui le prouve
@@ -281,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
-| 3. L'ordinateur à la force choisie | 0/7 | Planned | - |
+| 3. L'ordinateur à la force choisie | 1/7 | In Progress | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
