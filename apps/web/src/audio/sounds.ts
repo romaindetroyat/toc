@@ -27,6 +27,8 @@ export type SoundBus = "sfx";
 export type SynthRecipe =
   | "hoof"
   | "hoof-terre"
+  | "hoof-paves"
+  | "hoof-bois"
   | "neigh-sortie"
   | "neigh-ruade"
   | "neigh-plainte"
@@ -69,6 +71,10 @@ export const SOUNDS: Record<SoundId, SoundDef> = {
       synth("a", "hoof", 3),
       // « Sur la terre »: a softer, lower, duller clop.
       synth("b", "hoof-terre", 3),
+      // « Sur les pavés »: a bright, hard click with the ring of the iron shoe.
+      synth("c", "hoof-paves", 3),
+      // « Sur le bois »: a hollow knock, no thump.
+      synth("d", "hoof-bois", 3),
     ],
   },
   "hennissement-sortie": { bus: "sfx", variants: [synth("a", "neigh-sortie")] },

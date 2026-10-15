@@ -23,7 +23,14 @@ import {
   type VariantSource,
   variantOf,
 } from "./sounds.ts";
-import { renderCard, renderHoof, renderHoofTerre, renderNeigh } from "./synth.ts";
+import {
+  renderCard,
+  renderHoof,
+  renderHoofBois,
+  renderHoofPaves,
+  renderHoofTerre,
+  renderNeigh,
+} from "./synth.ts";
 
 // The audio engine. Everything is fire-and-forget: no function here returns a promise the game
 // loop has to await, and every start time is on the AudioContext clock (no setTimeout, no
@@ -420,6 +427,10 @@ function renderSynth(recipe: SynthRecipe, take: number, sampleRate: number): Pro
       return renderHoof(take, sampleRate);
     case "hoof-terre":
       return renderHoofTerre(take, sampleRate);
+    case "hoof-paves":
+      return renderHoofPaves(take, sampleRate);
+    case "hoof-bois":
+      return renderHoofBois(take, sampleRate);
     case "neigh-sortie":
       return renderNeigh("sortie", sampleRate);
     case "neigh-ruade":
@@ -449,10 +460,21 @@ async function renderRecipe(
 ): Promise<AudioBufferLike | undefined> {
   const buffer = await renderSynth(recipe, take, sampleRate);
   if (DEBUG && window.__tocDebug) {
+    const data = buffer.getChannelData(0);
     let peak = 0;
-    for (const sample of buffer.getChannelData(0)) peak = Math.max(peak, Math.abs(sample));
+    let energy = 0;
+    let slope = 0;
+    for (let i = 0; i < data.length; i++) {
+      const sample = data[i] as number;
+      peak = Math.max(peak, Math.abs(sample));
+      energy += sample * sample;
+      if (i > 0) slope += (sample - (data[i - 1] as number)) ** 2;
+    }
+    // A brightness estimate in Hz (the spectral centroid of a simple tone): the specs tell the
+    // versions of a sound apart by it.
+    const brightness = energy > 0 ? (sampleRate / (2 * Math.PI)) * Math.sqrt(slope / energy) : 0;
     const sounds = window.__tocDebug.audio.sounds ?? {};
-    sounds[`${recipe}#${take}`] = { duration: buffer.duration, peak };
+    sounds[`${recipe}#${take}`] = { duration: buffer.duration, peak, brightness };
     window.__tocDebug.audio.sounds = sounds;
   }
   return buffer;

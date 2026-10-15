@@ -100,6 +100,7 @@ function noiseHit(
   band.frequency.value = hit.freq;
   band.Q.value = hit.q;
   const env = ctx.createGain();
+  env.gain.value = 0;
   const attack = hit.attack ?? 0.002;
   env.gain.setValueAtTime(0, hit.at);
   env.gain.linearRampToValueAtTime(hit.gain, hit.at + attack);
@@ -119,6 +120,7 @@ function toneHit(
   osc.frequency.setValueAtTime(hit.from, hit.at);
   if (hit.to !== hit.from) osc.frequency.exponentialRampToValueAtTime(hit.to, hit.at + hit.decay);
   const env = ctx.createGain();
+  env.gain.value = 0;
   env.gain.setValueAtTime(0, hit.at);
   env.gain.linearRampToValueAtTime(hit.gain, hit.at + 0.002);
   env.gain.exponentialRampToValueAtTime(0.001, hit.at + hit.decay);
@@ -166,6 +168,122 @@ export async function renderHoofTerre(take: number, sampleRate = 44100): Promise
         q: 0.7,
         gain: 0.06 * strike.level,
         decay: 0.09,
+      });
+    }
+  });
+  normalize(buffer.getChannelData(0), HOOF_PEAK);
+  return buffer;
+}
+
+/**
+ * C, « sur les pavés »: an iron shoe on cobblestones. Bright and hard: a 1 ms click of noise through
+ * a narrow band-pass around 2.2 to 2.6 kHz (Q 2) that dies in 50 ms, a sharper tick at 5 kHz, the
+ * short metallic ring of the shoe (a 3.1 kHz sine and an inharmonic 4.4 kHz partial, low), and a
+ * short thump falling from 150 to 80 Hz in 40 ms. Takes: the band moves by 200 Hz, the ring by 2 %,
+ * the heel-toe gap by 6 ms.
+ */
+export async function renderHoofPaves(take: number, sampleRate = 44100): Promise<AudioBuffer> {
+  const seconds = 0.2;
+  const ring = 1 + 0.02 * (take % 3) - 0.02;
+  const buffer = await renderToBuffer(Math.ceil(seconds * sampleRate), sampleRate, (ctx) => {
+    for (const [n, strike] of strikes(take, [24, 18, 30], 0.78).entries()) {
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at,
+        seed: 0x51ed270b + take * 613 + n * 97,
+        freq: 2200 + 200 * take,
+        q: 2,
+        gain: 1.2 * strike.level,
+        decay: 0.05,
+        attack: 0.001,
+      });
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at,
+        seed: 0x7f4a7c15 + take * 7 + n,
+        freq: 5000,
+        q: 1,
+        gain: 0.4 * strike.level,
+        decay: 0.012,
+        attack: 0.0005,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 3100 * ring,
+        to: 3100 * ring,
+        gain: 0.1 * strike.level,
+        decay: 0.09,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 4370 * ring,
+        to: 4370 * ring,
+        gain: 0.05 * strike.level,
+        decay: 0.06,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 150,
+        to: 80,
+        gain: 0.45 * strike.level,
+        decay: 0.04,
+      });
+    }
+  });
+  normalize(buffer.getChannelData(0), HOOF_PEAK);
+  return buffer;
+}
+
+/**
+ * D, « sur le bois »: a hoof on a wooden bridge or a stable floor. A hollow knock: noise through two
+ * resonant band-passes near 450 Hz and 1.1 kHz (Q 6) that ring and die in 90 and 60 ms, the planks'
+ * own tones (sines at the same two pitches, the low one sagging a little), a faint click, and no
+ * thump (the floor is hollow, not earth). Takes: another plank, its pitches 5 % lower or 6 % higher,
+ * and another heel-toe gap.
+ */
+export async function renderHoofBois(take: number, sampleRate = 44100): Promise<AudioBuffer> {
+  const seconds = 0.24;
+  const plank = [1, 0.95, 1.06][take % 3] as number;
+  const buffer = await renderToBuffer(Math.ceil(seconds * sampleRate), sampleRate, (ctx) => {
+    for (const [n, strike] of strikes(take, [42, 34, 50], 0.72).entries()) {
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at,
+        seed: 0x2b992ddf + take * 389 + n * 53,
+        freq: 450 * plank,
+        q: 6,
+        gain: 1.6 * strike.level,
+        decay: 0.09,
+        attack: 0.001,
+      });
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at,
+        seed: 0x3c6ef372 + take * 17 + n,
+        freq: 1100 * plank,
+        q: 6,
+        gain: 1 * strike.level,
+        decay: 0.06,
+        attack: 0.001,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 462 * plank,
+        to: 440 * plank,
+        gain: 0.32 * strike.level,
+        decay: 0.09,
+      });
+      toneHit(ctx, ctx.destination, {
+        at: strike.at,
+        from: 1100 * plank,
+        to: 1100 * plank,
+        gain: 0.12 * strike.level,
+        decay: 0.05,
+      });
+      noiseHit(ctx, ctx.destination, {
+        at: strike.at,
+        seed: 0x6a09e667 + take + n,
+        freq: 3000,
+        q: 1,
+        gain: 0.15 * strike.level,
+        decay: 0.006,
+        attack: 0.0005,
       });
     }
   });

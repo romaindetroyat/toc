@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import raw from "../../../../assets/audio/LICENSES.md?raw";
-import { SOUND_IDS } from "../audio/sounds.ts";
+import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId } from "../audio/sounds.ts";
 import { LICENCES, type LicenceRow, parseLicences, uncoveredAssets } from "./licences.ts";
 
 const SAMPLE = [
@@ -213,5 +213,77 @@ describe("bundled asset files", () => {
       expect(entry.auteur, `auteur of ${entry.id}`).not.toBe("");
       expect(entry.licence, `licence of ${entry.id}`).not.toBe("");
     }
+  });
+});
+
+/**
+ * The rule of a recorded version (01-51): its `licence` names a « son » row of LICENSES.md, and that
+ * row covers each of its files (served from apps/web/public). Returns what breaks the rule.
+ */
+function fileVersionProblems(catalogue: Record<SoundId, SoundDef>, rows: LicenceRow[]): string[] {
+  const problems: string[] = [];
+  for (const id of SOUND_IDS) {
+    for (const variant of catalogue[id].variants) {
+      if (variant.source.kind !== "file") continue;
+      const { licence, files } = variant.source;
+      const entry = rows.find((candidate) => candidate.id === licence);
+      if (entry?.type !== "son") {
+        problems.push(`${id}:${variant.key} has no « son » row ${licence}`);
+        continue;
+      }
+      if (files.length === 0) problems.push(`${id}:${variant.key} lists no file`);
+      for (const file of uncoveredAssets(
+        files.map((url) => `apps/web/public${url}`),
+        [entry],
+      )) {
+        problems.push(`${id}:${variant.key}: ${file} is not covered by ${licence}`);
+      }
+    }
+  }
+  return problems;
+}
+
+describe("sound versions and the register", () => {
+  const sound = (id: string, fichier: string): LicenceRow => ({
+    id,
+    fichier,
+    type: "son",
+    source: "Freesound",
+    auteur: "Quelqu’un",
+    licence: "CC0 1.0",
+    url: "https://freesound.org/x",
+  });
+  const withFile = (licence: string, files: string[]): Record<SoundId, SoundDef> => ({
+    ...SOUNDS,
+    sabot: {
+      bus: "sfx",
+      variants: [...SOUNDS.sabot.variants, { key: "d", source: { kind: "file", files, licence } }],
+    },
+  });
+
+  it("accepts a recorded version whose own row covers each of its files", () => {
+    const rows = [sound("sabot-galop", "apps/web/public/audio/galop.m4a, galop.mp3")];
+    expect(
+      fileVersionProblems(withFile("sabot-galop", ["/audio/galop.m4a", "/audio/galop.mp3"]), rows),
+    ).toEqual([]);
+  });
+
+  it("refuses a recorded version without its row, or with a file its row does not cover", () => {
+    const rows = [sound("sabot-galop", "galop.m4a")];
+    expect(fileVersionProblems(withFile("inconnu", ["/audio/galop.m4a"]), rows)).toEqual([
+      "sabot:d has no « son » row inconnu",
+    ]);
+    expect(
+      fileVersionProblems(withFile("sabot-galop", ["/audio/galop.m4a", "/audio/galop.mp3"]), rows),
+    ).toEqual(["sabot:d: apps/web/public/audio/galop.mp3 is not covered by sabot-galop"]);
+  });
+
+  it("holds for every recorded version of the catalogue", () => {
+    expect(fileVersionProblems(SOUNDS, parseLicences(raw))).toEqual([]);
+  });
+
+  it("gives every sound at least its version « a », and the hooves four versions", () => {
+    for (const id of SOUND_IDS) expect(SOUNDS[id].variants[0]?.key, id).toBe("a");
+    expect(SOUNDS.sabot.variants.map((v) => v.key)).toEqual(["a", "b", "c", "d"]);
   });
 });

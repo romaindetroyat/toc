@@ -5,8 +5,22 @@ type TocWindow = Window & { __tocDebug?: { audio: { scheduled: number[] } } };
 
 const NBSP = " ";
 
-test.describe("page de test des sons", () => {
-  test("sons: la page liste les trois sections, chaque ligne a un bouton d’au moins 44 x 44", async ({
+type Played = { id: string; variant: string; take: number; at: number };
+/** Every buffer the engine started (debug builds), with its version. */
+const played = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __tocDebug?: { audio: { played?: Played[] } } }).__tocDebug?.audio
+        .played ?? [],
+  );
+
+const INTRO = "Écoute les versions de chaque son et choisis ta préférée.";
+const scheduledOf = (page: Page) =>
+  page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
+const sabots = (page: Page) => page.getByRole("radiogroup", { name: "Mon choix pour Sabots" });
+
+test.describe("page de test des sons à choix", () => {
+  test("sons: la page liste les trois sections, chaque son ses versions et son choix, boutons d’au moins 44 x 44", async ({
     page,
   }) => {
     await page.goto("/#/sons");
@@ -15,31 +29,44 @@ test.describe("page de test des sons", () => {
       await expect(page.getByRole("heading", { name: section, level: 2 })).toBeVisible();
     }
     await expect(page.getByRole("heading", { level: 2 })).toHaveCount(3);
-    await expect(page.getByText("Écoute chaque son et note-le.")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Écoute les versions de chaque son et choisis ta préférée. Ton choix compte tout de suite dans tes parties, sur cet appareil. Pour qu’il compte pour tout le monde, touche «\u202fCopier mes choix\u202f» et envoie-les.",
+      ),
+    ).toBeVisible();
     await expect(
       page.getByText(
         "Le son joue aussi quand l’iPhone est en mode silencieux. Pas de son\u202f? Monte le volume avec les boutons sur le côté.",
       ),
     ).toBeVisible();
 
-    // 4 hoof rows + the distance row + 6 neighs + 3 cards (no ambience since 2026-10-14).
-    await expect(page.locator("li.row")).toHaveCount(14);
-    // 13 rated rows, each with the three ratings.
-    await expect(page.getByRole("radiogroup")).toHaveCount(13);
-    await expect(page.getByRole("radio", { name: "À écouter" })).toHaveCount(13);
+    // 10 sounds + the hoof cadence and the distance rows (no ambience since 2026-10-14).
+    await expect(page.locator("li.row")).toHaveCount(12);
+    await expect(page.locator("li.row[data-sound]")).toHaveCount(10);
+    // One choice per sound; the hooves have four versions, the other sounds one until 01-52 and 01-53.
+    await expect(page.getByRole("radiogroup")).toHaveCount(10);
+    await expect(page.getByRole("radiogroup", { name: /^Mon choix pour / })).toHaveCount(10);
+    await expect(sabots(page).getByRole("radio")).toHaveText(["A", "B", "C", "D"]);
+    for (const letter of ["A", "B", "C", "D"]) {
+      await expect(
+        page.getByRole("button", { name: `Écouter Sabots, version ${letter}`, exact: true }),
+      ).toBeVisible();
+    }
+    await expect(page.getByRole("button", { name: /, version [A-D]$/ })).toHaveCount(13);
+    await expect(page.getByText("Mon choix", { exact: true })).toHaveCount(10);
 
     const buttons = page.locator("button.play");
     const count = await buttons.count();
-    expect(count).toBe(14);
+    expect(count).toBe(18); // 13 versions + 4 cadences + the distance
     for (let i = 0; i < count; i++) {
       const box = await buttons.nth(i).boundingBox();
       expect(box?.width, `play button ${i} width`).toBeGreaterThanOrEqual(44);
       expect(box?.height, `play button ${i} height`).toBeGreaterThanOrEqual(44);
     }
-    // Every radio of the rating is a touch target too.
     const radios = page.getByRole("radio");
     for (let i = 0; i < (await radios.count()); i++) {
       const box = await radios.nth(i).boundingBox();
+      expect(box?.width, `radio ${i} width`).toBeGreaterThanOrEqual(44);
       expect(box?.height, `radio ${i} height`).toBeGreaterThanOrEqual(44);
     }
   });
@@ -48,109 +75,188 @@ test.describe("page de test des sons", () => {
     await page.goto("/#/sons");
     await expect(page.getByText(`Son en attente${NBSP}: touche l’écran`)).toBeVisible();
 
-    await page.getByText("Écoute chaque son et note-le.").click();
+    await page.getByText(INTRO).click();
     await expect(page.getByText("Son prêt")).toBeVisible();
     await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
 
     await page.getByRole("button", { name: "Écouter 4 cases", exact: true }).click();
-    const scheduled = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
-    expect(scheduled).toHaveLength(4);
+    expect(await scheduledOf(page)).toHaveLength(4);
 
     await page.getByRole("button", { name: "Écouter 13 cases", exact: true }).click();
-    const gallop = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
-    expect(gallop?.length).toBeGreaterThan(13); // two clops per hop at the gallop
+    expect((await scheduledOf(page))?.length).toBeGreaterThan(13); // two clops per hop at the gallop
 
-    // The slider plays the same cadence as the fixed rows.
+    // The slider plays the same cadence as the fixed buttons.
     await page.getByRole("slider", { name: "Distance en cases" }).fill("1");
     await page.getByRole("button", { name: "Écouter la distance choisie" }).click();
-    const walk = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled);
-    expect(walk).toHaveLength(1);
+    expect(await scheduledOf(page)).toHaveLength(1);
+
+    // The cadences play the chosen version.
+    await sabots(page).getByRole("radio", { name: "D" }).click();
+    await page.evaluate(() => {
+      const w = window as unknown as { __tocDebug?: { audio: { played?: unknown[] } } };
+      if (w.__tocDebug) w.__tocDebug.audio.played = [];
+    });
+    await page.getByRole("button", { name: "Écouter 7 cases", exact: true }).click();
+    await expect
+      .poll(async () => (await played(page)).filter((p) => p.id === "sabot").length)
+      .toBeGreaterThan(0);
+    expect((await played(page)).every((p) => p.variant === "d")).toBe(true);
   });
 
-  test("sons: un premier appui sur un bouton d’écoute débloque le son puis joue", async ({
+  test("sons: un premier appui sur un bouton de version débloque le son puis la joue", async ({
     page,
   }) => {
     await page.goto("/#/sons");
-    await page.getByRole("button", { name: "Écouter 4 cases", exact: true }).click();
+    await page.getByRole("button", { name: "Écouter Sabots, version C", exact: true }).click();
     await expect(page.getByText("Son prêt")).toBeVisible();
     await expect
-      .poll(() => page.evaluate(() => (window as TocWindow).__tocDebug?.audio.scheduled.length))
-      .toBe(4);
-  });
-
-  test("sons: une note choisie est gardée après rechargement", async ({ page }) => {
-    await page.goto("/#/sons");
-    const group = page.getByRole("radiogroup", { name: /Sortie de l’écurie/ });
-    await expect(group.getByRole("radio", { name: "À écouter" })).toHaveAttribute(
+      .poll(async () => (await played(page)).filter((p) => p.variant === "c").length)
+      .toBe(4); // the 4-cell cadence, in version C
+    // Listening does not choose.
+    await expect(sabots(page).getByRole("radio", { name: "A" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    await group.getByRole("radio", { name: "Bon" }).click();
-    await expect(group.getByRole("radio", { name: "Bon" })).toHaveAttribute("aria-checked", "true");
-
-    await page.reload();
-    const again = page.getByRole("radiogroup", { name: /Sortie de l’écurie/ });
-    await expect(again.getByRole("radio", { name: "Bon" })).toHaveAttribute("aria-checked", "true");
-    // The other rows stay on the default.
-    const other = page.getByRole("radiogroup", { name: /Poser une carte/ });
-    await expect(other.getByRole("radio", { name: "À écouter" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-
-    const stored = await page.evaluate(() => localStorage.getItem("toc.soundnotes.v1"));
-    expect(JSON.parse(stored ?? "{}")).toEqual({ "hennissement-sortie": "bon" });
   });
 
-  test("sons: les flèches changent la note, une seule note est cochée par ligne", async ({
+  test("sons: les quatre versions des sabots sonnent différemment, et leurs trois prises aussi", async ({
     page,
   }) => {
     await page.goto("/#/sons");
-    const group = page.getByRole("radiogroup", { name: /Donne/ });
-    await group.getByRole("radio", { name: "À écouter" }).focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(group.getByRole("radio", { name: "Bon" })).toHaveAttribute("aria-checked", "true");
-    await page.keyboard.press("ArrowRight");
-    await expect(group.getByRole("radio", { name: "À changer" })).toHaveAttribute(
+    await page.getByText(INTRO).click();
+    await expect(page.getByText("Son prêt")).toBeVisible();
+    for (const letter of ["B", "C", "D"]) {
+      await page.getByRole("button", { name: `Écouter Sabots, version ${letter}` }).click();
+    }
+    type Rendered = Record<string, { duration: number; peak: number; brightness?: number }>;
+    await expect
+      .poll(async () =>
+        Object.keys(
+          await page.evaluate(
+            () =>
+              (window as unknown as { __tocDebug?: { audio: { sounds?: Rendered } } }).__tocDebug
+                ?.audio.sounds ?? {},
+          ),
+        ).filter((key) => key.startsWith("hoof")),
+      )
+      .toHaveLength(12);
+    const sounds = await page.evaluate(
+      () =>
+        (window as unknown as { __tocDebug?: { audio: { sounds?: Rendered } } }).__tocDebug?.audio
+          .sounds ?? {},
+    );
+    const bright = (recipe: string) =>
+      [0, 1, 2].map((take) => sounds[`${recipe}#${take}`]?.brightness ?? 0);
+    const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+    const [a, terre, paves, bois] = ["hoof", "hoof-terre", "hoof-paves", "hoof-bois"].map((r) =>
+      mean(bright(r)),
+    ) as [number, number, number, number];
+    // Earth is duller than today's clop, the cobblestones brighter, the wood in between and apart.
+    expect(terre).toBeLessThan(a * 0.8);
+    expect(paves).toBeGreaterThan(a * 1.2);
+    expect(bois).toBeLessThan(paves * 0.8);
+    expect(Math.abs(bois - terre)).toBeGreaterThan(terre * 0.1);
+    for (const recipe of ["hoof-terre", "hoof-paves", "hoof-bois"]) {
+      const takes = bright(recipe);
+      expect(new Set(takes.map((b) => Math.round(b))).size, recipe).toBe(3);
+      for (let take = 0; take < 3; take++) {
+        const sound = sounds[`${recipe}#${take}`];
+        expect(sound?.peak, `${recipe}#${take}`).toBeGreaterThan(0.5);
+        expect(sound?.peak, `${recipe}#${take}`).toBeLessThanOrEqual(1);
+        expect(sound?.duration, `${recipe}#${take}`).toBeLessThan(0.3);
+      }
+    }
+  });
+
+  test("sons: un choix est gardé après rechargement, les autres sons restent sur A", async ({
+    page,
+  }) => {
+    await page.goto("/#/sons");
+    await expect(sabots(page).getByRole("radio", { name: "A" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    await expect(group.locator('[aria-checked="true"]')).toHaveCount(1);
+    await sabots(page).getByRole("radio", { name: "D" }).click();
+    await expect(sabots(page).getByRole("radio", { name: "D" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    // The chosen version's button is marked too.
+    await expect(
+      page.getByRole("button", { name: "Écouter Sabots, version D", exact: true }),
+    ).toHaveClass(/chosen/);
+
+    await page.reload();
+    await expect(sabots(page).getByRole("radio", { name: "D" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    const other = page.getByRole("radiogroup", { name: "Mon choix pour Poser une carte" });
+    await expect(other.getByRole("radio", { name: "A" })).toHaveAttribute("aria-checked", "true");
+
+    const stored = await page.evaluate(() => localStorage.getItem("toc.soundchoices.v1"));
+    expect(JSON.parse(stored ?? "{}")).toEqual({ sabot: "d" });
   });
 
-  test("sons: un stockage abîmé ou piraté donne des notes par défaut, sans erreur", async ({
+  test("sons: les flèches changent le choix, un seul est coché par son", async ({ page }) => {
+    await page.goto("/#/sons");
+    const group = sabots(page);
+    await group.getByRole("radio", { name: "A" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(group.getByRole("radio", { name: "B" })).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowRight");
+    await expect(group.getByRole("radio", { name: "C" })).toHaveAttribute("aria-checked", "true");
+    await expect(group.locator('[aria-checked="true"]')).toHaveCount(1);
+    await page.keyboard.press("ArrowLeft");
+    await expect(group.getByRole("radio", { name: "B" })).toHaveAttribute("aria-checked", "true");
+    const stored = await page.evaluate(() => localStorage.getItem("toc.soundchoices.v1"));
+    expect(JSON.parse(stored ?? "{}")).toEqual({ sabot: "b" });
+  });
+
+  test("sons: un stockage abîmé ou piraté donne les choix par défaut, sans erreur, et les anciennes notes sont ignorées", async ({
     page,
   }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript(() => {
       localStorage.setItem(
-        "toc.soundnotes.v1",
+        "toc.soundchoices.v1",
         JSON.stringify({
-          "carte-pose": "excellent",
-          pirate: "bon",
-          ambiance: "bon",
-          "carte-donne": "bon",
+          sabot: "z",
+          pirate: "b",
+          ambiance: "a",
+          "carte-pose": "d",
+          "hennissement-sortie": "<b>",
+          "carte-donne": "a",
         }),
       );
+      localStorage.setItem("toc.soundnotes.v1", JSON.stringify({ "sabot-4": "bon" }));
     });
     await page.goto("/#/sons");
+    await expect(sabots(page).getByRole("radio", { name: "A" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     await expect(
-      page.getByRole("radiogroup", { name: /Poser une carte/ }).getByRole("radio", {
-        name: "À écouter",
-      }),
+      page
+        .getByRole("radiogroup", { name: "Mon choix pour Poser une carte" })
+        .getByRole("radio", { name: "A" }),
     ).toHaveAttribute("aria-checked", "true");
-    await expect(
-      page.getByRole("radiogroup", { name: /Donne/ }).getByRole("radio", { name: "Bon" }),
-    ).toHaveAttribute("aria-checked", "true");
-    // An old rating of the removed ambience is dropped: it has no row to show on.
-    await expect(page.getByRole("radiogroup", { name: /Ambiance/ })).toHaveCount(0);
+    // The old ratings have no control left.
+    await expect(page.getByRole("radio", { name: /À écouter|Bon|À changer/ })).toHaveCount(0);
+    // Unreadable JSON: the defaults too.
+    await page.evaluate(() => localStorage.setItem("toc.soundchoices.v1", "{oops"));
+    await page.reload();
+    await expect(sabots(page).getByRole("radio", { name: "A" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(errors).toEqual([]);
   });
 
   test("sons: il n’y a plus d’ambiance, ni ligne, ni bouton, ni volume", async ({ page }) => {
     await page.goto("/#/sons");
-    await page.getByText("Écoute chaque son et note-le.").click();
+    await page.getByText(INTRO).click();
     await expect(page.getByText("Son prêt")).toBeVisible();
     await expect(page.getByText(/ambiance/i)).toHaveCount(0);
     await expect(page.locator('[data-sound="ambiance"]')).toHaveCount(0);
@@ -158,7 +264,6 @@ test.describe("page de test des sons", () => {
     // The only slider left is the hoof distance.
     await expect(page.getByRole("slider")).toHaveCount(1);
     await expect(page.getByRole("slider", { name: "Distance en cases" })).toBeVisible();
-    // Nothing is rendered for an ambience either.
     const rendered = await page.evaluate(() =>
       Object.keys(
         (window as unknown as { __tocDebug?: { audio: { sounds?: object } } }).__tocDebug?.audio
@@ -169,19 +274,24 @@ test.describe("page de test des sons", () => {
     expect(rendered.filter((id) => id.startsWith("ambience"))).toEqual([]);
   });
 
-  test("sons: chaque ligne dit sa source, ici des sons générés par le code", async ({ page }) => {
+  test("sons: chaque version dit sa source, ici des sons générés par le code, et ce qu’elle est", async ({
+    page,
+  }) => {
     await page.goto("/#/sons");
-    await page.getByText("Écoute chaque son et note-le.").click();
+    await page.getByText(INTRO).click();
     await expect(page.getByText("Son prêt")).toBeVisible();
-    await expect(page.getByText("Généré par le code")).toHaveCount(13);
+    await expect(page.locator(".version .source")).toHaveCount(13);
+    await expect(page.getByText("Généré par le code", { exact: true })).toHaveCount(13);
     await expect(page.getByText("Son indisponible")).toHaveCount(0);
+    const hooves = page.locator('li.row[data-sound="sabot"] .version .what');
+    await expect(hooves).toHaveText(["actuel", "sur la terre", "sur les pavés", "sur le bois"]);
   });
 
-  test("sons: chaque ligne montre l’auteur et la licence du registre", async ({ page }) => {
+  test("sons: chaque son montre l’auteur et la licence du registre", async ({ page }) => {
     await page.goto("/#/sons");
-    await expect(page.locator("li.row[data-sound] .licence")).toHaveCount(13);
+    await expect(page.locator("li.row[data-sound] > .licence")).toHaveCount(10);
     await expect(page.getByText("Jeu TOC (synthèse Web Audio) · Aucune œuvre tierce")).toHaveCount(
-      13,
+      10,
     );
     await expect(page.getByText("Licence non renseignée")).toHaveCount(0);
   });
@@ -197,42 +307,35 @@ test.describe("page de test des sons", () => {
   });
 });
 
-test.describe("copier mes notes", () => {
+test.describe("copier mes choix", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
-  test("sons: Copier mes notes met le texte français dans le presse-papiers et le dit", async ({
+  test("sons: Copier mes choix met la liste française dans le presse-papiers et le dit", async ({
     page,
   }) => {
     await page.goto("/#/sons");
-    await page
-      .getByRole("radiogroup", { name: /Sortie de l’écurie/ })
-      .getByRole("radio", { name: "Bon" })
-      .click();
-    await page
-      .getByRole("radiogroup", { name: /13 cases/ })
-      .getByRole("radio", { name: "À changer" })
-      .click();
+    await sabots(page).getByRole("radio", { name: "B" }).click();
 
-    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    await page.getByRole("button", { name: "Copier mes choix" }).click();
     const toast = page.locator("[data-toast]");
-    await expect(toast).toHaveText("Notes copiées.");
-    await expect(page.getByRole("textbox", { name: "Tes notes" })).toHaveCount(0);
+    await expect(toast).toHaveText("Choix copiés.");
+    await expect(page.getByRole("textbox", { name: "Mes choix" })).toHaveCount(0);
 
     const clipboard = await page.evaluate(() => navigator.clipboard.readText());
     const lines = clipboard.split("\n");
-    expect(lines).toHaveLength(13);
+    expect(lines).toHaveLength(10);
+    expect(lines[0]).toBe(`Sabots${NBSP}: B`);
+    expect(lines).toContain(`Sortie de l’écurie${NBSP}: A`);
+    expect(lines).toContain(`Donne${NBSP}: A`);
     expect(clipboard).not.toContain("Ambiance");
-    expect(lines).toContain(`Sortie de l’écurie${NBSP}: Bon`);
-    expect(lines).toContain(`Sabots, 13 cases${NBSP}: À changer`);
-    expect(lines).toContain(`Donne${NBSP}: À écouter`);
   });
 
   test("sons: un seul message à la fois, le nouveau remplace l’ancien, il disparaît après 4 s", async ({
     page,
   }) => {
     await page.goto("/#/sons");
-    await page.getByRole("button", { name: "Copier mes notes" }).click();
-    await expect(page.locator("[data-toast]")).toHaveText("Notes copiées.");
+    await page.getByRole("button", { name: "Copier mes choix" }).click();
+    await expect(page.locator("[data-toast]")).toHaveText("Choix copiés.");
 
     // The clipboard now refuses: the second message replaces the first, never stacks.
     await page.evaluate(() => {
@@ -241,7 +344,7 @@ test.describe("copier mes notes", () => {
         value: { writeText: () => Promise.reject(new Error("refusé")) },
       });
     });
-    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    await page.getByRole("button", { name: "Copier mes choix" }).click();
     const toast = page.locator("[data-toast]");
     await expect(toast).toHaveCount(1);
     await expect(toast).toHaveText("Impossible de copier. Sélectionne le texte ci-dessous.");
@@ -252,29 +355,26 @@ test.describe("copier mes notes", () => {
     expect(Date.now() - shown).toBeGreaterThan(2000);
   });
 
-  test("sons: si la copie échoue, le texte est affiché, sélectionnable, sans balisage", async ({
+  test("sons: si la copie échoue, la liste est affichée, sélectionnable, sans balisage", async ({
     page,
   }) => {
     await page.goto("/#/sons");
-    await page
-      .getByRole("radiogroup", { name: /Poser une carte/ })
-      .getByRole("radio", { name: "Bon" })
-      .click();
+    await sabots(page).getByRole("radio", { name: "C" }).click();
     await page.evaluate(() => {
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
         value: undefined,
       });
     });
-    await page.getByRole("button", { name: "Copier mes notes" }).click();
+    await page.getByRole("button", { name: "Copier mes choix" }).click();
     await expect(page.locator("[data-toast]")).toHaveText(
       "Impossible de copier. Sélectionne le texte ci-dessous.",
     );
-    const box = page.getByRole("textbox", { name: "Tes notes" });
+    const box = page.getByRole("textbox", { name: "Mes choix" });
     await expect(box).toBeVisible();
     await expect(box).toHaveAttribute("readonly", "");
-    await expect(box).toHaveValue(new RegExp(`Poser une carte${NBSP}: Bon`));
-    await expect(box).toHaveValue(/\n/);
+    await expect(box).toHaveValue(new RegExp(`^Sabots${NBSP}: C\n`));
+    await expect(box).toHaveValue(new RegExp(`Poser une carte${NBSP}: A`));
   });
 });
 
@@ -368,15 +468,7 @@ test.describe("crédits et licences", () => {
   });
 });
 
-// --- La page « à choix » (recette 3 de Romain, 2026-10-15, test 29) ---
-
-type Played = { id: string; variant: string; take: number; at: number };
-const played = (page: Page) =>
-  page.evaluate(
-    () =>
-      (window as unknown as { __tocDebug?: { audio: { played?: Played[] } } }).__tocDebug?.audio
-        .played ?? [],
-  );
+// --- Le traceur de la page « à choix » (recette 3 de Romain, 2026-10-15, test 29) ---
 
 test("sons : choisir la version B des sabots la fait entendre dans la partie", async ({ page }) => {
   await page.goto("/#/sons");

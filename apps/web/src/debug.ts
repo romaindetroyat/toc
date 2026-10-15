@@ -16,8 +16,8 @@ declare global {
         cues?: { id: string; at: number; requestedAt: number; variant?: string }[];
         /** Every buffer the engine started (clops included): sound, version, take, audio-clock time. */
         played?: { id: string; variant: string; take: number; at: number }[];
-        /** Rendered synthesized sounds, keyed `recipe#take`: duration in seconds and peak amplitude. */
-        sounds?: Record<string, { duration: number; peak: number }>;
+        /** Rendered synthesized sounds, keyed `recipe#take`: duration in seconds, peak amplitude and a brightness estimate in Hz. */
+        sounds?: Record<string, { duration: number; peak: number; brightness?: number }>;
         /** The bus gains the last mix asked for: 0 or 1 for master and effects. */
         gains?: { master: number; sfx: number };
         /** iPhone and iPad: the silent looping element of keepAlive.ts (absent on a computer). */
