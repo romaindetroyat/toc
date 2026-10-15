@@ -62,7 +62,7 @@ test("As et Roi : « Que veux-tu faire ? », « Sortir » montre la sortie sans 
   await expect(page.locator('[data-pawn="bleu1"]')).toHaveAttribute("data-place", "ring:0");
 });
 
-test("le Roi : « Avancer de 13 » éclaire les chevaux de l’anneau puis montre le trajet", async ({
+test("le Roi : « Avancer de 13 » montre tout de suite le trajet du seul cheval de l’anneau", async ({
   page,
 }) => {
   await openPosition(page, {
@@ -71,12 +71,18 @@ test("le Roi : « Avancer de 13 » éclaire les chevaux de l’anneau puis montr
     hands: { bleu: ["13H"] },
   });
   await page.getByRole("button", { name: "Roi de cœur, jouable" }).click();
+  // The question is still asked: both an exit and an advance are possible.
+  await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+  // « Avancer »: bleu0 is the only knight on the ring, so it is chosen by itself and its move shown
+  // (recette 3, test 27), with no knight tap.
   await page.getByRole("button", { name: "Avancer de 13", exact: true }).click();
-  await expect(zone(page)).toContainText("Choisis un cheval.");
-  await expect(page.locator("[data-halo]")).toHaveCount(1);
-  await page.locator('[data-hit="bleu0"]').click({ force: true });
+  await expect(zone(page)).toHaveAttribute("data-state", "preview");
+  await expect(page.locator('[data-selected="bleu0"]')).toBeVisible();
   await expect(page.locator("[data-ghost]")).toBeVisible();
   await expect(zone(page)).toContainText("avance de 13 cases.");
+  // Nothing is played by itself (D-19).
+  await page.waitForTimeout(1000);
+  expect(await placeOf(page, "bleu0")).toBe("ring:10");
   await page.getByRole("button", { name: "Jouer", exact: true }).click();
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:23");
 });
@@ -169,7 +175,10 @@ test("le Valet : un seul échange possible attend quand même « Jouer »", asyn
     hands: { bleu: ["11H"] },
   });
   await page.getByRole("button", { name: "Valet de cœur, jouable" }).click();
+  // One knight and one target, yet the Valet asks for both (« sauf valet évidemment »).
+  await expect(zone(page)).toHaveAttribute("data-state", "jackPick");
   await page.locator('[data-hit="bleu0"]').click({ force: true });
+  await expect(zone(page)).toHaveAttribute("data-state", "jackTarget");
   await page.locator('[data-hit="vert0"]').click({ force: true });
   await expect(page.locator("[data-swap-preview]")).toBeVisible();
 
@@ -342,9 +351,13 @@ test("le 7 : un nombre de pas qui empêcherait de finir est grisé et s’expliq
 }) => {
   // bleu0 is four cells from the home with home slots 1 to 3 taken: only 3 steps leave a 7 that can be
   // finished. 7 steps would send it past its home, which G16 forbids since a split of this 7 brings it home.
+  // Rouge has two knights out, so the rest can be shared in several ways and the assistant opens empty.
   await openPosition(page, {
     turn: "bleu",
-    pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+    pawns: {
+      bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+    },
     hands: { bleu: ["7H"] },
   });
   await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
@@ -369,6 +382,37 @@ test("le 7 : un nombre de pas qui empêcherait de finir est grisé et s’expliq
   await page.getByRole("button", { name: "Jouer", exact: true }).click();
   await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "home:bleu:0");
   await expect(page.locator('[data-pawn="rouge0"]')).toHaveAttribute("data-place", "ring:49");
+});
+
+test("le 7 d’un cheval seul se remplit tout seul : « Tout est réparti. », puis « Jouer »", async ({
+  page,
+}) => {
+  // bleu0 is the only knight that can move: the 7 has a single split (recette 3, test 27).
+  await openPosition(page, {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+    hands: { bleu: ["7H"] },
+  });
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(counter(page)).toHaveAttribute("data-remaining", "0");
+  await expect(counter(page)).toHaveText("Tout est réparti.");
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page)).toContainText("7 pas");
+  await expect(page.locator('[data-seven-ghost="bleu0"]')).toBeVisible();
+  await expect(page.locator("[data-seven-path]")).toHaveCount(1);
+  // Nothing is played by itself (D-19).
+  await page.waitForTimeout(1000);
+  expect(await placeOf(page, "bleu0")).toBe("ring:10");
+
+  // « Tout annuler » puts the card down, and the 7 fills itself again.
+  await page.getByRole("button", { name: "Tout annuler" }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(zone(page)).toHaveAttribute("data-state", "idle");
+  await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
+  await expect(counter(page)).toHaveAttribute("data-remaining", "0");
+  await page.locator("[data-seven-play]").click();
+  await expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:17");
 });
 
 test("le 7 : un chiffre sans cheval choisi demande d’abord un cheval", async ({ page }) => {

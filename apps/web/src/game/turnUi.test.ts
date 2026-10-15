@@ -600,21 +600,48 @@ describe("As and Roi: « Sortir ou avancer » (D-16, PLAY-04)", () => {
   });
 
   it("advancing lights the ring knights and waits for the tap", () => {
+    const two = ctxOf(
+      build({
+        pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+        hands: { bleu: ["13H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+        turn: "bleu",
+      }),
+    );
     const [, advance, pawn, confirm] = run(
-      synced(ctx),
-      ctx,
+      synced(two),
+      two,
       { t: "tapCard", card: "13H" },
       { t: "chooseAdvance" },
-      { t: "tapPawn", pawn: "bleu0" },
+      { t: "tapPawn", pawn: "bleu1" },
       { t: "confirm" },
     );
     expect(advance?.state).toMatchObject({
       kind: "cardSelected",
       card: "13H",
-      candidates: [{ t: "move", card: "13H", pawn: "bleu0" }],
+      candidates: [
+        { t: "move", card: "13H", pawn: "bleu0" },
+        { t: "move", card: "13H", pawn: "bleu1" },
+      ],
     });
     expect(advance?.submit).toBeUndefined();
-    expect(pawn?.state).toMatchObject({ kind: "preview", action: { t: "move", pawn: "bleu0" } });
+    expect(pawn?.state).toMatchObject({ kind: "preview", action: { t: "move", pawn: "bleu1" } });
+    expect(confirm?.submit).toEqual({ t: "move", card: "13H", pawn: "bleu1" });
+  });
+
+  it("advancing with a single ring knight previews it at once (recette 3, test 27)", () => {
+    const [, advance, confirm] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "13H" },
+      { t: "chooseAdvance" },
+      { t: "confirm" },
+    );
+    expect(advance?.state).toMatchObject({
+      kind: "preview",
+      auto: true,
+      action: { t: "move", card: "13H", pawn: "bleu0" },
+    });
+    expect(advance?.submit).toBeUndefined();
     expect(confirm?.submit).toEqual({ t: "move", card: "13H", pawn: "bleu0" });
   });
 
@@ -1145,10 +1172,14 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
 
   it("refuses a number of steps that would make the 7 impossible to finish, and says so", () => {
     // bleu0 stands 2 cells before its carré 16 with home slots 1 to 3 taken: only 3 steps (home slot 0,
-    // then rouge0 takes 4, G12) leave a 7 that can be finished. 7 steps would send it past its home,
-    // which G16 forbids since a split of this 7 brings it home.
+    // then rouge0 and rouge1 share 4, G12) leave a 7 that can be finished. 7 steps would send it past
+    // its home, which G16 forbids since a split of this 7 brings it home. (Rouge has two knights out, so
+    // the 7 has several splits and the assistant opens empty; with one, it fills itself, test 27.)
     const near = build({
-      pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      pawns: {
+        bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }],
+        rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+      },
       hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
       turn: "bleu",
     });
@@ -1174,14 +1205,19 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
 
   it("goes on with the partner's knights once the fourth knight is home, in the middle of the 7 (G12)", () => {
     const near = build({
-      pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      pawns: {
+        bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }],
+        rouge: [{ p: 9 }, { p: 30 }, "S", "S"],
+      },
       hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
       turn: "bleu",
     });
     const ctx = ctxOf(near);
+    expect(lit(build7(ctx))).toEqual(["bleu0"]);
     const state = build7(ctx, ["bleu0", 3]);
     expect(state.remaining).toBe(4);
-    expect(state.steps.rouge0).toEqual([4]);
+    expect(state.steps.rouge0).toContain(4);
+    expect(state.steps.rouge1).toContain(4);
     const done = build7(ctx, ["bleu0", 3], ["rouge0", 4]);
     expect(done.remaining).toBe(0);
     const [confirmed] = run(done, ctx, { t: "confirm" });
@@ -1193,6 +1229,28 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
         { pawn: "rouge0", steps: 4 },
       ],
     });
+  });
+
+  it("fills itself when its only split goes on with the partner's knight (G12, test 27)", () => {
+    const near = build({
+      pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    });
+    const ctx = ctxOf(near);
+    const plan = [
+      { pawn: "bleu0", steps: 3 },
+      { pawn: "rouge0", steps: 4 },
+    ];
+    const [filled, confirmed] = run(
+      synced(ctx),
+      ctx,
+      { t: "tapCard", card: "7H" },
+      { t: "confirm" },
+    );
+    expect(filled?.state).toMatchObject({ kind: "sevenBuilding", auto: true, remaining: 0, plan });
+    expect(filled?.submit).toBeUndefined();
+    expect(confirmed?.submit).toEqual({ t: "seven", card: "7H", plan });
   });
 
   it("a finished player plays the 7 with his partner's knights (RULE-17)", () => {
@@ -1348,6 +1406,14 @@ describe("back: one step back (Échap)", () => {
       turn: "bleu",
     }),
   );
+  // As with both modes and two ring knights to advance.
+  const aceTwo = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+      hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
   // As with the exit only (no knight on the ring).
   const exitOnly = ctxOf(
     build({
@@ -1421,13 +1487,20 @@ describe("back: one step back (Échap)", () => {
   });
 
   it("takes « Avancer » back to the As/Roi question, then the question to nothing selected", () => {
-    const question = stateAfter(ace, { t: "tapCard", card: "1S" });
-    const advance = reduceTurnUi(question, { t: "chooseAdvance" }, ace).state;
+    const question = stateAfter(aceTwo, { t: "tapCard", card: "1S" });
+    const advance = reduceTurnUi(question, { t: "chooseAdvance" }, aceTwo).state;
     expect(advance.kind).toBe("cardSelected");
-    expect(back(advance, ace).state).toEqual(question);
-    const preview = reduceTurnUi(advance, { t: "tapPawn", pawn: "bleu0" }, ace).state;
-    expect(back(preview, ace).state).toEqual(advance);
-    expect(back(question, ace).state).toEqual({ kind: "idle" });
+    expect(back(advance, aceTwo).state).toEqual(question);
+    const preview = reduceTurnUi(advance, { t: "tapPawn", pawn: "bleu0" }, aceTwo).state;
+    expect(back(preview, aceTwo).state).toEqual(advance);
+    expect(back(question, aceTwo).state).toEqual({ kind: "idle" });
+  });
+
+  it("takes the preview « Avancer » opened by itself (one ring knight) back to the question", () => {
+    const question = stateAfter(ace, { t: "tapCard", card: "1S" });
+    const preview = reduceTurnUi(question, { t: "chooseAdvance" }, ace).state;
+    expect(preview).toMatchObject({ kind: "preview", auto: true });
+    expect(back(preview, ace).state).toEqual(question);
   });
 
   it("takes the Valet's swap preview to his knight's targets, then to his own knight choice", () => {
@@ -1589,6 +1662,107 @@ describe("un seul cheval pour la carte (recette 3, test 27)", () => {
     expect(tapped.state).toMatchObject({ kind: "cardSelected", card: "6H" });
     if (tapped.state.kind !== "cardSelected") throw new Error("no cardSelected");
     expect(tapped.state.candidates).toHaveLength(2);
+  });
+
+  const ace = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["1S"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const loneSeven = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const twoSeven = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+      hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+  const loneJack = ctxOf(
+    build({
+      pawns: { bleu: [{ p: 5 }, "S", "S", "S"], vert: [{ p: 40 }, "S", "S", "S"] },
+      hands: { bleu: ["11H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
+      turn: "bleu",
+    }),
+  );
+
+  it("the As with an exit and one advancing knight: the question, then « Avancer » previews it", () => {
+    const [question, advance, confirm] = run(
+      synced(ace),
+      ace,
+      { t: "tapCard", card: "1S" },
+      { t: "chooseAdvance" },
+      { t: "confirm" },
+    );
+    expect(question?.state.kind).toBe("modeChoice");
+    expect(question?.submit).toBeUndefined();
+    expect(advance?.state).toMatchObject({
+      kind: "preview",
+      card: "1S",
+      auto: true,
+      action: { t: "move", card: "1S", pawn: "bleu0" },
+    });
+    expect(advance?.submit).toBeUndefined();
+    expect(confirm?.submit).toEqual({ t: "move", card: "1S", pawn: "bleu0" });
+    // One step back from that preview is the question again, then nothing selected.
+    const back = reduceTurnUi(advance?.state as TurnUiState, { t: "back" }, ace);
+    expect(back.state).toEqual(question?.state);
+    expect(reduceTurnUi(back.state, { t: "back" }, ace).state).toEqual({ kind: "idle" });
+  });
+
+  it("a 7 with a single split is filled by itself: Reste 0, the plan, « Jouer » plays it", () => {
+    const [tapped, confirm] = run(
+      synced(loneSeven),
+      loneSeven,
+      { t: "tapCard", card: "7H" },
+      {
+        t: "confirm",
+      },
+    );
+    expect(tapped?.state).toMatchObject({
+      kind: "sevenBuilding",
+      card: "7H",
+      plan: [{ pawn: "bleu0", steps: 7 }],
+      remaining: 0,
+      auto: true,
+    });
+    expect(tapped?.submit).toBeUndefined();
+    if (tapped?.state.kind !== "sevenBuilding") throw new Error("no sevenBuilding");
+    expect(tapped.state.preview.moves).toHaveLength(1);
+    expect(tapped.state.selected).toBeUndefined();
+    expect(confirm?.submit).toEqual({
+      t: "seven",
+      card: "7H",
+      plan: [{ pawn: "bleu0", steps: 7 }],
+    });
+  });
+
+  it("back and « Retirer le dernier pas » on the automatic 7 put the card down", () => {
+    const filled = reduceTurnUi(synced(loneSeven), { t: "tapCard", card: "7H" }, loneSeven).state;
+    for (const event of [{ t: "back" }, { t: "undoLast" }, { t: "cancelAll" }] as TurnUiEvent[]) {
+      const result = reduceTurnUi(filled, event, loneSeven);
+      expect(result.state, event.t).toEqual({ kind: "idle" });
+      expect(result.submit).toBeUndefined();
+    }
+  });
+
+  it("a 7 with two knights that can move opens the assistant empty, as before", () => {
+    const tapped = reduceTurnUi(synced(twoSeven), { t: "tapCard", card: "7H" }, twoSeven).state;
+    expect(tapped).toMatchObject({ kind: "sevenBuilding", plan: [], remaining: 7 });
+    expect("auto" in tapped).toBe(false);
+  });
+
+  it("the Valet always asks, even with one knight and one target", () => {
+    const tapped = reduceTurnUi(synced(loneJack), { t: "tapCard", card: "11H" }, loneJack);
+    expect(tapped.state).toMatchObject({ kind: "jackPick", pawns: ["bleu0"] });
+    expect(tapped.submit).toBeUndefined();
   });
 
   it("an As with only an exit: the card tap previews the exit", () => {

@@ -682,9 +682,11 @@ describe("keyIntent: round trips through the reducer", () => {
     ]);
   });
 
-  it("As: « 1 », « a » light the ring knight, then Échap goes back to the question, then to idle", () => {
+  it("As: « 1 », « a » preview the lone ring knight, then Échap goes back to the question, then to idle", () => {
+    // One knight on the ring: « Avancer » chooses it by itself (recette 3, test 27).
     const advance = play(ACE, reach(ACE), "1", "a");
-    expect(advance.state.kind).toBe("cardSelected");
+    expect(advance.state).toMatchObject({ kind: "preview", auto: true });
+    expect(advance.submitted).toEqual([]);
     expect(play(ACE, advance.state, "Escape").state.kind).toBe("modeChoice");
     expect(play(ACE, advance.state, "Escape", "Escape").state.kind).toBe("idle");
   });

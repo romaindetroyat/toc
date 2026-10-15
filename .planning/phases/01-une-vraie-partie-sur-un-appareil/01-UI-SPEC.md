@@ -165,7 +165,7 @@ Register: tutoiement, warm, short sentences, first person for the player's own o
 | Exchange, done | « Échange fait. Tu as reçu {Carte} de {Partenaire}. » ; tag on the card: « Reçue » |
 | Own turn, no selection | « À toi de jouer. Choisis une carte. » |
 | Card selected | « Choisis un cheval. » |
-| Only one pawn can play | « Un seul cheval peut jouer cette carte : touche-le. » |
+| Only one pawn can play | (aucune consigne : le cheval est choisi et l’aperçu s’affiche, recette 3) |
 | As / Roi, both possible | « Que veux-tu faire ? » + buttons « Sortir un cheval » and « Avancer de 1 » (As) / « Avancer de 13 » (Roi) |
 | Valet | « Valet : touche ton cheval, puis celui à échanger. » then « Maintenant, touche le cheval à échanger. » |
 | Preview, advance | « {Carte} : avance de {n} cases. » |
@@ -417,7 +417,7 @@ Board → pointer behaviour: tapping a non-candidate pawn or empty board while a
 
 1. Own turn: playable cards raised, others dimmed. Nothing is ever played automatically, even with one legal move; that move is only emphasised (D-19).
 2. Tap card → playable pawns get halos (As/Roi: first the mode choice if both modes are possible; « Sortir » needs no pawn tap: the preview shows the exit to the diamond 18 directly).
-3. Tap pawn → preview (path, captures, ghost) and the description line; for Valet, a second tap on the target.
+3. Tap pawn → preview (path, captures, ghost) and the description line; for Valet, a second tap on the target. A single candidate skips the pawn tap (recette 3, test 27): when only one knight can play the card (after « Avancer » for an As/Roi that asked), the card tap opens its preview at once, and a 7 with a single split opens its assistant already filled (« Tout est réparti. »). « Jouer » still confirms (D-19); the Valet always takes its two taps. See the addendum « Recette 3 de Romain », « Un seul cheval pour la carte ».
 4. « Jouer » confirms → input is locked until the animation queue is idle (inputs not queued; PITFALLS 12), then the next turn starts.
 5. There is no undo after confirmation (REQUIREMENTS out of scope); only before.
 
@@ -906,3 +906,22 @@ Source : la recette refaite par Romain le 2026-10-15 (01-UAT.md, tests 23 à 30)
 - Le coin, le centre, la taille (2,6 pas de haut), l’opacité 0,85 et la couleur ne changent pas ; les dessins `cav-<couleur>.png` de Romain ne sont pas retouchés, et aucun cavalier ne devient une cible.
 - Dégagement mesuré pour les quatre places k : au moins 1,29 pas entre l’empreinte tournée et chaque case de l’anneau, de maison ou d’écurie (cases comptées comme des disques d’un demi-pas), comme avant. Tournés à 90° ou 270°, les cavaliers de gauche et de droite font 278 × 209 unités et restent au-dessus ou au-dessous du tapis (celui du haut finit vers y 561, le tapis commence à y 576). `scene.test.ts` le vérifie pour chaque k.
 - Les 118 images de RULES.md (`docs/regles/`) sont redessinées avec les cavaliers tournés ; deux rendus successifs sont identiques octet pour octet.
+
+### Un seul cheval pour la carte
+
+**Les mots de Romain** (recette 3, test 27) : « Quand il ne reste qu’un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet évidemment ».
+
+**Lecture à confirmer par Romain** (01-CONTEXT.md, « Recette 3 » ; recette de fin de phase, plan 01-54) : quand un seul cheval peut jouer la carte choisie, il est choisi tout seul et l’aperçu s’affiche avec « Jouer ». Le jeu ne joue toujours pas à la place du joueur (D-19) : il faut toujours toucher « Jouer ». La règle vaut dès qu’un seul cheval peut jouer la carte, même s’il en reste d’autres sur le plateau.
+
+**Les cas** :
+- **Une carte ordinaire, le 4, la Dame, le Roi ou l’As qui ne peut que sortir** : un seul coup possible avec cette carte, et toucher la carte (ou son chiffre au clavier) montre tout de suite le trajet, l’ombre, les prises et la phrase du coup, avec « Jouer » et « Annuler ce coup ». Le cheval porte la marque du cheval choisi ; pour une sortie, les autres chevaux de l’écurie restent éclairés. La consigne « Un seul cheval peut jouer cette carte : touche-le. » n’existe plus : quand plusieurs chevaux sont éclairés, la consigne reste « Choisis un cheval. ».
+- **L’As et le Roi** : quand sortir et avancer sont possibles tous les deux, la question « Que veux-tu faire ? » est toujours posée. Après « Avancer », un seul cheval sur l’anneau donne tout de suite son aperçu ; plusieurs chevaux s’éclairent comme avant.
+- **Le Valet** : il demande toujours les deux chevaux, le sien puis celui à échanger, même avec un seul échange possible.
+- **Le 7** : s’il n’a qu’un seul partage possible (en pratique un seul cheval qui peut bouger, ou un partage imposé par G16 et G12), l’assistant s’ouvre déjà rempli : « Tout est réparti. » (reste 0), la ligne du partage, les trajets et les ombres, et son « Jouer » actif. Avec deux partages ou plus, il s’ouvre vide, comme avant.
+- **Échap, « Annuler ce coup », « Changer de carte »** : un pas en arrière depuis un aperçu venu tout seul repose la carte (rien de choisi), puisqu’il n’y avait pas de cheval à choisir. Après « Avancer » de l’As ou du Roi, Échap revient à la question. Sur le 7 rempli tout seul, Échap, « Retirer le dernier pas » (⌫) et « Tout annuler » reposent la carte. Ces lignes remplacent, pour ces cas, celles du tableau « Échap revient d’un pas » de l’addendum « Raccourcis clavier ».
+- **Clavier** : sur ordinateur, le chiffre de la carte puis Entrée jouent le coup d’un cheval seul, sans lettre. Les lettres A à D servent toujours à choisir parmi plusieurs chevaux éclairés.
+
+**Faits techniques (sans confirmation)** :
+- Le réducteur `turnUi` (`apps/web/src/game/turnUi.ts`) ouvre l’aperçu avec `auto: true` quand la carte a un seul candidat de mouvement (après la question de l’As ou du Roi) ; il remplit le 7 quand `sevenPlans(view, siège, carte, 2)` du moteur ne rend qu’un partage. Le moteur ne change pas.
+- Un pas automatique ne rend jamais d’action : seuls « Jouer » (`confirm`), « Passer cette carte » et « Poser mes cartes » en rendent une (D-19, D-20) ; `turnUi.test.ts` le vérifie (describe « un seul cheval pour la carte (recette 3, test 27) »).
+- Toucher à nouveau le cheval seul dans son aperçu le laisse tel quel ; Échap depuis cet aperçu ne repasse jamais par un état « carte choisie » qui rouvrirait le même aperçu.

@@ -178,8 +178,15 @@ const HANDS = {
 };
 
 const POSITIONS = {
-  /** The As: « Sortir un cheval » or « Avancer de 1 ». */
-  as: { turn: "bleu", pawns: { bleu: [{ p: 10 }, "S", "S", "S"] }, hands: { bleu: ["1S", "13H"] } },
+  /**
+   * The As: « Sortir un cheval » or « Avancer de 1 ». Two knights on the ring, so « Avancer » lights
+   * them both (a lone one would be chosen by itself, recette 3, test 27).
+   */
+  as: {
+    turn: "bleu",
+    pawns: { bleu: [{ p: 10 }, { p: 30 }, "S", "S"] },
+    hands: { bleu: ["1S", "13H"] },
+  },
   /** Two knights on neighbouring cells: the « Lequel ? » tray. */
   tray: { turn: "bleu", pawns: { bleu: [{ p: 5 }, { p: 6 }, "S", "S"] }, hands: { bleu: ["3S"] } },
   /** Every knight in its stable and no card to leave it: a dead hand. */

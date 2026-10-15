@@ -76,10 +76,10 @@ test.describe("au clavier seul", () => {
       pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
       hands: { bleu: ["12H"] },
     };
-    // The focus on a button: Entrée presses that button, the move is not played.
+    // The focus on a button: Entrée presses that button, the move is not played. (« 1 » alone shows the
+    // preview: the Dame has a single knight, recette 3, test 27.)
     await openPosition(page, QUEEN);
     await page.keyboard.press("1");
-    await page.keyboard.press("a");
     await expect(zone(page)).toHaveAttribute("data-state", "preview");
     await page.getByRole("button", { name: "Annuler ce coup" }).focus();
     await page.keyboard.press("Enter");
@@ -88,7 +88,6 @@ test.describe("au clavier seul", () => {
 
     // The focus on the previewed knight (reached with Tab in real play): Entrée plays, once.
     await page.keyboard.press("1");
-    await page.keyboard.press("a");
     await expect(zone(page)).toHaveAttribute("data-state", "preview");
     await page.locator('[data-hit="bleu0"]').focus();
     await page.keyboard.press("Enter");
@@ -166,16 +165,29 @@ test.describe("au clavier seul", () => {
   });
 
   test("Échap revient d’un pas", async ({ page }) => {
-    // As with both modes: « Avancer », then back to the question, then nothing selected.
+    // As with both modes: « Avancer » shows the lone ring knight's move at once (recette 3, test 27),
+    // then back to the question, then nothing selected.
     await openPosition(page, ACE);
     await page.keyboard.press("1");
     await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
     await page.keyboard.press("a");
-    await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
     await page.keyboard.press("Escape");
     await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
     await page.keyboard.press("Escape");
     await expect(zone(page)).toHaveAttribute("data-state", "idle");
+
+    // A lone knight's Dame: « 1 » shows its preview, Échap puts the card down at once.
+    await openPosition(page, {
+      turn: "bleu",
+      pawns: { bleu: [{ p: 10 }, "S", "S", "S"] },
+      hands: { bleu: ["12H"] },
+    });
+    await page.keyboard.press("1");
+    await expect(zone(page)).toHaveAttribute("data-state", "preview");
+    await page.keyboard.press("Escape");
+    await expect(zone(page)).toHaveAttribute("data-state", "idle");
+    await expect(page.locator("[data-ghost]")).toHaveCount(0);
 
     // The 7: the knight is unselected, then the step taken back, then the card dropped.
     await openPosition(page, SEVEN);
@@ -488,7 +500,7 @@ test.describe("les touches se voient sur ordinateur", () => {
       {
         name: "« Jouer » / Entrée",
         open: { etat: QUEEN, state: "idle" },
-        keys: ["1", "a"],
+        keys: ["1"],
         click: button("Jouer"),
         key: "Enter",
       },

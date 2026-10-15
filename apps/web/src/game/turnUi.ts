@@ -13,7 +13,9 @@
 // ne reste qu'un cheval sur le plateau, inutile de cliquer dessus pour jouer la carte, sauf valet
 // évidemment ». The card tap opens that knight's preview, flagged `auto`, and « Jouer » still decides
 // (D-19): an automatic step never submits. One step back from it puts the card down, since there was
-// no knight choice to go back to.
+// no knight choice to go back to. The same holds after « Avancer » of the As or the Roi (back is then
+// the question) and for a 7 that has a single split: its assistant opens filled, « Reste 0 ». The
+// Valet always asks for both knights (« sauf valet évidemment »).
 
 import {
   type Action,
@@ -37,6 +39,7 @@ import {
   rankOf,
   resolveMove,
   type SevenPlan,
+  sevenPlans,
   teamOf,
 } from "@toc/engine";
 
@@ -95,6 +98,8 @@ export type TurnUiState =
       preview: SevenPreview;
       /** What the last refused choice was: a number of steps that cannot be finished, or no knight yet. */
       notice?: "stepRefused" | "pickKnight";
+      /** Filled by itself: the 7 had a single split (recette 3, test 27). */
+      auto?: true;
     }
   /** Candidate knights too close to tell apart: chips to choose from; `next` is where the flow resumes. */
   | { kind: "tray"; card: CardId; options: PawnId[]; next: TurnUiState }
@@ -323,7 +328,10 @@ function resolvedPreview(
 /** The state a tap on a card leads to: the question, the Valet's first tap, or the candidate knights. */
 function selectCard(card: CardId, ctx: TurnCtx): TurnUiState {
   if (rankOf(card) === 7) {
-    return buildSeven(card, [], undefined, ctx) ?? { kind: "cardSelected", card, candidates: [] };
+    return (
+      singleSplit(card, ctx) ??
+      buildSeven(card, [], undefined, ctx) ?? { kind: "cardSelected", card, candidates: [] }
+    );
   }
   if (rankOf(card) === 11) {
     const candidates = swapsOf(ctx, card);
@@ -398,6 +406,15 @@ function sevenPreview(card: CardId, plan: SevenPlan, ctx: TurnCtx): SevenPreview
   return { moves, captures };
 }
 
+/** A 7 with exactly one complete split: its assistant filled with it, « Reste 0 », or null. */
+function singleSplit(card: CardId, ctx: TurnCtx): TurnUiState | null {
+  const plans = sevenPlans(ctx.view, ctx.seat, card, 2);
+  const only = plans[0];
+  if (plans.length !== 1 || only === undefined) return null;
+  const filled = buildSeven(card, normalizePlan(only), undefined, ctx);
+  return filled !== null && filled.remaining === 0 ? { ...filled, auto: true } : null;
+}
+
 /** The splitter for `plan`: what is left, what each knight may be given, and the preview. */
 function buildSeven(
   card: CardId,
@@ -432,6 +449,8 @@ function pickSteps(state: TurnUiState, steps: number, ctx: TurnCtx): TurnUiResul
 
 function undoLast(state: TurnUiState, ctx: TurnCtx): TurnUiResult {
   if (state.kind !== "sevenBuilding" || state.plan.length === 0) return { state };
+  // A split filled by itself is the only one: taking a step back would rebuild the same plan.
+  if (state.auto) return { state: IDLE };
   const next = buildSeven(state.card, state.plan.slice(0, -1), undefined, ctx);
   return { state: next ?? state };
 }
@@ -573,9 +592,7 @@ export function trayLetters(options: readonly PawnId[]): string[] {
 
 function chooseMode(state: TurnUiState, mode: "exit" | "advance", ctx: TurnCtx): TurnUiResult {
   if (state.kind !== "modeChoice") return { state };
-  if (mode === "advance") {
-    return { state: { kind: "cardSelected", card: state.card, candidates: state.advance } };
-  }
+  if (mode === "advance") return { state: litOrAuto(state.card, state.advance, ctx) };
   const next = previewState(state.card, [state.exit], state.exit, ctx);
   return { state: next ?? state };
 }
@@ -640,6 +657,7 @@ function back(state: TurnUiState, ctx: TurnCtx): TurnUiResult {
     case "modeChoice":
       return { state: IDLE };
     case "sevenBuilding": {
+      if (state.auto) return { state: IDLE };
       if (state.selected !== undefined) {
         const { selected: _, notice: __, ...rest } = state;
         return { state: rest };
