@@ -176,10 +176,10 @@ Plans:
 - [ ] 01-51-PLAN.md — La page d'essai des sons à choix, et les sabots en quatre versions
 
 **Wave 43** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 42 completion)*
-- [ ] 01-52-PLAN.md — Les hennissements en trois ou quatre versions
+- [ ] 01-52-PLAN.md — Les hennissements en trois ou quatre versions *(reporté le 2026-10-15, Romain : « laisse les sons de côté sauf les sabots des chevaux »)*
 
 **Wave 44** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 43 completion)*
-- [ ] 01-53-PLAN.md — Les sons de cartes en trois ou quatre versions, et les sons de fin de partie
+- [ ] 01-53-PLAN.md — Les sons de cartes en trois ou quatre versions, et les sons de fin de partie *(reporté le 2026-10-15, Romain : « laisse les sons de côté sauf les sabots des chevaux »)*
 
 **Wave 45** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 44 completion)*
 - [ ] 01-54-PLAN.md — Toutes les vérifications après la recette 3, puis la recette 4 de Romain
