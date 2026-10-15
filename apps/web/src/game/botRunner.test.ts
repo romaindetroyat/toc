@@ -59,24 +59,50 @@ describe("syncRunner", () => {
 
 describe("createInlineRunner", () => {
   it("yields to the event loop between slices of the Champion's search", async () => {
+    // Two deterministic proofs, rather than racing a setTimeout(0): Node delivers up to 1000 messages
+    // of one MessagePort in a single event-loop turn before it runs timers, so a timer can lose that
+    // race to any MessageChannel yield under load. (In the browser each message is its own task; the
+    // bench's « Plus longue image figée » in banc.spec.ts measures that the page keeps painting.)
+    // 1. The stack unwinds between two slices: a microtask queued at one slice boundary has run by
+    //    the next one, which a synchronous loop could never do.
+    // 2. Each yield is a macrotask: one MessageChannel message posted per slice boundary.
     let checks = 0;
+    let unwound = 0;
+    let pending = false;
     const runner = createInlineRunner({
       now: () => performance.now(),
       isHidden: () => {
         checks++;
+        if (checks > 1 && !pending) unwound++;
+        pending = true;
+        queueMicrotask(() => {
+          pending = false;
+        });
         return false;
       },
     });
-    let timerRan = false;
-    let timerBeforeThink = false;
-    setTimeout(() => {
-      timerRan = true;
-    }, 0);
+    const Native = globalThis.MessageChannel;
+    let posted = 0;
+    globalThis.MessageChannel = class extends Native {
+      constructor() {
+        super();
+        const post = this.port2.postMessage.bind(this.port2);
+        this.port2.postMessage = (message: unknown) => {
+          posted++;
+          post(message);
+        };
+      }
+    };
     const { view, seat } = crowded;
-    const thought = await runner.think({ view, seat, level: 5, rng: RNG, deadline: null });
-    timerBeforeThink = timerRan;
-    expect(timerBeforeThink).toBe(true);
+    let thought: Awaited<ReturnType<typeof runner.think>>;
+    try {
+      thought = await runner.think({ view, seat, level: 5, rng: RNG, deadline: null });
+    } finally {
+      globalThis.MessageChannel = Native;
+    }
     expect(checks).toBeGreaterThanOrEqual(2);
+    expect(unwound).toBe(checks - 1);
+    expect(posted).toBe(checks);
     // Slicing never changes the move: the same decision as in one go.
     expect(thought).toEqual(chooseAction(view, seat, 5, RNG));
   }, 30_000);
