@@ -3,7 +3,7 @@ status: partial
 phase: 01-une-vraie-partie-sur-un-appareil
 source: [01-VERIFICATION.md, 01-UI-REVIEW.md]
 started: 2026-10-13T23:30:00Z
-updated: 2026-10-15T08:06:24Z
+updated: 2026-10-15T08:40:00Z
 ---
 
 ## Current Test
@@ -226,11 +226,19 @@ note: "La lecture du planificateur visait aussi les hennissements, les sons de c
 expected: Lecture du planificateur, 01-CONTEXT.md « Recette 3 de Romain » : « le panneau devient une planche dans le bois du galet. Il porte le titre en Caveat, les deux couleurs de l'équipe gagnante avec leurs cavaliers, le score des chevaux rentrés (« 8 – 5 »), les donnes jouées et les chevaux mangés, puis « Rejouer » et « Changer de couleur ». » Son aspect (face en chêne veinée, bord en noyer, ombre nette sans flou) et son titre en Caveat de 44 px, une exception à la typographie du jeu (le plus grand texte est sinon de 28 px), comme les numéros des cases : 01-UI-SPEC.md « La planche de fin de partie ». Romain confirme ou demande un changement.
 result: [pending]
 
+### 44. Recette 4 (2026-10-15) : sauter les chevaux déjà rentrés dans la maison
+expected: Un cheval qui entre dans sa maison saute les chevaux déjà rentrés et tombe au compte exact sur une case vide ; un cheval déjà rentré qui avance dans la maison saute aussi ceux devant lui. Le coup est proposé, et le cheval n'a pas à refaire un tour.
+result: issue
+reported: "J'ai essayé, et je voudrais être sûr que c'est bien intégré : quand un cheval entre dans son écurie, il peut doubler les autres chevaux et arriver sur une case vide. Tout à l'heure, ce n'était pas proposé, et le cheval a dû refaire un tour, ce qui n'est pas normal"
+severity: major
+note: "Question posée ensuite, « Un cheval déjà rentré dans son arrivée peut encore y avancer pour se ranger au fond, au compte exact. Peut-il lui aussi sauter les chevaux devant lui ? », choix de Romain : « Oui, aussi (Recommandé) » (texte de l'option : « Même règle partout dans l'arrivée : on peut sauter les chevaux déjà rentrés, tant qu'on tombe au compte exact sur une case vide. »). Corrigé par le plan 01-55 (règle G17, qui remplace G2) ; à re-tester par Romain : il relit R-13 et G17 dans RULES.md et les images R-13.7, R-13.10, R-13.19 et R-13.28 à R-13.31, puis joue un cheval qui entre par-dessus un cheval déjà rentré, et un cheval rentré qui avance par-dessus un autre."
+retest: [pending]
+
 ## Summary
 
-total: 43
+total: 44
 passed: 1
-issues: 14
+issues: 15
 pending: 28
 skipped: 0
 blocked: 0
@@ -370,3 +378,14 @@ blocked: 0
   artifacts: [apps/web/src/ui/EndScreen.svelte, apps/web/src/routes/Game.svelte, apps/web/src/i18n/fr/game.ts, apps/web/e2e/partie.spec.ts, apps/web/e2e/finition.spec.ts]
   missing: ["Panneau dans le bois du galet (chêne, liseré de noyer, ombre sans flou), titre Caveat, les deux couleurs et cavaliers de l'équipe gagnante, score « 8 – n », donnes jouées et chevaux mangés, « Rejouer » et « Changer de couleur » ; tient dans 750 × 342 ; addendum de 01-UI-SPEC.md"]
   debug_session: ""
+- gap_id: G-01-31
+  truth: "Dans la maison, un cheval saute les chevaux déjà rentrés, en y entrant depuis le carré 16 comme en y avançant, tant qu'il tombe au compte exact sur une case vide ; l'entrée reste obligatoire quand le compte tombe juste"
+  status: failed
+  reason: "User reported: J'ai essayé, et je voudrais être sûr que c'est bien intégré : quand un cheval entre dans son écurie, il peut doubler les autres chevaux et arriver sur une case vide. Tout à l'heure, ce n'était pas proposé, et le cheval a dû refaire un tour, ce qui n'est pas normal"
+  severity: major
+  test: 44
+  root_cause: "Pas d'erreur du moteur : c'était la règle G2 validée le 2026-10-13 (« le cheval ne le saute pas et repart pour un tour ») et D-03 (« sans sauter un autre cheval »). packages/engine/src/path.ts walk() refusait l'entrée quand une case avant la case visée était occupée (HOME_JUMP_BLOCKED 'continue' : le cheval repart pour un tour) et refusait le pas dans la maison par-dessus un cheval (« home-blocked »)."
+  artifacts: [packages/engine/src/path.ts, packages/engine/src/rules.ts, packages/engine/scenarios/prises-maison.ts, RULES.md, .planning/REQUIREMENTS.md]
+  missing: ["Règle G17 (constante HOME_JUMP_ALLOWED, réglable comme G14 à G16) : en entrant comme dans la maison, seuls le compte exact et la case visée vide comptent ; RULES.md R-13, G2 remplacé, D-03 ; scénarios R-13.7, R-13.10, R-13.19 réécrits et R-13.28 à R-13.31 avec leurs images"]
+  debug_session: ""
+  decision: "Romain, 2026-10-15, à « Un cheval déjà rentré dans son arrivée peut encore y avancer pour se ranger au fond, au compte exact. Peut-il lui aussi sauter les chevaux devant lui ? » : « Oui, aussi (Recommandé) » (« Même règle partout dans l'arrivée : on peut sauter les chevaux déjà rentrés, tant qu'on tombe au compte exact sur une case vide. »)"
