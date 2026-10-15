@@ -16,8 +16,8 @@
 //   implementing the alternative first and widening its type.
 //
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
-// G14 and G15 record the changes Romain made on 2026-10-14 during the phase acceptance test (later
-// changes continue the numbering).
+// G14 and G15 record the changes Romain made on 2026-10-14 during the phase acceptance test; later
+// changes continue the numbering (G16, 2026-10-15, his third acceptance test).
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
 
 /**
@@ -123,6 +123,21 @@ export const ENTRY_WITHOUT_FULL_LAP: boolean = true;
 export const SEVEN_EATS_PASSED_PARTNER: boolean = false;
 
 /**
+ * G16 — The knight a card can bring home moves only to enter, judged card by card (RULES.md R-10, R-13,
+ * « Décisions de Romain »; decided by Romain on 2026-10-15 during the acceptance test, UAT test 26; precises
+ * D-02). His words: « si l'on peut atteindre une case vide de la zone d'arrivée, il faut que ce soit le seul
+ * coup à jouer », « Seulement pour ce cheval », and, for a 9 played on a knight a 2 would bring home,
+ * « Oui, autorisé » (« Seulement la carte qui le fait rentrer pile est obligée de le faire rentrer. Avec le
+ * 9, il peut continuer son tour. »). An ordinary card already enters at the exact count (D-02); the 4 and
+ * the Valet never enter.
+ * true: a 7 whose split can leave a knight in its home moves that knight only to bring it home (it may
+ * stop on its carré 16 and enter with a later step of the same 7); a 7 that does not move it stays free,
+ * and the rule never makes a 7 unplayable.
+ * false: the rule of 2026-10-14, the 7 may send that knight past its home or leave it short of it.
+ */
+export const KNIGHT_MUST_ENTER: boolean = true;
+
+/**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
  * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
@@ -165,6 +180,7 @@ export type RuleSet = {
   SEVEN_CONTINUES_WITH_PARTNER: boolean;
   ENTRY_WITHOUT_FULL_LAP: boolean;
   SEVEN_EATS_PASSED_PARTNER: boolean;
+  KNIGHT_MUST_ENTER: boolean;
   EMPTY_HAND_SKIPPED: true;
   EXCHANGE_KEEPS_HAND_SIZE: true;
   PAUSE_IN_ALL_PHASES: true;
@@ -187,6 +203,7 @@ export const DEFAULT_RULES: Readonly<RuleSet> = {
   SEVEN_CONTINUES_WITH_PARTNER,
   ENTRY_WITHOUT_FULL_LAP,
   SEVEN_EATS_PASSED_PARTNER,
+  KNIGHT_MUST_ENTER,
   EMPTY_HAND_SKIPPED,
   EXCHANGE_KEEPS_HAND_SIZE,
   PAUSE_IN_ALL_PHASES,
