@@ -76,19 +76,60 @@ describe("G1 SWAP_PROGRESS", () => {
   });
 });
 
-describe("G2 HOME_JUMP_BLOCKED", () => {
+describe("G2 HOME_JUMP_BLOCKED (read only when HOME_JUMP_ALLOWED is false)", () => {
   const state = (value: "continue" | "illegal") =>
     playState({ bleu: [{ p: 66 }, { h: 0 }, "S", "S"] }, { bleu: ["8S"] }, "bleu", {
+      HOME_JUMP_ALLOWED: false,
       HOME_JUMP_BLOCKED: value,
     });
   const move: Action = { t: "move", card: "8S", pawn: "bleu0" };
 
-  it("continue: the pawn goes round again (R-13.7)", () => {
+  it("continue: the pawn goes round again (the old R-13.7, before G17)", () => {
     expect(actions(state("continue"), "bleu", "8S")).toContainEqual(move);
+    const end = movesForCard(state("continue"), "bleu", "8S").find(
+      (c) => c.action.t === "move" && c.action.pawn === "bleu0",
+    )?.walk?.end;
+    expect(end).toEqual({ zone: "ring", progress: 74 });
   });
 
   it("illegal: the move is forbidden", () => {
     expect(actions(state("illegal"), "bleu", "8S")).not.toContainEqual(move);
+  });
+});
+
+describe("G17 HOME_JUMP_ALLOWED", () => {
+  const endOf = (state: ReturnType<typeof playState>, card: "2S" | "8S", pawn: PawnId) =>
+    movesForCard(state, "bleu", card).find((c) => c.action.t === "move" && c.action.pawn === pawn)
+      ?.walk?.end;
+  const entering = (value: boolean) =>
+    playState({ bleu: [{ p: 66 }, { h: 0 }, "S", "S"] }, { bleu: ["8S"] }, "bleu", {
+      HOME_JUMP_ALLOWED: value,
+    });
+  const inside = (value: boolean) =>
+    playState({ bleu: [{ h: 0 }, { h: 1 }, { p: 20 }, "S"] }, { bleu: ["2S"] }, "bleu", {
+      HOME_JUMP_ALLOWED: value,
+    });
+
+  it("true (default): entering, the knight jumps the knight home and lands in slot 3 (R-13.7)", () => {
+    expect(endOf(entering(true), "8S", "bleu0")).toEqual({ zone: "home", slot: 3 });
+  });
+
+  it("true (default): inside the home, the knight jumps the knight in front (R-13.10)", () => {
+    expect(actions(inside(true), "bleu", "2S")).toContainEqual({
+      t: "move",
+      card: "2S",
+      pawn: "bleu0",
+    });
+    expect(endOf(inside(true), "2S", "bleu0")).toEqual({ zone: "home", slot: 2 });
+  });
+
+  it("false: G2 and D-03 « sans sauter » come back", () => {
+    expect(endOf(entering(false), "8S", "bleu0")).toEqual({ zone: "ring", progress: 74 });
+    expect(actions(inside(false), "bleu", "2S")).not.toContainEqual({
+      t: "move",
+      card: "2S",
+      pawn: "bleu0",
+    });
   });
 });
 

@@ -139,3 +139,67 @@ describe("G16 never makes the 7 unplayable (G16)", () => {
     }
   });
 });
+
+describe("G16 sees the entries a jump opens (G17)", () => {
+  // bleu0 two cells before its carré 16, bleu1 in home slot 0, bleu2 far away, a 7. Before G17 bleu0 could
+  // not enter (slot 0 taken, the other slots behind bleu1); with G17 it jumps bleu1 into slots 1 to 3.
+  const jumping = (value: boolean) =>
+    playState({ bleu: [{ p: 68 }, { h: 0 }, { p: 10 }, "S"] }, { bleu: ["7S"] }, "bleu", {
+      HOME_JUMP_ALLOWED: value,
+    });
+
+  it("sevenMustEnter lists bleu0, which a split brings home over bleu1 (G16, G17)", () => {
+    expect(sevenMustEnter(jumping(true), "bleu")).toEqual(["bleu0"]);
+  });
+
+  it("the splits that move bleu0 without bringing it home are refused, the jumping ones listed", () => {
+    const listed = new Set(sevenPlans(jumping(true), "bleu", "7S").map(key));
+    expect(listed.has(key(plan(["bleu0", 4], ["bleu2", 3])))).toBe(true);
+    expect(listed.has(key(plan(["bleu0", 6], ["bleu2", 1])))).toBe(true);
+    expect(listed.has(key(plan(["bleu2", 7])))).toBe(true);
+    expect(listed.has(key(plan(["bleu0", 7])))).toBe(false);
+    expect(listed.has(key(plan(["bleu0", 3], ["bleu2", 4])))).toBe(false);
+    const r = applyPlan(jumping(true), "bleu", "7S", plan(["bleu0", 4], ["bleu2", 3]));
+    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "home", slot: 1 });
+    expect(applyPlan(jumping(true), "bleu", "7S", plan(["bleu0", 7]))).toEqual({
+      ok: false,
+      reason: "must-enter",
+    });
+  });
+
+  it("HOME_JUMP_ALLOWED false: bleu0 enters only once bleu1 has moved out of its way (G2)", () => {
+    expect(sevenMustEnter(jumping(false), "bleu")).toEqual(["bleu0"]);
+    expect(applyPlan(jumping(false), "bleu", "7S", plan(["bleu0", 4], ["bleu2", 3]))).toEqual({
+      ok: false,
+      reason: "must-enter",
+    });
+    const r = applyPlan(
+      jumping(false),
+      "bleu",
+      "7S",
+      plan(["bleu1", 3], ["bleu0", 3], ["bleu2", 1]),
+    );
+    expect(r.ok && [r.pawns.bleu0, r.pawns.bleu1]).toEqual([
+      { zone: "home", slot: 0 },
+      { zone: "home", slot: 3 },
+    ]);
+  });
+
+  it("a 7 step inside the home jumps the knight in front (G17)", () => {
+    const state = playState(
+      { bleu: [{ h: 0 }, { h: 1 }, { p: 20 }, "S"] },
+      { bleu: ["7S"] },
+      "bleu",
+    );
+    const r = applyPlan(state, "bleu", "7S", plan(["bleu0", 2], ["bleu2", 5]));
+    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "home", slot: 2 });
+    expect(nextSteps(state, "bleu", "7S", []).bleu0).toEqual([2, 3]);
+  });
+
+  it("an ordinary card enters over a knight home, and must (D-02, G17)", () => {
+    const state = playState({ bleu: [{ p: 66 }, { h: 0 }, "S", "S"] }, { bleu: ["8S"] }, "bleu");
+    const after = apply(state, "bleu", { t: "move", card: "8S", pawn: "bleu0" });
+    expect(after.state.pawns.bleu0).toEqual({ zone: "home", slot: 3 });
+    expect(after.events.map((e) => e.t)).toContain("pawnEnteredHome");
+  });
+});

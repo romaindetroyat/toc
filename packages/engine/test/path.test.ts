@@ -65,15 +65,50 @@ describe("home entry (D-01, D-02, D-03)", () => {
     expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72 });
   });
 
-  it("a home pawn in the way: HOME_JUMP_BLOCKED continue goes round again", () => {
+  it("a home pawn in the way is jumped: 8 steps from 66 over slot 0 land in slot 3 (G17)", () => {
     const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 } });
+    expect(walk(b, "bleu0", 8, 1, alone("bleu0"))).toEqual({
+      ok: true,
+      path: [ring(67), ring(68), ring(69), ring(70), home(0), home(1), home(2), home(3)],
+      end: { zone: "home", slot: 3 },
+      captures: [],
+    });
+    expect(walk(b, "bleu0", 6, 1, alone("bleu0"))).toMatchObject({
+      ok: true,
+      end: { zone: "home", slot: 1 },
+    });
+  });
+
+  it("jumping three home pawns to the last empty slot (G17)", () => {
+    const b = board({ bleu0: { p: 69 }, bleu1: { h: 0 }, bleu2: { h: 1 }, bleu3: { h: 2 } });
+    const r = walk(b, "bleu0", 5, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "home", slot: 3 });
+  });
+
+  it("jumping does not open an occupied target: the pawn goes round again (G17, D-01)", () => {
+    const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 }, bleu2: { h: 2 } });
+    const r = walk(b, "bleu0", 7, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 73 });
+  });
+
+  it("HOME_JUMP_ALLOWED false, G2 continue: a home pawn in the way sends the pawn round again", () => {
+    const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 } }, { HOME_JUMP_ALLOWED: false });
     const r = walk(b, "bleu0", 6, 1, alone("bleu0"));
     expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72 });
   });
 
-  it("a home pawn in the way: HOME_JUMP_BLOCKED illegal forbids the move", () => {
-    const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 } }, { HOME_JUMP_BLOCKED: "illegal" });
+  it("HOME_JUMP_ALLOWED false, G2 illegal: a home pawn in the way forbids the move", () => {
+    const b = board(
+      { bleu0: { p: 66 }, bleu1: { h: 0 } },
+      { HOME_JUMP_ALLOWED: false, HOME_JUMP_BLOCKED: "illegal" },
+    );
     expect(walk(b, "bleu0", 6, 1, alone("bleu0"))).toEqual({ ok: false, reason: "home-blocked" });
+  });
+
+  it("HOME_JUMP_BLOCKED illegal is not read while HOME_JUMP_ALLOWED: the pawn jumps (G17)", () => {
+    const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 } }, { HOME_JUMP_BLOCKED: "illegal" });
+    const r = walk(b, "bleu0", 6, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "home", slot: 1 });
   });
 
   it("after one extra lap the pawn enters at the next passage (progress 140 + 4)", () => {
@@ -143,12 +178,31 @@ describe("entry after backing with the 4 (G14)", () => {
     });
   });
 
-  it("a home pawn in the way: G2 continue goes on round the ring, illegal forbids the move", () => {
-    const cont = board({ bleu0: { p: -4 }, bleu1: { h: 0 } });
+  it("a home pawn in the way is jumped: 5 steps from -4 land in slot 2 (G14, G17)", () => {
+    const b = board({ bleu0: { p: -4 }, bleu1: { h: 0 } });
+    expect(walk(b, "bleu0", 5, 1, alone("bleu0"))).toEqual({
+      ok: true,
+      path: [ring(69), ring(70), home(0), home(1), home(2)],
+      end: { zone: "home", slot: 2 },
+      captures: [],
+    });
+  });
+
+  it("HOME_JUMP_ALLOWED false: G2 continue goes on round the ring, illegal forbids the move", () => {
+    const cont = board({ bleu0: { p: -4 }, bleu1: { h: 0 } }, { HOME_JUMP_ALLOWED: false });
     const r = walk(cont, "bleu0", 5, 1, alone("bleu0"));
     expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
-    const ill = board({ bleu0: { p: -4 }, bleu1: { h: 0 } }, { HOME_JUMP_BLOCKED: "illegal" });
+    const ill = board(
+      { bleu0: { p: -4 }, bleu1: { h: 0 } },
+      { HOME_JUMP_ALLOWED: false, HOME_JUMP_BLOCKED: "illegal" },
+    );
     expect(walk(ill, "bleu0", 5, 1, alone("bleu0"))).toEqual({ ok: false, reason: "home-blocked" });
+  });
+
+  it("the 4 never enters, even with home pawns to jump (D-04, G17)", () => {
+    const b = board({ bleu0: { p: 2 }, bleu1: { h: 0 } });
+    const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
   });
 
   it("the 4 from -4 still goes backward, to -8: the 4 never enters the home", () => {
@@ -182,8 +236,24 @@ describe("moving inside the home (D-03)", () => {
     });
   });
 
-  it("is illegal when it would jump a pawn already home", () => {
+  it("jumps a pawn already home, at the exact count onto an empty slot (G17)", () => {
     const b = board({ bleu0: { h: 0 }, bleu1: { h: 1 } });
+    expect(walk(b, "bleu0", 2, 1, alone("bleu0"))).toEqual({
+      ok: true,
+      path: [home(1), home(2)],
+      end: { zone: "home", slot: 2 },
+      captures: [],
+    });
+  });
+
+  it("jumps two pawns already home to the last slot (G17)", () => {
+    const b = board({ bleu0: { h: 0 }, bleu1: { h: 1 }, bleu2: { h: 2 } });
+    const r = walk(b, "bleu0", 3, 1, alone("bleu0"));
+    expect(r.ok && r.end).toEqual({ zone: "home", slot: 3 });
+  });
+
+  it("HOME_JUMP_ALLOWED false: illegal when it would jump a pawn already home (D-03)", () => {
+    const b = board({ bleu0: { h: 0 }, bleu1: { h: 1 } }, { HOME_JUMP_ALLOWED: false });
     expect(walk(b, "bleu0", 2, 1, alone("bleu0"))).toEqual({ ok: false, reason: "home-blocked" });
   });
 
