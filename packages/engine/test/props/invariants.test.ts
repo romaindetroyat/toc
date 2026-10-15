@@ -2,7 +2,9 @@
 // level-1 bot, which sees only its own view. After every action: the 52 cards are all accounted for, no two
 // pawns share a cell, legal actions apply, mutated actions are refused, the 7 generator and the 7 validator
 // agree, deals end, every home entry goes forward through the colour's carré 16 (G14), no knight of the
-// mover's team is eaten in passing (G15), and the same seed and actions give the same JSON.
+// mover's team is eaten in passing (G15), G16 never changes whether a 7 is playable and every applied 7
+// brings home each knight it moved that it could bring home, and the same seed and actions give the
+// same JSON.
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -15,6 +17,8 @@ import {
   type CardId,
   COLORS,
   type Color,
+  canPlaySeven,
+  controlledPawns,
   ENTRY,
   FULL_DECK,
   type GameEvent,
@@ -31,6 +35,7 @@ import {
   rankOf,
   ringIndex,
   type SevenPlan,
+  sevenMustEnter,
   sevenPlans,
   teamOf,
   viewFor,
@@ -63,6 +68,12 @@ const seen = {
   entriesWithoutLap: 0,
   /** 7 actions whose path crossed a knight of the mover's partner colour that stayed on its cell (G15). */
   teamPassedBySeven: 0,
+  /** G16: 7 actions played while sevenMustEnter was not empty. */
+  sevensWithDuty: 0,
+  /** G16: of those, the 7 actions that moved a knight of the duty (each brought it home). */
+  dutyKnightsMoved: 0,
+  /** G16: boards holding a 7 where a split could bring a knight home but no split kept the duty (the safety). */
+  dutySafety: 0,
 };
 
 function check(condition: boolean, message: string): void {
@@ -199,6 +210,53 @@ function checkTeamCaptures(
     }),
   );
   if (passed) seen.teamPassedBySeven++;
+}
+
+/** The same state with G16 off (the rule of 2026-10-14). */
+const withoutG16 = (state: GameState): GameState => ({
+  ...state,
+  rules: { ...state.rules, KNIGHT_MUST_ENTER: false },
+});
+
+/**
+ * G16 on a board where `seat` holds a 7: the 7 is playable with G16 exactly when it is without it, and
+ * seen.dutySafety counts the boards where the safety dropped the duty (a split could bring a knight home,
+ * sevenMustEnter is empty). Only boards with a controlled knight within 6 cells of its carré 16 are
+ * enumerated, the others cannot enter with a 7.
+ */
+function checkSevenDuty(state: GameState, seat: Color): void {
+  check(
+    canPlaySeven(state, seat) === canPlaySeven(withoutG16(state), seat),
+    `${seat}: G16 changed whether the 7 is playable`,
+  );
+  if (sevenMustEnter(state, seat).length > 0) return;
+  const near = controlledPawns(state, seat).filter((id) => {
+    const pawn = state.pawns[id];
+    if (pawn.zone !== "ring") return false;
+    for (let k = 0; k < 7; k++) {
+      if (ringIndex(colorOf(id), pawn.progress + k) === ENTRY[colorOf(id)]) return true;
+    }
+    return false;
+  });
+  if (near.length === 0) return;
+  const off = withoutG16(state);
+  const card = state.hands[seat].find((c) => rankOf(c) === 7) as CardId;
+  const couldEnter = sevenPlans(off, seat, card).some((plan) => {
+    const r = applyPlan(off, seat, card, plan);
+    return r.ok && near.some((id) => r.pawns[id].zone === "home");
+  });
+  if (couldEnter) seen.dutySafety++;
+}
+
+/** G16 after an applied 7: each knight of the duty (listed before the move) that the plan moved is home. */
+function checkDutyKept(duty: readonly PawnId[], action: Action, after: GameState): void {
+  if (action.t !== "seven" || duty.length === 0) return;
+  seen.sevensWithDuty++;
+  const moved = duty.filter((id) => action.plan.some((entry) => entry.pawn === id));
+  for (const id of moved) {
+    check(after.pawns[id].zone === "home", `${id} moved by a 7 that could bring it home, not home`);
+  }
+  if (moved.length > 0) seen.dutyKnightsMoved++;
 }
 
 const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -363,6 +421,8 @@ function playChecked(
     // the 7: generator and validator agree on small boards, and the bot's plan is one of the listed plans
     if (action.t === "seven") seen.botSevens++;
     const holdsSeven = state.phase === "play" && state.hands[seat].some((c) => rankOf(c) === 7);
+    if (holdsSeven) checkSevenDuty(state, seat);
+    const duty = action.t === "seven" ? sevenMustEnter(state, seat) : [];
     if (holdsSeven && sevenChecks < 2) {
       const card = state.hands[seat].find((c) => rankOf(c) === 7) as CardId;
       if (checkSevenAgreement(state, seat, card)) {
@@ -387,6 +447,7 @@ function playChecked(
     checkPawns(state);
     checkEntries(before, result.events);
     checkTeamCaptures(before, state, action, result.events);
+    checkDutyKept(duty, action, state);
 
     // every deal ends within DEAL_CAP actions (RULE-16)
     if (state.dealsPlayed !== before.dealsPlayed) dealActions = 0;
@@ -439,6 +500,10 @@ describe("engine invariants over 200 random games driven by the level-1 bot", ()
     expect(seen.entries).toBeGreaterThanOrEqual(GAMES * 8);
     expect(seen.entriesWithoutLap).toBeGreaterThan(0);
     expect(seen.teamPassedBySeven).toBeGreaterThan(0);
+    expect(seen.sevensWithDuty).toBeGreaterThan(0);
+    expect(seen.dutyKnightsMoved).toBeGreaterThan(0);
+    // seed 20261015: 820 sevens with a duty, 616 of them moved a duty knight, 4 boards used the safety
+    expect(seen.dutySafety).toBeGreaterThan(0);
   });
 });
 

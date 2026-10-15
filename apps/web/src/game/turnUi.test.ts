@@ -1126,7 +1126,9 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
   });
 
   it("refuses a number of steps that would make the 7 impossible to finish, and says so", () => {
-    // bleu0 stands 4 cells from the home: only 3 or 7 steps leave a 7 that can be finished.
+    // bleu0 stands 2 cells before its carré 16 with home slots 1 to 3 taken: only 3 steps (home slot 0,
+    // then rouge0 takes 4, G12) leave a 7 that can be finished. 7 steps would send it past its home,
+    // which G16 forbids since a split of this 7 brings it home.
     const near = build({
       pawns: { bleu: [{ p: 68 }, { h: 1 }, { h: 2 }, { h: 3 }], rouge: [{ p: 9 }, "S", "S", "S"] },
       hands: { bleu: ["7H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] },
@@ -1136,7 +1138,7 @@ describe("the 7, knight by knight (PLAY-03, RULE-10, D-17)", () => {
     const picked = build7(ctx);
     const tapped = reduceTurnUi(picked, { t: "tapPawn", pawn: "bleu0" }, ctx).state;
     const offered = building(tapped).steps.bleu0 ?? [];
-    expect(offered).toEqual([3, 7]);
+    expect(offered).toEqual([3]);
     const refused = reduceTurnUi(tapped, { t: "pickSteps", steps: 1 }, ctx);
     const state = building(refused.state);
     expect(state.notice).toBe("stepRefused");

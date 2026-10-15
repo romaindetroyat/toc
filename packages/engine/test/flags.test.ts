@@ -7,7 +7,9 @@ import {
   applyPlan,
   controlledPawns,
   movesForCard,
+  nextSteps,
   type PawnId,
+  sevenMustEnter,
   swapEnds,
 } from "../src/index.ts";
 import { board, playState } from "./helpers.ts";
@@ -357,5 +359,44 @@ describe("G15 SEVEN_EATS_PASSED_PARTNER", () => {
     const r = finished(false, true);
     expect(r.ok).toBe(true);
     expect(r.ok && r.captured).toEqual(["rouge1"]);
+  });
+});
+
+describe("G16 KNIGHT_MUST_ENTER", () => {
+  // bleu0 two cells before its carré 16 (progress 68), bleu1 at 10, a 7.
+  const state = (value: boolean) =>
+    playState({ bleu: [{ p: 68 }, { p: 10 }, "S", "S"] }, { bleu: ["7S"] }, "bleu", {
+      KNIGHT_MUST_ENTER: value,
+    });
+  const passes: { pawn: PawnId; steps: number }[][] = [
+    [{ pawn: "bleu0", steps: 7 }],
+    [
+      { pawn: "bleu0", steps: 2 },
+      { pawn: "bleu1", steps: 5 },
+    ],
+  ];
+
+  it("true (default): a 7 that moves bleu0 without bringing it home is refused", () => {
+    expect(sevenMustEnter(state(true), "bleu")).toEqual(["bleu0"]);
+    for (const plan of passes) {
+      expect(applyPlan(state(true), "bleu", "7S", plan)).toEqual({
+        ok: false,
+        reason: "must-enter",
+      });
+    }
+    expect(nextSteps(state(true), "bleu", "7S", []).bleu0).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("false: the rule of 2026-10-14, bleu0 may pass its home or stop short of it", () => {
+    expect(sevenMustEnter(state(false), "bleu")).toEqual([]);
+    const ends = passes.map((plan) => {
+      const r = applyPlan(state(false), "bleu", "7S", plan);
+      return r.ok ? r.pawns.bleu0 : r.reason;
+    });
+    expect(ends).toEqual([
+      { zone: "ring", progress: 75 },
+      { zone: "ring", progress: 70 },
+    ]);
+    expect(nextSteps(state(false), "bleu", "7S", []).bleu0).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 });

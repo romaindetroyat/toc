@@ -10,6 +10,7 @@ import {
   type Action,
   apply,
   applyPlan,
+  canPlaySeven,
   IllegalActionError,
   isComplete,
   legalActions,
@@ -81,12 +82,10 @@ describe("the 7 brings home the knight it can bring home, or leaves it (G16)", (
 
   it("nextSteps offers bleu0 1 to 6 steps, never 7 (G16)", () => {
     const state = nearHome();
-    expect(nextSteps(state, "bleu", "7S", [])["bleu0"]).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(nextSteps(viewFor(state, "bleu"), "bleu", "7S", [])["bleu0"]).toEqual([
-      1, 2, 3, 4, 5, 6,
-    ]);
+    expect(nextSteps(state, "bleu", "7S", []).bleu0).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(nextSteps(viewFor(state, "bleu"), "bleu", "7S", []).bleu0).toEqual([1, 2, 3, 4, 5, 6]);
     // bleu1 5 or 6 would leave bleu0 2 or 1 steps, which stop it short of its home.
-    expect(nextSteps(state, "bleu", "7S", [])["bleu1"]).toEqual([1, 2, 3, 4, 7]);
+    expect(nextSteps(state, "bleu", "7S", []).bleu1).toEqual([1, 2, 3, 4, 7]);
   });
 
   it("after bleu0 2 then bleu1 5, the plan is refused with « must-enter » (G16)", () => {
@@ -111,5 +110,32 @@ describe("the 7 brings home the knight it can bring home, or leaves it (G16)", (
     expect(sevenPlans(state, "bleu", "7S").map(key)).toEqual([key(plan(["bleu0", 7]))]);
     const r = applyPlan(state, "bleu", "7S", plan(["bleu0", 7]));
     expect(r.ok && r.pawns.bleu0).toEqual({ zone: "ring", progress: 77 });
+  });
+});
+
+describe("G16 never makes the 7 unplayable (G16)", () => {
+  // Found by a search over the bleu boards near the home: home slot 3 is taken, bleu2 at 69 and bleu3 on
+  // its carré 16 (70) can each be brought home by a split of the 7, but not both (each would need slot 2),
+  // and the knight that does not enter would have to take 3 or more steps without entering.
+  const stuck = (value: boolean) =>
+    playState({ bleu: ["S", { h: 3 }, { p: 69 }, { p: 70 }] }, { bleu: ["7S"] }, "bleu", {
+      KNIGHT_MUST_ENTER: value,
+    });
+
+  it("no split keeps the duty: sevenMustEnter is empty and the 7 plays as before (G16)", () => {
+    expect(sevenMustEnter(stuck(true), "bleu")).toEqual([]);
+    expect(canPlaySeven(stuck(true), "bleu")).toBe(true);
+    const on = sevenPlans(stuck(true), "bleu", "7S").map(key);
+    const off = sevenPlans(stuck(false), "bleu", "7S").map(key);
+    expect(on.length).toBeGreaterThan(0);
+    expect(on).toEqual(off);
+    // each of the two knights alone can be brought home by some split
+    for (const id of ["bleu2", "bleu3"] as const) {
+      const home = sevenPlans(stuck(false), "bleu", "7S").some((p) => {
+        const r = applyPlan(stuck(false), "bleu", "7S", p);
+        return r.ok && r.pawns[id].zone === "home";
+      });
+      expect(home).toBe(true);
+    }
   });
 });
