@@ -1,0 +1,11 @@
+{
+  // TOC en ligne : Worker avec ressources statiques (pas Pages).
+  // Construire d'abord : pnpm --filter @toc/web build
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "toc",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./apps/web/dist",
+    "not_found_handling": "single-page-application"
+  }
+}
