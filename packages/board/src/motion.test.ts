@@ -52,7 +52,7 @@ describe("MOTION table (UI-SPEC Motion Contract)", () => {
     expect([MOTION.partyRear, MOTION.partyBurst, MOTION.partyParticles]).toEqual([500, 700, 8]);
     expect(MOTION.winHop).toBe(600);
     expect([MOTION.landingSquash, MOTION.lastHopSettle]).toEqual([0.08, 80]);
-    expect([MOTION.dealCard, MOTION.dealStagger]).toEqual([250, 40]);
+    expect([MOTION.dealCard, MOTION.dealStagger]).toEqual([300, 55]);
     expect([MOTION.deadCard, MOTION.deadStagger]).toEqual([350, 60]);
     expect([MOTION.cardPlay, MOTION.exchangeCross, MOTION.banner]).toEqual([300, 300, 1200]);
     expect(REDUCED.cards).toBe(150);
@@ -140,10 +140,11 @@ describe("eventDuration", () => {
 });
 
 describe("the cards", () => {
-  it("a deal of 20 cards lasts 250 ms for the first and a 40 ms stagger for each next one", () => {
-    expect(cardsDuration(20, "deal", "normal")).toBe(250 + 19 * 40);
-    expect(cardsDuration(16, "deal", "normal")).toBe(250 + 15 * 40);
-    expect(cardsDuration(1, "deal", "normal")).toBe(250);
+  it("a deal of 20 cards lasts 300 ms for the first and a 55 ms stagger for each next one", () => {
+    expect(cardsDuration(20, "deal", "normal")).toBe(300 + 19 * 55);
+    expect(cardsDuration(20, "deal", "normal")).toBe(1345);
+    expect(cardsDuration(16, "deal", "normal")).toBe(300 + 15 * 55);
+    expect(cardsDuration(1, "deal", "normal")).toBe(300);
     expect(cardsDuration(0, "deal", "normal")).toBe(0);
   });
 
@@ -157,7 +158,8 @@ describe("the cards", () => {
   });
 
   it("fast mode multiplies every card motion by 0.4", () => {
-    expect(cardsDuration(20, "deal", "fast")).toBeCloseTo((250 + 19 * 40) * 0.4, 9);
+    expect(cardsDuration(20, "deal", "fast")).toBeCloseTo((300 + 19 * 55) * 0.4, 9);
+    expect(cardsDuration(20, "deal", "fast")).toBeCloseTo(538, 9);
     expect(cardPlayDuration("normal")).toBe(300);
     expect(cardPlayDuration("fast")).toBeCloseTo(120, 9);
     expect(exchangeDuration("normal")).toBe(300);
@@ -174,10 +176,10 @@ describe("the cards", () => {
   it("card events take their time on screen, the hands of a deal flying with the dealt event", () => {
     const hand = { t: "handDealt", seat: "bleu", size: 1, cards: ["1S"] } as GameEvent;
     expect(eventDuration({ t: "dealt", dealer: "bleu", dealIndex: 0, size: 5 }, "normal")).toBe(
-      250 + 19 * 40,
+      300 + 19 * 55,
     );
     expect(eventDuration({ t: "dealt", dealer: "bleu", dealIndex: 1, size: 4 }, "normal")).toBe(
-      250 + 15 * 40,
+      300 + 15 * 55,
     );
     expect(eventDuration(hand, "normal")).toBe(0);
     expect(eventDuration({ t: "cardPlayed", seat: "bleu", card: "5H" }, "normal")).toBe(300);

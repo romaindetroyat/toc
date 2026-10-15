@@ -31,8 +31,12 @@ export const MOTION = {
   partyRear: 500,
   partyBurst: 700,
   partyParticles: 8,
-  dealCard: 250,
-  dealStagger: 40,
+  /**
+   * One dealt card's flight and the gap between two cards. Slowed on 2026-10-15 (recette 3), Romain:
+   * « La distribution de cartes est un tout petit peu trop rapide » (250 ms and 40 ms before).
+   */
+  dealCard: 300,
+  dealStagger: 55,
   deadCard: 350,
   deadStagger: 60,
   cardPlay: 300,

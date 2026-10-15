@@ -107,11 +107,11 @@ describe("seatSlot and seatEdge on the landscape galet", () => {
 });
 
 describe("dealFlights", () => {
-  it("flies 20 face-down cards, 250 ms each, 40 ms apart, round by round", () => {
+  it("flies 20 face-down cards, 300 ms each, 55 ms apart, round by round", () => {
     const flights = dealFlights(SEATS, 0, "normal");
     expect(flights).toHaveLength(20);
-    expect(flights.every((f) => f.durationMs === 250 && f.card === null)).toBe(true);
-    expect(flights.map((f) => f.delayMs)).toEqual(Array.from({ length: 20 }, (_, i) => i * 40));
+    expect(flights.every((f) => f.durationMs === 300 && f.card === null)).toBe(true);
+    expect(flights.map((f) => f.delayMs)).toEqual(Array.from({ length: 20 }, (_, i) => i * 55));
     // The first four cards go to the four seats in dealing order.
     const firstRound = flights.slice(0, 4).map((f) => translation(lastPose(f.keyframes)));
     const edges = SEATS.map(({ seat }) => seatEdge(seat, 0));
@@ -138,8 +138,8 @@ describe("dealFlights", () => {
 
   it("fast mode multiplies the flight and the stagger by 0.4", () => {
     const flights = dealFlights(SEATS, 0, "fast");
-    expect(flights[0]?.durationMs).toBeCloseTo(100, 9);
-    expect(flights[1]?.delayMs).toBeCloseTo(16, 9);
+    expect(flights[0]?.durationMs).toBeCloseTo(120, 9);
+    expect(flights[1]?.delayMs).toBeCloseTo(22, 9);
   });
 
   it("reduced motion: one 150 ms fade per seat, all at once", () => {

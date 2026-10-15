@@ -173,7 +173,7 @@ async function shoot(
 }
 
 /**
- * Like `shoot`, for animations that are all running together only briefly (the deal: 250 ms): before the
+ * Like `shoot`, for animations that are all running together only briefly (the deal: 300 ms): before the
  * page loads, `Element.animate` is wrapped so that `minimum` animations of the selector are frozen at
  * `at` in the very task that starts the last of them, however late the test or the frames come.
  * `shootArmed` then takes the screenshot and lets them run on.
@@ -586,10 +586,10 @@ function bannerWatch() {
   }).observe(document, { childList: true, subtree: true });
 }
 
-test("la donne : 20 cartes de 250 ms à 40 ms d’intervalle avec le bruit de la donne, puis la main se retourne", async ({
+test("la donne : 20 cartes de 300 ms à 55 ms d’intervalle avec le bruit de la donne, puis la main se retourne", async ({
   page,
 }) => {
-  // The 20 cards are all in flight together for only 250 ms, until the first one lands: the freeze is
+  // The 20 cards are all in flight together for only 300 ms, until the first one lands: the freeze is
   // armed before the page loads, so a slow poll or frame cannot miss that moment.
   await armShot(page, "[data-flight]", 20, LEAD + 300);
   await openSeeded(page);
@@ -598,11 +598,11 @@ test("la donne : 20 cartes de 250 ms à 40 ms d’intervalle avec le bruit de la
     .poll(async () => flightsOf(await records(page), "deal").length, { timeout: 10_000 })
     .toBe(20);
   // The freeze for the screenshot shifts the start of the cards the recorder saw only after it, so the
-  // 40 ms interval is read from each card's own delay, in dealing order.
+  // 55 ms interval is read from each card's own delay, in dealing order.
   const deal = flightsOf(await records(page), "deal").sort((a, b) => a.delay - b.delay);
   for (const [i, flight] of deal.entries()) {
-    near(flight.duration, 250, 1);
-    near(flight.delay - (deal[0] as Rec).delay, i * 40, 1);
+    near(flight.duration, 300, 1);
+    near(flight.delay - (deal[0] as Rec).delay, i * 55, 1);
     expect(flight.card).toBe("back");
   }
 
@@ -614,8 +614,8 @@ test("la donne : 20 cartes de 250 ms à 40 ms d’intervalle avec le bruit de la
   await expect.poll(async () => handCards(await records(page)).length).toBe(5);
   const flips = handCards(await records(page));
   for (const [i, flip] of flips.entries()) {
-    near(flip.duration, 250, 1);
-    near(flip.delay, i * 40, 1);
+    near(flip.duration, 300, 1);
+    near(flip.delay, i * 55, 1);
   }
   await expect(page.locator("[data-flight]")).toHaveCount(0);
   await expect(page.locator("[data-talon]")).toHaveAttribute("data-talon", "32");
@@ -806,7 +806,7 @@ test.describe("Avance rapide : le bond de 4 cases, les cartes", () => {
     }
   });
 
-  test("la donne : 20 cartes de 100 ms espacées de 16 ms, la main se retourne en 100 ms", async ({
+  test("la donne : 20 cartes de 120 ms espacées de 22 ms, la main se retourne en 120 ms", async ({
     page,
   }) => {
     await openSeeded(page);
@@ -815,11 +815,11 @@ test.describe("Avance rapide : le bond de 4 cases, les cartes", () => {
       .toBe(20);
     const deal = flightsOf(await records(page), "deal");
     for (const [i, flight] of deal.entries()) {
-      near(flight.duration, 100, 2);
-      near(flight.begins - (deal[0] as Rec).begins, i * 16, 6);
+      near(flight.duration, 120, 2);
+      near(flight.begins - (deal[0] as Rec).begins, i * 22, 6);
     }
     await expect.poll(async () => handCards(await records(page)).length).toBe(5);
-    for (const flip of handCards(await records(page))) near(flip.duration, 100, 2);
+    for (const flip of handCards(await records(page))) near(flip.duration, 120, 2);
     expect((await cues(page)).filter((c) => c.id === "carte-donne")).toHaveLength(1);
   });
 
