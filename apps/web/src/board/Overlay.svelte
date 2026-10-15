@@ -39,6 +39,9 @@
   const GHOST_RX = 70;
   const GHOST_RY = 26;
   const BADGE_X = KNIGHT.w / 2 + 7;
+  /** A badge's radius and stroke, screen pixels. */
+  const BADGE_R = 21;
+  const BADGE_STROKE = 2;
   /** A capture mark above the victim's head, a letter above the knight's head. */
   const CAPTURE_UP = KNIGHT.head + 10;
   const LETTER_UP = KNIGHT.head + 22;
@@ -53,6 +56,18 @@
 
   function pawnAt(pawn: PawnId): Point {
     return anchorOf(render.pawns[pawn], k);
+  }
+
+  /**
+   * Where a « +n » badge sits from the knight it marks (standing at scene height `y`, at `size`):
+   * beside its head, but never above the board's top edge. On a phone held sideways the galet has no
+   * head room of its own and the prompt row stands right over it, so a badge of a top-row cell
+   * would rise into the line and hide its end (seen by 01-47 at 750 x 342); it is lowered just
+   * enough to stay on the board.
+   */
+  function badgeAt(y: number, size: number): string {
+    const up = Math.max(-KNIGHT.head * size, (BADGE_R + BADGE_STROKE / 2) * px - y);
+    return `translate(${BADGE_X * size} ${up})`;
   }
 
   /** Sprite-to-scene scale of a knight where it stands (ring, home or stable). */
@@ -345,11 +360,8 @@
       <g data-ghost transform={`translate(${destination[0]} ${destination[1]})`}>
         {@render ghostKnight(ghostColor, destinationSize)}
         {#if badge !== null}
-          <g
-            data-badge
-            transform={`translate(${BADGE_X * destinationSize} ${-KNIGHT.head * destinationSize})`}
-          >
-            <circle r={21 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
+          <g data-badge transform={badgeAt(destination[1], destinationSize)}>
+            <circle r={BADGE_R * px} fill={WALNUT} stroke={CREAM} stroke-width={BADGE_STROKE * px} />
             <text
               text-anchor="middle"
               dominant-baseline="central"
@@ -366,8 +378,8 @@
     {#each sevenGhosts as ghost (ghost.pawn)}
       <g data-seven-ghost={ghost.pawn} transform={`translate(${ghost.at[0]} ${ghost.at[1]})`}>
         {@render ghostKnight(pawnColor(ghost.pawn), ghost.size)}
-        <g data-badge transform={`translate(${BADGE_X * ghost.size} ${-KNIGHT.head * ghost.size})`}>
-          <circle r={21 * px} fill={WALNUT} stroke={CREAM} stroke-width={2 * px} />
+        <g data-badge transform={badgeAt(ghost.at[1], ghost.size)}>
+          <circle r={BADGE_R * px} fill={WALNUT} stroke={CREAM} stroke-width={BADGE_STROKE * px} />
           <text
             text-anchor="middle"
             dominant-baseline="central"
