@@ -15,6 +15,7 @@ import {
   type PlayerView,
   type Rng,
   scenarioState,
+  sevenOutcomes,
   sevenPlans,
   teamOf,
   viewFor,
@@ -235,6 +236,33 @@ describe("candidates", () => {
     expect(new Set(sevens.map((c) => boardKey(c.pawns))).size).toBe(sevens.length);
     // Two 7 in hand: the second adds nothing (same rank, same boards), the first in hand order is kept.
     expect(sevens.every((c) => c.action.t === "seven" && c.action.card === "7S")).toBe(true);
+  });
+
+  it("takes the 7's candidates from the engine's outcomes, one per board, on a crowded board", () => {
+    const view = viewFor(
+      scenarioState(
+        {
+          pawns: {
+            bleu: [{ p: 3 }, { p: 20 }, { p: 40 }, { p: 60 }],
+            jaune: [{ p: 1 }, { p: 30 }, "S", "S"],
+            rouge: [{ p: 50 }, "S", "S", "S"],
+            vert: [{ p: 10 }, { p: 25 }, "S", "S"],
+          },
+          hands: { bleu: ["7S", "2H"], jaune: ["9S"] },
+          turn: "bleu",
+        },
+        [1, 2, 3, 4],
+      ),
+      "bleu",
+    );
+    const outcomes = sevenOutcomes(view, "bleu", "7S");
+    const sevens = candidatesFor(view, "bleu").filter((c) => c.action.t === "seven");
+    expect(outcomes.length).toBeGreaterThan(20);
+    expect(sevens.length).toBe(outcomes.length);
+    expect(sevens.map((c) => c.action)).toEqual(
+      outcomes.map((o) => ({ t: "seven", card: "7S", plan: o.plan })),
+    );
+    expect(sevens.map((c) => c.pawns)).toEqual(outcomes.map((o) => o.pawns));
   });
 
   it("keeps a card of another rank that ends on the same board, and collapses the same rank", () => {

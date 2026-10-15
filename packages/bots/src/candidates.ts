@@ -2,16 +2,16 @@
 // (03-RESEARCH Pattern 2). The bots score boards, not plans: a 7 that has thousands of plans is a
 // handful of candidates, one per distinct end board.
 // - the cards other than the 7: legalActions (without the 7's plans), each resolved with resolveMove;
-// - the 7: one candidate per distinct end board (sevenPlans then applyPlan, the first plan kept);
+// - the 7: one candidate per distinct end board, the engine's sevenOutcomes (same boards as every plan
+//   of sevenPlans played through applyPlan, G16 included, at a fraction of the cost);
 // - the discard alone when the hand is dead (nothing else, the 7 included, can be played);
 // - two cards of the same rank that end on the same board are one candidate, the first in hand order.
-// Every legality decision is the engine's (movesForCard, sevenPlans with G16, legalActions).
+// Every legality decision is the engine's (movesForCard, sevenOutcomes with G16, legalActions).
 // Pure, no I/O, erasable syntax only.
 
 import {
   type Action,
   ALL_PAWNS,
-  applyPlan,
   type CardId,
   type Color,
   legalActions,
@@ -20,7 +20,7 @@ import {
   type PlayerView,
   rankOf,
   resolveMove,
-  sevenPlans,
+  sevenOutcomes,
 } from "@toc/engine";
 
 export type BotCandidate = {
@@ -43,21 +43,13 @@ export function pawnsKey(pawns: Record<PawnId, Pawn>): string {
 
 /** The distinct end boards of a 7, each with the first plan that reaches it. */
 function sevenCandidates(view: PlayerView, seat: Color, card: CardId): BotCandidate[] {
-  const out: BotCandidate[] = [];
-  const seen = new Set<string>();
-  for (const plan of sevenPlans(view, seat, card)) {
-    const result = applyPlan(view, seat, card, plan);
-    if (!result.ok) continue;
-    const key = pawnsKey(result.pawns);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      action: { t: "seven", card, plan: result.plan },
-      pawns: result.pawns,
-      captured: result.captured,
-    });
-  }
-  return out;
+  return sevenOutcomes(view, seat, card).map(
+    (outcome): BotCandidate => ({
+      action: { t: "seven", card, plan: outcome.plan },
+      pawns: outcome.pawns,
+      captured: outcome.captured,
+    }),
+  );
 }
 
 /**
