@@ -12,6 +12,10 @@ const row = (page: Page, role: "partner" | "left" | "right") =>
   page.locator(`[data-strength-row="${role}"]`);
 const level = (page: Page, role: "partner" | "left" | "right", name: string) =>
   row(page, role).getByRole("radio", { name, exact: true });
+const radioOf = (page: Page, name: string) =>
+  page
+    .getByRole("radiogroup", { name: "Choisis ta couleur" })
+    .getByRole("radio", { name, exact: true });
 
 async function stored(page: Page): Promise<Record<string, unknown>> {
   const text = await page.evaluate((key) => localStorage.getItem(key), KEY);
@@ -124,4 +128,111 @@ test("force: « Jouer la partie » avec un Champion ouvre la partie sans erreur"
   await expect(page.locator("[data-action-zone]")).toHaveAttribute("data-state", "exchange");
   await expect(page.locator("[data-error-screen]")).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+// --- The launch screen on every target screen (03-UI-SPEC « Launch screen layouts », « Fit at the
+// target sizes »). Each size is set on the page itself, so both projects check every size. ---
+
+type Fit = { scrollWidth: number; scrollHeight: number; innerWidth: number; innerHeight: number };
+
+const fit = (page: Page): Promise<Fit> =>
+  page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+  }));
+
+const forms = (page: Page) =>
+  page
+    .locator("[data-strength-row]")
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-form")));
+
+async function openAt(page: Page, size: { width: number; height: number }) {
+  await page.setViewportSize(size);
+  await page.goto("/");
+  await expect(page.locator("[data-strength-row]")).toHaveCount(3);
+  await page.evaluate(() => document.fonts.ready);
+}
+
+for (const size of [
+  { width: 1280, height: 800 },
+  { width: 1024, height: 640 },
+]) {
+  test(`force: sur l’ordinateur (${size.width} × ${size.height}), deux colonnes sans défilement`, async ({
+    page,
+  }) => {
+    await openAt(page, size);
+    await expect(page.locator("main.launch")).toHaveAttribute("data-layout", "computer");
+    // The strength column is to the right of the tiles.
+    const tiles = await page.getByRole("radiogroup", { name: "Choisis ta couleur" }).boundingBox();
+    const strength = await page
+      .getByRole("heading", { name: "Force de l’ordinateur" })
+      .boundingBox();
+    if (!tiles || !strength) throw new Error("no tiles or no strength heading");
+    expect(strength.x).toBeGreaterThanOrEqual(tiles.x + tiles.width);
+    // Three inline rows, 48 high.
+    await expect.poll(() => forms(page)).toEqual(["inline", "inline", "inline"]);
+    for (const role of ["partner", "left", "right"] as const) {
+      const box = await row(page, role).boundingBox();
+      expect(box?.height).toBeCloseTo(48, 0);
+    }
+    // « Réglages » 16 px left of « Jouer la partie », on the same row.
+    const settings = await page.getByRole("button", { name: "Réglages" }).boundingBox();
+    const play = await page.getByRole("button", { name: "Jouer la partie" }).boundingBox();
+    if (!settings || !play) throw new Error("no button row");
+    expect(play.x - (settings.x + settings.width)).toBeCloseTo(16, 0);
+    expect(Math.abs(settings.y + settings.height / 2 - (play.y + play.height / 2))).toBeLessThan(1);
+    // Nothing scrolls.
+    const now = await fit(page);
+    expect(now.scrollHeight).toBeLessThanOrEqual(now.innerHeight);
+    expect(now.scrollWidth).toBeLessThanOrEqual(now.innerWidth);
+  });
+}
+
+test("force: l’ordre de tabulation, puis les flèches dans une force avec retour au début", async ({
+  page,
+}) => {
+  await openAt(page, { width: 1280, height: 800 });
+  const order = [
+    radioOf(page, "Bleu"),
+    level(page, "partner", "Galopeur"),
+    level(page, "left", "Galopeur"),
+    level(page, "right", "Galopeur"),
+    page.getByRole("button", { name: "Réglages" }),
+    page.getByRole("button", { name: "Jouer la partie" }),
+  ];
+  for (const target of order) {
+    await page.keyboard.press("Tab");
+    await expect(target).toBeFocused();
+  }
+  // Inside a picker, the arrows move and select, and wrap around.
+  await level(page, "left", "Galopeur").focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(level(page, "left", "Champion")).toHaveAttribute("aria-checked", "true");
+  await expect(level(page, "left", "Champion")).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(level(page, "left", "Poulain")).toHaveAttribute("aria-checked", "true");
+  await expect(level(page, "left", "Poulain")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(level(page, "left", "Champion")).toHaveAttribute("aria-checked", "true");
+  expect((await stored(page)).botLevels).toEqual({ partner: 3, left: 5, right: 3 });
+});
+
+test("force: le titre « Force 5 sur 5 », et l’option cochée en crème, jamais en ambre", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(level(page, "partner", "Champion")).toHaveAttribute("title", "Force 5 sur 5");
+  await expect(level(page, "partner", "Poulain")).toHaveAttribute("title", "Force 1 sur 5");
+  const checked = await level(page, "partner", "Galopeur").evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { background: style.backgroundColor, color: style.color, weight: style.fontWeight };
+  });
+  expect(checked).toEqual({
+    background: "rgb(255, 248, 225)",
+    color: "rgb(43, 29, 18)",
+    weight: "700",
+  });
 });
