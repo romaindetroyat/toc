@@ -6,6 +6,12 @@ import {
   type VoiceHandle,
   WebAudioBackend,
 } from "./backend.ts";
+import {
+  createKeepAlive,
+  isAppleTouch,
+  type KeepAlive,
+  type KeepAliveDocument,
+} from "./keepAlive.ts";
 import { SOUND_IDS, SOUNDS, type SoundDef, type SoundId, type SynthRecipe } from "./sounds.ts";
 import { renderCard, renderHoof, renderNeigh } from "./synth.ts";
 
@@ -373,6 +379,66 @@ function mirrorState(): void {
   document.body.dataset.audio = backend ? backend.state() : "none";
 }
 
+type AudioSession = { type: string };
+
+function audioSession(): AudioSession | undefined {
+  return (navigator as Navigator & { audioSession?: AudioSession }).audioSession;
+}
+
+/**
+ * iPhone and iPad only: the silent looping element that keeps the page in the « playback » audio
+ * category, so the ringer switch does not mute the game (keepAlive.ts). Created in the first gesture.
+ */
+let keepAlive: KeepAlive | undefined;
+
+function soundOn(): boolean {
+  return (pendingMix ?? DEFAULT_MIX).sound;
+}
+
+/** Debug builds: the e2e specs read the session type and the silent element's state. */
+function publishKeepAlive(): void {
+  if (!DEBUG || !window.__tocDebug) return;
+  window.__tocDebug.audio.keepAlive = {
+    exists: keepAlive !== undefined,
+    playing: keepAlive?.playing() ?? false,
+  };
+  const session = audioSession();
+  if (session) window.__tocDebug.audio.audioSessionType = session.type;
+}
+
+/** Starts the silent element when the game may sound: the page is visible and « Son » is on. */
+function startKeepAlive(): void {
+  if (!keepAlive || document.hidden || !soundOn()) return;
+  keepAlive.start();
+  publishKeepAlive();
+}
+
+function pauseKeepAlive(): void {
+  if (!keepAlive) return;
+  keepAlive.pause();
+  publishKeepAlive();
+}
+
+/** Called inside the first gesture once the engine exists: creates the element on Apple touch WebKit. */
+function armKeepAlive(): void {
+  if (!keepAlive && isAppleTouch(navigator)) {
+    try {
+      keepAlive = createKeepAlive(document as unknown as KeepAliveDocument);
+      const element = document.querySelector("audio[data-audio-keepalive]");
+      element?.addEventListener("playing", publishKeepAlive);
+      element?.addEventListener("pause", publishKeepAlive);
+      // Hidden (the app in the background, the phone locked): quiet, and no « À l'écoute » entry.
+      // Back on screen it waits for the next gesture (the retry listeners below).
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) pauseKeepAlive();
+      });
+    } catch {
+      keepAlive = undefined; // no <audio>: the game plays on, as before
+    }
+  }
+  startKeepAlive();
+}
+
 /**
  * Create the AudioContext on first call and resume it. Call this synchronously inside a user
  * gesture handler (the « Jouer la partie » tap): browsers refuse to start audio otherwise.
@@ -381,6 +447,10 @@ function mirrorState(): void {
 export function unlock(): AudioContext | undefined {
   // A browser that could not create the context is asked again on each tap (« Réessayer » in the
   // game): the failure is reported again if it persists.
+  // iOS: ask for the « playback » session (the ringer switch does not mute it) before the
+  // AudioContext exists, so the context starts in it (feature-detected; Safari 16.4+).
+  const session = audioSession();
+  if (session) session.type = "playback";
   if (!engine) {
     try {
       const created = new WebAudioBackend();
@@ -392,7 +462,11 @@ export function unlock(): AudioContext | undefined {
       created.onStateChange(mirrorState);
       // Any later tap or key retries the resume (iOS interrupts the context when the app goes to the
       // background). Only events that grant user activation may resume it: a touch pointerdown does not.
-      const retry = () => made.retryResume();
+      // The same taps start the silent element again once the page is visible and « Son » is on.
+      const retry = () => {
+        made.retryResume();
+        startKeepAlive();
+      };
       for (const type of ACTIVATION_EVENTS) {
         document.addEventListener(type, retry, { passive: true });
       }
@@ -402,10 +476,9 @@ export function unlock(): AudioContext | undefined {
       emit("failed");
     }
   }
-  // iOS: play through the media channel so the ringer switch does not mute the game (feature-detected).
-  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-  if (session) session.type = "playback";
   resuming = engine ? engine.unlock() : Promise.resolve();
+  if (engine) armKeepAlive();
+  publishKeepAlive();
   mirrorState();
   return backend?.context;
 }
@@ -482,6 +555,10 @@ export function setMix(mix: Mix): void {
   }
   pendingMix = { ...mix };
   engine?.setMix(mix);
+  // « Son » off: the silent element stops too. Back on (a tap on the switch): it plays again; WebKit
+  // lets an element a gesture has already started play again.
+  if (mix.sound) startKeepAlive();
+  else pauseKeepAlive();
 }
 
 /** Try the recorded files of every sound ([.m4a, .mp3]); a sound whose decode fails stays synthesized. */

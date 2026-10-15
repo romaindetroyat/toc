@@ -18,6 +18,10 @@ declare global {
         sounds?: Record<string, { duration: number; peak: number }>;
         /** The bus gains the last mix asked for: 0 or 1 for master and effects. */
         gains?: { master: number; sfx: number };
+        /** iPhone and iPad: the silent looping element of keepAlive.ts (absent on a computer). */
+        keepAlive?: { exists: boolean; playing: boolean };
+        /** navigator.audioSession.type after the unlock, where the browser has the API. */
+        audioSessionType?: string;
       };
     };
   }
