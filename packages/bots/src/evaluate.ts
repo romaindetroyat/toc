@@ -10,7 +10,10 @@
 //   plays them, R-15), so eating the partner costs what losing one's own knight costs.
 // The candidates of the play phase are scored as evaluate(after) + handBonus(the cards kept, after): a
 // bot that keeps an As or a Roi while knights wait in the stable, or a 4 for the trick, is credited
-// for it. Each weight is a named constant (tuned by tools/ladder.mjs, plan 03-02 Task 3).
+// for it. Each weight is a named constant, judged by tools/ladder.mjs (plan 03-02 Task 3, 2026-10-15,
+// seed 1, 400 games per step: 2 → 1 92.5 %, 3 → 2 98.3 %, 4 → 3 66.3 %, all above the bar on the
+// first run, so these weights were kept; head to head at T = 0 this evaluation beat 03-01's, without
+// the risk and hand terms, 305 / 400 = 76.3 %). Re-run the ladder after any change here.
 // The risk term approximates reach (no protected knight in the way, no home entry on the way): it is a
 // heuristic, never a legality decision (those are the engine's).
 // Pure, no I/O, erasable syntax only.

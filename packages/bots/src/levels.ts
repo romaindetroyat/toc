@@ -27,10 +27,35 @@ export function parseBotLevel(value: unknown): BotLevel | null {
  */
 export type LevelParams = { epsilon: number; temperature: number };
 
+/** Level 2, Trotteur: half of its moves at random, the rest through a broad softmax. */
+export const TROTTEUR_EPSILON = 0.5;
+/**
+ * Level 2's temperature. Ladder 2026-10-15 (plan 03-02, evaluation with the risk and hand terms):
+ * `node tools/ladder.mjs --a 2 --b 1 --games 400 --seed 1` → 370 / 400, p̂ 92.5 %, Wilson 95 %
+ * lower bound 89.5 % (pairs 171 / 28 / 1). PASS.
+ */
+export const TROTTEUR_TEMPERATURE = 20;
+/**
+ * Level 3, Galopeur. Ladder 2026-10-15: `--a 3 --b 2 --games 400 --seed 1` → 393 / 400, p̂ 98.3 %,
+ * Wilson lower bound 96.4 % (pairs 193 / 7 / 0). PASS.
+ */
+export const GALOPEUR_TEMPERATURE = 8;
+/**
+ * Level 4, Pur-sang. Ladder 2026-10-15: `--a 4 --b 3 --games 400 --seed 1` → 265 / 400, p̂ 66.3 %,
+ * Wilson lower bound 61.5 % (pairs 80 / 105 / 15). PASS. The narrow step: plan 03-04 may soften it
+ * once level 5 has its search (5 → 4 must pass the same bar).
+ */
+export const PUR_SANG_TEMPERATURE = 3;
+
+/**
+ * Frozen by plan 03-02 Task 3: every step passed the bar (p̂ ≥ 60 %, Wilson lower bound > 55 %) with
+ * p̂ ≥ 63 % on the first run, so the starting values of 03-RESEARCH Pattern 4 were kept unchanged.
+ * Re-run the three ladder steps whenever this table or evaluate.ts changes (research Pitfall 7).
+ */
 export const LEVEL_PARAMS: Readonly<Record<BotLevel, LevelParams>> = {
   1: { epsilon: 1, temperature: 0 },
-  2: { epsilon: 0.5, temperature: 20 },
-  3: { epsilon: 0, temperature: 8 },
-  4: { epsilon: 0, temperature: 3 },
+  2: { epsilon: TROTTEUR_EPSILON, temperature: TROTTEUR_TEMPERATURE },
+  3: { epsilon: 0, temperature: GALOPEUR_TEMPERATURE },
+  4: { epsilon: 0, temperature: PUR_SANG_TEMPERATURE },
   5: { epsilon: 0, temperature: 0 },
 };
