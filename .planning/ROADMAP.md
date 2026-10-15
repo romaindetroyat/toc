@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 49/54 plans executed (01-42 to 01-54: gap closure after Romain's re-test of 2026-10-15: rule G16 for the 7, riders turned to their camp, one-knight auto-select, slower deal, full-height board on the phone, silent-mode sound, end plank, sound test page with choices; 01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
+**Plans:** 50/54 plans executed (01-42 to 01-54: gap closure after Romain's re-test of 2026-10-15: rule G16 for the 7, riders turned to their camp, one-knight auto-select, slower deal, full-height board on the phone, silent-mode sound, end plank, sound test page with choices; 01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -170,7 +170,7 @@ Plans:
 - [x] 01-49-PLAN.md — Le son de l'iPhone en mode silencieux
 
 **Wave 41** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 40 completion)*
-- [ ] 01-50-PLAN.md — La planche de fin de partie, dans le bois du galet
+- [x] 01-50-PLAN.md — La planche de fin de partie, dans le bois du galet
 
 **Wave 42** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 41 completion)*
 - [ ] 01-51-PLAN.md — La page d'essai des sons à choix, et les sabots en quatre versions
@@ -256,7 +256,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Une vraie partie sur un appareil | 49/54 | In Progress | - |
+| 1. Une vraie partie sur un appareil | 50/54 | In Progress | - |
 | 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
 | 3. L'ordinateur à la force choisie | 0/TBD | Not started | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
