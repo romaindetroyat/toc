@@ -1,12 +1,12 @@
 # Règles du TOC — version maison
 
-**Statut :** Validé par Romain le 2026-10-13 ; règles changées par Romain le 2026-10-14 pendant la recette, puis précisées le 2026-10-15 (G16) ; voir « Décisions de Romain » à la fin
+**Statut :** Validé par Romain le 2026-10-13 ; règles changées par Romain le 2026-10-14 pendant la recette, puis précisées le 2026-10-15 (G16) et changées le même jour (G17) ; voir « Décisions de Romain » à la fin
 **Date :** 2026-10-15
 **Contenu de cette version :** les seize règles R-01 à R-16 (équipes, plateau, donnes, échange, tour, As et Roi, cartes à avancer, le 4, le Valet, le 7, prise, sortie protégée, maison, main injouable, joueur qui a fini, fin de partie), suivies de « Décisions de Romain » (les points qu’il a validés, avec la valeur retenue) et de « Décidé » (ce qui l’est déjà, avec sa source). Chaque scénario est dessiné sur le plateau galet en largeur : en haut avant le coup, en bas après.
 
 Chaque règle est numérotée. Chaque règle cite des scénarios (`R-NN.k`) : ce sont de petits cas écrits comme des données, que le moteur de jeu devra reproduire à l’identique. Rien n’est décidé en silence dans le code : ce qui est écrit ici est ce que le jeu fera.
 
-Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Le 2026-10-14, pendant la recette de la phase 1, Romain a changé des règles (G14 et suivantes, dans « Décisions de Romain »). Le 2026-10-15, après une nouvelle recette, il a précisé l’entrée dans la maison (G16) ; la façon dont le 7 l’applique est une lecture à confirmer par Romain. Ce que dit ce document est ce que le moteur fait.
+Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Le 2026-10-14, pendant la recette de la phase 1, Romain a changé des règles (G14 et suivantes, dans « Décisions de Romain »). Le 2026-10-15, après une nouvelle recette, il a précisé l’entrée dans la maison (G16) ; la façon dont le 7 l’applique est une lecture à confirmer par Romain. Le même jour, il a décidé qu’un cheval saute les chevaux déjà rentrés dans sa maison (G17, qui remplace G2). Ce que dit ce document est ce que le moteur fait.
 
 ## Vocabulaire
 
@@ -323,7 +323,7 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-13 Entrée dans la maison
 
-**Règle** — Pour entrer dans sa maison, un cheval doit atteindre ou franchir son carré 16 en avançant, puis tomber au compte exact sur une case vide de sa maison : depuis le carré 16, 1 pas mène à la case 0 de la maison, 2 pas à la case 1, 3 pas à la case 2 et 4 pas à la case 3. Quand le compte tombe juste, l’entrée est obligatoire. Si le compte ne tombe pas juste (plus de 4 pas au-delà du carré 16, case visée occupée, cheval déjà rentré à sauter), le cheval n’entre pas : il dépasse son entrée et repart pour un tour, ce coup est permis. S’arrêter pile sur le carré 16 n’est pas entrer. Le tour complet n’est pas exigé : un cheval qui a reculé avec le 4, ou que le Valet a placé avant son carré 16, entre de la même façon (G14). On n’entre jamais en reculant. Un cheval déjà rentré peut encore avancer dans sa maison, au compte exact et sans sauter un autre cheval ; il ne ressort jamais de la maison.
+**Règle** — Pour entrer dans sa maison, un cheval doit atteindre ou franchir son carré 16 en avançant, puis tomber au compte exact sur une case vide de sa maison : depuis le carré 16, 1 pas mène à la case 0 de la maison, 2 pas à la case 1, 3 pas à la case 2 et 4 pas à la case 3. Quand le compte tombe juste, l’entrée est obligatoire. Les chevaux déjà rentrés ne gênent pas : le cheval les saute, seule la case où il tombe doit être vide (G17, 2026-10-15). Si le compte ne tombe pas juste (plus de 4 pas au-delà du carré 16, case visée occupée), le cheval n’entre pas : il dépasse son entrée et repart pour un tour, ce coup est permis. S’arrêter pile sur le carré 16 n’est pas entrer. Le tour complet n’est pas exigé : un cheval qui a reculé avec le 4, ou que le Valet a placé avant son carré 16, entre de la même façon (G14). On n’entre jamais en reculant. Un cheval déjà rentré peut encore avancer dans sa maison, au compte exact sur une case vide, en sautant les chevaux devant lui (G17) ; il ne ressort jamais de la maison.
 
 Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette carte ne joue ce cheval que pour le faire rentrer (G16, 2026-10-15). La règle se juge carte par carte :
 - avec une carte ordinaire, c’est déjà le compte exact (D-02) ; une autre carte de la main reste libre de faire dépasser sa maison au même cheval, comme Romain l’a choisi ;
@@ -332,9 +332,13 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
 
 **Cas limites**
 - Compte exact jusqu’à une case vide, entrée obligatoire, avancer dans la maison : c’est acté (D-01, D-02, D-03, RULE-15).
-- On n’entre jamais en reculant : c’est acté (D-04). Le tour complet n’est plus obligatoire depuis le 2026-10-14 (G14) : un cheval qui a reculé depuis sa sortie (progression −4) entre au compte exact dès qu’il repasse son carré 16 en avançant (R-13.12, R-13.16) ; s’il s’arrête pile dessus, il n’entre pas (R-13.17) ; si le compte dépasse le fond de la maison, il repart pour un tour (R-13.18) ; il ne saute pas un cheval déjà rentré (R-13.19, G2). Un pas du 7 entre de la même façon (R-13.20), et un cheval placé par le Valet aussi (R-13.21).
+- On n’entre jamais en reculant : c’est acté (D-04). Le tour complet n’est plus obligatoire depuis le 2026-10-14 (G14) : un cheval qui a reculé depuis sa sortie (progression −4) entre au compte exact dès qu’il repasse son carré 16 en avançant (R-13.12, R-13.16) ; s’il s’arrête pile dessus, il n’entre pas (R-13.17) ; si le compte dépasse le fond de la maison, il repart pour un tour (R-13.18) ; il saute un cheval déjà rentré pour tomber sur une case vide (R-13.19, G17). Un pas du 7 entre de la même façon (R-13.20), et un cheval placé par le Valet aussi (R-13.21).
 - La case 0 de la maison est la plus proche du carré 16, la case 3 la plus éloignée.
-- Si la case visée est libre mais qu’un cheval déjà rentré se trouve sur le chemin, le cheval ne le saute pas et repart pour un tour, comme si la case était occupée (G2, validé).
+- Si la case visée est libre et qu’un cheval déjà rentré se trouve sur le chemin, le cheval le saute et entre ; l’entrée reste obligatoire (G17, R-13.7). Il peut sauter plusieurs chevaux, jusqu’au fond de la maison (R-13.28). Jusqu’au 2026-10-15, il ne le sautait pas et repartait pour un tour, comme si la case était occupée (G2, remplacé par G17).
+- Dans la maison, un cheval rentré saute de même les chevaux devant lui, au compte exact sur une case vide (G17, R-13.10), aussi avec un pas du 7 (R-13.29). Il ne va jamais plus loin que la case 3 (R-13.11).
+- Sauter ne change pas le compte exact : si la case où il tombe est occupée, le cheval n’entre pas et repart pour un tour (D-01, G17, R-13.30) ; dans la maison, ce coup est impossible.
+- Avec le 7, G16 compte aussi les entrées en sautant : si un partage du 7 peut faire rentrer un cheval par-dessus un cheval déjà rentré, le 7 le fait rentrer ou ne le bouge pas (G16, G17, R-13.31).
+- Le 4 ne fait toujours jamais entrer un cheval, même s’il y a des chevaux rentrés à sauter (D-04).
 - Un cheval qui rate sa maison continue sur le parcours, il peut manger ou être mangé comme n’importe quel cheval, et il retrouve le carré 16 un tour plus tard (R-13.15).
 - Dans un 7, un pas qui arrive au compte exact entre dans la maison, avec les mêmes règles (R-13.3).
 - Le 2 fait rentrer le cheval posé sur son carré 16 ; le 9 de la même main peut quand même lui faire refaire un tour (G16, R-13.22).
@@ -358,13 +362,13 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
   ![R-13.5](docs/regles/R-13.5.webp)
 - R-13.6 — Si la case visée de la maison est occupée, le pion repart pour un tour
   ![R-13.6](docs/regles/R-13.6.webp)
-- R-13.7 — Un pion déjà rentré ne se saute pas : le pion repart pour un tour
+- R-13.7 — Le cheval saute un cheval déjà rentré et entre au compte exact sur une case vide
   ![R-13.7](docs/regles/R-13.7.webp)
 - R-13.8 — Quand le compte tombe juste, l’entrée est obligatoire : pas de tour de plus
   ![R-13.8](docs/regles/R-13.8.webp)
 - R-13.9 — Un pion rentré avance encore dans la maison, au compte exact
   ![R-13.9](docs/regles/R-13.9.webp)
-- R-13.10 — Dans la maison, un pion ne saute pas un autre pion rentré
+- R-13.10 — Dans la maison, un cheval saute un autre cheval rentré, au compte exact sur une case vide
   ![R-13.10](docs/regles/R-13.10.webp)
 - R-13.11 — Au fond de la maison, un pion ne peut pas aller plus loin
   ![R-13.11](docs/regles/R-13.11.webp)
@@ -382,7 +386,7 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
   ![R-13.17](docs/regles/R-13.17.webp)
 - R-13.18 — Après un recul, un compte qui dépasse le fond de la maison fait repartir le pion
   ![R-13.18](docs/regles/R-13.18.webp)
-- R-13.19 — Après un recul, un pion déjà rentré ne se saute pas
+- R-13.19 — Après un recul, le cheval saute un cheval déjà rentré et entre au compte exact
   ![R-13.19](docs/regles/R-13.19.webp)
 - R-13.20 — Après un recul, un pas du 7 entre dans la maison
   ![R-13.20](docs/regles/R-13.20.webp)
@@ -400,6 +404,14 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
   ![R-13.26](docs/regles/R-13.26.webp)
 - R-13.27 — Case visée occupée : le cheval ne peut pas rentrer, il dépasse sa maison
   ![R-13.27](docs/regles/R-13.27.webp)
+- R-13.28 — Le dernier cheval saute les trois chevaux rentrés et se range au fond
+  ![R-13.28](docs/regles/R-13.28.webp)
+- R-13.29 — Avec le 7, un cheval rentré saute celui de devant, puis un autre cheval finit le 7
+  ![R-13.29](docs/regles/R-13.29.webp)
+- R-13.30 — Sauter ne suffit pas : si la case visée est occupée, le cheval repart pour un tour
+  ![R-13.30](docs/regles/R-13.30.webp)
+- R-13.31 — Le 7 qui peut faire rentrer un cheval en sautant un cheval rentré le fait rentrer
+  ![R-13.31](docs/regles/R-13.31.webp)
 
 ### R-14 Main injouable
 
@@ -477,7 +489,7 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
 
 ## Décisions de Romain
 
-Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R-13.7 et R-10.13, puis l’a validé tel quel le 2026-10-13 : chaque point prend la valeur retenue indiquée. Aucune correction. Les scénarios R-09.9 et R-15.9 dessinent l’autre choix de G1 et de G12 : ils sont conservés comme repères et ne sont pas implémentés. Chaque valeur est une constante nommée dans `packages/engine/src/rules.ts`.
+Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R-13.7 et R-10.13, puis l’a validé tel quel le 2026-10-13 : chaque point prend la valeur retenue indiquée. Aucune correction. (L’image R-13.7 a été redessinée le 2026-10-15 pour G17, qui remplace G2.) Les scénarios R-09.9 et R-15.9 dessinent l’autre choix de G1 et de G12 : ils sont conservés comme repères et ne sont pas implémentés. Chaque valeur est une constante nommée dans `packages/engine/src/rules.ts`.
 
 Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci-dessous (G14 et suivantes). Ses mots sont cités tels quels.
 
@@ -491,11 +503,16 @@ Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci
   - Retenu : quand une carte peut amener un cheval pile sur une case vide de sa maison, cette carte ne joue ce cheval que pour le faire rentrer. Les autres cartes restent libres sur ce cheval, et les autres chevaux restent libres. Avec une carte ordinaire, c’est déjà le compte exact (D-02). Le 4 et le Valet ne sont pas concernés.
   - À confirmer par Romain : avec le 7, si un partage du 7 peut faire rentrer ce cheval, le 7 le fait rentrer ou ne le bouge pas ; à la fin du 7, il ne peut pas rester devant sa maison, mais il peut s’arrêter sur son carré 16 et entrer à un pas suivant du même 7. G16 ne rend jamais le 7 injouable : si aucun partage ne la respecte (par exemple deux chevaux qui auraient besoin de la même case), le 7 se joue comme avant.
   - Précise D-02. Constante KNIGHT_MUST_ENTER. Touche R-13 (et un renvoi en R-10) ; scénarios R-13.22 à R-13.27.
+- **G17 — On saute les chevaux déjà rentrés dans la maison (décision du 2026-10-15).** Romain a rejoué le 2026-10-15, après G16.
+  - Les mots de Romain : « J'ai essayé, et je voudrais être sûr que c'est bien intégré : quand un cheval entre dans son écurie, il peut doubler les autres chevaux et arriver sur une case vide. Tout à l'heure, ce n'était pas proposé, et le cheval a dû refaire un tour, ce qui n'est pas normal ». (Son « écurie » est ici la maison d’arrivée.)
+  - À la question « Un cheval déjà rentré dans son arrivée peut encore y avancer pour se ranger au fond, au compte exact. Peut-il lui aussi sauter les chevaux devant lui ? », son choix : « Oui, aussi (Recommandé) ». Le texte de l’option était : « Même règle partout dans l'arrivée : on peut sauter les chevaux déjà rentrés, tant qu'on tombe au compte exact sur une case vide. »
+  - Retenu : dans la maison, en entrant depuis le carré 16 comme en y avançant, un cheval saute les chevaux déjà rentrés. Il lui faut toujours le compte exact jusqu’à une case vide (D-01) : si le compte dépasse le fond ou si la case où il tombe est occupée, il n’entre pas et repart pour un tour (dans la maison, ce coup est impossible). Quand le compte tombe juste sur une case vide, l’entrée reste obligatoire (D-02), en sautant s’il le faut. Le 4 ne fait jamais entrer (D-04). Avec le 7, G16 compte ces entrées.
+  - Remplace G2 (validé le 2026-10-13) et la fin de D-03 (« sans sauter un autre cheval »). Constante HOME_JUMP_ALLOWED ; l’ancienne règle G2 reste réglable (HOME_JUMP_BLOCKED). Touche R-13 ; scénarios R-13.7, R-13.10, R-13.19 (réécrits) et R-13.28 à R-13.31.
 
 Les points validés le 2026-10-13 :
 
 - **G1 — Progression d’un cheval après un échange au Valet.** Retenu : le cheval qui change de case prend la progression de sa nouvelle case (de 0 à 71 ; un cheval qui avait fait un tour de plus perd ce tour). Touche R-02, R-09, R-13 ; scénarios R-09.1, R-09.2, R-09.8, R-15.4. Le scénario R-09.9 (garder ses tours) n’est pas retenu.
-- **G2 — Entrée bloquée par un cheval déjà rentré.** Retenu : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. Touche R-13 ; scénario R-13.7.
+- **G2 — Entrée bloquée par un cheval déjà rentré.** Retenu le 2026-10-13 : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. **Remplacé par G17 le 2026-10-15** : le cheval saute les chevaux déjà rentrés (voir G17 plus haut). Touche R-13 ; scénario R-13.7, réécrit pour G17.
 - **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Retenu : il est protégé comme au premier passage, la protection tient à la case et à la couleur, pas au tour. Touche R-12 ; scénario R-12.9.
 - **G4 — Un cheval protégé bloque-t-il aussi ses propres chevaux ?** Retenu : oui, personne ne le dépasse, y compris son propre camp. Touche R-08, R-12 ; scénarios R-08.4, R-08.5, R-12.10.
 - **G5 — Le même cheval deux fois dans un 7.** Retenu : un plan peut reprendre un cheval déjà déplacé plus tôt dans le même 7 ; deux pas de suite du même cheval n’en font qu’un. Touche R-10 ; scénario R-10.13.
@@ -517,7 +534,7 @@ Ces points ne sont plus à discuter : ils sont écrits plus haut sans réserve.
 **Précisions de la discussion et rappels (D-01 à D-04)**
 - D-01 : pour entrer dans sa maison, il faut le compte exact jusqu’à une case vide. Si le compte ne tombe pas juste, ou si la case est occupée, le cheval dépasse son entrée et repart pour un tour (R-13).
 - D-02 : quand le compte permet d’entrer pile sur une case vide, l’entrée est obligatoire (R-13 ; précisé par G16 le 2026-10-15).
-- D-03 : un cheval déjà rentré peut encore avancer dans sa maison, au compte exact et sans sauter un autre cheval (R-13).
+- D-03 : un cheval déjà rentré peut encore avancer dans sa maison, au compte exact (R-13). Depuis le 2026-10-15, il saute les chevaux devant lui pour tomber sur une case vide (G17) ; jusque-là, il ne pouvait pas sauter un autre cheval.
 - D-04 : sens horaire (R-05) ; entrée par le carré 16 (R-02, R-13) ; losange infranchissable seulement pour le cheval de sa couleur (R-12, Q14) ; le 4 peut reculer depuis la sortie mais jamais pour entrer dans la maison (R-08, Q2, Q18) ; le tour complet, obligatoire jusqu’au 2026-10-14, ne l’est plus (G14) ; le 7 dépasse ses propres chevaux (Q1) et se joue en entier ou pas du tout (R-10, Q19) ; échange de carte à chaque donne (R-04, Q5) ; le Valet n’échange pas deux chevaux du même joueur (R-09).
 
 **Décidé autrement que l’hypothèse de la recherche**

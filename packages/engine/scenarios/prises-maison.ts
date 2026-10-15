@@ -426,7 +426,8 @@ export const r13: Scenario[] = [
   {
     id: "R-13.10",
     rule: "R-13",
-    title: "Dans la maison, un cheval saute un autre cheval rentré, au compte exact sur une case vide",
+    title:
+      "Dans la maison, un cheval saute un autre cheval rentré, au compte exact sur une case vide",
     before: {
       pawns: { bleu: [{ h: 0 }, { h: 1 }, "S", "S"] },
       hands: { bleu: ["2S"] },
@@ -784,5 +785,97 @@ export const r13: Scenario[] = [
       ],
     },
     flags: ["G16"],
+  },
+  {
+    id: "R-13.28",
+    rule: "R-13",
+    title: "Le dernier cheval saute les trois chevaux rentrés et se range au fond",
+    before: {
+      pawns: { bleu: [{ p: 69 }, { h: 0 }, { h: 1 }, { h: 2 }] },
+      hands: { bleu: ["5S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "5S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ h: 3 }, { h: 0 }, { h: 1 }, { h: 2 }] } },
+    },
+    flags: ["G17"],
+  },
+  {
+    id: "R-13.29",
+    rule: "R-13",
+    title: "Avec le 7, un cheval rentré saute celui de devant, puis un autre cheval finit le 7",
+    before: {
+      pawns: { bleu: [{ h: 0 }, { h: 1 }, { p: 20 }, "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    action: {
+      t: "seven",
+      card: "7S",
+      plan: [
+        { pawn: "bleu0", steps: 2 },
+        { pawn: "bleu2", steps: 5 },
+      ],
+    },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ h: 2 }, { h: 1 }, { p: 25 }, "S"] } },
+      events: ["cardPlayed", "pawnMoved", "pawnMoved", "turn"],
+    },
+    flags: ["G17", "seven"],
+  },
+  {
+    id: "R-13.30",
+    rule: "R-13",
+    title: "Sauter ne suffit pas : si la case visée est occupée, le cheval repart pour un tour",
+    before: {
+      pawns: { bleu: [{ p: 67 }, { h: 0 }, { h: 2 }, "S"] },
+      hands: { bleu: ["6S"] },
+      turn: "bleu",
+    },
+    action: { t: "move", card: "6S", pawn: "bleu0" },
+    expect: {
+      legal: true,
+      after: { pawns: { bleu: [{ p: 73 }, { h: 0 }, { h: 2 }, "S"] } },
+      events: ["cardPlayed", "pawnMoved", "turn"],
+    },
+    flags: ["G17"],
+  },
+  {
+    id: "R-13.31",
+    rule: "R-13",
+    title: "Le 7 qui peut faire rentrer un cheval en sautant un cheval rentré le fait rentrer",
+    before: {
+      pawns: { bleu: [{ p: 68 }, { h: 0 }, { p: 10 }, "S"] },
+      hands: { bleu: ["7S"] },
+      turn: "bleu",
+    },
+    expect: {
+      legalInclude: [
+        {
+          t: "seven",
+          card: "7S",
+          plan: [
+            { pawn: "bleu0", steps: 4 },
+            { pawn: "bleu2", steps: 3 },
+          ],
+        },
+        { t: "seven", card: "7S", plan: [{ pawn: "bleu2", steps: 7 }] },
+      ],
+      legalExclude: [
+        { t: "seven", card: "7S", plan: [{ pawn: "bleu0", steps: 7 }] },
+        {
+          t: "seven",
+          card: "7S",
+          plan: [
+            { pawn: "bleu0", steps: 3 },
+            { pawn: "bleu2", steps: 4 },
+          ],
+        },
+      ],
+    },
+    flags: ["G16", "G17", "seven"],
   },
 ];

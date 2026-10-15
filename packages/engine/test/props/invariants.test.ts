@@ -3,7 +3,8 @@
 // pawns share a cell, legal actions apply, mutated actions are refused, the 7 generator and the 7 validator
 // agree, deals end, every home entry goes forward through the colour's carré 16 (G14), no knight of the
 // mover's team is eaten in passing (G15), G16 never changes whether a 7 is playable and every applied 7
-// brings home each knight it moved that it could bring home, and the same seed and actions give the
+// brings home each knight it moved that it could bring home, a knight whose count lands on an empty home
+// slot enters, jumping the knights already home (D-02, G17), and the same seed and actions give the
 // same JSON.
 
 import fc from "fast-check";
@@ -30,6 +31,7 @@ import {
   normalizePlan,
   PARTNER,
   type PawnId,
+  type Place,
   RING,
   type Rng,
   rankOf,
@@ -74,6 +76,12 @@ const seen = {
   dutyKnightsMoved: 0,
   /** G16: boards holding a 7 where a split could bring a knight home but no split kept the duty (the safety). */
   dutySafety: 0,
+  /** G17: entries that jumped a knight already home. */
+  entryJumps: 0,
+  /** G17: moves inside a home that jumped a knight already home. */
+  homeJumps: 0,
+  /** D-02 with G17: forward ring moves that crossed or left their carré 16 (none may skip an open slot). */
+  entryChances: 0,
 };
 
 function check(condition: boolean, message: string): void {
@@ -158,6 +166,51 @@ function checkEntries(before: GameState, events: readonly GameEvent[]): void {
 }
 
 const colorOf = (id: PawnId): Color => id.slice(0, -1) as Color;
+
+/**
+ * D-02 with G17, event by event, the home slots followed through the action: a forward move of a ring
+ * knight that stands on or crosses its carré 16 with 1 to 4 steps left, the target home slot being empty,
+ * enters (the knights already home are jumped; G14 opens the carré 16 on every lap). Counts in seen the
+ * entries and the moves inside a home that jumped a knight already home.
+ */
+function checkHomeJumps(before: GameState, events: readonly GameEvent[]): void {
+  const slots = new Map<Color, boolean[]>(COLORS.map((c) => [c, [false, false, false, false]]));
+  for (const id of ALL_PAWNS) {
+    const pawn = before.pawns[id];
+    if (pawn.zone === "home") (slots.get(colorOf(id)) as boolean[])[pawn.slot] = true;
+  }
+  const jumps = (home: boolean[], path: readonly Place[]): boolean =>
+    path.slice(0, -1).some((place) => place.z === "home" && home[place.slot] === true);
+  for (const event of events) {
+    if (event.t === "pawnMoved") {
+      const color = colorOf(event.pawn);
+      const home = slots.get(color) as boolean[];
+      if (event.from.z === "home") {
+        const last = event.path[event.path.length - 1];
+        check(last?.z === "home", `${event.pawn} left its home`);
+        if (jumps(home, event.path)) seen.homeJumps++;
+        home[event.from.slot] = false;
+        if (last?.z === "home") home[last.slot] = true;
+        continue;
+      }
+      if (event.from.z !== "ring" || event.dir !== 1) continue;
+      const cells = [event.from, ...event.path.slice(0, -1)];
+      cells.forEach((place, k) => {
+        if (place.z !== "ring" || place.cell !== ENTRY[color]) return;
+        seen.entryChances++;
+        const r = event.path.length - k;
+        check(
+          r < 1 || r > 4 || home[r - 1] === true,
+          `${event.pawn} passed its home while ${r} steps led to the empty slot ${r - 1}`,
+        );
+      });
+    } else if (event.t === "pawnEnteredHome") {
+      const home = slots.get(colorOf(event.pawn)) as boolean[];
+      if (jumps(home, event.path)) seen.entryJumps++;
+      home[event.slot] = true;
+    }
+  }
+}
 
 /**
  * G15: a pawnCaptured whose victim is of the capturer's team happens only on the last cell of the
@@ -446,6 +499,7 @@ function playChecked(
     checkCards(state);
     checkPawns(state);
     checkEntries(before, result.events);
+    checkHomeJumps(before, result.events);
     checkTeamCaptures(before, state, action, result.events);
     checkDutyKept(duty, action, state);
 
@@ -504,6 +558,10 @@ describe("engine invariants over 200 random games driven by the level-1 bot", ()
     expect(seen.dutyKnightsMoved).toBeGreaterThan(0);
     // seed 20261015: 820 sevens with a duty, 616 of them moved a duty knight, 4 boards used the safety
     expect(seen.dutySafety).toBeGreaterThan(0);
+    // seed 20261015: 5451 forward moves past a carré 16, 126 entries and 71 home moves jumped a knight
+    expect(seen.entryChances).toBeGreaterThan(GAMES);
+    expect(seen.entryJumps).toBeGreaterThan(0);
+    expect(seen.homeJumps).toBeGreaterThan(0);
   });
 });
 
