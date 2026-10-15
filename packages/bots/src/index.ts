@@ -1,4 +1,13 @@
 export {
+  distanceToEntry,
+  evaluate,
+  handBonus,
+  knightValue,
+  type ScoredCandidate,
+  scoreCandidates,
+} from "./evaluate.ts";
+export { GIVE_OWN_LOSS, type GiveScore, giveScores } from "./exchange.ts";
+export {
   BOT_LEVELS,
   type BotLevel,
   DEFAULT_BOT_LEVEL,

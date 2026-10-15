@@ -3,18 +3,21 @@
 // randomLegal. A GameState, which carries every hand, is a type error (BOT-04, D-10): the bot decides
 // from what a human in its seat would know.
 // - level 1: randomLegal, unchanged (BOT-02);
-// - levels 2 to 5: every distinct candidate (candidates.ts) is scored with the team evaluation, then
-//   picked through the noise of the level (levels.ts): an epsilon chance of a uniform pick, otherwise a
-//   softmax of temperature T over the scores (T 0: the best score, ties to the first);
-// - exchange phase: the give of randomLegal at every level (plan 03-02 adds the choice of D-09).
+// - levels 2 to 5: every distinct candidate (candidates.ts) is scored with the team evaluation and the
+//   cards kept (evaluate.ts scoreOf), then picked through the noise of the level (levels.ts): an epsilon
+//   chance of a uniform pick, otherwise a softmax of temperature T over the scores (T 0: the best
+//   score, ties to the first);
+// - exchange phase: level 1 gives like randomLegal; levels 2 to 5 score each card for the partner
+//   (exchange.ts giveScores, D-09) and pick through the same noise, level 5 taking the best.
 // Work is counted in units (Budget), never in time, so the same inputs give the same move on every
 // machine and inside the Durable Object of phase 2. Levels 1 to 5 finish in their first step here;
 // plan 03-04 makes level 5 anytime.
 // Pure, no I/O, erasable syntax only.
 
-import { type Action, type Color, next, type PlayerView, type Rng, teamOf } from "@toc/engine";
+import { type Action, type Color, next, type PlayerView, type Rng } from "@toc/engine";
 import { candidatesFor } from "./candidates.ts";
-import { evaluate } from "./evaluate.ts";
+import { scoreOf } from "./evaluate.ts";
+import { giveScores } from "./exchange.ts";
 import { type BotLevel, LEVEL_PARAMS } from "./levels.ts";
 import { randomLegal } from "./randomLegal.ts";
 
@@ -84,10 +87,44 @@ function pickIndex(scores: readonly number[], level: BotLevel, rng: Rng): [numbe
   return [weights.length - 1, r];
 }
 
+/** The gap between the two best scores (0 with fewer than two). */
+function gapOf(scores: readonly number[]): number {
+  const sorted = [...scores].sort((a, b) => b - a);
+  return sorted.length > 1 ? (sorted[0] as number) - (sorted[1] as number) : 0;
+}
+
+/** The exchange card of levels 2 to 5: giveScores through the noise of the level. */
+function decideGive(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thought {
+  const gives = giveScores(view, seat);
+  const only = gives[0];
+  if (only === undefined) throw new Error(`chooseAction: ${seat} has no card to give`);
+  const units = gives.length;
+  if (gives.length === 1) {
+    return {
+      action: { t: "give", card: only.card },
+      rng: [...rng],
+      difficulty: 0,
+      candidates: 1,
+      units,
+    };
+  }
+  const scores = gives.map((give) => give.score);
+  const [index, after] = pickIndex(scores, level, rng);
+  const chosen = gives[index] ?? only;
+  return {
+    action: { t: "give", card: chosen.card },
+    rng: after,
+    difficulty: difficultyOf(gives.length, gapOf(scores)),
+    candidates: gives.length,
+    units,
+  };
+}
+
 /** The decision of a level from 1 to 5, computed in one go. */
 function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thought {
+  if (view.phase === "exchange" && level !== 1) return decideGive(view, seat, level, rng);
   if (view.phase !== "play") {
-    // The exchange (and a won game, where randomLegal reports there is nothing to play).
+    // Level 1's exchange (and a won game, where randomLegal reports there is nothing to play).
     const [action, after] = randomLegal(view, seat, rng);
     const options = new Set(view.hand).size;
     return {
@@ -100,10 +137,8 @@ function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thoug
   }
 
   const candidates = candidatesFor(view, seat);
-  const scores = candidates.map((c) => evaluate(c.pawns, view.rules, teamOf(seat)));
-  const sorted = [...scores].sort((a, b) => b - a);
-  const gap = sorted.length > 1 ? (sorted[0] as number) - (sorted[1] as number) : 0;
-  const difficulty = difficultyOf(candidates.length, gap);
+  const scores = candidates.map((c) => scoreOf(view, seat, c));
+  const difficulty = difficultyOf(candidates.length, gapOf(scores));
   const units = candidates.length;
 
   if (level === 1) {
