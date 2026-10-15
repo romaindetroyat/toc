@@ -17,7 +17,8 @@
 //
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
 // G14 and G15 record the changes Romain made on 2026-10-14 during the phase acceptance test; later
-// changes continue the numbering (G16, 2026-10-15, his third acceptance test).
+// changes continue the numbering (G16, 2026-10-15, his third acceptance test; G17, the same day, his
+// fourth).
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
 
 /**
@@ -28,8 +29,9 @@
 export const SWAP_PROGRESS: "position" | "keep" = "position";
 
 /**
- * G2 — Home entry blocked by a pawn already home (RULES.md R-13; validated 2026-10-13).
- * 'continue': the pawn does not jump it and goes on for another lap, as if the square were occupied (scenario R-13.7).
+ * G2 — Home entry blocked by a pawn already home (RULES.md R-13; validated 2026-10-13, replaced by G17 on
+ * 2026-10-15). Read only when HOME_JUMP_ALLOWED is false.
+ * 'continue': the pawn does not jump it and goes on for another lap, as if the square were occupied.
  * 'illegal': the move is forbidden.
  */
 export const HOME_JUMP_BLOCKED: "continue" | "illegal" = "continue";
@@ -138,6 +140,19 @@ export const SEVEN_EATS_PASSED_PARTNER: boolean = false;
 export const KNIGHT_MUST_ENTER: boolean = true;
 
 /**
+ * G17 — Knights already home are jumped (RULES.md R-13, « Décisions de Romain »; decided by Romain on
+ * 2026-10-15, recette 4, UAT test 44; replaces G2 and the « sans sauter un autre cheval » of D-03). His
+ * words: « quand un cheval entre dans son écurie, il peut doubler les autres chevaux et arriver sur une case
+ * vide », and, for a knight already home moving deeper, « Oui, aussi (Recommandé) » (« Même règle partout
+ * dans l'arrivée : on peut sauter les chevaux déjà rentrés, tant qu'on tombe au compte exact sur une case
+ * vide. »).
+ * true: entering from the carré 16 or moving inside the home, a knight jumps the knights already home; only
+ * the target slot must be empty (exact count, D-01; entry still mandatory, D-02).
+ * false: the rule of 2026-10-13, G2 (HOME_JUMP_BLOCKED) and D-03 « sans sauter » (illegal inside the home).
+ */
+export const HOME_JUMP_ALLOWED: boolean = true;
+
+/**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
  * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
@@ -181,6 +196,7 @@ export type RuleSet = {
   ENTRY_WITHOUT_FULL_LAP: boolean;
   SEVEN_EATS_PASSED_PARTNER: boolean;
   KNIGHT_MUST_ENTER: boolean;
+  HOME_JUMP_ALLOWED: boolean;
   EMPTY_HAND_SKIPPED: true;
   EXCHANGE_KEEPS_HAND_SIZE: true;
   PAUSE_IN_ALL_PHASES: true;
@@ -204,6 +220,7 @@ export const DEFAULT_RULES: Readonly<RuleSet> = {
   ENTRY_WITHOUT_FULL_LAP,
   SEVEN_EATS_PASSED_PARTNER,
   KNIGHT_MUST_ENTER,
+  HOME_JUMP_ALLOWED,
   EMPTY_HAND_SKIPPED,
   EXCHANGE_KEEPS_HAND_SIZE,
   PAUSE_IN_ALL_PHASES,

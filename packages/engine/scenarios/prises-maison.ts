@@ -4,7 +4,8 @@
 // Cell arithmetic: cell = (EXIT[color] + progress) mod 72, with EXIT bleu 0, jaune 18, rouge 36, vert 54.
 // Home entry (D-01 to D-03, G14): the entry square is the cell EXIT - 2 (the carré 16), reached at
 // progress 70 on the first lap or at -2 after a backward 4 (G14: the full lap is not required); `r`
-// steps beyond it (1 to 4) land in home slot r - 1, if that slot and every slot before it are empty.
+// steps beyond it (1 to 4) land in home slot r - 1 if that slot is empty, jumping the knights already
+// home on the slots before it (G17, 2026-10-15; before it, G2 asked every slot before it to be empty).
 
 import type { Scenario } from "../src/types.ts";
 
@@ -376,7 +377,7 @@ export const r13: Scenario[] = [
   {
     id: "R-13.7",
     rule: "R-13",
-    title: "Un pion déjà rentré ne se saute pas : le pion repart pour un tour",
+    title: "Le cheval saute un cheval déjà rentré et entre au compte exact sur une case vide",
     before: {
       pawns: { bleu: [{ p: 66 }, { h: 0 }, "S", "S"] },
       hands: { bleu: ["8S"] },
@@ -385,10 +386,10 @@ export const r13: Scenario[] = [
     action: { t: "move", card: "8S", pawn: "bleu0" },
     expect: {
       legal: true,
-      after: { pawns: { bleu: [{ p: 74 }, { h: 0 }, "S", "S"] } },
-      events: ["cardPlayed", "pawnMoved", "turn"],
+      after: { pawns: { bleu: [{ h: 3 }, { h: 0 }, "S", "S"] } },
+      events: ["cardPlayed", "pawnEnteredHome", "turn"],
     },
-    flags: ["G2"],
+    flags: ["G17"],
   },
   {
     id: "R-13.8",
@@ -425,16 +426,19 @@ export const r13: Scenario[] = [
   {
     id: "R-13.10",
     rule: "R-13",
-    title: "Dans la maison, un pion ne saute pas un autre pion rentré",
+    title: "Dans la maison, un cheval saute un autre cheval rentré, au compte exact sur une case vide",
     before: {
       pawns: { bleu: [{ h: 0 }, { h: 1 }, "S", "S"] },
       hands: { bleu: ["2S"] },
       turn: "bleu",
     },
+    action: { t: "move", card: "2S", pawn: "bleu0" },
     expect: {
-      legalInclude: [{ t: "move", card: "2S", pawn: "bleu1" }],
-      legalExclude: [{ t: "move", card: "2S", pawn: "bleu0" }],
+      legal: true,
+      after: { pawns: { bleu: [{ h: 2 }, { h: 1 }, "S", "S"] } },
+      events: ["cardPlayed", "pawnMoved", "turn"],
     },
+    flags: ["G17"],
   },
   {
     id: "R-13.11",
@@ -585,7 +589,7 @@ export const r13: Scenario[] = [
   {
     id: "R-13.19",
     rule: "R-13",
-    title: "Après un recul, un pion déjà rentré ne se saute pas",
+    title: "Après un recul, le cheval saute un cheval déjà rentré et entre au compte exact",
     before: {
       pawns: { bleu: [{ p: -4 }, { h: 0 }, "S", "S"] },
       hands: { bleu: ["5S"] },
@@ -594,9 +598,10 @@ export const r13: Scenario[] = [
     action: { t: "move", card: "5S", pawn: "bleu0" },
     expect: {
       legal: true,
-      after: { pawns: { bleu: [{ p: 1 }, { h: 0 }, "S", "S"] } },
+      after: { pawns: { bleu: [{ h: 2 }, { h: 0 }, "S", "S"] } },
+      events: ["cardPlayed", "pawnEnteredHome", "turn"],
     },
-    flags: ["G2", "G14"],
+    flags: ["G14", "G17"],
   },
   {
     id: "R-13.20",

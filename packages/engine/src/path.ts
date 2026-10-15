@@ -1,7 +1,8 @@
 // The single movement path (RESEARCH Pattern 1): walk() is used by legality, previews, captures,
 // the 7 (plan 01-13, seven.ts) and animation. No second movement code path exists for the 4, the Valet or the 7.
-// Rules read: RULES.md R-02, R-08, R-10, R-12, R-13 and the choices G2, G3, G4, G14, G15 through
-// `board.rules` (G15: a capture in passing eats only opponents, the mover's team is passed).
+// Rules read: RULES.md R-02, R-08, R-10, R-12, R-13 and the choices G2, G3, G4, G14, G15, G17 through
+// `board.rules` (G15: a capture in passing eats only opponents, the mover's team is passed; G17: the
+// knights already home are jumped, G2 is read only when G17 is off).
 // Pure, no I/O, erasable syntax only.
 
 import type { RuleSet } from "./rules.ts";
@@ -209,10 +210,12 @@ function entryOpensAt(color: Color, q: number, rules: RuleSet): boolean {
 
 /**
  * Moves `pawnId` by `steps` (forward with dir 1, backward with dir -1: only the 4 goes backward).
- * Home entry (D-01 to D-03, G14): whenever the pawn reaches or crosses its carré 16 moving forward,
+ * Home entry (D-01 to D-03, G14, G17): whenever the pawn reaches or crosses its carré 16 moving forward,
  * full lap done or not, it enters only if the count ends exactly on an empty home slot, and then it
- * must; otherwise it goes on round the ring. A home pawn advances by the exact count without jumping.
- * Backward moves stay on the ring and never enter the home (D-04).
+ * must; otherwise it goes on round the ring. A home pawn advances by the exact count onto an empty slot.
+ * Under G17 (HOME_JUMP_ALLOWED) both jump the knights already home; without it, G2 applies on entry and a
+ * home pawn may not jump (D-03 as of 2026-10-13). Backward moves stay on the ring and never enter the
+ * home (D-04).
  */
 export function walk(
   board: Board,
@@ -230,9 +233,12 @@ export function walk(
     if (dir !== 1) return { ok: false, reason: "no-entry" };
     if (pawn.slot + steps > HOME_SLOTS - 1) return { ok: false, reason: "home-overflow" };
     const occupied = homeOccupied(board, color);
+    const target = pawn.slot + steps;
     const path: Place[] = [];
-    for (let slot = pawn.slot + 1; slot <= pawn.slot + steps; slot++) {
-      if (occupied[slot]) return { ok: false, reason: "home-blocked" };
+    for (let slot = pawn.slot + 1; slot <= target; slot++) {
+      // G17: a knight already home is jumped, only the target slot must be empty.
+      const jumped = slot < target && board.rules.HOME_JUMP_ALLOWED;
+      if (occupied[slot] && !jumped) return { ok: false, reason: "home-blocked" };
       path.push(homePlace(color, slot));
     }
     return {
@@ -255,7 +261,8 @@ export function walk(
       if (r < 1 || r > HOME_SLOTS) break;
       const occupied = homeOccupied(board, color);
       if (occupied[r - 1]) break; // occupied target: the pawn goes round again (D-01)
-      if (occupied.slice(0, r - 1).some(Boolean)) {
+      // G17: the knights already home are jumped; without it, G2 decides.
+      if (!board.rules.HOME_JUMP_ALLOWED && occupied.slice(0, r - 1).some(Boolean)) {
         if (board.rules.HOME_JUMP_BLOCKED === "illegal")
           return { ok: false, reason: "home-blocked" };
         break; // G2 continue: the pawn does not jump the home pawn and goes round again
