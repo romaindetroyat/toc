@@ -90,6 +90,20 @@ export const SOUNDS: Record<SoundId, SoundDef> = {
 
 export const SOUND_IDS = Object.keys(SOUNDS) as SoundId[];
 
+/**
+ * The sounds that are heard, in the game and on #/sons: the one switch of what plays. Romain, on
+ * 2026-10-15: « laisse les sons de côté sauf les sabots des chevaux », then « Oui, que les sabots ».
+ * So only the hooves sound for now: no neigh, no card sound. The other sounds keep their recipes,
+ * their catalogue entries and their cue plan (game/cues.ts): adding an id back here brings that
+ * sound back everywhere, with nothing else to change.
+ */
+export const ENABLED_SOUNDS: ReadonlySet<SoundId> = new Set<SoundId>(["sabot"]);
+
+/** True when the sound is heard (ENABLED_SOUNDS). */
+export function isSoundEnabled(id: SoundId): boolean {
+  return ENABLED_SOUNDS.has(id);
+}
+
 /** One version of a sound, or undefined when that sound has no such version. */
 export function variantOf(
   id: SoundId,

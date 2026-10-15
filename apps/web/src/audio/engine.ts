@@ -14,6 +14,7 @@ import {
   type KeepAliveDocument,
 } from "./keepAlive.ts";
 import {
+  ENABLED_SOUNDS,
   SOUND_IDS,
   SOUNDS,
   type SoundDef,
@@ -104,6 +105,11 @@ export type EngineOptions = {
   choices?: Choices;
   /** Told of every buffer started (debug builds publish it to the e2e specs). */
   onPlay?: (played: PlayedSound) => void;
+  /**
+   * The sounds that may be heard (default: ENABLED_SOUNDS, only the hooves since 2026-10-15). A sound
+   * outside it is never rendered, prepared or played; its choice is still kept.
+   */
+  enabled?: ReadonlySet<SoundId>;
 };
 
 export interface AudioEngine {
@@ -146,6 +152,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   const { backend, render } = options;
   const random = options.random ?? Math.random;
   const catalogue = options.catalogue ?? SOUNDS;
+  const enabled = options.enabled ?? ENABLED_SOUNDS;
   const decode: Decoder =
     options.decode ??
     (async (url) => {
@@ -308,7 +315,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   /** Starts the next take of one prepared version. */
   function playVariant(id: SoundId, variant: VariantKey, at?: number, opts: CueOptions = {}): void {
     // A suspended or interrupted context would queue the sound and burst it out on resume.
-    if (!unlocked || backend.state() !== "running") return;
+    if (!unlocked || backend.state() !== "running" || !enabled.has(id)) return;
     const list = takes.get(slot(id, variant));
     if (!list || list.length === 0) return;
     const round = rounds.get(slot(id, variant)) ?? 0;
@@ -328,6 +335,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   }
 
   function cue(id: SoundId, at?: number, opts: CueOptions = {}): void {
+    if (!enabled.has(id)) return; // silenced (ENABLED_SOUNDS)
     const variant = active.get(id);
     if (variant !== undefined) playVariant(id, variant, at, opts);
   }
@@ -350,7 +358,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
       for (const offset of offsets) cue("sabot", t0 + offset / 1000);
       return;
     }
-    if (!unlocked) return;
+    if (!unlocked || !enabled.has("sabot")) return;
     const run = (start: number) => {
       for (const offset of offsets) playVariant("sabot", variant, start + offset / 1000);
     };
@@ -359,7 +367,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   }
 
   function play(id: SoundId, variant: VariantKey, at?: number): void {
-    if (!unlocked) return;
+    if (!unlocked || !enabled.has(id)) return;
     if (stateOf(id, variant) === "ready") playVariant(id, variant, at);
     else
       void prepare(id, variant).then(() =>
@@ -368,7 +376,10 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
   }
 
   async function renderAll(): Promise<void> {
-    await Promise.all(SOUND_IDS.map((id) => activate(id, chosen[id])));
+    // Only the sounds that may be heard are rendered: a silenced one costs nothing.
+    await Promise.all(
+      SOUND_IDS.filter((id) => enabled.has(id)).map((id) => activate(id, chosen[id])),
+    );
     rendered = true;
     updateStatus();
     resolveReady();
@@ -381,6 +392,7 @@ export function createAudioEngine(options: EngineOptions): AudioEngine {
       if (chosen[id] === variant) continue;
       chosen[id] = variant;
       if (!unlocked) continue; // the first gesture prepares the chosen versions
+      if (!enabled.has(id)) continue; // silenced: the choice is kept, nothing is prepared
       if (stateOf(id, variant) === "ready") active.set(id, variant);
       else void activate(id, variant);
     }
@@ -685,6 +697,8 @@ export function scheduleClops(offsetsMs: number[], t0: number, variant?: Variant
 
 /** Play the chosen version of one sound now (or at audio-clock time `at`), with jitter. Fire-and-forget. */
 export function cue(id: SoundId, at?: number, opts?: CueOptions): void {
+  // A silenced sound (ENABLED_SOUNDS) is neither asked for nor played: nothing reaches the log either.
+  if (!ENABLED_SOUNDS.has(id)) return;
   if (DEBUG && window.__tocDebug) {
     // Debug builds: the e2e specs read which sounds were asked for, in which version, and when.
     const log = window.__tocDebug.audio.cues ?? [];
