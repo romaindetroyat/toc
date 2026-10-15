@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Les cavaliers en fausse 3D, aux 4 couleurs, s'animent à chaque action : sortie de l'écurie, déplacement case par case, prise, retour à l'écurie, entrée dans la maison, échange au Valet. La durée du déplacement suit la distance, et les bruits de sabots suivent la même cadence.
   5. Des hennissements et des sons de cartes accompagnent les actions, y compris sur iPhone. La licence de chaque fichier est tracée. Le joueur peut couper le son et réduire les animations, et la partie reste entièrement jouable sans son.
 
-**Plans:** 41/41 plans executed (01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
+**Plans:** 41/54 plans executed (01-42 to 01-54: gap closure after Romain's re-test of 2026-10-15: rule G16 for the 7, riders turned to their camp, one-knight auto-select, slower deal, full-height board on the phone, silent-mode sound, end plank, sound test page with choices; 01-25 to 01-28: gap closure after Romain's UAT of 2026-10-14; 01-29 to 01-31: board C+, rejected by Romain; 01-32 to 01-41: board galet, then « paysage obligatoire »: the landscape galet only, « Compacter l'écran » on the phone held sideways, « Tourne ton téléphone », UAT tests 3 and 4)
 
 Plans:
 **Wave 1**
@@ -144,6 +144,45 @@ Plans:
 
 **Wave 32** *(gap closure, UAT tests 3 and 4; blocked on Wave 31 completion)*
 - [x] 01-41-PLAN.md — L’ancienne géométrie quitte packages/board, toutes les vérifications, puis le re-test de Romain
+
+**Wave 33** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 32 completion)*
+- [ ] 01-42-PLAN.md — Règle G16, la carte qui peut faire rentrer un cheval le fait rentrer (moteur)
+
+**Wave 34** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 33 completion)*
+- [ ] 01-43-PLAN.md — Règle G16 dans RULES.md, ses scénarios et leurs images
+
+**Wave 35** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 34 completion)*
+- [ ] 01-44-PLAN.md — Les cavaliers à l'encre du galet, sabots vers leur camp
+
+**Wave 36** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 35 completion)*
+- [ ] 01-45-PLAN.md — Un seul cheval pour la carte : directement l'aperçu et « Jouer »
+
+**Wave 37** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 36 completion)*
+- [ ] 01-46-PLAN.md — La donne un peu moins rapide
+
+**Wave 38** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 37 completion)*
+- [ ] 01-47-PLAN.md — Le plateau sur toute la hauteur du téléphone (1/2) : le cadre et chaque état du tour
+
+**Wave 39** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 38 completion)*
+- [ ] 01-48-PLAN.md — Le plateau sur toute la hauteur du téléphone (2/2) : chaque état prouvé, toute la suite, le contrat
+
+**Wave 40** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 39 completion)*
+- [ ] 01-49-PLAN.md — Le son de l'iPhone en mode silencieux
+
+**Wave 41** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 40 completion)*
+- [ ] 01-50-PLAN.md — La planche de fin de partie, dans le bois du galet
+
+**Wave 42** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 41 completion)*
+- [ ] 01-51-PLAN.md — La page d'essai des sons à choix, et les sabots en quatre versions
+
+**Wave 43** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 42 completion)*
+- [ ] 01-52-PLAN.md — Les hennissements en trois ou quatre versions
+
+**Wave 44** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 43 completion)*
+- [ ] 01-53-PLAN.md — Les sons de cartes en trois ou quatre versions, et les sons de fin de partie
+
+**Wave 45** *(gap closure, Romain's re-test of 2026-10-15; blocked on Wave 44 completion)*
+- [ ] 01-54-PLAN.md — Toutes les vérifications après la recette 3, puis la recette 4 de Romain
 
 **UI hint**: yes
 
