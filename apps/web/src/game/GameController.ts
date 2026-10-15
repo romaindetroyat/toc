@@ -1,11 +1,16 @@
 // The local game session: a thin shell around the engine that the Phase 2 Durable Object replaces.
 // It owns the full GameState, applies the human's actions (validated by the engine), plays the three
-// computer players with a human-like think delay, and hands every engine event to the Director.
+// computer players at a natural pace, and hands every engine event to the Director.
 //
 // Nothing is ever played for the human: his give, his play and his dead-hand discard happen only
 // through submit() (D-19, D-20). Each bot plays at the level of its seat (phase 3, BOT-01) through the
 // single bot entry point chooseAction, which is given viewFor(state, bot) only (BOT-04), and the deck
 // and bot seeds come from the browser's secure random source (T-01-21, T-01-22).
+//
+// The pace (D-11, D-13, pace.ts): a bot decides first, then waits only what is left of the think time
+// its decision deserves, so the search's own time is inside the think and never added to it. A decision
+// is played only if the same bot is still due on the same state after every wait; otherwise it is
+// dropped and the bot thinks again (the human's give during the exchange, 03-RESEARCH Pitfall 4).
 
 import { type BotLevel, chooseAction, DEFAULT_BOT_LEVEL } from "@toc/bots";
 import {
@@ -28,8 +33,9 @@ import {
   viewFor,
 } from "@toc/engine";
 import { BOT_NAMES } from "./botNames.ts";
+import { paceFor } from "./pace.ts";
 
-/** `normal` and `fast` pace the bots (D-18); `test` has no think delay (debug builds and tests). */
+/** `normal` and `fast` pace the bots (D-11, D-13); `test` has no think time (debug builds and tests). */
 export type Speed = "normal" | "fast" | "test";
 
 /** What the controller needs from the Director. */
@@ -51,6 +57,8 @@ export type CreateGameOptions = {
   scenario?: Scenario["before"];
   /** The level of each computer seat; a seat without one plays at Galopeur (3). */
   levels?: Partial<Record<Color, BotLevel>>;
+  /** The clock of the think times, in ms. Default: performance.now (tests inject their fake clock). */
+  now?: () => number;
   director: GameDirector;
 };
 
@@ -114,23 +122,12 @@ export function humanSeat(requested: Color, scenario?: Scenario["before"]): Colo
     : (COLORS.find((c) => c === scenario.turn) ?? requested);
 }
 
-/** Think time in ms for one bot step (D-18). `u` is uniform in [0, 1). */
-export function thinkDelay(speed: Speed, u: number): number {
-  switch (speed) {
-    case "normal":
-      return 700 + u * 600;
-    case "fast":
-      return 200 + u * 100;
-    case "test":
-      return 0;
-  }
-}
-
 export function createGame(options: CreateGameOptions): GameController {
   const { director, scenario } = options;
   const human = humanSeat(options.human, scenario);
   const seed = options.seed ?? randomSeed();
   const levels: Partial<Record<Color, BotLevel>> = { ...options.levels };
+  const now = options.now ?? (() => performance.now());
   let botRng: Rng = options.botSeed ?? randomSeed();
   const speedOf: () => Speed =
     typeof options.speed === "function"
@@ -213,28 +210,32 @@ export function createGame(options: CreateGameOptions): GameController {
     try {
       while (!disposed) {
         await director.idle();
-        if (disposed || nextBot() === null) break;
-        let u: number;
-        [u, botRng] = next(botRng);
-        setThinking(nextBot());
-        await sleep(thinkDelay(speedOf(), u));
-        wake = null;
-        // The screen may have been held meanwhile (the invitation to turn it, plan 01-38): the bot
-        // plays only once the director is idle again, never behind the invitation.
-        await director.idle();
-        // The state may have moved while the bot was thinking (the human's give in the exchange).
+        if (disposed) break;
         const bot = nextBot();
-        if (disposed || bot === null) {
-          setThinking(null);
-          continue;
-        }
+        if (bot === null) break;
+        const seen = state;
+        setThinking(bot);
+        const start = now();
         const thought = chooseAction(
           viewFor(state, bot),
           bot,
           levels[bot] ?? DEFAULT_BOT_LEVEL,
           botRng,
         );
+        // The rng moves on even if this decision is dropped below: a seeded game stays reproducible.
         botRng = thought.rng;
+        let u: number;
+        [u, botRng] = next(botRng);
+        // The speed is read once the decision is made, so « Avance rapide » acts on this very step.
+        await sleep(Math.max(0, paceFor(thought, speedOf(), u) - (now() - start)));
+        wake = null;
+        // The screen may have been held meanwhile (the invitation to turn it, plan 01-38): the bot
+        // plays only once the director is idle again, never behind the invitation.
+        await director.idle();
+        if (disposed) break;
+        // The state may have moved while the bot was thinking (the human's give in the exchange): the
+        // decision was made on another state, so it is dropped and the due bot thinks again.
+        if (state !== seen || nextBot() !== bot) continue;
         setThinking(null);
         play(bot, thought.action);
       }
