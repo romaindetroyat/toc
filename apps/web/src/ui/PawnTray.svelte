@@ -138,8 +138,12 @@
     gap: 0;
   }
 
+  .alone :global(.key-hint.corner) {
+    right: 2px;
+  }
+
   .alone .other {
-    width: var(--strip-button, 56px);
+    width: var(--strip-button, 58px);
     min-width: 0;
     margin-left: 0;
     padding: 2px 0;

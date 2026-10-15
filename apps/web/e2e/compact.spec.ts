@@ -105,7 +105,7 @@ function stripItems(page: Page): Promise<Item[]> {
           "[data-info-bar], [data-hand] [data-card], [data-tray-option], [data-seven-chips] [data-step]",
         );
         const right = node.matches(
-          "[data-fast], [data-action-buttons] button, [data-seven-buttons] button",
+          "[data-settings-slot] button, [data-fast], [data-action-buttons] button, [data-seven-buttons] button",
         );
         return {
           name:

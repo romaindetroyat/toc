@@ -56,6 +56,7 @@
   import InfoBar from "../ui/InfoBar.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
+  import SettingsButton from "../ui/SettingsButton.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
@@ -709,6 +710,25 @@
   {/if}
 {/snippet}
 
+{#snippet seven(part: "all" | "line" | "chips" | "buttons")}
+  {#if flow.kind === "sevenBuilding"}
+    <SevenPanel
+      seven={flow}
+      {bar}
+      {compact}
+      {part}
+      tray={ui.kind === "tray" ? ui : null}
+      {missed}
+      onpickSteps={(steps) => send({ t: "pickSteps", steps })}
+      onundo={() => send({ t: "undoLast" })}
+      oncancelAll={() => send({ t: "cancelAll" })}
+      onconfirm={() => send({ t: "confirm" })}
+      ontrayPick={pickTrayOption}
+      ontrayClose={() => send({ t: "closeTray" })}
+    />
+  {/if}
+{/snippet}
+
 {#snippet hand()}
   {#if session !== undefined && view !== undefined}
     <HandFan
@@ -750,14 +770,17 @@
             {render}
             human={session.human}
             names={session.names}
-            form={bar ? "column" : compact ? "side" : "row"}
+            form={bar ? "column" : compact ? "pill" : "row"}
             onabandon={abandon}
           />
         </div>
 
         {#if compact}
-          <!-- The top of the right strip: « Avance rapide » while the computer plays. -->
+          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays. -->
           <div class="tools">
+            <div class="gear" data-settings-slot>
+              <SettingsButton onabandon={abandon} />
+            </div>
             {@render zone("fast")}
           </div>
         {/if}
@@ -834,22 +857,29 @@
           <DealBanner {render} names={session.names} />
         </div>
 
-        {#if flow.kind === "sevenBuilding"}
+        {#if flow.kind === "sevenBuilding" && compact}
+          <!-- The 7 splitter in the compact mode: its line in the prompt row, the step chips in the
+               left strip, its buttons in the right one. The region takes no box of its own. -->
+          <section
+            class="seven"
+            data-seven-panel
+            data-selected={flow.selected ?? ""}
+            aria-label={copy.seven.title}
+          >
+            <div class="prompt-row">
+              {@render seven("line")}
+            </div>
+            <div class="chips">
+              {@render seven("chips")}
+            </div>
+            <div class="actions">
+              {@render seven("buttons")}
+            </div>
+          </section>
+        {:else if flow.kind === "sevenBuilding"}
           <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
           <div class="seven">
-            <SevenPanel
-              seven={flow}
-              {bar}
-              {compact}
-              tray={ui.kind === "tray" ? ui : null}
-              {missed}
-              onpickSteps={(steps) => send({ t: "pickSteps", steps })}
-              onundo={() => send({ t: "undoLast" })}
-              oncancelAll={() => send({ t: "cancelAll" })}
-              onconfirm={() => send({ t: "confirm" })}
-              ontrayPick={pickTrayOption}
-              ontrayClose={() => send({ t: "closeTray" })}
-            />
+            {@render seven("all")}
           </div>
         {:else if compact}
           <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
@@ -992,18 +1022,20 @@
    * « compact », every other landscape screen (a phone held sideways, a small window; Romain's
    * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: a strip of at least
    * --strip at each side and the board between them, so the board is centred and the strips take
-   * what is left, max(--strip, (100vw − insets − board) / 2) each. Two rows: the --prompt-row over
-   * the board, then the board's own row; the strips span both. No head room of its own: the prompt
-   * row is that room, a lifted top-row knight's head may rise into it. In the left strip the info at
-   * the top and the hand (or the chips of « Lequel ? » or of the 7) at the bottom; in the right one
-   * « Avance rapide » at the top and the state's buttons at the bottom. Nothing has a margin or a
+   * what is left, max(--strip, (100vw − insets − board) / 2) each. In the middle column the
+   * --prompt-row over the board, the two kept together and centred in the height (a screen limited
+   * by its width leaves the same room above and below them); the strips span the whole height. No
+   * head room of its own: the prompt row is that room, a lifted top-row knight's head may rise into
+   * it. In the left strip the info pill at the top and the hand (or the chips of « Lequel ? » or of
+   * the 7) at the bottom; in the right one « Réglages » and « Avance rapide » at the top and the
+   * state's buttons at the bottom. Nothing has a margin or a
    * padding, so the formula subtracts exactly what renders; each strip's bottom item is kept under
    * what stands at its top.
    */
   @media (orientation: landscape) and (max-width: 959.98px), (orientation: landscape) and (max-height: 599.98px) {
     .game {
       --strip: 60px;
-      --strip-button: 56px;
+      --strip-button: 58px;
       --prompt-row: 24px;
       --board-size: max(
         0px,
@@ -1023,21 +1055,20 @@
       overflow: clip;
       gap: 0;
       grid-template-columns: minmax(var(--strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
-      grid-template-rows: var(--prompt-row) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) var(--prompt-row) auto minmax(0, 1fr);
       grid-template-areas:
+        "left . right"
         "left prompt right"
-        "left stage right";
+        "left stage right"
+        "left . right";
       align-content: stretch;
     }
 
-    /* The top of the left strip. */
+    /* The top of the left strip: the info pill. */
     .info {
       grid-area: left;
       align-self: start;
       justify-self: center;
-      width: var(--strip);
-      max-height: 88px;
-      overflow: hidden;
     }
 
     /* The top of the right strip: the gear, then « Avance rapide ». */
@@ -1090,10 +1121,9 @@
       padding-bottom: var(--space-xs);
     }
 
+    /* The 7's region has no box: its three parts are placed like the others. */
     .seven {
-      grid-area: right;
-      min-width: 0;
-      min-height: 0;
+      display: contents;
     }
   }
 

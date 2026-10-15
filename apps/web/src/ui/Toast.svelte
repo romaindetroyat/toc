@@ -8,9 +8,57 @@
     dismissToast();
     action?.run();
   }
+
+  /**
+   * In the game's compact mode (a phone held sideways, plan 01-47) the bottom of the screen is the
+   * galet's bottom ring row and the strips at its sides: the toast is centred over the felt instead,
+   * at most three quarters of the board wide, so it never covers a strip nor the bottom ring row. Elsewhere it
+   * keeps its place at the bottom of the screen.
+   */
+  let place = $state<{ x: number; y: number; width: number } | null>(null);
+
+  function measure() {
+    const board = document.querySelector('main.game[data-chrome="compact"] [data-board]');
+    if (board === null) {
+      place = null;
+      return;
+    }
+    const box = board.getBoundingClientRect();
+    const felt = board.querySelector("[data-felt-button]")?.getBoundingClientRect();
+    place = {
+      x: felt ? felt.left + felt.width / 2 : box.left + box.width / 2,
+      y: felt ? felt.top + felt.height / 2 : box.top + box.height / 2,
+      width: Math.min(480, box.width * 0.75),
+    };
+  }
+
+  // A message may come before the game screen is laid out (the sound's failure at the first tap): the
+  // board is looked for again on the next frames, for up to two seconds, then on every resize.
+  $effect(() => {
+    if (!toast.current) return;
+    measure();
+    let frames = 120;
+    let frame = 0;
+    const again = () => {
+      measure();
+      if (place === null && --frames > 0) frame = requestAnimationFrame(again);
+    };
+    if (place === null) frame = requestAnimationFrame(again);
+    return () => cancelAnimationFrame(frame);
+  });
 </script>
 
-<div class="toast-region" aria-live="polite" role="status">
+<svelte:window onresize={() => toast.current && measure()} />
+
+<div
+  class="toast-region"
+  class:over-felt={place !== null}
+  aria-live="polite"
+  role="status"
+  style:left={place ? `${place.x - place.width / 2}px` : undefined}
+  style:top={place ? `${place.y}px` : undefined}
+  style:width={place ? `${place.width}px` : undefined}
+>
   {#if toast.current}
     {#key toast.current.id}
       <div class="toast" data-toast>
@@ -36,6 +84,14 @@
     justify-content: center;
     padding: 0 var(--space-md);
     pointer-events: none;
+  }
+
+  /* Over the felt (the compact mode): centred on it, as wide as the place it is given. */
+  .toast-region.over-felt {
+    right: auto;
+    bottom: auto;
+    padding: 0;
+    transform: translateY(-50%);
   }
 
   .toast {

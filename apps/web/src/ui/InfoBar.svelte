@@ -1,10 +1,10 @@
 <script lang="ts">
   import { type Color, PARTNER, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
-  import { reglages } from "../i18n/fr/reglages.ts";
-  import Icon from "./Icon.svelte";
+  import InfoBar from "./InfoBar.svelte";
   import SeatChip from "./SeatChip.svelte";
-  import SettingsSheet from "./SettingsSheet.svelte";
+  import SettingsButton from "./SettingsButton.svelte";
+  import Sheet from "./Sheet.svelte";
 
   type Props = {
     render: RenderState;
@@ -16,17 +16,22 @@
      * info zone at the left of the computer's bottom bar (lines, pills and gear stacked, on the
      * bar's own band). « side »: the 96 px column at the left of the board on the compact bar of a
      * phone held sideways (plan 01-37): the gear on top, then the turn and dealer lines, wrapping,
-     * then the two team pills stacked.
+     * then the two team pills stacked. « pill »: the compact mode's info pill (plan 01-47), 52 x 44
+     * at the top of the left strip: the turn dot and the glyph of the seat whose turn it is, and
+     * under them the score « n–m »; a tap opens the sheet « Infos de la partie » with this bar in its
+     * column form. The gear is not in the pill: it stands at the top of the right strip.
      */
-    form?: "row" | "column" | "side";
+    form?: "row" | "column" | "side" | "pill";
+    /** Whether the bar holds the gear (« Réglages »); the sheet's copy of the bar does not. */
+    gear?: boolean;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
   };
 
-  let { render, human, names, form = "row", onabandon }: Props = $props();
+  let { render, human, names, form = "row", gear = true, onabandon }: Props = $props();
 
-  let settingsOpen = $state(false);
-  let gear = $state<HTMLButtonElement | null>(null);
+  let infoOpen = $state(false);
+  let pill = $state<HTMLButtonElement | null>(null);
 
   const partner = $derived(PARTNER[human]);
   const playing = $derived(render.phase === "play");
@@ -42,65 +47,96 @@
       render.homeCounts.vert -
       us,
   );
+
+  /** The turn line as row 1 says it, for the pill's accessible name. */
+  const turnLine = $derived(
+    playing
+      ? ownTurn
+        ? game.info.ownTurn
+        : game.info.botTurn(turnName)
+      : render.phase === "exchange"
+        ? game.info.exchanging
+        : game.info.over,
+  );
 </script>
 
-<!-- Info bar (UI-SPEC, D-07): 56 px, three zones. The bot's name is never truncated; below 360 px the
-     words « Tour de » are hidden visually and stay in the text for screen readers. In column form (the
-     computer's bottom bar) the same three zones stack: the turn and dealer lines, then the two team
-     pills side by side with the gear. -->
-<header
-  class="bar"
-  class:column={form === "column"}
-  class:side={form === "side"}
-  data-info-bar
-  data-form={form}
->
-  <div class="left">
-    <p class="turn" data-turn={playing ? render.turn : ""}>
+{#if form === "pill"}
+  <!-- The compact mode's info pill (plan 01-47): whose turn it is and the score; the rest in a sheet. -->
+  <button
+    type="button"
+    class="info-pill"
+    data-info-bar
+    data-form="pill"
+    data-turn={playing ? render.turn : ""}
+    aria-label={game.info.pillAria(turnLine, us, them)}
+    aria-haspopup="dialog"
+    bind:this={pill}
+    onclick={() => (infoOpen = true)}
+  >
+    <span class="pill-turn" aria-hidden="true">
+      <span class="dot" class:own={ownTurn}></span>
       {#if playing}
-        <span class="dot" class:own={ownTurn} aria-hidden="true"></span>
         <SeatChip color={render.turn} showName={false} small />
-        {#if ownTurn}
-          <span class="name">{game.info.ownTurn}</span>
-        {:else}
-          <span class="prefix">{game.info.turnPrefix(turnName)}</span><span class="name">{turnName}</span>
-        {/if}
-      {:else}
-        <span class="name">
-          {render.phase === "exchange" ? game.info.exchanging : game.info.over}
-        </span>
       {/if}
-    </p>
-    <p class="deal" data-deal>
-      {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
-    </p>
-  </div>
-
-  <div class="teams">
-    <span class="pill own" aria-label={game.info.teamAria(us)} data-team-us>
-      {game.info.teamUs(us)}
     </span>
-    <span class="pill" aria-label={game.info.teamAriaThem(them)} data-team-them>
-      {game.info.teamThem(them)}
-    </span>
-  </div>
+    <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
+  </button>
 
-  <div class="gear" data-settings-slot>
-    <button
-      type="button"
-      class="gear-button"
-      aria-label={reglages.openLabel}
-      aria-haspopup="dialog"
-      bind:this={gear}
-      onclick={() => (settingsOpen = true)}
-    >
-      <Icon name="settings" />
-    </button>
-  </div>
-</header>
+  {#if infoOpen}
+    <Sheet title={game.info.sheetTitle} onclose={() => (infoOpen = false)} opener={pill}>
+      <div class="sheet-info" data-info-sheet>
+        <InfoBar {render} {human} {names} form="column" gear={false} />
+      </div>
+    </Sheet>
+  {/if}
+{:else}
+  <!-- Info bar (UI-SPEC, D-07): 56 px, three zones. The bot's name is never truncated; below 360 px the
+       words « Tour de » are hidden visually and stay in the text for screen readers. In column form (the
+       computer's bottom bar) the same three zones stack: the turn and dealer lines, then the two team
+       pills side by side with the gear. -->
+  <header
+    class="bar"
+    class:column={form === "column"}
+    class:side={form === "side"}
+    data-info-bar
+    data-form={form}
+  >
+    <div class="left">
+      <p class="turn" data-turn={playing ? render.turn : ""}>
+        {#if playing}
+          <span class="dot" class:own={ownTurn} aria-hidden="true"></span>
+          <SeatChip color={render.turn} showName={false} small />
+          {#if ownTurn}
+            <span class="name">{game.info.ownTurn}</span>
+          {:else}
+            <span class="prefix">{game.info.turnPrefix(turnName)}</span><span class="name">{turnName}</span>
+          {/if}
+        {:else}
+          <span class="name">
+            {render.phase === "exchange" ? game.info.exchanging : game.info.over}
+          </span>
+        {/if}
+      </p>
+      <p class="deal" data-deal>
+        {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
+      </p>
+    </div>
 
-{#if settingsOpen}
-  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} {onabandon} />
+    <div class="teams">
+      <span class="pill own" aria-label={game.info.teamAria(us)} data-team-us>
+        {game.info.teamUs(us)}
+      </span>
+      <span class="pill" aria-label={game.info.teamAriaThem(them)} data-team-them>
+        {game.info.teamThem(them)}
+      </span>
+    </div>
+
+    {#if gear}
+      <div class="gear" data-settings-slot>
+        <SettingsButton {onabandon} />
+      </div>
+    {/if}
+  </header>
 {/if}
 
 <style>
@@ -287,20 +323,58 @@
     height: var(--touch);
   }
 
-  .gear-button {
+  /* The compact mode's pill: 52 x 44, the turn on top, the score « n–m » under it. */
+  .info-pill {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: var(--touch);
+    gap: 2px;
+    width: 52px;
+    min-width: 0;
     height: var(--touch);
     padding: 0;
-    border: 0;
+    border: 2px solid var(--creme-attenuee);
     border-radius: var(--radius-button);
-    background: transparent;
+    background: var(--bois-sombre);
     color: var(--creme);
+    font-family: var(--font-ui);
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .pill-turn {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 16px;
+  }
+
+  .pill-turn :global(.chip.small) {
+    height: 16px;
+    padding: 0 2px;
+  }
+
+  .pill-turn :global(.chip.small svg) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .pill-turn .dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .pill-score {
+    font-size: var(--label-size);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 16px;
+  }
+
+  .sheet-info {
+    padding: var(--space-xs) 0;
   }
 
   /* Compact rule: « Tour de » is hidden visually and the middle zone narrows to 96. */

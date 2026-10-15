@@ -348,14 +348,24 @@
     transform-origin: 0 0;
   }
 
-  /* Smaller middle marks on the smaller card; an unplayable card at 40 %. */
+  /* Smaller middle marks on the smaller card. An unplayable card looks as at 40 % over the page, but
+     stays opaque: the cards overlap in the column, and a see-through card would show the one under
+     it. */
   .compact .slot :global(.card[data-card] .big),
   .compact .slot :global(.card[data-card] .letter) {
     font-size: 30px;
   }
 
   .compact .slot :global(.card[data-card].unplayable) {
-    opacity: 0.4;
+    opacity: 1;
+  }
+
+  .compact .slot :global(.card[data-card].unplayable::after) {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgb(43 29 18 / 0.6);
+    pointer-events: none;
   }
 
   /* No room for two lines of text in the column: the heading shows, the body is read out. */

@@ -640,7 +640,7 @@
     flex: none;
   }
 
-  /* The buttons' column: --strip-button wide (56 px: « Annuler » is 52.4 px in Label 14 bold),
+  /* The buttons' column: --strip-button wide (58 px: « Annuler » is 52.4 px in Label 14 bold),
      stacked 4 px apart at the bottom of the right strip, at least 48 px high each, Label 14 bold on
      two lines at most. A computer's key badges sit astride each button's top edge: 12 px apart then,
      so a badge never covers the button above. */
@@ -659,7 +659,7 @@
   }
 
   .stack .btn {
-    width: var(--strip-button, 56px);
+    width: var(--strip-button, 58px);
     min-width: 0;
     min-height: var(--button-height);
     padding: 2px 0;
@@ -668,6 +668,11 @@
     line-height: 1.2;
     text-align: center;
     overflow-wrap: normal;
+  }
+
+  /* A computer's key badge stays over its button, never over the board beside the strip. */
+  .stack :global(.key-hint.corner) {
+    right: 2px;
   }
 
   @media (hover: hover) and (pointer: fine) {

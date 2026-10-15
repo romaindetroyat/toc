@@ -31,20 +31,26 @@
      */
     bar?: boolean;
     /**
-     * In the compact bar of a phone held sideways (plan 01-37), in place of the hand and the action
-     * zone: never taller than --band. From 640 px wide one row: at the left a 20 px line (the title,
-     * « Reste n », the prompt and the plan, scrolling sideways) over the step chips (scrolling
-     * sideways when narrower than 332 px), the three buttons at the right. Below 640 px the line
-     * over the plan in the 56 px row, the chips and the buttons in the 64 px row. Its tray takes the
-     * chips' place.
+     * The compact mode of a phone held sideways (plan 01-47): the short labels of the buttons (their
+     * accessible names and their titles keep the full ones).
      */
     compact?: boolean;
+    /**
+     * What this instance draws. « all » (the computer's bar): the whole assistant. In the compact
+     * mode, each part in its place beside the full-height galet: « line », the prompt row (« Reste n »,
+     * then the plan or the instruction, one line); « chips », the selected knight's step chips in a
+     * column of the left strip (the tray's chips while it is open); « buttons », « Retour »,
+     * « Effacer » and « Jouer » stacked at the bottom of the right strip (« Autre cheval » while the
+     * tray is open). The game screen wraps the three parts in the [data-seven-panel] region.
+     */
+    part?: "all" | "line" | "chips" | "buttons";
   };
 
   let {
     seven,
     bar = false,
     compact = false,
+    part = "all",
     tray,
     missed,
     onpickSteps,
@@ -80,6 +86,14 @@
   const chips = $derived(Array.from({ length: seven.remaining }, (_, i) => i + 1));
   const offered = $derived(seven.selected === undefined ? [] : (seven.steps[seven.selected] ?? []));
 
+  /** The prompt row's one line: « Reste n », then the instruction and the plan (or the tray's question). */
+  const counterText = $derived(done ? game.seven.allSpread : game.seven.remaining(seven.remaining));
+  const lineText = $derived(
+    [counterText, ...(tray !== null ? [game.tray.question] : [...(prompt === null ? [] : [prompt]), ...rows])].join(
+      " · ",
+    ),
+  );
+
   // The newest row is the one to see: the list scrolls down to it (sideways in the bar).
   let region = $state<HTMLElement | undefined>();
   $effect(() => {
@@ -90,86 +104,158 @@
   });
 </script>
 
-<!-- 7 splitter panel (UI-SPEC, D-17): it replaces the action zone and the hand fan. -->
-<section
-  class="panel"
-  class:bar
-  class:compact
-  class:traying={tray !== null}
-  data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
-  <!-- In the bar, one line: the title with « Reste n », then the prompt and the plan. -->
-  <div class="top">
-    <header class="head">
-      <span class="mini" data-seven-card style:color={face.colour} role="img" aria-label={game.seven.card(cardName(seven.card))}>
-        <span class="rank">{face.rankLabel}</span><span>{face.suitGlyph}</span>
-      </span>
-      <h2 class="title">{game.seven.title}</h2>
-      <p class="counter t-display tabular" class:done data-remaining={seven.remaining} aria-live="polite">
-        {done ? game.seven.allSpread : game.seven.remaining(seven.remaining)}
-      </p>
-    </header>
+{#snippet undoButton()}
+  <button
+    type="button"
+    class="btn btn-secondary undo"
+    data-seven-undo
+    disabled={seven.plan.length === 0}
+    aria-label={game.seven.undo}
+    aria-keyshortcuts="Backspace"
+    title={compact ? game.seven.undo : undefined}
+    onclick={onundo}
+  >
+    {compact ? game.compact.undo : game.seven.undo}
+    <KeyHint label={clavier.keys.backspace} />
+  </button>
+{/snippet}
 
-    {#if tray === null}
-      <div class="region" bind:this={region} data-seven-region>
+{#snippet resetButton()}
+  <button
+    type="button"
+    class="btn btn-secondary reset"
+    data-seven-reset
+    aria-label={compact ? game.seven.reset : undefined}
+    title={compact ? game.seven.reset : undefined}
+    onclick={oncancelAll}
+  >
+    {compact ? game.compact.reset : game.seven.reset}
+  </button>
+{/snippet}
+
+{#snippet playButton()}
+  <button
+    type="button"
+    class="btn btn-primary play"
+    data-seven-play
+    disabled={!done}
+    aria-label={game.seven.play}
+    aria-keyshortcuts="Enter"
+    title={compact ? game.seven.play : undefined}
+    onclick={onconfirm}
+  >
+    {game.seven.play}
+    <KeyHint label={clavier.keys.enter} />
+  </button>
+{/snippet}
+
+{#snippet stepChips()}
+  {#each chips as steps (steps)}
+    <StepChip {steps} enabled={offered.includes(steps)} onpick={onpickSteps} />
+  {/each}
+{/snippet}
+
+{#if part === "line"}
+  <!-- The compact prompt row: « Reste n » in amber, then the instruction and the plan, one line. -->
+  <div class="line-part" data-seven-line title={lineText}>
+    <span class="line-text">
+      <span
+        class="counter-inline tabular"
+        class:done
+        data-remaining={seven.remaining}
+        aria-live="polite">{counterText}</span
+      >
+      {#if tray !== null}
+        <span class="line-prompt" role="status">{game.tray.question}</span>
+      {:else}
         {#if prompt !== null}
-          <p class="prompt" data-seven-prompt role="status">{prompt}</p>
+          <span class="line-prompt" data-seven-prompt role="status">{prompt}</span>
         {/if}
         {#if rows.length > 0}
-          <ol class="rows" data-seven-rows>
+          <ol class="line-rows" data-seven-rows>
             {#each rows as row, i (i)}
               <li data-seven-row>{row}</li>
             {/each}
           </ol>
         {/if}
-      </div>
-    {/if}
+      {/if}
+    </span>
   </div>
-
+{:else if part === "chips"}
+  <!-- The compact left strip: the step chips in a column (the tray's chips while it is open). -->
   {#if tray !== null}
-    <div class="tray">
-      <PawnTray options={tray.options} onpick={ontrayPick} onclose={ontrayClose} />
-    </div>
+    <PawnTray options={tray.options} part="chips" compact onpick={ontrayPick} onclose={ontrayClose} />
   {:else}
-    <!-- In the bar, the step chips and the buttons side by side, or on two rows. -->
-    <div class="controls">
-      <div class="chips" data-seven-chips>
-        {#each chips as steps (steps)}
-          <StepChip {steps} enabled={offered.includes(steps)} onpick={onpickSteps} />
-        {/each}
-      </div>
-
-      <div class="buttons">
-        <button
-          type="button"
-          class="btn btn-secondary undo"
-          data-seven-undo
-          disabled={seven.plan.length === 0}
-          aria-label={game.seven.undo}
-          aria-keyshortcuts="Backspace"
-          onclick={onundo}
-        >
-          {game.seven.undo}
-          <KeyHint label={clavier.keys.backspace} />
-        </button>
-        <button type="button" class="btn btn-secondary reset" data-seven-reset onclick={oncancelAll}>
-          {game.seven.reset}
-        </button>
-        <button
-          type="button"
-          class="btn btn-primary play"
-          data-seven-play
-          disabled={!done}
-          aria-label={game.seven.play}
-          aria-keyshortcuts="Enter"
-          onclick={onconfirm}
-        >
-          {game.seven.play}
-          <KeyHint label={clavier.keys.enter} />
-        </button>
-      </div>
+    <div class="chip-column" data-seven-chips>
+      {@render stepChips()}
     </div>
   {/if}
-</section>
+{:else if part === "buttons"}
+  <!-- The compact right strip: the three buttons stacked, « Jouer » lowest. -->
+  {#if tray !== null}
+    <PawnTray options={tray.options} part="close" compact onpick={ontrayPick} onclose={ontrayClose} />
+  {:else}
+    <div class="button-column" data-seven-buttons>
+      {@render undoButton()}
+      {@render resetButton()}
+      {@render playButton()}
+    </div>
+  {/if}
+{:else}
+  <!-- 7 splitter panel (UI-SPEC, D-17): it replaces the action zone and the hand fan. -->
+  <section
+    class="panel"
+    class:bar
+    class:traying={tray !== null}
+    data-seven-panel data-selected={seven.selected ?? ""} aria-label={game.seven.title}>
+    <!-- In the bar, one line: the title with « Reste n », then the prompt and the plan. -->
+    <div class="top">
+      <header class="head">
+        <span class="mini" data-seven-card style:color={face.colour} role="img" aria-label={game.seven.card(cardName(seven.card))}>
+          <span class="rank">{face.rankLabel}</span><span>{face.suitGlyph}</span>
+        </span>
+        <h2 class="title">{game.seven.title}</h2>
+        <p class="counter t-display tabular" class:done data-remaining={seven.remaining} aria-live="polite">
+          {counterText}
+        </p>
+      </header>
+
+      {#if tray === null}
+        <div class="region" bind:this={region} data-seven-region>
+          {#if prompt !== null}
+            <p class="prompt" data-seven-prompt role="status">{prompt}</p>
+          {/if}
+          {#if rows.length > 0}
+            <ol class="rows" data-seven-rows>
+              {#each rows as row, i (i)}
+                <li data-seven-row>{row}</li>
+              {/each}
+            </ol>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    {#if tray !== null}
+      <div class="tray">
+        <PawnTray options={tray.options} onpick={ontrayPick} onclose={ontrayClose} />
+      </div>
+    {:else}
+      <!-- In the bar, the step chips and the buttons side by side, or on two rows. -->
+      <div class="controls">
+        <div class="chips" data-seven-chips>
+          {@render stepChips()}
+        </div>
+
+        <div class="buttons">
+          {@render undoButton()}
+          {@render resetButton()}
+          {@render playButton()}
+        </div>
+      </div>
+    {/if}
+  </section>
+{/if}
 
 <style>
   .panel {
@@ -368,157 +454,92 @@
     padding: 0 var(--space-md);
   }
 
-  /*
-   * The compact bar (a phone held sideways). One row of --band-row from 640 px wide: a grid whose
-   * left column holds the 20 px line over the 44 px chips, and whose right column holds the three
-   * buttons. The tray needs its 56 px chips: it takes the whole row and the line steps aside.
-   */
-  .panel.compact {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: 20px var(--touch);
-    align-content: center;
-    gap: 0 var(--space-sm);
+  /* The compact mode's prompt row (plan 01-47): one line of Label 14, « Reste n » in amber, a
+     longer text ending with « … » (its full text in the title). */
+  .line-part {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     height: 100%;
-    min-height: 0;
-    max-height: var(--band, 64px);
-    padding: 0;
-    overflow: hidden;
-  }
-
-  .compact .top {
-    grid-column: 1;
-    grid-row: 1;
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
     min-width: 0;
-    height: 20px;
-  }
-
-  .compact .head {
-    flex: none;
-    min-height: 0;
-    gap: var(--space-xs);
-  }
-
-  .compact .mini {
-    display: none;
-  }
-
-  .compact .title,
-  .compact .counter {
-    flex: none;
-    font-size: var(--label-size);
-    line-height: 20px;
-  }
-
-  .compact .region {
-    flex: 1 1 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    min-width: 0;
-    height: 20px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-  }
-
-  .compact .prompt,
-  .compact .rows {
-    line-height: 20px;
-  }
-
-  .compact .rows {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .compact .controls {
-    display: contents;
-  }
-
-  .compact .chips {
-    grid-column: 1;
-    grid-row: 2;
-    flex-wrap: nowrap;
-    min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  .compact .chips > :global(*) {
-    flex: none;
-  }
-
-  .compact .buttons {
-    grid-column: 2;
-    grid-row: 1 / -1;
-    flex-wrap: nowrap;
-    align-self: center;
-  }
-
-  /* Label 14 bold on two lines at most, 48 px high. */
-  .compact .buttons .btn {
-    flex: none;
-    width: 88px;
     padding: 0 var(--space-xs);
   }
 
-  .compact .buttons .undo {
-    width: 96px;
-  }
-
-  .compact .buttons .play {
-    width: 72px;
-  }
-
-  .compact.traying .top {
-    display: none;
-  }
-
-  .compact .tray {
-    grid-column: 1 / -1;
-    grid-row: 1 / -1;
+  .line-text {
     min-width: 0;
+    overflow: hidden;
+    color: var(--creme-attenuee);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* Below 640 px wide: the line and the plan in the 56 px row, the chips and the buttons in the
-     64 px row under it; the tray takes the 64 px row. */
-  @media (max-width: 639.98px) {
-    .panel.compact {
-      grid-template-rows: 56px var(--band-row, 64px);
-      align-content: stretch;
-    }
+  .counter-inline {
+    color: var(--ambre);
+    font-weight: 700;
+  }
 
-    .compact .top {
-      grid-column: 1 / -1;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: center;
-      gap: var(--space-xs);
-      height: auto;
-    }
+  .line-prompt,
+  .line-rows,
+  .line-rows li {
+    display: inline;
+  }
 
-    .compact .region {
-      flex: none;
-    }
+  .line-prompt::before,
+  .line-rows li::before {
+    content: " · ";
+    color: var(--creme-attenuee);
+  }
 
-    .compact .chips {
-      align-self: center;
-    }
+  .line-rows {
+    margin: 0;
+    padding: 0;
+    color: var(--creme);
+    font-weight: 700;
+    list-style: none;
+  }
 
-    .compact .buttons {
-      grid-row: 2;
-    }
+  /* The compact left strip: 44 x 44 chips, 4 px apart, in a column (the strip's slot scrolls). */
+  .chip-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+  }
 
-    .compact.traying .top {
-      display: flex;
-    }
+  .chip-column > :global(*) {
+    flex: none;
+  }
 
-    .compact .tray {
-      grid-row: 2;
+  /* The compact right strip: the buttons stacked 4 px apart (12 px with a computer's key badges),
+     each --strip-button wide, at least 48 px high, two lines at most. */
+  .button-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+  }
+
+  .button-column .btn {
+    position: relative;
+    width: var(--strip-button, 58px);
+    min-width: 0;
+    min-height: var(--button-height);
+    padding: 2px 0;
+    font-size: var(--label-size);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .button-column :global(.key-hint.corner) {
+    right: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .button-column {
+      gap: 12px;
     }
   }
 
