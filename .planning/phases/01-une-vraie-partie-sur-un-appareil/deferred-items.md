@@ -15,3 +15,7 @@ Out-of-scope discoveries logged by executors. They are not fixed by the plan tha
   - `apps/web/src/board/geometry.ts:30` « … after the board rotation » in the doc of `facingFor`.
   Suggested wording, later: « The human's seat index k (quarterTurnsFor): which colour sits at the bottom of the galet », as FeltTable.svelte and Overlay.svelte already say.
 - **01-UI-SPEC.md, addendum « Plateau galet », not in 01-41's files:** item 2 still writes `sceneXY(place, k, layout)` (the layout parameter left in 01-40), and « Faits techniques » still describes the portrait scene (2000 × 3000) as kept in the code « pour l'instant » (removed in 01-40).
+
+## Found during 01-43
+
+- **Rule pictures ring pawns, not moves:** tools/render-scenarios.mjs draws one halo per pawn, and an allowed move overrides a refused one on the same pawn (lines 234-235). In R-13.23 every knight of a refused 7 plan also moves in an allowed plan, so the picture shows bleu A and bleu B ringed in green and no red ring; R-13.22 rings bleu A once for both the 2 and the 9. The text of R-13 says which plans are refused. Drawing per-move halos (or the landing cell) would change the renderer and so could alter the 112 earlier pictures, which 01-43 must keep byte-identical.
