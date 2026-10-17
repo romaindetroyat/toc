@@ -7,6 +7,7 @@
   import { bots } from "../i18n/fr/bots.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { table as copy } from "../i18n/fr/table.ts";
+  import { browserApi, tableSummary } from "../net/api.ts";
   import { connectTable, type TableConnection } from "../net/connection.svelte.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import { createRemoteGame } from "../net/remoteGame.ts";
@@ -27,9 +28,37 @@
 
   const valid = $derived(isTableId(id));
 
+  // No network when the link is opened: the « Pas de connexion » notice, « Réessayer » tries again.
+  let offline = $state(!browserApi.online());
+  let attempt = $state(0);
+
+  function retry() {
+    offline = !browserApi.online();
+    attempt++;
+  }
+
+  // Before the first name is typed: who invites (GET /api/tables/:id, D-02), or a table that is gone.
+  let invitedBy = $state<string | null>(null);
+  let gone = $state(false);
+
+  $effect(() => {
+    if (!valid || device.name !== null) return;
+    let live = true;
+    void tableSummary(id).then((result) => {
+      if (!live) return;
+      if (result === "gone") gone = true;
+      else if (result !== "unknown") invitedBy = result.creatorName;
+    });
+    return () => {
+      live = false;
+    };
+  });
+
   $effect(() => {
     const name = device.name;
-    if (!valid || name === null) return;
+    // « Réessayer » opens a new connection.
+    void attempt;
+    if (!valid || name === null || offline) return;
     const opened = connectTable(id, { token: device.token, name });
     connection = opened;
     return () => {
@@ -53,8 +82,9 @@
 
   /** What the screen shows now. */
   const screenState = $derived.by(() => {
-    if (!valid || closeCode === CLOSE_GONE) return "introuvable" as const;
+    if (!valid || closeCode === CLOSE_GONE || gone) return "introuvable" as const;
     if (device.name === null) return "prenom" as const;
+    if (offline) return "horsligne" as const;
     if (closeCode === CLOSE_ELSEWHERE) return "ailleurs" as const;
     if (closeCode === CLOSE_VERSION) return "version" as const;
     if (connection === null || you === null || info === null) return "connexion" as const;
@@ -111,10 +141,31 @@
   }
 
   const creator = $derived(info?.creatorName ?? "");
+
+  /** « Connexion à la table… » for more than 10 s: the slow line and a way home. */
+  const SLOW_MS = 10_000;
+  let slow = $state(false);
+
+  $effect(() => {
+    if (screenState !== "connexion") {
+      slow = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      slow = true;
+    }, SLOW_MS);
+    return () => clearTimeout(timer);
+  });
 </script>
 
+<svelte:window ononline={() => offline && retry()} />
+
 {#if screenState === "prenom"}
-  <NamePrompt context={accueil.name.invited} onsubmit={rememberName} onback={home} />
+  <NamePrompt
+    context={invitedBy !== null ? accueil.name.invitedBy(invitedBy) : accueil.name.invited}
+    onsubmit={rememberName}
+    onback={home}
+  />
 {:else if screenState === "partie" && you?.seat}
   <Game online={{ makeController, seat: you.seat }} />
 {:else if screenState === "salle" && info !== null}
@@ -180,12 +231,21 @@
       <button type="button" class="btn btn-primary" onclick={() => location.reload()}>
         {copy.version.reload}
       </button>
+    {:else if screenState === "horsligne"}
+      <h1 class="t-heading">{copy.offline.heading}</h1>
+      <p class="t-body">{copy.offline.body}</p>
+      <button type="button" class="btn btn-primary" onclick={retry}>{copy.offline.retry}</button>
+      <button type="button" class="btn btn-secondary" onclick={home}>{copy.home}</button>
     {:else if screenState === "commencee"}
       <h1 class="t-heading">{copy.started.heading}</h1>
       <p class="t-body">{copy.started.body}</p>
       <button type="button" class="btn btn-secondary" onclick={home}>{copy.home}</button>
     {:else}
       <h1 class="t-heading" aria-live="polite">{copy.connecting}</h1>
+      {#if slow}
+        <p class="t-body" role="status" data-connecting-slow>{copy.slow}</p>
+        <button type="button" class="btn btn-secondary" onclick={home}>{copy.home}</button>
+      {/if}
     {/if}
   </main>
 {/if}

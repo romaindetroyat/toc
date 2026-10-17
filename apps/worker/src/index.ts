@@ -1,5 +1,6 @@
 // The Worker « toc »: a small router in front of the built app (02-RESEARCH « Worker router »).
 //   POST /api/tables        → a new table: 128-bit id, the GameRoom creates it, 201 { id }
+//   GET  /api/tables/:id    → the table's public summary (02-04), 404 when there is no such table
 //   GET  /ws/table/:id      → the WebSocket upgrade, handed to that table's GameRoom
 //   other /api/*            → 404
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -62,9 +63,26 @@ async function createTableRoute(request: Request, env: Env, url: URL): Promise<R
   return json({ id }, 201);
 }
 
+/**
+ * The public summary of a table (T-02-15: first names, seat kinds, status, game number, last activity;
+ * never an id, a token hash or a card). A malformed id never reaches getByName, and an unknown one is
+ * answered without writing anything (T-02-16).
+ */
+async function summaryRoute(request: Request, env: Env, id: string): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  if (!isTableId(id)) return json({ error: "not-found" }, 404);
+  const found = await env.GAME_ROOM.getByName(id).summary();
+  return found === null ? json({ error: "not-found" }, 404) : json(found, 200);
+}
+
 export async function handleRequest(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname === "/api/tables") return createTableRoute(request, env, url);
+
+  const summary = /^\/api\/tables\/([^/]*)$/.exec(url.pathname);
+  if (summary !== null) return summaryRoute(request, env, summary[1] ?? "");
 
   const socket = /^\/ws\/table\/([^/]*)$/.exec(url.pathname);
   if (socket !== null) {

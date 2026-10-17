@@ -3,19 +3,40 @@
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
   import Icon from "./Icon.svelte";
+  import Sheet from "./Sheet.svelte";
 
+  // 02-UI-SPEC « First-name prompt » (D-01): once per device, before joining or creating a table, and
+  // as the sheet « Changer de prénom » from the home. The name is validated like the server does (NFC,
+  // no control characters, 1 to 20 characters); nothing else is refused.
   type Props = {
-    /** The context line under the heading (who invites, or what the name is for). */
-    context: string;
-    /** The normalized first name; the prompt is done. */
+    /** The context line under the heading (who invites, or what the name is for); screen form only. */
+    context?: string;
+    /** The normalized first name; the prompt is done (or, while creating, waits for `busy`). */
     onsubmit: (name: string) => void;
-    /** « Retour »: back to the home. */
-    onback: () => void;
+    /** « Retour »: back to the home (screen form). */
+    onback?: () => void;
+    /** The sheet form « Changer de prénom » (prefilled, « Enregistrer », the sheet's « Fermer »). */
+    sheet?: { onclose: () => void; opener?: HTMLElement | null };
+    /** The field's first value (the stored name, in the sheet). */
+    initial?: string;
+    /** The table is being created: « Création de la table… », aria-busy. */
+    busy?: boolean;
+    /** The creation failed: the line under the field says why. */
+    error?: "server" | "offline" | null;
   };
 
-  let { context, onsubmit, onback }: Props = $props();
+  let {
+    context = "",
+    onsubmit,
+    onback,
+    sheet,
+    initial = "",
+    busy = false,
+    error = null,
+  }: Props = $props();
 
-  let value = $state("");
+  // svelte-ignore state_referenced_locally
+  let value = $state(initial);
   let empty = $state(false);
   let field = $state<HTMLInputElement | null>(null);
 
@@ -24,9 +45,21 @@
     if (window.matchMedia("(pointer: fine)").matches) field?.focus();
   });
 
+  /** The line under the field: the empty error, a creation error, or the helper. */
+  const problem = $derived(
+    empty
+      ? accueil.name.empty
+      : error === "server"
+        ? accueil.name.serverError
+        : error === "offline"
+          ? accueil.name.offlineError
+          : null,
+  );
+
   function submit(event: SubmitEvent) {
     event.preventDefault();
     unlock();
+    if (busy) return;
     const name = normalizeName(value);
     if (name === null) {
       empty = true;
@@ -36,14 +69,19 @@
     empty = false;
     onsubmit(name);
   }
+
+  function back() {
+    unlock();
+    onback?.();
+  }
 </script>
 
-<!-- 02-UI-SPEC « First-name prompt » (D-01): once per device, before joining a table. The name is
-     validated like the server does (NFC, no control characters, 1 to 20 characters). -->
-<main class="prompt" data-name-prompt>
-  <form class="column" onsubmit={submit} novalidate>
-    <h1 class="t-heading" id="name-heading">{accueil.name.heading}</h1>
-    <p class="t-body context">{context}</p>
+{#snippet form(mode: "screen" | "sheet")}
+  <form class="column" class:in-sheet={mode === "sheet"} onsubmit={submit} novalidate>
+    {#if mode === "screen"}
+      <h1 class="t-heading" id="name-heading">{accueil.name.heading}</h1>
+      {#if context}<p class="t-body context">{context}</p>{/if}
+    {/if}
     <div class="row">
       <input
         bind:this={field}
@@ -54,23 +92,38 @@
         autocapitalize="words"
         enterkeyhint="go"
         spellcheck="false"
-        aria-labelledby="name-heading"
+        aria-labelledby={mode === "screen" ? "name-heading" : undefined}
+        aria-label={mode === "sheet" ? accueil.name.heading : undefined}
         aria-describedby="name-note"
-        aria-invalid={empty}
+        aria-invalid={problem !== null}
       />
-      <button type="submit" class="btn btn-primary">{accueil.name.submit}</button>
+      <button type="submit" class="btn btn-primary submit" aria-busy={busy} data-name-submit>
+        {mode === "sheet" ? accueil.name.save : busy ? accueil.name.busy : accueil.name.submit}
+      </button>
     </div>
-    {#if empty}
-      <p class="t-label note error" id="name-note" role="alert" data-name-empty>
+    {#if problem !== null}
+      <p class="t-label note error" id="name-note" role="alert" data-name-error>
         <Icon name="x" size={16} />
-        {accueil.name.empty}
+        {problem}
       </p>
     {:else}
       <p class="t-label note" id="name-note">{accueil.name.helper}</p>
     {/if}
-    <button type="button" class="btn btn-text back" onclick={onback}>{accueil.name.back}</button>
+    {#if mode === "screen"}
+      <button type="button" class="btn btn-text back" onclick={back}>{accueil.name.back}</button>
+    {/if}
   </form>
-</main>
+{/snippet}
+
+{#if sheet}
+  <Sheet title={accueil.name.changeTitle} onclose={sheet.onclose} opener={sheet.opener ?? null}>
+    <div data-name-prompt="sheet">{@render form("sheet")}</div>
+  </Sheet>
+{:else}
+  <main class="prompt" data-name-prompt="screen">
+    {@render form("screen")}
+  </main>
+{/if}
 
 <style>
   .prompt {
@@ -86,6 +139,12 @@
     display: flex;
     flex-direction: column;
     width: min(400px, 100%);
+  }
+
+  /* Room for the focus ring inside the sheet's scrolling body. */
+  .column.in-sheet {
+    width: 100%;
+    padding: 5px;
   }
 
   h1,
@@ -104,6 +163,10 @@
     margin-top: var(--space-md);
   }
 
+  .in-sheet .row {
+    margin-top: 0;
+  }
+
   input {
     flex: 1;
     min-width: 0;
@@ -120,6 +183,11 @@
   input:focus-visible {
     outline: 3px solid var(--ambre);
     outline-offset: 2px;
+  }
+
+  /* Busy keeps its full opacity (only disabled is 40 %). */
+  .submit[aria-busy="true"] {
+    cursor: progress;
   }
 
   .note {

@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
-  import { loadDevice, pageStorage } from "../net/device.ts";
+  import { browserApi, createTable } from "../net/api.ts";
+  import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
+  import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import { screen } from "../ui/screen.svelte.ts";
+  import { showToast } from "../ui/toast.svelte.ts";
 
   // « Accueil » at #/ (02-UI-SPEC « Home « Accueil » », D-09): the game against the computer (the solo
   // setup at #/ordinateur, unchanged and offline) or an online table, the first name this device
@@ -28,17 +32,74 @@
   );
   const compact = $derived(layout === "two" || layout === "one");
 
-  function create() {
-    location.hash = "#/table/";
+  // « Créer une table en ligne » (D-01, D-02): without a stored first name the prompt comes first; then
+  // POST /api/tables, « Création de la table… », and the table's link opens. Offline: the toast only.
+  let prompting = $state(false);
+  let creating = $state(false);
+  let createError = $state<"server" | "offline" | null>(null);
+
+  async function startCreate() {
+    creating = true;
+    createError = null;
+    const result = await createTable();
+    creating = false;
+    if (result.ok) {
+      location.hash = `#/table/${result.id}`;
+      return;
+    }
+    if (prompting) createError = result.reason;
+    else showToast(result.reason === "offline" ? accueil.home.offline : accueil.name.serverError);
   }
 
-  function changeName() {
-    device = loadDevice(storage);
+  function create() {
+    // The AudioContext must be created and resumed synchronously inside this tap.
+    unlock();
+    if (creating) return;
+    if (!browserApi.online()) {
+      showToast(accueil.home.offline);
+      return;
+    }
+    if (device.name === null) {
+      prompting = true;
+      return;
+    }
+    void startCreate();
+  }
+
+  function named(name: string) {
+    const saved = saveName(storage, name);
+    if (saved === null) return;
+    device = saved;
+    void startCreate();
+  }
+
+  function backHome() {
+    prompting = false;
+    createError = null;
+  }
+
+  // « Changer » opens the sheet « Changer de prénom », prefilled; the focus returns to « Changer ».
+  let changing = $state(false);
+  let changeButton = $state<HTMLButtonElement | null>(null);
+
+  function rename(name: string) {
+    const saved = saveName(storage, name);
+    if (saved !== null) device = saved;
+    changing = false;
   }
 </script>
 
 <svelte:window bind:innerWidth={width} />
 
+{#if prompting}
+  <NamePrompt
+    context={accueil.name.creating}
+    busy={creating}
+    error={createError}
+    onsubmit={named}
+    onback={backHome}
+  />
+{:else}
 <main class="home" data-layout={layout} data-home>
   <!-- DOM order = keyboard order: the gear, tile 1, tile 2, « Changer », the list. -->
   <div class="gear" data-settings-slot><SettingsButton /></div>
@@ -69,7 +130,8 @@
         <ChoiceTile
           choice="table"
           picture="users"
-          label={accueil.home.online.label}
+          label={creating ? accueil.name.busy : accueil.home.online.label}
+          busy={creating}
           sub={accueil.home.online.sub}
           onclick={create}
           compact={layout !== "computer"}
@@ -85,7 +147,12 @@
             type="button"
             class="btn btn-text"
             aria-label={accueil.home.changeLabel}
-            onclick={changeName}
+            aria-haspopup="dialog"
+            bind:this={changeButton}
+            onclick={() => {
+              unlock();
+              changing = true;
+            }}
           >
             {accueil.home.change}
           </button>
@@ -104,6 +171,15 @@
     </section>
   </div>
 </main>
+{/if}
+
+{#if changing && device.name !== null}
+  <NamePrompt
+    initial={device.name}
+    onsubmit={rename}
+    sheet={{ onclose: () => (changing = false), opener: changeButton }}
+  />
+{/if}
 
 <style>
   .home {

@@ -1,8 +1,9 @@
 // The two HTTP calls of the online table (plan 02-04): POST /api/tables (a new table) and
 // GET /api/tables/:id (its public summary). The fetch and the browser's online flag are passed in, so
-// the rules run under Node with a fake.
+// the rules run under Node with a fake. Every answer is untrusted: the id is checked with isTableId and
+// the summary with the shared schema (parseTableSummary).
 
-import type { TableSummary } from "@toc/protocol";
+import { isTableId, parseTableSummary, type TableSummary } from "@toc/protocol";
 
 export type ApiDeps = {
   fetch: (input: string, init?: RequestInit) => Promise<Response>;
@@ -12,13 +13,60 @@ export type ApiDeps = {
 
 export type CreateResult = { ok: true; id: string } | { ok: false; reason: "offline" | "server" };
 
-export async function createTable(_deps?: ApiDeps): Promise<CreateResult> {
-  throw new Error("createTable: not yet");
+/** The page's own fetch and online flag. */
+export const browserApi: ApiDeps = {
+  fetch: (input, init) => fetch(input, init),
+  online: () => typeof navigator === "undefined" || navigator.onLine !== false,
+};
+
+async function bodyOf(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return undefined;
+  }
 }
 
+/** POST /api/tables: the new table's id, or why there is none (offline, or the server's fault). */
+export async function createTable(deps: ApiDeps = browserApi): Promise<CreateResult> {
+  if (!deps.online()) return { ok: false, reason: "offline" };
+  let response: Response;
+  try {
+    response = await deps.fetch("/api/tables", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+  } catch {
+    return { ok: false, reason: "offline" };
+  }
+  if (response.status !== 201) return { ok: false, reason: "server" };
+  const body = await bodyOf(response);
+  const id = typeof body === "object" && body !== null ? (body as { id?: unknown }).id : undefined;
+  return isTableId(id) ? { ok: true, id } : { ok: false, reason: "server" };
+}
+
+/**
+ * GET /api/tables/:id: the public summary, "gone" when the table does not exist (404, or an id that
+ * cannot be one), "unknown" when the answer cannot be had (offline, a server error, not a summary).
+ */
 export async function tableSummary(
-  _id: string,
-  _deps?: ApiDeps,
+  id: string,
+  deps: ApiDeps = browserApi,
 ): Promise<TableSummary | "gone" | "unknown"> {
-  throw new Error("tableSummary: not yet");
+  if (!isTableId(id)) return "gone";
+  if (!deps.online()) return "unknown";
+  let response: Response;
+  try {
+    response = await deps.fetch(`/api/tables/${id}`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return "unknown";
+  }
+  if (response.status === 404) return "gone";
+  if (response.status !== 200) return "unknown";
+  return parseTableSummary(await bodyOf(response)) ?? "unknown";
 }

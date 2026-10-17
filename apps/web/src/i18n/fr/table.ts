@@ -3,6 +3,13 @@
 
 export const table = {
   connecting: "Connexion à la table…",
+  /** Under « Connexion à la table… » after 10 s. */
+  slow: "La connexion est lente. Vérifie le réseau.",
+  offline: {
+    heading: "Pas de connexion",
+    body: "La table en ligne a besoin d’Internet. Vérifie le réseau, puis réessaie. Sans réseau, tu peux jouer contre l’ordinateur.",
+    retry: "Réessayer",
+  },
   notFound: {
     heading: "Cette table n’existe plus",
     body: "Le lien est peut-être incomplet, ou la partie a été effacée après 30 jours sans jouer.",

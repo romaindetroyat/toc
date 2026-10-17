@@ -16,6 +16,7 @@ import {
   PROTOCOL_VERSION,
   parseClientFrame,
   type ServerFrame,
+  type TableSummary,
   toBase64Url,
 } from "@toc/protocol";
 import {
@@ -23,6 +24,7 @@ import {
   createTable,
   nextDeadline,
   reduce,
+  summary,
   type Table,
   type TestOptions,
 } from "@toc/table";
@@ -78,6 +80,15 @@ export class GameRoom extends DurableObject<Env> {
     commit(sql, table, [], Date.now());
     this.cached = table;
     return true;
+  }
+
+  /**
+   * RPC from the Worker: the table's public summary, or null when this id holds no table. Reads
+   * sqlite_master first, so asking about an unknown id creates no schema (T-02-16).
+   */
+  async summary(): Promise<TableSummary | null> {
+    const table = this.table();
+    return table === null ? null : summary(table);
   }
 
   /** The WebSocket upgrade, already checked by the Worker (id format, Origin). */
