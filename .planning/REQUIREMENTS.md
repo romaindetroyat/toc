@@ -46,7 +46,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **NET-02** : Un joueur qui recharge la page ou perd le réseau retrouve la partie dans son état exact en se reconnectant.
 - [ ] **NET-03** : Quand un humain se déconnecte, la partie se met en pause et tous les joueurs le voient.
 - [ ] **NET-04** : Après un délai, le créateur de la table choisit : attendre encore, confier la place à l'ordinateur (le joueur la récupère à son retour), ou sauvegarder la partie pour plus tard.
-- [ ] **NET-05** : Les joueurs d'une table échangent par chat texte pendant la partie.
+- [ ] **NET-05** : Les joueurs d'une table échangent des messages rapides pendant la partie : des phrases et des émojis prêts à l'emploi, sans clavier (choix de Romain du 2026-10-17, D-07).
 
 ### Comptes et amis (ACCT)
 
@@ -102,7 +102,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | Feature | Reason |
 |---------|--------|
 | Matchmaking public avec des inconnus | Jeu familial et entre amis ; évite la modération |
-| Discussion vocale | Le chat texte suffit |
+| Discussion vocale | Les messages rapides suffisent |
 | Classement mondial / Elo | Pas de public ouvert |
 | Annuler un coup après validation | Incompatible avec les mains cachées et l'IA ; remplacé par aperçu + confirmation |
 | Minuteur strict qui joue à la place | Contredit la pause en cas de déconnexion |

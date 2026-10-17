@@ -218,7 +218,7 @@
 {/if}
 
 {#if shortcutsOpen}
-  <ShortcutsSheet onclose={() => (shortcutsOpen = false)} opener={shortcutsButton} />
+  <ShortcutsSheet onclose={() => (shortcutsOpen = false)} opener={shortcutsButton} {online} />
 {/if}
 
 {#if abandonOpen && onabandon}

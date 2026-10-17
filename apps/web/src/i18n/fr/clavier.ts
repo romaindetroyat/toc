@@ -6,6 +6,8 @@ export type ShortcutRow = {
   /** The keys, each drawn as a key cap; several keys mean « either of them » (« S » / « A »). */
   keys: string[];
   action: string;
+  /** Shown at an online table only (« M », plan 02-08). */
+  online?: boolean;
 };
 
 export const clavier = {
@@ -34,6 +36,8 @@ export const clavier = {
       action: "Passer la carte choisie, ou poser tes cartes quand aucune n’est jouable.",
     },
     { keys: ["?"], action: "Afficher cette aide." },
+    /** In an online game only (plan 02-08); the local game has no messages. */
+    { keys: ["M"], action: "Ouvrir les messages rapides.", online: true },
   ] satisfies ShortcutRow[],
 
   /** The short labels of the key hints (plan 01-28). */
@@ -45,5 +49,6 @@ export const clavier = {
     advance: "A",
     pass: "P",
     help: "?",
+    messages: "M",
   },
 } as const;

@@ -38,10 +38,16 @@ export type KeyContext = {
   focus: FocusTarget;
   /** A sheet or dialog is open, the end screen is up, or there is no game. */
   blocked: boolean;
+  /** An online game: « M » opens « Messages rapides » (plan 02-08); absent or false in the local game. */
+  messages?: boolean;
 };
 
-/** Reducer events to send, or the help sheet to open (« ? »), or nothing. */
-export type KeyIntent = { kind: "turn"; events: TurnUiEvent[] } | { kind: "help" } | null;
+/** Reducer events to send, the help sheet (« ? ») or the quick messages (« M », online) to open, or nothing. */
+export type KeyIntent =
+  | { kind: "turn"; events: TurnUiEvent[] }
+  | { kind: "help" }
+  | { kind: "messages" }
+  | null;
 
 /**
  * The knights lit for the flow (the state under the tray): the 7's knights that may still be given
@@ -194,6 +200,10 @@ export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
   }
   // « ? » (typed with Shift on most layouts) opens the help sheet, whatever the turn.
   if (input.key === "?") return { kind: "help" };
+  // « M » (the typed letter, wherever the layout puts it) opens the quick messages online, whatever the turn.
+  if (ctx.messages === true && (input.key === "m" || input.key === "M")) {
+    return { kind: "messages" };
+  }
   const { ui } = ctx;
 
   const digit = digitOf(input.code);

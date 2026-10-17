@@ -8,6 +8,7 @@
   import SeatChip from "./SeatChip.svelte";
   import SettingsButton from "./SettingsButton.svelte";
   import Icon from "./Icon.svelte";
+  import MessagesButton from "./MessagesButton.svelte";
   import Sheet from "./Sheet.svelte";
   import TablePlayers from "./TablePlayers.svelte";
 
@@ -40,6 +41,11 @@
      * sheet (phone) or behind a 44 px button on a fourth row of the column form (computer).
      */
     players?: { table: TablePublic; me: Color };
+    /**
+     * An online game (plan 02-08): « Messages » on the column form's fourth row, next to « À la
+     * table »; opens « Messages rapides » (the key « M » does too).
+     */
+    onmessages?: (opener: HTMLElement) => void;
   };
 
   let {
@@ -53,6 +59,7 @@
     onstop,
     thinking = null,
     players,
+    onmessages,
   }: Props = $props();
 
   let infoOpen = $state(false);
@@ -220,7 +227,7 @@
     {/if}
 
     {#if form === "column" && gear && players !== undefined}
-      <!-- The computer's fourth row (plan 02-06): « À la table »; plan 02-08 adds « Messages ». -->
+      <!-- The computer's fourth row: « À la table » (plan 02-06), then « Messages » (plan 02-08). -->
       <div class="table-row" data-table-row-buttons>
         <button
           type="button"
@@ -234,6 +241,9 @@
         >
           <Icon name="users" size={24} />
         </button>
+        {#if onmessages !== undefined}
+          <MessagesButton onopen={onmessages} keys />
+        {/if}
       </div>
     {/if}
   </header>

@@ -61,6 +61,8 @@
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import MessagesButton from "../ui/MessagesButton.svelte";
+  import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
@@ -457,6 +459,17 @@
   function stopGame() {
     online?.connection.send({ t: "stop" });
   }
+
+  // --- « Messages rapides » (plan 02-08): the button, the key « M », the sheet ---
+  let messagesOpen = $state(false);
+  let messagesOpener = $state<HTMLElement | null>(null);
+
+  /** Opens the sheet; `opener` gets the focus back (« Messages », or what had it before « M »). */
+  function openMessages(opener: HTMLElement | null) {
+    if (online === undefined) return;
+    messagesOpener = opener;
+    messagesOpen = true;
+  }
   let previousTable: TablePublic | null = null;
   $effect(() => {
     const next = onlineTable;
@@ -673,6 +686,7 @@
       lit: candidates,
       concealed,
       focus: focusTarget(),
+      messages: online !== undefined,
       blocked:
         session === undefined ||
         view === undefined ||
@@ -680,8 +694,8 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
-    // Under a plate only « ? » reaches the game (« M » arrives with plan 02-08).
-    if (plateUp && intent.kind !== "help") return;
+    // Under a plate only « ? » and « M » reach the game.
+    if (plateUp && intent.kind !== "help" && intent.kind !== "messages") return;
     // The key is handled: no native action (a focused card or button is not also activated). It is
     // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
     // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
@@ -691,6 +705,11 @@
       const active = document.activeElement;
       shortcutsOpener = active instanceof HTMLElement && active !== document.body ? active : null;
       shortcutsOpen = true;
+      return;
+    }
+    if (intent.kind === "messages") {
+      const active = document.activeElement;
+      openMessages(active instanceof HTMLElement && active !== document.body ? active : null);
       return;
     }
     for (const each of intent.events) {
@@ -816,6 +835,7 @@
       {bar}
       {compact}
       {part}
+      fastToggle={online === undefined}
       {view}
       human={session.human}
       names={session.names}
@@ -920,11 +940,14 @@
             players={online !== undefined && onlineTable !== null
               ? { table: onlineTable, me: online.seat }
               : undefined}
+            onmessages={online !== undefined ? openMessages : undefined}
           />
         </div>
 
         {#if compact}
-          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays. -->
+          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays;
+               online « Messages » takes that slot (the server paces the computers, plan 02-08) and
+               stays usable under a plate. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
               <SettingsButton
@@ -935,9 +958,13 @@
                 onstop={canStop ? stopGame : undefined}
               />
             </div>
-            <div class="fast" inert={plateUp}>
-              {@render zone("fast")}
-            </div>
+            {#if online !== undefined}
+              <MessagesButton onopen={openMessages} keys />
+            {:else}
+              <div class="fast" inert={plateUp}>
+                {@render zone("fast")}
+              </div>
+            {/if}
           </div>
         {/if}
 
@@ -1108,7 +1135,22 @@
       {/if}
 
       {#if shortcutsOpen}
-        <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
+        <ShortcutsSheet
+          opener={shortcutsOpener}
+          online={online !== undefined}
+          onclose={() => (shortcutsOpen = false)}
+        />
+      {/if}
+
+      {#if messagesOpen && online !== undefined && onlineTable !== null && !ended}
+        <MessagesSheet
+          chat={online.connection.chat}
+          table={onlineTable}
+          me={online.seat}
+          opener={messagesOpener}
+          onsend={(msg) => online.connection.send({ t: "chat", msg })}
+          onclose={() => (messagesOpen = false)}
+        />
       {/if}
 
       {#if ended && render.winner !== null && endNames !== undefined}

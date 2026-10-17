@@ -4,6 +4,7 @@
   import { unlock } from "../audio/engine.ts";
   import type { ControllerFactory } from "../game/session.svelte.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
+  import { messages } from "../i18n/fr/messages.ts";
   import { table as copy } from "../i18n/fr/table.ts";
   import { seats as seatCopy } from "../i18n/fr/seats.ts";
   import { browserApi, tableHealth, tableSummary } from "../net/api.ts";
@@ -80,6 +81,9 @@
         // Back after a drop long enough to show the banner (plan 02-07).
         else if ((opened.lastDownMs ?? 0) >= BANNER_MS) showToast(copy.game.connection.back);
         if (frame.you.seat !== null) reclaim = "idle";
+      } else if (frame.t === "error" && frame.code === "rate") {
+        // Four quick messages within 5 s (plan 02-08): the fourth was not sent.
+        showToast(messages.rate);
       } else if (frame.t === "reclaimResult") {
         if (!frame.accepted) reclaim = "refused";
       } else if (frame.t === "reclaimRequest") {

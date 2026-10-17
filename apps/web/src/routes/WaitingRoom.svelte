@@ -9,6 +9,8 @@
   import { tableNotices } from "../net/notices.ts";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
   import InviteSheet, { takeNewTable } from "../ui/InviteSheet.svelte";
+  import MessagesButton from "../ui/MessagesButton.svelte";
+  import MessagesSheet from "../ui/MessagesSheet.svelte";
   import MoveSheet from "../ui/MoveSheet.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SeatTile from "../ui/SeatTile.svelte";
@@ -156,6 +158,17 @@
   let inviteOpen = $state(false);
   let inviteButton = $state<HTMLButtonElement | null>(null);
 
+  // « Messages rapides » (plan 02-08): for the seated only (the server takes no message from
+  // someone without a seat).
+  let messagesOpen = $state(false);
+  let messagesOpener = $state<HTMLElement | null>(null);
+
+  function openMessages(opener: HTMLElement) {
+    unlock();
+    messagesOpener = opener;
+    messagesOpen = true;
+  }
+
   function invite() {
     unlock();
     inviteOpen = true;
@@ -283,10 +296,13 @@
         <p class="t-body muted" data-unseated>{copy.lobby.unseated(unseatedOthers)}</p>
       {/if}
 
-      <!-- DOM order = visual order: [Réglages] [Inviter] [Lancer la partie] (plan 02-08 adds
-           « Messages » after « Réglages »). -->
+      <!-- DOM order = visual order: [Réglages] [Messages] [Inviter] [Lancer la partie]; « Messages »
+           once seated (plan 02-08). -->
       <div class="actions" data-room-actions>
         <div class="gear" data-settings-slot><SettingsButton online {onleave} /></div>
+        {#if mySeat !== null}
+          <MessagesButton onopen={openMessages} />
+        {/if}
         {#if viewer === "full"}
           <button type="button" class="btn btn-secondary" onclick={onhome}>{copy.home}</button>
         {:else}
@@ -337,6 +353,17 @@
     onmove={(to) => move(from, to)}
     onclose={() => (moving = null)}
     opener={tiles[from]}
+  />
+{/if}
+
+{#if messagesOpen && mySeat !== null}
+  <MessagesSheet
+    chat={connection.chat}
+    {table}
+    me={mySeat}
+    opener={messagesOpener}
+    onsend={(msg) => connection.send({ t: "chat", msg })}
+    onclose={() => (messagesOpen = false)}
   />
 {/if}
 

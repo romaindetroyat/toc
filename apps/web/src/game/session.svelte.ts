@@ -138,8 +138,11 @@ export function createSession(
   const k = quarterTurnsFor(human);
   const testSpeed = debug.vitesse === "test";
 
+  // Online the server paces the computers for everyone: « Avance rapide » is hidden there and its
+  // setting is not applied (plan 02-08, 02-UI-SPEC « Chrome changes »).
+  const fast = () => settings.fast && makeController === undefined;
   const paceNow = (): DirectorMode =>
-    testSpeed ? "test" : settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal";
+    testSpeed ? "test" : settings.reduceMotion ? "reduced" : fast() ? "fast" : "normal";
   const director = createDirector({
     animator: env.animator,
     audio: env.audio ?? audio,

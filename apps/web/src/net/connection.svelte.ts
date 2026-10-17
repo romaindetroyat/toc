@@ -23,6 +23,8 @@
 
 import type { PlayerView } from "@toc/engine";
 import {
+  CHAT_KEEP,
+  type ChatEntry,
   CLOSE_SILENT,
   type ClientFrame,
   type EventsFrame,
@@ -51,6 +53,11 @@ export type TableConnection = RemoteConnection & {
   readonly lastDownMs: number | null;
   /** The server answered bad-frame: « La table ne répond pas ». */
   readonly serverError: boolean;
+  /**
+   * The quick messages the table kept (plan 02-08), oldest first: the welcome's, then each chat frame
+   * (at most CHAT_KEEP). « Derniers messages » reads them; the bubbles follow the live chat frames.
+   */
+  readonly chat: readonly ChatEntry[];
   /** « Réessayer maintenant », « Réessayer »: a new socket at once. */
   reconnect(): void;
   close(): void;
@@ -84,6 +91,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
   let linkNow = $state(Date.now());
   let lastDownMs = $state<number | null>(null);
   let serverError = $state(false);
+  let chat = $state.raw<ChatEntry[]>([]);
   let linkTimers: ReturnType<typeof setTimeout>[] = [];
 
   function clearLinkTimers(): void {
@@ -143,6 +151,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
         table = frame.table;
         view = frame.view;
         seq = frame.seq;
+        chat = frame.chat;
         // A snapshot replaces everything: a game screen built now starts from its view.
         collecting = false;
         start = null;
@@ -161,6 +170,9 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
         return;
       case "error":
         if (frame.code === "bad-frame") serverError = true;
+        return;
+      case "chat":
+        chat = [...chat, { from: frame.from, msg: frame.msg, at: frame.at }].slice(-CHAT_KEEP);
         return;
       case "reclaimRequest":
       case "reclaimResult":
@@ -294,6 +306,9 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
     },
     get serverError() {
       return serverError;
+    },
+    get chat() {
+      return chat;
     },
     reconnect() {
       if (ended) return;
