@@ -86,13 +86,16 @@ async function overlaps(page: Page): Promise<string[]> {
       [t.left, t.bottom],
       [t.right, t.bottom],
     ] as const) {
-      if (((x - cx) / (f.width / 2)) ** 2 + ((y - cy) / (f.height / 2)) ** 2 <= 1) hit.push("tapis");
+      if (((x - cx) / (f.width / 2)) ** 2 + ((y - cy) / (f.height / 2)) ** 2 <= 1)
+        hit.push("tapis");
     }
     return hit;
   });
 }
 
-test("the deal says who starts: banner, « 1er » token, « Commence : … »", async ({ page }, info) => {
+test("the deal says who starts: banner, « 1er » token, « Commence : … »", async ({
+  page,
+}, info) => {
   // Pégase, Ourasi…: a computer seat starts (rouge, the player's partner at the top).
   await open(page, SEEDS.rouge as string);
   const banner = page.locator("[data-deal-banner]");
