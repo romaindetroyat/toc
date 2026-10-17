@@ -12,7 +12,7 @@
 // handler leaves at scheduledTime (after production's clamp to that Date.now()) is deleted.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { CHOICE_CEILING_MS, HARD_CAP_MS, randomLegal } from "@toc/bots";
+import { CHOICE_CEILING_MS, FAST_CEILING_MS, HARD_CAP_MS, randomLegal } from "@toc/bots";
 import type { Action, Color, GameEvent, PlayerView, Rng } from "@toc/engine";
 import type { ServerFrame } from "@toc/protocol";
 import type { Table } from "@toc/table";
@@ -24,6 +24,11 @@ import { type Client, connect, createTable, token } from "./helpers.ts";
 
 /** A computer's turn: its think time (at most CHOICE_CEILING_MS) plus a second for the alarms. */
 const TURN_MS = CHOICE_CEILING_MS + 1_000;
+/**
+ * « Avance rapide » (plan 02-10b): a computer's think time is at most FAST_CEILING_MS; this is the
+ * slack left for the alarms and the decision itself (a Galopeur decides in a few ms).
+ */
+const FAST_SLACK_MS = 250;
 /** How long the drive waits for one move before it reports the stall. */
 const STALL_MS = 15_000;
 
@@ -124,6 +129,7 @@ type Turn = { due: Row; move: Row };
 async function play(
   levels: Partial<Record<Color, 1 | 2 | 3 | 4 | 5>> | undefined,
   enough: (turns: Turn[]) => boolean,
+  options: { fast?: boolean } = {},
 ): Promise<{ id: string; turns: Turn[] }> {
   const id = await createTable(
     levels === undefined ? { pace: "normal" } : { pace: "normal", levels },
@@ -139,6 +145,11 @@ async function play(
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");
   bea.send({ t: "sit", seat: "jaune" });
   await bea.next("welcome", (frame) => frame.you.seat === "jaune");
+  if (options.fast === true) {
+    // The chef de table switches the table's « Avance rapide » on before the start (plan 02-10b).
+    ana.send({ t: "speed", fast: true });
+    await bea.next("table", (frame) => frame.table.fast);
+  }
   ana.send({ t: "start" });
   let rng: Rng = [20261017, 11, 13, 17];
   const acted = new Set<string>();
@@ -187,13 +198,17 @@ async function play(
   }
 }
 
-/** Each computer play, its delay after the commit that made it due, and the budget it had. */
-function report(turns: Turn[], extra: number) {
+/**
+ * Each computer play, its delay after the commit that made it due, and the budget it had: the
+ * animation of that commit at `mode` plus `extra`.
+ */
+function report(turns: Turn[], extra: number, mode: "normal" | "fast" = "normal") {
   return turns.map(({ due, move }) => ({
     seat: move.seat,
     seq: move.seq,
     delay: move.at - due.at,
-    budget: Math.round(eventsDuration(due.events, "normal")) + extra,
+    animation: Math.round(eventsDuration(due.events, mode)),
+    budget: Math.round(eventsDuration(due.events, mode)) + extra,
     slices: move.bot?.slices,
   }));
 }
@@ -218,6 +233,21 @@ describe("computer players at the real pace", () => {
     console.log(`production delivery: ${JSON.stringify(rows)}`);
     for (const row of rows) expect(row.delay, JSON.stringify(row)).toBeLessThanOrEqual(row.budget);
     expect(turns.some(byComputer)).toBe(true);
+  }, 90_000);
+
+  it("« Avance rapide » on: each Galopeur plays within 0.3 s of the fast animation", async () => {
+    restore = deliverAsProduction();
+    const byComputer = (turn: Turn) => turn.due.bot !== null;
+    const { id, turns } = await play(
+      undefined,
+      (done) => done.length >= 12 || (done.length >= 6 && done.some(byComputer)),
+      { fast: true },
+    );
+    expect((await readTable(id)).fast).toBe(true);
+    const rows = report(turns, FAST_CEILING_MS + FAST_SLACK_MS, "fast");
+    console.log(`production delivery, fast: ${JSON.stringify(rows)}`);
+    for (const row of rows) expect(row.delay, JSON.stringify(row)).toBeLessThanOrEqual(row.budget);
+    expect(rows.length).toBeGreaterThanOrEqual(6);
   }, 90_000);
 
   it("two Champions still decide in slices, one alarm each, within their cap", async () => {
