@@ -91,7 +91,7 @@ async function settled(page: Page) {
 
 /**
  * Everything the strips show: the info, the gear, « Avance rapide », the buttons, the chips. The hand
- * is checked on its own (expectHand): since plan 03-10 its cards may leave the strip.
+ * is checked on its own (expectHand): since plan 03-10 its cards reach over the galet's bare side.
  */
 const STRIP_ITEMS =
   "[data-info-bar], [data-settings-slot] button, [data-fast], [data-action-buttons] button, [data-tray-option], [data-seven-chips] [data-step], [data-seven-buttons] button";
@@ -160,8 +160,10 @@ function stripItems(page: Page): Promise<Item[]> {
  * The hand in the galet's corner (plan 03-10, Romain's « Cartes plus grandes en coin »): every card
  * under the info pill and above the screen's bottom edge; on the screen, each shows a slice of at
  * least 44 x 44 px (to the next card's top, or whole for the last); and no card, wherever it stands
- * (in the strip, over the galet's bare side or past the screen's left edge), covers a drawn cell or a
- * knight.
+ * (in the strip or over the galet's bare side), covers a drawn cell or a knight. One straight column
+ * (plan 02-06b, Romain's « la carte du bas est décalée, je ne veux pas ça »): every card the same size
+ * and the same left edge (the selected one 6 px toward the board), never left of the strip, so never
+ * in the screen's safe-area inset.
  */
 async function expectHand(page: Page, what: string) {
   const size = page.viewportSize();
@@ -172,11 +174,14 @@ async function expectHand(page: Page, what: string) {
       return { x: box.x, y: box.y, width: box.width, height: box.height };
     };
     const info = document.querySelector("[data-info-bar]");
+    const hand = document.querySelector("[data-hand]");
     return {
       cards: [...document.querySelectorAll("[data-hand] [data-card]")].map((node) => ({
         name: node.getAttribute("aria-label") ?? "",
+        selected: node.getAttribute("data-state") === "selected",
         ...rect(node),
       })),
+      strip: hand === null ? null : rect(hand),
       keep: [...document.querySelectorAll("[data-board-art] [data-cell], [data-pawn]")]
         .map((node) => ({
           name: node.getAttribute("data-cell") ?? node.getAttribute("data-pawn") ?? "",
@@ -186,6 +191,20 @@ async function expectHand(page: Page, what: string) {
       info: info === null ? null : rect(info),
     };
   });
+  // The column's left edge: a card not selected (a lone selected card is the column, moved).
+  const column = found.cards.find((card) => !card.selected);
+  for (const card of found.cards) {
+    const label = `${what}: « ${card.name} »`;
+    if (column) {
+      expect(card.x - column.x, `${label} out of the column`).toBeCloseTo(card.selected ? 6 : 0, 0);
+      expect(card.width, `${label} not the column's width`).toBeCloseTo(column.width, 0);
+      expect(card.height, `${label} not the column's height`).toBeCloseTo(column.height, 0);
+    }
+    expect(card.x, `${label} left of the screen`).toBeGreaterThanOrEqual(-0.5);
+    if (found.strip) {
+      expect(card.x, `${label} left of the strip`).toBeGreaterThanOrEqual(found.strip.x - 0.5);
+    }
+  }
   for (const [i, card] of found.cards.entries()) {
     const label = `${what}: « ${card.name} »`;
     const next = found.cards[i + 1];
@@ -297,9 +316,11 @@ test.describe("sur le téléphone tenu en largeur, le plateau sur toute la haute
     await expectStrips(page, "à toi de jouer");
     await expectNoScroll(page, "à toi de jouer");
 
-    // The hand in the corner (plan 03-10): 67 x 94 cards at 750 x 342 (52 x 73 before), from the
-    // bottom of the left strip up, 50 px apart (past the middle of each card), the last one on the
-    // screen's bottom edge; none further right than the board's edge but by the bare wood.
+    // The hand in the corner (plans 03-10 and 02-06b): one straight column of 56 x 79 cards at
+    // 750 x 342 (the largest that the 60 px strip and the galet's bare side leave; 52 x 73 in the
+    // 01-47 column), from the bottom of the left strip up, 51 px apart (past the middle of each card),
+    // the last one on the screen's bottom edge; all on the screen's left edge, none further right than
+    // the board's edge but by the bare wood.
     const board = await boxOf(page, "[data-board]");
     const cards = await page.locator("[data-hand] [data-card]").evaluateAll((nodes) =>
       nodes.map((node) => {
@@ -309,13 +330,14 @@ test.describe("sur le téléphone tenu en largeur, le plateau sur toute la haute
     );
     expect(cards.length).toBeGreaterThan(0);
     for (const [i, card] of cards.entries()) {
-      expect(card.width, "a 67 px card").toBeCloseTo(67, 0);
-      expect(card.height, "a 94 px card").toBeCloseTo(94, 0);
+      expect(card.width, "a 56 px card").toBeCloseTo(56, 0);
+      expect(card.height, "a 79 px card").toBeCloseTo(79, 0);
+      expect(card.x, "the card on the screen's left edge").toBeCloseTo(0, 0);
       expect(card.x + card.width, "the card by the board's left side").toBeLessThanOrEqual(
         board.x + 12,
       );
       const next = cards[i + 1];
-      if (next) expect(next.y - card.y, "50 px of the card").toBeCloseTo(50, 0);
+      if (next) expect(next.y - card.y, "51 px of the card").toBeCloseTo(51, 0);
       else expect(card.y + card.height, "the last card on the bottom edge").toBeCloseTo(342, 0);
     }
 
@@ -500,8 +522,7 @@ type Control = Box & {
 /**
  * Every visible control of the page (buttons, the chips) except the board's own (its knights, its
  * hit layer and its felt) and the hand's cards, which expectHand checks (since plan 03-10 they may
- * stand over the galet's bare corner and past the screen's left edge), each with the column it
- * scrolls in, if any.
+ * reach over the galet's bare side), each with the column it scrolls in, if any.
  */
 function controlsOf(page: Page): Promise<Control[]> {
   return page.evaluate(() => {
@@ -922,6 +943,53 @@ test.describe("les tailles visées du téléphone tenu en largeur (émulation Ch
       await expect.poll(() => offCell(page, "bleu0", 15)).toBeLessThanOrEqual(0.5);
       await boardWidth(page);
       await expectNoScroll(page, `${what}, après le coup`);
+    });
+  }
+});
+
+test.describe("sur l’iPhone, les cartes hors de la marge de l’encoche (plan 02-06b)", () => {
+  test.skip(({ isMobile }) => isMobile, "explicit landscape viewports");
+
+  // Chromium has no env(safe-area-inset-*): the iPhone's insets held sideways are set on the game
+  // screen as Game.svelte reads them (its padding, --inset-x and --inset-y). iPhone 14 (47 px each
+  // side) and iPhone 15 Pro (59 px, the Dynamic Island), 21 px at the bottom.
+  for (const iphone of [
+    { name: "iPhone 14", width: 844, height: 390, side: 47 },
+    { name: "iPhone 15 Pro", width: 852, height: 393, side: 59 },
+  ]) {
+    test(`${iphone.name} : une seule colonne, aucune carte sous l’encoche`, async ({ page }) => {
+      await page.setViewportSize({ width: iphone.width, height: iphone.height });
+      await page.goto("/");
+      await page.goto(`/#/partie?graine=1234567890abcdef1234567890abcdef&vitesse=test`);
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      await page.addStyleTag({
+        content: `main.game { padding: 0 ${iphone.side}px 21px ${iphone.side}px !important;
+          --inset-x: ${2 * iphone.side}px !important; --inset-y: 21px !important; }`,
+      });
+      const what = `${iphone.name}, encoche de ${iphone.side} px`;
+      await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
+      // The strip starts after the inset, and the board is width-limited: 60 px strips.
+      await expect
+        .poll(async () => (await boxOf(page, "[data-hand]")).x, { message: what })
+        .toBeCloseTo(iphone.side, 0);
+      const board = await boxOf(page, "[data-board]");
+      expect(board.x - iphone.side, `${what}: a 60 px strip`).toBeCloseTo(60, 0);
+      await expect
+        .poll(
+          async () =>
+            Math.min(
+              ...(await page
+                .locator("[data-hand] [data-card]")
+                .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().x))),
+            ),
+          { message: what },
+        )
+        .toBeGreaterThanOrEqual(iphone.side - 0.5);
+      await expectHand(page, what);
+      // A card chosen: it moves 6 px toward the board, the others stay in the column.
+      await page.locator("[data-hand] [data-card]").nth(2).click();
+      await settled(page);
+      await expectHand(page, `${what}, une carte choisie`);
     });
   }
 });

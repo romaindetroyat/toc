@@ -386,32 +386,37 @@ Applicable state considerations resolved: 15 covered, 3 backstop, 0 unresolved
 
 ### The phone held sideways (compact mode): the hand in the corner
 
+> **Note, 2026-10-17 (plan 02-06b).** Romain, with a screenshot from his iPhone held sideways (Dynamic Island on the left): « Sur iphone, la carte du bas est décalée, je ne veux pas ça ». The lowest card (a Dame) stood much further right than the others, over the board's bottom-left ring cells, while the upper ones ran left under the Dynamic Island. The hand is now **one straight vertical column**: every card the same size and the same left edge, never left of the strip (which starts after `env(safe-area-inset-left)`, about 47–59 px on an iPhone held sideways), no per-card horizontal offset. The rows « Card », « Horizontal place » and « Middle » and the size table below are replaced accordingly; the 03-10 card size is kept wherever the strip leaves room for it, which on a phone it does not: on every iPhone held sideways the board is width-limited and the strip is 60 px, so the cards are the largest uniform 5:7 cards that fit there, 56 × 79 (about 1.08 times the 01-47 column's 52 × 73).
+
 Measured before building, from `packages/board` (insets 0): the galet’s bare bottom-left corner is a quarter disc of about 110 px from the screen corner, and along the left strip the ring’s cells stand 2 to 7 px right of the board’s edge. Whole 80 px cards cannot stand there without covering cells. So the hand is a cascade of large cards from the bottom of the left strip up, each pushed as far right as the scene geometry allows (the lower ones lean into the corner), and running past the screen’s left edge when the strip is narrower than the card. On an iPhone the safe-area inset (about 47 px each side in landscape) gives the cards that room first, so they show (nearly) whole there.
 
 | Property | Value |
 |----------|-------|
-| Card | `cornerCard(height)` (`apps/web/src/cards/fan.ts`): the largest 5:7 card, at most 80 × 112, such that five fit under the info pill (48 px) with each slice at least 3 px past the middle of its card (the middle of every card is seen and tapped) |
+| Card | `cornerLayout(...).card` (`apps/web/src/cards/fan.ts`): the largest `cornerCard(height, maxWidth)` that fits the column's room (below); `cornerCard` is the largest 5:7 card, at most 80 × 112 (and at most `maxWidth` wide), such that five fit under the info pill (48 px) with each slice at least 3 px past the middle of its card (the middle of every card is seen and tapped). One size for every card |
 | Board | Unchanged (formula of 01-47): no shrinking |
 | Order and slices | Ascending value from top to bottom; the last card on the strip’s bottom edge, each card a slice above the next (a box of five: nothing jumps when a card leaves); slice = min(h/2 + 12, (height − 48 − h) / 4), at least 44 |
-| Horizontal place | `cornerLayout` over `leftClearance(y0, y1)` (`packages/board/src/scene.ts`): the right edge of each card at the leftmost thing of the game in its band (a ring cell with the knight, halo and ghost ring it may carry, a home or stable dot with its knight, a rider with its thinking glow, the felt), less 2 px and the 6 px of the selection; never right of the card under it |
+| Horizontal place | One column (plan 02-06b): every card at the same `x = max(0, floor(room − w))` in the strip, where `room` is the strip's width plus `leftClearance(y0, y1)` (`packages/board/src/scene.ts`) over the **whole box of five cards** (the leftmost thing of the game in that band: a ring cell with the knight, halo and ghost ring it may carry, a home or stable dot with its knight, a rider with its thinking glow, the felt), less 2 px and the 6 px of the selection. Never left of the strip, so never in the safe-area inset (under the Dynamic Island); the same `x` whatever the number of cards |
 | Index | Rank over suit, stacked in the card’s **top-right** corner (the part always on the screen, as on a four-index deck): rank 25 % of the card’s height (27.5 px at 110), suit 20 %, weight 800 |
-| Middle | The big pip, letter or figure centred on the part on the screen (`--cut`), and, on every card but the last, under its slice (`--middle-top`), so a slice shows its index alone |
+| Middle | The big pip, letter or figure centred on the card (no card runs past the screen's edge any more: no `--cut`), and, on every card but the last, under its slice (`--middle-top`), so a slice shows its index alone |
 | Selected | Moves 6 px toward the board, keeps its place in the stack (amber outline) |
 | Unplayable | Opaque card under a walnut veil at 50 % (was 60 %) |
 | Taps | The cards only: the hand’s box covers the left strip but lets every other tap through (the info pill stays reachable); the 7’s step chips and « Lequel ? »’s chips still take the hand’s place, unchanged |
-| Keyboard | Digits 1–5, arrows up and down, unchanged; the digit (computer only) astride the card’s top edge at the left of its part on the screen |
+| Keyboard | Digits 1–5, arrows up and down, unchanged; the digit (computer only) astride the card’s top edge, 4 px from its left |
 
-Sizes at the target windows (Chromium emulation, insets 0; « shown » = the part of the card on the screen):
+Sizes at the target windows since plan 02-06b (the column's `x` is in the strip, which starts after the left inset; every card is whole on the screen):
 
-| Window | Board width | Card | Slice | Shown of each card (the last one) |
-|--------|-------------|------|-------|----------------------------------|
-| 844 × 390 | 724 px | 79 × 110 | 58 px | 57 px (65) |
-| 750 × 342 | 630 px | 67 × 94 | 50 px | 56 px (63) |
-| 667 × 375 | 547 px | 75 × 105 | 55 px | 55 px (70) |
-| 568 × 320 | 448 px | 61 × 86 | 46 px | 55 px (whole) |
-| 480 × 320 | 360 px | 61 × 86 | 46 px | 54 px (whole) |
+| Window | Insets (left/right, bottom) | Board width | Strip | Card | Slice | Column `x` |
+|--------|-----------------------------|-------------|-------|------|-------|------------|
+| 844 × 390 | 0, 0 (Chromium) | 724 px | 60 px | 56 × 79 | 51 px | 1 px |
+| 750 × 342 | 0, 0 (Chromium) | 630 px | 60 px | 56 × 79 | 51 px | 0 |
+| 667 × 375 | 0, 0 (Chromium) | 547 px | 60 px | 55 × 77 | 50 px | 0 |
+| 568 × 320 | 0, 0 (Chromium) | 448 px | 60 px | 55 × 77 | 48 px | 0 |
+| 480 × 320 | 0, 0 (Chromium) | 360 px | 60 px | 54 × 75 | 49 px | 0 |
+| 844 × 390 (iPhone 14) | 47, 21 | 630 px | 60 px | 56 × 79 | 51 px | 0 (screen x 47) |
+| 852 × 393 (iPhone 15 Pro) | 59, 21 | 614 px | 60 px | 56 × 79 | 51 px | 0 (screen x 59) |
+| 959 × 400 (small window) | 0, 0 | 752 px | 103.5 px | 80 × 112 | 60 px | 20 px |
 
-The smallest phones (320 px high) degrade gracefully: cards 1.17 times the old column’s instead of 1.5, slices of 46 px. A window lower than 306 px keeps 44 px slices with smaller cards.
+The galet's bare side along the left strip is only 2 to 7 px wide at its narrowest (the ring's cells at mid-height), and the column spans the whole height, so a 60 px strip holds cards 56 px wide at most (60 + 5 − 2 − 6 = 57, 5:7). A window wider than its height allows (the board height-limited) has wider strips and gets the 03-10 cards. (Before plan 02-06b: 79 × 110 at 844 × 390, 67 × 94 at 750 × 342, 61 × 86 at 320 px high, each card at its own `x`, past the screen's left edge.)
 
 ### The card received from the partner
 
@@ -440,7 +445,7 @@ A 6 px border of the partner’s seat colour (`PALETTE.hex`: bleu `#1F4FA8`, jau
 |---------|-------------|
 | Deal banner, last line of every deal | « Tu commences. » when the player starts, « {Nom} commence. » otherwise (e.g. « Pégase commence. »); same `.sub` style as « Donne 1 sur 3 · 5 cartes ». The banner's polite live region reads it with the deal, so screen readers hear it with no new announcement |
 | Computer's bottom bar (info column) and the phone's sheet « Infos de la partie » | A third line « Commence : {Nom} » (« Commence : toi » for the player, like « Donneur : toi »), muted cream like the dealer line, under « Donneur : X · Donne n sur 3 » (that line is unchanged). Not in the hidden 56 px row form, nor in the info pill (its accessible name is unchanged) |
-| « 1er » token on the board | A walnut pill 34 × 24 px with a 2 px cream outline and cream « 1 » + superscript « er » (the « D » disc is a cream disc with a walnut letter: they never read alike), on the wood just outside the felt's rim (6 px gap) on the first player's side, centred in the bare wood between that side's stable and home lane (50 scene units off the felt's axis toward the stable at the top and the bottom). It stays for the whole deal, never takes a tap and is `aria-hidden` (the banner and the info line say it in words) |
+| « 1er » token on the board | A walnut pill 34 × 24 px with a 2 px cream outline and cream « 1 » (15 px) + raised « er » (10 px), two texts meeting at the pill's middle (« 1 » anchored at its end, « er » at its start, 1 px apart, « er » 4.5 px higher), no `tspan`/`baseline-shift` (plan 02-06b: on Romain's iPhone the superscript was clipped and ran into the « 1 ») (the « D » disc is a cream disc with a walnut letter: they never read alike), on the wood just outside the felt's rim (6 px gap) on the first player's side, centred in the bare wood between that side's stable and home lane (50 scene units off the felt's axis toward the stable at the top and the bottom). It stays for the whole deal, never takes a tap and is `aria-hidden` (the banner and the info line say it in words) |
 
 Why outside the felt and not at a corner of the card place like « D »: the top and bottom card places sit between the talon and the défausse, so a token at their corner touched a pile (seen at 1280 × 800, worse on phones where 24 px is up to 9 scene units per pixel). On the wood beside the felt it covers no ring cell, dot, knight, rider or pile at any size.
 
@@ -480,7 +485,7 @@ Choix du chercheur à l’intérieur des décisions D-01 à D-13 ; ils seront re
 6. **Le résumé des équipes** (« Ton équipe : … », « Adversaires : … ») remplacé à l’écran par les lignes de force ; « Réglages » à gauche de « Jouer la partie ».
 7. **Le banc d’essai** à l’adresse `#/banc`, dans toutes les versions, sans aucun lien vers lui.
 8. **Les seuils du verdict** du banc : 95 % des coups en moins d’une seconde, aucun coup au-delà de 2 s, aucune image figée plus de 100 ms.
-9. **La main dans le coin** (plan 03-10) : le coin nu du galet est trop petit pour des cartes entières sans couvrir de cases ; les cartes montent donc en cascade depuis le bas de la bande de gauche, chacune aussi à droite que le galet le permet, et dépassent du bord gauche de l’écran quand la bande est trop étroite (sur l’iPhone, la marge de l’encoche leur laisse la place). La valeur est en haut à droite de la carte, la partie toujours visible.
+9. **La main dans le coin** (plan 03-10, puis 02-06b après « Sur iphone, la carte du bas est décalée, je ne veux pas ça », le 2026-10-17) : les cartes montent depuis le bas de la bande de gauche en **une seule colonne droite**, toutes de la même taille et au même bord gauche, jamais sous l’encoche de l’iPhone ; la colonne va aussi à droite que le galet le permet sur toute sa hauteur, sans couvrir de case. Sur un téléphone la bande fait 60 px : les cartes y font 56 × 79 (79 × 110 avant, mais en escalier et sous l’encoche). La valeur est en haut à droite de la carte.
 10. **La taille** : 79 × 110 à 844 × 390 (au lieu de ≈ 80 × 112, pour que le milieu de chaque carte reste visible et touchable), 67 × 94 sur l’iPhone 13 de Playwright (750 × 342), 61 × 86 sur les plus petits téléphones.
 11. **Le liseré** : 6 px de la couleur du partenaire, avec un filet noyer à l’intérieur ; la carte n’est plus entourée d’ambre.
 12. **L’ordinateur** : des cartes de 106 × 148 dont le bas passe sous le bord de l’écran, pour garder la barre de 160 px et le plateau de 1227 px ; le rouge des cœurs et des carreaux un peu plus foncé.

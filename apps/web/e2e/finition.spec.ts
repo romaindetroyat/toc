@@ -200,10 +200,10 @@ async function expectFits(page: Page, what: string, selectors: string[]) {
 }
 
 /**
- * The hand's cards may run past the screen's edges since plan 03-10 (Romain's larger cards: past the
- * left edge in the phone's corner, past the bottom edge in the computer's bar), but each shows on the
- * screen at least 44 x 44 px and its whole top corner index, and none starts above the screen or ends
- * past its right edge.
+ * The hand's cards may run past the screen's bottom edge since plan 03-10 (Romain's larger cards in
+ * the computer's bar), but each shows on the screen at least 44 x 44 px and its whole top corner
+ * index, and none starts above the screen, left of it (the phone's column stands inside its strip
+ * since plan 02-06b: « la carte du bas est décalée, je ne veux pas ça ») or ends past its right edge.
  */
 async function expectCardsShown(page: Page, what: string) {
   const size = page.viewportSize();
@@ -226,6 +226,7 @@ async function expectCardsShown(page: Page, what: string) {
   for (const card of cards) {
     const label = `${what}: « ${card.name} »`;
     expect(card.y, `${label} starts above the screen`).toBeGreaterThanOrEqual(-0.5);
+    expect(card.x, `${label} starts left of the screen`).toBeGreaterThanOrEqual(-0.5);
     expect(card.right, `${label} ends right of the screen`).toBeLessThanOrEqual(size.width + 0.5);
     const shownX = Math.min(size.width, card.right) - Math.max(0, card.x);
     const shownY = Math.min(size.height, card.bottom) - Math.max(0, card.y);
