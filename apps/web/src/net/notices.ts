@@ -1,5 +1,7 @@
-// The waiting room's toasts (02-UI-SPEC « Waiting room », Toasts): who arrived, who left, and, for the
-// person the host moved, where they are now. Pure: built from two public tables in a row and this
+// The table's toasts. In the waiting room (02-UI-SPEC « Waiting room », Toasts): who arrived, who
+// left, and, for the person the host moved, where they are now. In the game (plan 02-06, 02-UI-SPEC
+// « In the game (online only) »): the chef de table's choice, who is back, and the chef de table role
+// passed while the creator is away and given back on return (D-05). Pure: built from two public tables in a row and this
 // device's own seat; nothing on the first frame (the screen is new, there is nothing to tell).
 //
 // People are counted by first name (the public table carries no id): the seated people plus the people
@@ -65,5 +67,63 @@ export function tableNotices(prev: TablePublic | null, next: TablePublic, me: Me
   const after = others(next, me.seat, me.name);
   for (const name of minus(after, before)) notices.push(copy.lobby.joined(name));
   for (const name of minus(before, after)) notices.push(copy.lobby.left(name));
+  return notices;
+}
+
+/** The online game's toasts for one change of the public table, seen from `me.seat`. */
+export function gameNotices(
+  prev: TablePublic | null,
+  next: TablePublic,
+  me: { seat: Color },
+): string[] {
+  if (prev === null || prev.status === "lobby" || next.status === "lobby") return [];
+  const notices: string[] = [];
+  const nameOf = (table: TablePublic, color: Color) => table.seats[color].name ?? seats[color].name;
+  const creator = next.creatorName ?? "";
+
+  // The chef de table's choice once the minute was over (saved: the plate says it).
+  if (prev.status === "paused" && prev.pause?.choosing === true) {
+    if (next.status === "paused" && next.pause !== null && !next.pause.choosing) {
+      const host = next.host === null ? creator : nameOf(next, next.host);
+      notices.push(copy.game.notices.waits(host));
+    } else if (next.status === "playing") {
+      const handed = COLORS.filter(
+        (color) => prev.seats[color].handedOver === null && next.seats[color].handedOver !== null,
+      );
+      if (handed.length > 0) {
+        const names = copy.names(handed.map((color) => nameOf(next, color)));
+        notices.push(copy.game.notices.handedOver(names, handed.length > 1));
+      }
+    }
+  }
+
+  // The role: the creator's seat is the host's while the creator is online; when the role moves to a
+  // seat whose person just came back with the creator's name, the creator is back.
+  let creatorBack: Color | null = null;
+  if (next.host !== prev.host && next.host !== null) {
+    const host = next.host;
+    const returned = !prev.seats[host].online && next.seats[host].online;
+    if (returned && nameOf(next, host) === creator) {
+      creatorBack = host;
+      if (host !== me.seat) notices.push(copy.game.notices.creatorBack(creator));
+    } else if (host === me.seat) {
+      notices.push(copy.game.notices.youHost(copy.of(creator)));
+    } else {
+      notices.push(copy.game.notices.hostAway(nameOf(next, host), copy.of(creator)));
+    }
+  }
+
+  // Who is back (the returning device hears it from its own welcome).
+  for (const color of COLORS) {
+    if (color === me.seat || color === creatorBack) continue;
+    const before = prev.seats[color];
+    const after = next.seats[color];
+    if (after.kind !== "human" || before.online || !after.online) continue;
+    notices.push(
+      before.handedOver !== null
+        ? copy.game.notices.tookBack(nameOf(next, color))
+        : copy.game.notices.back(nameOf(next, color)),
+    );
+  }
   return notices;
 }

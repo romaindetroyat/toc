@@ -11,6 +11,7 @@
   import { forgetTable, rememberTable } from "../net/tables.ts";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import Notice from "../ui/Notice.svelte";
+  import { showToast } from "../ui/toast.svelte.ts";
   import Game from "./Game.svelte";
   import WaitingRoom from "./WaitingRoom.svelte";
 
@@ -60,7 +61,14 @@
     if (!valid || name === null || offline) return;
     const opened = connectTable(id, { token: device.token, name });
     connection = opened;
+    // A hello that took the seat back from the computer (plan 02-06): told to this device only.
+    const unsubscribe = opened.onFrame((frame) => {
+      if (frame.t === "welcome" && frame.regained === true) {
+        showToast(copy.game.notices.youTookBack);
+      }
+    });
     return () => {
+      unsubscribe();
       opened.close();
       connection = null;
     };
@@ -144,8 +152,9 @@
     onsubmit={rememberName}
     onback={home}
   />
-{:else if screenState === "partie" && you?.seat}
-  <Game online={{ makeController, seat: you.seat }} />
+{:else if screenState === "partie" && you?.seat && connection !== null}
+  <!-- A paused or saved game stays on the game screen, under its plate (plan 02-06). -->
+  <Game online={{ makeController, seat: you.seat, connection, onhome: home }} />
 {:else if screenState === "salle" && info !== null && you !== null && connection !== null && device.name !== null}
   <WaitingRoom
     {id}

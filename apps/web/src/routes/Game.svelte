@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { TablePublic } from "@toc/protocol";
   import { type Component, flushSync, onMount, tick, untrack } from "svelte";
   import {
     type CardId,
@@ -41,6 +42,9 @@
   import { mixFromSettings } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
   import { game as copy } from "../i18n/fr/game.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
+  import type { TableConnection } from "../net/connection.svelte.ts";
+  import { gameNotices } from "../net/notices.ts";
   import {
     type ControllerFactory,
     createSession,
@@ -60,6 +64,7 @@
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import TablePlate from "../ui/TablePlate.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
@@ -70,8 +75,15 @@
      * An online table (#/table/<id>): the server's controller and the seat it gave this device, which
      * turns the board to that seat. Online there is no « Abandonner la partie » (plan 02-07 adds the
      * online stop and leave) and the end plank's buttons lead to the home (plan 02-09: « Revanche »).
+     * `connection` gives the public table (the pause, the chef de table, who is online: plan 02-06);
+     * `onhome` leaves the table for the home (« Retour à l’accueil » of the saved plate).
      */
-    online?: { makeController: ControllerFactory; seat: Color };
+    online?: {
+      makeController: ControllerFactory;
+      seat: Color;
+      connection: TableConnection;
+      onhome: () => void;
+    };
   };
 
   let { online }: Props = $props();
@@ -406,6 +418,28 @@
    */
   const compact = $derived(screen.chrome === "compact");
 
+  // --- The online table (plan 02-06): the plate over the board, the toasts of the pause ---
+  const onlineTable = $derived<TablePublic | null>(online?.connection.table ?? null);
+  /**
+   * A plate is up (paused or saved): the board, the hand and the state buttons are inert under it;
+   * the info pill and « Réglages » stay usable; the game shortcuts are ignored but « ? ».
+   */
+  const plateUp = $derived(
+    onlineTable !== null && (onlineTable.status === "paused" || onlineTable.status === "saved"),
+  );
+  let previousTable: TablePublic | null = null;
+  $effect(() => {
+    const next = onlineTable;
+    const seat = online?.seat;
+    if (next === null || seat === undefined) return;
+    untrack(() => {
+      const notices = gameNotices(previousTable, next, { seat });
+      previousTable = next;
+      const first = notices[0];
+      if (first !== undefined) showToast(first);
+    });
+  });
+
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
   /** The end screen is up: the rest of the game screen is inert behind it. */
@@ -616,6 +650,8 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
+    // Under a plate only « ? » reaches the game (« M » arrives with plan 02-08).
+    if (plateUp && intent.kind !== "help") return;
     // The key is handled: no native action (a focused card or button is not also activated). It is
     // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
     // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
@@ -682,6 +718,16 @@
   let playEl = $state<HTMLElement | null>(null);
   /** The board's box (the stage is exactly the galet): the phone's hand measures its corner on it. */
   let stageEl = $state<HTMLElement | null>(null);
+  /** The board itself (the plate is placed on it), once the game is drawn. */
+  let boardEl = $state<HTMLElement | null>(null);
+  const drawnBoard = $derived(render !== null);
+  $effect(() => {
+    const stage = stageEl;
+    void drawnBoard;
+    void tick().then(() => {
+      boardEl = stage?.querySelector<HTMLElement>("[data-board]") ?? null;
+    });
+  });
   /** The element of the game that had the focus when the invitation appeared. */
   let focusBefore: HTMLElement | null = null;
   let wasPrompting = false;
@@ -779,6 +825,11 @@
   {/if}
 {/snippet}
 
+{#snippet pausedLine()}
+  <!-- While a plate is up the prompt row (or the action zone) says only « Partie en pause ». -->
+  <p class="paused-line" data-paused-prompt>{tableCopy.game.paused}</p>
+{/snippet}
+
 {#snippet hand()}
   {#if session !== undefined && view !== undefined}
     <HandFan
@@ -834,11 +885,13 @@
             <div class="gear" data-settings-slot>
               <SettingsButton onabandon={online === undefined ? abandon : undefined} />
             </div>
-            {@render zone("fast")}
+            <div class="fast" inert={plateUp}>
+              {@render zone("fast")}
+            </div>
           </div>
         {/if}
 
-        <div class="stage" bind:this={stageEl}>
+        <div class="stage" bind:this={stageEl} inert={plateUp}>
           <Board
             {k}
             {render}
@@ -916,6 +969,7 @@
                left strip, its buttons in the right one. The region takes no box of its own. -->
           <section
             class="seven"
+            inert={plateUp}
             data-seven-panel
             data-selected={flow.selected ?? ""}
             aria-label={copy.seven.title}
@@ -932,17 +986,21 @@
           </section>
         {:else if flow.kind === "sevenBuilding"}
           <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
-          <div class="seven">
+          <div class="seven" inert={plateUp}>
             {@render seven("all")}
           </div>
         {:else if compact}
           <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
                and the hand (or the « Lequel ? » chips) at the bottom of the left one. -->
           <div class="prompt-row">
-            {@render zone("prompt")}
+            {#if plateUp}
+              {@render pausedLine()}
+            {:else}
+              {@render zone("prompt")}
+            {/if}
           </div>
           {#if ui.kind === "tray"}
-            <div class="chips">
+            <div class="chips" inert={plateUp}>
               <PawnTray
                 options={ui.options}
                 part="chips"
@@ -952,24 +1010,41 @@
               />
             </div>
           {/if}
-          <div class="actions">
-            {@render zone("buttons")}
+          <div class="actions" inert={plateUp}>
+            {#if !plateUp}
+              {@render zone("buttons")}
+            {/if}
           </div>
           {#if ui.kind !== "tray"}
-            <div class="hand">
+            <div class="hand" inert={plateUp}>
               {@render hand()}
             </div>
           {/if}
         {:else}
-          <div class="action">
-            {@render zone("all")}
+          <div class="action" inert={plateUp}>
+            {#if plateUp}
+              {@render pausedLine()}
+            {:else}
+              {@render zone("all")}
+            {/if}
           </div>
 
-          <div class="hand">
+          <div class="hand" inert={plateUp}>
             {@render hand()}
           </div>
         {/if}
       </div>
+
+      {#if online !== undefined && onlineTable !== null}
+        <TablePlate
+          table={onlineTable}
+          me={online.seat}
+          offset={online.connection.serverOffset}
+          board={boardEl}
+          send={(frame) => online.connection.send(frame)}
+          onhome={online.onhome}
+        />
+      {/if}
 
       {#if tapisOpen}
         <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
@@ -1025,6 +1100,21 @@
    * compact mode it is the info, « Avance rapide », the board, the 7's or the tray's chips, the
    * buttons, the hand.
    */
+
+  /* « Partie en pause » in the prompt row (compact) or the action zone (bar), plan 02-06. */
+  .paused-line {
+    margin: 0;
+    color: var(--creme);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: 24px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .fast {
+    display: contents;
+  }
 
   /* The game's wrapper takes no box of its own; behind the invitation it is not displayed at all. */
   .play {

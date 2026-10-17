@@ -10,6 +10,7 @@
 import { type Color, type GameEvent, nextColor, type PlayerView, teamOf } from "@toc/engine";
 import type { ClientFrame, EventsFrame, ServerFrame, TablePublic, You } from "@toc/protocol";
 import type { GameController, GameDirector } from "../game/GameController.ts";
+import { table as copy } from "../i18n/fr/table.ts";
 
 /** The events of a game start: the first frame is dealt on screen, the later ones follow it. */
 export type StartBatch = { first: EventsFrame; later: EventsFrame[] };
@@ -94,10 +95,18 @@ export function createRemoteGame(
     else early.push(frame);
   });
 
+  /** A seat the computer plays for its absent person reads « {Nom} (ordinateur) » (plan 02-06). */
   function names(): Record<Color, string> {
     const out = {} as Record<Color, string>;
     for (const color of ["bleu", "jaune", "rouge", "vert"] as const) {
-      out[color] = color === human ? SELF : (table?.seats[color].name ?? "");
+      const seat = table?.seats[color];
+      const name = seat?.name ?? "";
+      out[color] =
+        color === human
+          ? SELF
+          : seat?.kind === "human" && seat.handedOver !== null
+            ? copy.game.handedOverName(name)
+            : name;
     }
     return out;
   }

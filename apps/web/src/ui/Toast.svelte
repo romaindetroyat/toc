@@ -15,9 +15,23 @@
    * at most three quarters of the board wide, so it never covers a strip nor the bottom ring row. Elsewhere it
    * keeps its place at the bottom of the screen.
    */
-  let place = $state<{ x: number; y: number; width: number } | null>(null);
+  let place = $state<{ x: number; y: number; width: number; top: boolean } | null>(null);
 
   function measure() {
+    // While a plate is up over the board (plan 02-06), the toast stands at the top of the board
+    // (board top + 8) in every mode, so it never covers the plate.
+    const plated = document.querySelector("[data-plate]") !== null;
+    const top = plated ? document.querySelector("main.game [data-board]") : null;
+    if (top !== null) {
+      const box = top.getBoundingClientRect();
+      place = {
+        x: box.left + box.width / 2,
+        y: box.top + 8,
+        width: Math.min(480, box.width * 0.75),
+        top: true,
+      };
+      return;
+    }
     const board = document.querySelector('main.game[data-chrome="compact"] [data-board]');
     if (board === null) {
       place = null;
@@ -29,6 +43,7 @@
       x: felt ? felt.left + felt.width / 2 : box.left + box.width / 2,
       y: felt ? felt.top + felt.height / 2 : box.top + box.height / 2,
       width: Math.min(480, box.width * 0.75),
+      top: false,
     };
   }
 
@@ -53,6 +68,7 @@
 <div
   class="toast-region"
   class:over-felt={place !== null}
+  class:at-top={place?.top === true}
   aria-live="polite"
   role="status"
   style:left={place ? `${place.x - place.width / 2}px` : undefined}
@@ -93,6 +109,11 @@
     bottom: auto;
     padding: 0;
     transform: translateY(-50%);
+  }
+
+  /* At the top of the board, under its top edge, while a plate is up. */
+  .toast-region.at-top {
+    transform: none;
   }
 
   .toast {

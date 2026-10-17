@@ -232,9 +232,15 @@ export function createSession(
     ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
   });
 
+  // Online, a name may change during the game: a seat handed over to the computer reads
+  // « {Nom} (ordinateur) » (plan 02-06). Kept as state so the turn line and the prompts follow.
+  let names = $state.raw<Record<Color, string>>(controller.names);
+
   controller.onChange(() => {
     view = controller.view();
     thinking = controller.thinking();
+    const fresh = controller.names;
+    if (COLORS.some((color) => fresh[color] !== names[color])) names = fresh;
     void syncWhenIdle();
   });
 
@@ -244,7 +250,9 @@ export function createSession(
     get pace() {
       return paceNow();
     },
-    names: controller.names,
+    get names() {
+      return names;
+    },
     get view() {
       return view;
     },

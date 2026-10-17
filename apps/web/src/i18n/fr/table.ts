@@ -1,6 +1,11 @@
 // The online table route copy (02-UI-SPEC « Connecting, errors », « Waiting room »). The server's error
 // codes are never shown: each maps to one of these lines.
 
+/** « de Ana » → « d’Ana »: the elision before a vowel or a mute h (« jusqu’au retour d’Ana »). */
+function of(name: string): string {
+  return /^[aeiouhàâäéèêëîïôöùûüæœ]/i.test(name) ? `d’${name}` : `de ${name}`;
+}
+
 export const table = {
   connecting: "Connexion à la table…",
   /** Under « Connexion à la table… » after 10 s. */
@@ -126,6 +131,85 @@ export const table = {
     names.length < 2
       ? names.join("")
       : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`,
+  of,
+  /**
+   * The online game (02-UI-SPEC « In the game (online only) », plan 02-06). Gender-neutral: no word
+   * agrees with a player (« est de retour », « hors ligne »).
+   */
+  game: {
+    /** The prompt row and the action zone while the game waits. */
+    paused: "Partie en pause",
+    /** A seat the computer plays for its absent person, in the turn line and the prompts. */
+    handedOverName: (name: string) => `${name} (ordinateur)`,
+    pause: {
+      /** « En attente de Bruno… », « En attente d’Ana et Paul… ». */
+      title: (names: string) => `En attente ${of(names)}…`,
+      body: (several: boolean) =>
+        several
+          ? "La partie est en pause jusqu’à leur retour."
+          : "La partie est en pause jusqu’à son retour.",
+      /** The countdown line, « 0:42 » counted from the server's clock. */
+      countdownYou: (time: string) => `Dans ${time}, tu pourras choisir la suite.`,
+      countdown: (host: string, time: string) => `Dans ${time}, ${host} pourra choisir la suite.`,
+      /** Said once to screen readers when the pause begins (the countdown itself is hidden). */
+      announceYou: "Tu pourras choisir la suite dans une minute.",
+      announce: (host: string) => `${host} pourra choisir la suite dans une minute.`,
+      /** After the minute, to everyone but the chef de table. */
+      choosing: (host: string) => `${host} choisit la suite…`,
+      /** After the minute, to the chef de table. */
+      choose: (names: string, several: boolean) =>
+        several
+          ? `${names} ne sont pas de retour. Que veux-tu faire ?`
+          : `${names} n’est pas de retour. Que veux-tu faire ?`,
+      chooseAnnounce: "Tu peux choisir la suite.",
+      wait: "Attendre encore une minute",
+      handOver: (several: boolean) =>
+        several ? "Confier leurs places à l’ordinateur" : "Confier sa place à l’ordinateur",
+      save: "Sauvegarder et arrêter",
+      levelTitle: "Quelle force pour l’ordinateur ?",
+      confirmHandOver: (several: boolean) => (several ? "Confier les places" : "Confier la place"),
+      back: "Retour",
+    },
+    saved: {
+      title: "Partie sauvegardée",
+      body: "Retrouve-la avec le même lien ou dans « Mes parties en cours ». Elle est gardée 30 jours sans jouer.",
+      present: (names: string) => `À la table : ${names}.`,
+      absent: (names: string) => `Pas encore là : ${names}.`,
+      resume: "Reprendre la partie",
+      hostResumes: (host: string) => `${host} peut reprendre la partie.`,
+    },
+    /** Toasts of the online game (gameNotices). */
+    notices: {
+      waits: (host: string) => `${host} attend encore une minute.`,
+      handedOver: (names: string, several: boolean) =>
+        several
+          ? `L’ordinateur joue pour ${names} jusqu’à leur retour.`
+          : `L’ordinateur joue pour ${names} jusqu’à son retour.`,
+      back: (name: string) => `${name} est de retour.`,
+      tookBack: (name: string) => `${name} reprend sa place.`,
+      youTookBack: "Tu reprends ta place. L’ordinateur a joué pour toi pendant ton absence.",
+      /** « Paul est chef de table jusqu’au retour d’Ana. » (`ofCreator`: « d’Ana », « de Romain »). */
+      hostAway: (host: string, ofCreator: string) =>
+        `${host} est chef de table jusqu’au retour ${ofCreator}.`,
+      youHost: (ofCreator: string) => `Tu es chef de table jusqu’au retour ${ofCreator}.`,
+      creatorBack: (creator: string) => `${creator} est de retour et redevient chef de table.`,
+    },
+    /** « À la table » (TablePlayers): the players list. */
+    players: {
+      title: "À la table",
+      you: "toi",
+      partner: "partenaire",
+      opponent: "adversaire",
+      host: "chef de table",
+      online: "en ligne",
+      offline: "hors ligne",
+      handedOver: (level: string) => `hors ligne · l’ordinateur joue à sa place (${level})`,
+      computer: (level: string) => `ordinateur · ${level}`,
+      /** One sentence per row for screen readers: « Jaune : Bruno, partenaire, hors ligne. » */
+      row: (colour: string, name: string, tags: readonly string[], status: string) =>
+        `${colour} : ${[name, ...tags, status].join(", ")}.`,
+    },
+  },
   /** « Inviter à la table » (02-UI-SPEC « Invite sheet », D-02). */
   invite: {
     title: "Inviter à la table",

@@ -148,7 +148,7 @@
             <span class="name">{game.info.ownTurn}</span>
           {:else}
             <span class="prefix" class:respire-texte={breathing}>{game.info.turnPrefix(turnName)}</span
-            ><span class="name" class:respire-texte={breathing}>{turnName}</span>
+            ><span class="name other" class:respire-texte={breathing} title={turnName}>{turnName}</span>
             {#if breathing}
               <span class="respire-mark" aria-hidden="true">…</span>
             {/if}
@@ -250,6 +250,15 @@
   /* The name is never cut: the row may overflow its zone before the name shrinks. */
   .name {
     flex: none;
+  }
+
+  /* Another player's name: a first name online may be 20 letters, « (ordinateur) » may follow (plan
+     02-06): cut with « … » at 128 px, the full name in its title and in the text read aloud
+     (02-UI-SPEC « Long names »). Horse names fit whole. */
+  .name.other {
+    max-width: 128px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .prefix {
