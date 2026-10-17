@@ -7,6 +7,7 @@
   import ChoiceTile from "../ui/ChoiceTile.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import { markNewTable } from "../ui/InviteSheet.svelte";
   import TableList from "../ui/TableList.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import { showToast } from "../ui/toast.svelte.ts";
@@ -49,6 +50,8 @@
     const result = await createTable();
     creating = false;
     if (result.ok) {
+      // The waiting room opens « Inviter à la table » by itself, once (D-02).
+      markNewTable(result.id);
       location.hash = `#/table/${result.id}`;
       return;
     }

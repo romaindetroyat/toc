@@ -126,6 +126,21 @@ export const table = {
     names.length < 2
       ? names.join("")
       : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`,
+  /** « Inviter à la table » (02-UI-SPEC « Invite sheet », D-02). */
+  invite: {
+    title: "Inviter à la table",
+    text: "Envoie ce lien à tes proches.",
+    qrLabel: "Code QR du lien de la table",
+    qrCaption: "À scanner avec l’appareil photo",
+    qrFailed: "Code QR indisponible : partage le lien.",
+    linkLabel: "Lien de la table",
+    share: "Partager le lien",
+    copy: "Copier le lien",
+    shareTitle: "TOC",
+    shareText: (name: string) => `${name} t’invite à une partie de TOC !`,
+    copied: "Lien copié.",
+    copyFailed: "Impossible de copier. Sélectionne le lien ci-dessus.",
+  },
   /** Confirmations of the waiting room (02-UI-SPEC « Confirmations »). */
   confirm: {
     startWithout: {

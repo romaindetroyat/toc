@@ -8,6 +8,7 @@
   import type { TableConnection } from "../net/connection.svelte.ts";
   import { tableNotices } from "../net/notices.ts";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
+  import InviteSheet, { takeNewTable } from "../ui/InviteSheet.svelte";
   import MoveSheet from "../ui/MoveSheet.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SeatTile from "../ui/SeatTile.svelte";
@@ -23,6 +24,9 @@
   // Layouts as the solo setup (Launch.svelte): computer, two columns from 640 wide, one scrolling column
   // with the action row in a sticky band; « Tourne ton téléphone » when held upright.
   type Props = {
+    /** The table's id and the link anyone opens it with (« Inviter »). */
+    id: string;
+    link: string;
     connection: TableConnection;
     table: TablePublic;
     you: You;
@@ -34,7 +38,7 @@
     onhome: () => void;
   };
 
-  let { connection, table, you, myName, onleave, onhome }: Props = $props();
+  let { id, link, connection, table, you, myName, onleave, onhome }: Props = $props();
 
   type Layout = "computer" | "two" | "one";
   const TWO_COLUMNS_FROM = 640;
@@ -149,6 +153,11 @@
     unlock();
     inviteOpen = true;
   }
+
+  // Right after the creation the sheet opens by itself, once, for the creator (D-02).
+  $effect(() => {
+    if (you.host && takeNewTable(id)) inviteOpen = true;
+  });
 
   // --- Toasts: who arrived, who left, and where the creator moved this device (tableNotices) ---
 
@@ -304,6 +313,10 @@
     onclose={() => (moving = null)}
     opener={tiles[from]}
   />
+{/if}
+
+{#if inviteOpen}
+  <InviteSheet url={link} name={myName} onclose={() => (inviteOpen = false)} opener={inviteButton} />
 {/if}
 
 {#if confirmStart}

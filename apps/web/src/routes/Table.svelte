@@ -108,6 +108,9 @@
     return createRemoteGame(connection, director);
   };
 
+  /** The link anyone opens the table with (the invite sheet, D-02): no query, no route options. */
+  const tableLink = $derived(`${location.origin}/#/table/${id}`);
+
   /** « Quitter la table » in the waiting room: the seat is freed, the table leaves this device's list. */
   function leave() {
     unlock();
@@ -145,6 +148,8 @@
   <Game online={{ makeController, seat: you.seat }} />
 {:else if screenState === "salle" && info !== null && you !== null && connection !== null && device.name !== null}
   <WaitingRoom
+    {id}
+    link={tableLink}
     {connection}
     table={info}
     {you}

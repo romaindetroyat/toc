@@ -79,7 +79,8 @@
     left: 0;
     right: 0;
     bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
-    z-index: 50;
+    /* Above an open sheet (60): « Lien copié. » is said over « Inviter à la table ». */
+    z-index: 65;
     display: flex;
     justify-content: center;
     padding: 0 var(--space-md);

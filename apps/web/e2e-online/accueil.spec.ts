@@ -30,6 +30,11 @@ test("créer une table depuis l’accueil, la retrouver dans « Mes parties en c
   // The table is created and its waiting room opens; Ana is its creator.
   await expect(ana).toHaveURL(/#\/table\/[A-Za-z0-9_-]{22}$/);
   const id = new URL(ana.url()).hash.slice("#/table/".length);
+  // « Inviter à la table » opens by itself for the creator (plan 02-05); « Fermer » shows the room.
+  const invite = ana.getByRole("dialog", { name: "Inviter à la table" });
+  await expect(invite).toBeVisible();
+  await invite.getByRole("button", { name: "Fermer" }).click();
+  await expect(invite).toHaveCount(0);
   await expect(seatTile(ana, "bleu")).toBeVisible();
   await seatTile(ana, "bleu").click();
   await expect(seatTile(ana, "bleu")).toHaveAttribute("data-seat-state", "you");
