@@ -260,6 +260,13 @@ describe("a 7 split in more than four parts (G5)", () => {
     const pawns = reply?.t === "events" ? reply.view.pawns : null;
     expect(pawns?.bleu0).toEqual({ zone: "ring", progress: 9 });
     expect(pawns?.bleu1).toEqual({ zone: "ring", progress: 23 });
-    expect((await readTable(id)).seq).toBe(start.seq + 1);
+    // The server's own log: bleu's 7 as sent, played at the next seq.
+    const played = await runInDurableObject(stubOf(id), (_room, state) =>
+      state.storage.sql
+        .exec("SELECT seat, action FROM events WHERE seq = ?", start.seq + 1)
+        .toArray()
+        .map((row) => ({ seat: row.seat, action: JSON.parse(String(row.action)) })),
+    );
+    expect(played).toEqual([{ seat: "bleu", action: { t: "seven", card: "7H", plan } }]);
   });
 });

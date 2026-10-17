@@ -54,6 +54,13 @@ const card = z.string().check(z.regex(/^(1[0-3]|[1-9])[SHDC]$/));
 const pawn = z.string().check(z.regex(/^(bleu|jaune|rouge|vert)[0-3]$/));
 const count = z.int().check(z.minimum(0));
 
+/**
+ * The most parts of a 7 plan: seven steps of at least one each. Not four (one per knight): a knight may
+ * come back after another one (G5) and the partner's knights may finish the 7 (G12), and apply()
+ * plays every such split. A narrower bound here refused legal moves as bad-frame.
+ */
+const SEVEN_PARTS = 7;
+
 /** The six engine actions (packages/engine/src/types.ts), shape only: apply() decides legality. */
 const actionSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("give"), card }),
@@ -65,7 +72,7 @@ const actionSchema = z.discriminatedUnion("t", [
     card,
     plan: z
       .array(z.strictObject({ pawn, steps: z.int().check(z.minimum(1), z.maximum(7)) }))
-      .check(z.minLength(1), z.maxLength(4)),
+      .check(z.minLength(1), z.maxLength(SEVEN_PARTS)),
   }),
   z.strictObject({ t: z.literal("discard") }),
 ]);
@@ -165,7 +172,7 @@ export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false }
 
 /**
  * A client frame from untrusted text: too long, not JSON, an unknown type, an extra key, a seat, card
- * or pawn outside the engine's formats, a 7 plan of more than four parts, a base that is not a natural
+ * or pawn outside the engine's formats, a 7 plan of more than seven parts, a base that is not a natural
  * number, a first name that normalizes to nothing, or a level with a pause choice other than "bot" are
  * all refused. The hello's name comes back
  * normalized (normalizeName).
