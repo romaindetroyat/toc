@@ -57,7 +57,7 @@
   } from "../game/session.svelte.ts";
   import { type FocusTarget, keyIntent, litKnights } from "../game/shortcuts.ts";
   import type { TurnUiEvent } from "../game/turnUi.ts";
-  import { settings } from "../settings/store.svelte.ts";
+  import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
@@ -69,6 +69,7 @@
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import type { TableSpeed } from "../ui/tableSpeed.ts";
   import SevenPanel from "../ui/SevenPanel.svelte";
   import TablePlate from "../ui/TablePlate.svelte";
   import SeatBadges from "../board/SeatBadges.svelte";
@@ -357,7 +358,13 @@
     missed = false;
     await tick();
     if (!alive || mine !== epoch) return;
-    const created = createSession(env, debug, colour, online?.makeController);
+    const created = createSession(
+      env,
+      debug,
+      colour,
+      online?.makeController,
+      () => online?.connection.table?.fast === true,
+    );
     session = created;
     // Online, the game number this screen plays (a higher one is the rematch, plan 02-09).
     playingGameNo = online?.connection.table?.gameNo ?? null;
@@ -469,6 +476,26 @@
   function stopGame() {
     online?.connection.send({ t: "stop" });
   }
+
+  /**
+   * The table-wide « Avance rapide » of « Réglages » (plan 02-10b): the chef de table switches it
+   * (and this device remembers the choice for the tables it creates), the others see it.
+   */
+  const tableSpeed = $derived.by((): TableSpeed | undefined => {
+    if (online === undefined || onlineTable === null) return undefined;
+    const table = onlineTable;
+    const canSet = table.host !== null && table.host === online.seat;
+    return {
+      fast: table.fast,
+      canSet,
+      hostName: (table.host === null ? null : table.seats[table.host].name) ?? table.creatorName ?? "",
+      onset: (fast) => {
+        if (!canSet) return;
+        updateSettings({ tableFast: fast });
+        online.connection.send({ t: "speed", fast });
+      },
+    };
+  });
 
   // --- « Messages rapides » (plan 02-08): the button, the key « M », the sheet ---
   let messagesOpen = $state(false);
@@ -1037,6 +1064,7 @@
             onabandon={online === undefined ? abandon : undefined}
             onleave={online?.onleave}
             onstop={canStop ? stopGame : undefined}
+            {tableSpeed}
             players={online !== undefined && onlineTable !== null
               ? { table: onlineTable, me: online.seat }
               : undefined}
@@ -1056,6 +1084,7 @@
                 inGame={online !== undefined}
                 onleave={online?.onleave}
                 onstop={canStop ? stopGame : undefined}
+                {tableSpeed}
               />
             </div>
             {#if online !== undefined}

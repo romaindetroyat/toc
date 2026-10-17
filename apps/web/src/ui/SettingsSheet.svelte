@@ -11,6 +11,7 @@
   import Sheet from "./Sheet.svelte";
   import ShortcutsSheet from "./ShortcutsSheet.svelte";
   import Switch from "./Switch.svelte";
+  import type { TableSpeed } from "./tableSpeed.ts";
 
   // « Réglages » (UI-SPEC): sound, effects, reduced animations, and the links
   // to the sound test and the credits. Every change is applied at once and kept (no Save button): the
@@ -42,6 +43,11 @@
      * « Arrêter la partie ? » (the game is saved for everyone), in place of « Abandonner la partie ».
      */
     onstop?: () => void;
+    /**
+     * At an online table (plan 02-10b): the table-wide « Avance rapide », first row of the sheet; the
+     * chef de table switches it, the others see it disabled.
+     */
+    tableSpeed?: TableSpeed;
   };
 
   let {
@@ -52,6 +58,7 @@
     onleave,
     inGame = false,
     onstop,
+    tableSpeed,
   }: Props = $props();
 
   let leaveOpen = $state(false);
@@ -104,6 +111,19 @@
 
 <Sheet title={reglages.title} {onclose} {opener} closeLabel={reglages.close}>
   <div class="form" data-settings>
+    {#if tableSpeed !== undefined}
+      <div data-table-fast>
+        <Switch
+          label={reglages.tableFast}
+          helper={tableSpeed.canSet
+            ? reglages.tableFastHelper
+            : reglages.tableFastOthers(tableSpeed.hostName)}
+          checked={tableSpeed.fast}
+          disabled={!tableSpeed.canSet}
+          onchange={(fast) => tableSpeed.onset(fast)}
+        />
+      </div>
+    {/if}
     <Switch
       label={reglages.sound}
       helper={reglages.soundHelper}

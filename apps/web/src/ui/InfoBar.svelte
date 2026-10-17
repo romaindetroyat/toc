@@ -11,6 +11,7 @@
   import MessagesButton from "./MessagesButton.svelte";
   import Sheet from "./Sheet.svelte";
   import TablePlayers from "./TablePlayers.svelte";
+  import type { TableSpeed } from "./tableSpeed.ts";
 
   type Props = {
     render: RenderState;
@@ -46,6 +47,8 @@
      * table »; opens « Messages rapides » (the key « M » does too).
      */
     onmessages?: (opener: HTMLElement) => void;
+    /** An online table (plan 02-10b): the table-wide « Avance rapide » of its gear. */
+    tableSpeed?: TableSpeed;
   };
 
   let {
@@ -60,6 +63,7 @@
     thinking = null,
     players,
     onmessages,
+    tableSpeed,
   }: Props = $props();
 
   let infoOpen = $state(false);
@@ -222,6 +226,7 @@
           inGame={onleave !== undefined}
           {onleave}
           {onstop}
+          {tableSpeed}
         />
       </div>
     {/if}

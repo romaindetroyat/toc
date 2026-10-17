@@ -3,6 +3,8 @@
 // « In the game (online only) »): the chef de table's choice, who is back, and the chef de table role
 // passed while the creator is away and given back on return (D-05). Pure: built from two public tables in a row and this
 // device's own seat; nothing on the first frame (the screen is new, there is nothing to tell).
+// In both, the table's « Avance rapide » switched by the chef de table (plan 02-10b), told to everyone
+// else with the chef de table's name.
 //
 // People are counted by first name (the public table carries no id): the seated people plus the people
 // online without a seat. Taking a seat, changing seat or going offline on a seat changes nothing; a
@@ -56,6 +58,14 @@ function minus(a: readonly string[], b: readonly string[]): string[] {
   return out;
 }
 
+/** « {Chef} a mis / a enlevé l’avance rapide. » when the flag changed; the chef de table's name. */
+function fastNotice(prev: TablePublic, next: TablePublic): string | null {
+  if (prev.fast === next.fast) return null;
+  const host = next.host === null ? null : next.seats[next.host].name;
+  const name = host ?? next.creatorName ?? "";
+  return next.fast ? copy.game.notices.fastOn(name) : copy.game.notices.fastOff(name);
+}
+
 /** The toasts for one change of the public table, most important first. */
 export function tableNotices(prev: TablePublic | null, next: TablePublic, me: Me): string[] {
   if (prev === null) return [];
@@ -67,6 +77,8 @@ export function tableNotices(prev: TablePublic | null, next: TablePublic, me: Me
   const after = others(next, me.seat, me.name);
   for (const name of minus(after, before)) notices.push(copy.lobby.joined(name));
   for (const name of minus(before, after)) notices.push(copy.lobby.left(name));
+  const fast = me.host ? null : fastNotice(prev, next);
+  if (fast !== null) notices.push(fast);
   return notices;
 }
 
@@ -125,5 +137,9 @@ export function gameNotices(
         : copy.game.notices.back(nameOf(next, color)),
     );
   }
+
+  // The table's « Avance rapide », to everyone but the chef de table who switched it.
+  const fast = next.host === me.seat ? null : fastNotice(prev, next);
+  if (fast !== null) notices.push(fast);
   return notices;
 }

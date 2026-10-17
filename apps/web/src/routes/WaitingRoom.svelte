@@ -18,6 +18,8 @@
   import SeatTile from "../ui/SeatTile.svelte";
   import Icon from "../ui/Icon.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import { settings, updateSettings } from "../settings/store.svelte.ts";
+  import type { TableSpeed } from "../ui/tableSpeed.ts";
   import { screen } from "../ui/screen.svelte.ts";
   import StrengthPicker from "../ui/StrengthPicker.svelte";
   import TablePlate from "../ui/TablePlate.svelte";
@@ -194,9 +196,29 @@
     inviteOpen = true;
   }
 
-  // Right after the creation the sheet opens by itself, once, for the creator (D-02).
+  // Right after the creation the sheet opens by itself, once, for the creator (D-02); the table takes
+  // the creator's last « Avance rapide » on this device (plan 02-10b).
   $effect(() => {
-    if (you.host && takeNewTable(id)) inviteOpen = true;
+    if (you.host && takeNewTable(id)) {
+      inviteOpen = true;
+      if (settings.tableFast && !table.fast) connection.send({ t: "speed", fast: true });
+    }
+  });
+
+  /**
+   * The table-wide « Avance rapide » of « Réglages » (plan 02-10b): the chef de table switches it
+   * (and this device remembers the choice for the tables it creates), the others see it.
+   */
+  const tableSpeed = $derived<TableSpeed>({
+    fast: table.fast,
+    canSet: you.host,
+    hostName: (table.host === null ? null : table.seats[table.host].name) ?? creator,
+    onset: (fast) => {
+      if (!you.host) return;
+      unlock();
+      updateSettings({ tableFast: fast });
+      connection.send({ t: "speed", fast });
+    },
   });
 
   // --- Toasts: who arrived, who left, and where the creator moved this device (tableNotices) ---
@@ -315,11 +337,14 @@
       {#if unseatedOthers.length > 0}
         <p class="t-body muted" data-unseated>{copy.lobby.unseated(unseatedOthers)}</p>
       {/if}
+      {#if table.fast && viewer !== "full"}
+        <p class="t-body muted" data-fast-line>{copy.lobby.fastLine}</p>
+      {/if}
 
       <!-- DOM order = visual order: [Réglages] [Messages] [Inviter] [Lancer la partie]; « Messages »
            once seated (plan 02-08). -->
       <div class="actions" data-room-actions>
-        <div class="gear" data-settings-slot><SettingsButton online {onleave} /></div>
+        <div class="gear" data-settings-slot><SettingsButton online {onleave} {tableSpeed} /></div>
         {#if mySeat !== null}
           <MessagesButton onopen={openMessages} />
         {/if}

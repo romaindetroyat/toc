@@ -68,6 +68,7 @@ describe("parseSettings", () => {
       sfx: false,
       reduceMotion: true,
       fast: true,
+      tableFast: false,
       lastColor: "jaune",
       botLevels: { partner: 3, left: 3, right: 3 },
     });

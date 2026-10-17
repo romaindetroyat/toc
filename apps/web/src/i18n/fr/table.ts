@@ -141,6 +141,8 @@ export const table = {
       }.`,
     /** Others' view of a computer seat: « Rouge : ordinateur, Galopeur ». */
     computerLine: (colour: string, level: string) => `${colour} : ordinateur, ${level}`,
+    /** The right column's line while the table's « Avance rapide » is on (plan 02-10b). */
+    fastLine: "Avance rapide pour toute la table.",
     /** « Sans place : Céline, Paul. » */
     unseated: (names: readonly string[]) => `Sans place : ${names.join(", ")}.`,
     full: {
@@ -237,6 +239,9 @@ export const table = {
         `${host} est chef de table jusqu’au retour ${ofCreator}.`,
       youHost: (ofCreator: string) => `Tu es chef de table jusqu’au retour ${ofCreator}.`,
       creatorBack: (creator: string) => `${creator} est de retour et redevient chef de table.`,
+      /** The table's « Avance rapide » (plan 02-10b), to everyone but the chef de table. */
+      fastOn: (host: string) => `${host} a mis l’avance rapide.`,
+      fastOff: (host: string) => `${host} a enlevé l’avance rapide.`,
     },
     /** « À la table » (TablePlayers): the players list. */
     players: {

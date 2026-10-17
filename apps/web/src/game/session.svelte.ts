@@ -125,22 +125,26 @@ export function levelsByColour(levels: BotLevels, human: Color): Partial<Record<
 
 /**
  * `colour` is the seat the human plays; without it, the colour chosen on the launch screen. A debug
- * scenario overrides it with the seat whose turn it is.
+ * scenario overrides it with the seat whose turn it is. Online, `tableFast` reads the table's
+ * « Avance rapide » (plan 02-10b) at each move.
  */
 export function createSession(
   env: SessionEnv,
   debug: DebugParams = {},
   colour: Color = settings.lastColor,
   makeController?: ControllerFactory,
+  tableFast?: () => boolean,
 ): Session {
   const scenario = debug.etat ?? debug.scenario?.before;
   const human = humanSeat(colour, scenario);
   const k = quarterTurnsFor(human);
   const testSpeed = debug.vitesse === "test";
 
-  // Online the server paces the computers for everyone: « Avance rapide » is hidden there and its
-  // setting is not applied (plan 02-08, 02-UI-SPEC « Chrome changes »).
-  const fast = () => settings.fast && makeController === undefined;
+  // Online the server paces the computers for everyone: the local « Avance rapide » is hidden there
+  // and its setting is not applied (plan 02-08); the moves are played fast while the chef de table
+  // has the table's own « Avance rapide » on (plan 02-10b). « Réduire les animations » still wins.
+  const fast = () =>
+    makeController === undefined ? settings.fast : (tableFast?.() ?? false) === true;
   const paceNow = (): DirectorMode =>
     testSpeed ? "test" : settings.reduceMotion ? "reduced" : fast() ? "fast" : "normal";
   const director = createDirector({
