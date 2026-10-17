@@ -119,3 +119,16 @@ export async function connect(
 export function token(letter: string): string {
   return letter.repeat(43);
 }
+
+/**
+ * A near-end start position (test option `before`, plan 02-09): bleu's 5 brings the eighth knight of
+ * bleu-rouge home (R-16.1 from bleu's side); the dealer is vert.
+ */
+export const NEAR_END = {
+  pawns: {
+    bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
+    rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+  },
+  hands: { bleu: ["5S"] },
+  turn: "bleu",
+};

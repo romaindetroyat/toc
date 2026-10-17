@@ -10,19 +10,9 @@ import type { Table } from "@toc/table";
 import { structuralProblems } from "@toc/table/oracle";
 import { describe, expect, it } from "vitest";
 import { load } from "../src/storage.ts";
-import { connect, createTable, token } from "./helpers.ts";
+import { connect, createTable, NEAR_END, token } from "./helpers.ts";
 
 const stubOf = (id: string) => env.GAME_ROOM.getByName(id);
-
-/** Bleu's 5 brings the eighth knight of bleu-rouge home. */
-export const NEAR_END = {
-  pawns: {
-    bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
-    rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
-  },
-  hands: { bleu: ["5S"] },
-  turn: "bleu",
-};
 
 async function readTable(id: string): Promise<Table> {
   const table = await runInDurableObject(stubOf(id), (_room, state) => load(state.storage.sql));

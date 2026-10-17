@@ -13,7 +13,15 @@ import type {
   WelcomeFrame,
 } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
-import { createTable, nextDeadline, type Out, reduce, summary, type Table } from "./index.ts";
+import {
+  createTable,
+  gameRecordOf,
+  nextDeadline,
+  type Out,
+  reduce,
+  summary,
+  type Table,
+} from "./index.ts";
 
 const ID = "abcdefghijklmnopqrstuv";
 const ANA = "who-ana";
@@ -326,5 +334,145 @@ describe("someone offline at the end (UI-SPEC « à confirmer »)", () => {
     expect(three.status).toBe("finished");
     expect(three.gameNo).toBe(1);
     expect(three.deadlines.expire).toBeDefined();
+  });
+});
+
+describe("the record of a finished game (plan 02-09 Task 2, HIST-01, D-14)", () => {
+  it("the winning step carries one record: game, times, winner, seats, deals, captures", () => {
+    const result = won();
+    expect(result.records).toEqual([
+      {
+        gameNo: 1,
+        startedAt: 2000,
+        endedAt: 3000,
+        winner: "bleu-rouge",
+        seats: [
+          { colour: "bleu", kind: "human", name: "Ana", level: null, handedOver: false },
+          { colour: "jaune", kind: "human", name: "Ben", level: null, handedOver: false },
+          {
+            colour: "rouge",
+            kind: "bot",
+            name: (result.table.seats.rouge as { name: string }).name,
+            level: 3,
+            handedOver: false,
+          },
+          {
+            colour: "vert",
+            kind: "bot",
+            name: (result.table.seats.vert as { name: string }).name,
+            level: 4,
+            handedOver: false,
+          },
+        ],
+        deals: 0,
+        captures: { "bleu-rouge": 0, "jaune-vert": 0 },
+      },
+    ]);
+    expect(result.table.records).toEqual(result.records);
+  });
+
+  it("holds no table id, person id, token or card", () => {
+    const text = JSON.stringify(won().records);
+    expect(text).not.toContain(ID);
+    expect(text).not.toContain("who-");
+    expect(text).not.toMatch(/"(1[0-3]|[1-9])[SHDC]"/);
+  });
+
+  it("is pending until recorded, with the d1Retry deadline a minute later", () => {
+    const { table } = won();
+    expect(table.deadlines.d1Retry).toEqual({ at: 3000 + 60_000, attempt: 1 });
+    expect(nextDeadline(table)).toBe(3000 + 60_000);
+    const done = reduce(table, { t: "recorded", gameNo: 1 }, ctx(3100));
+    expect(done.table.records).toEqual([]);
+    expect(done.table.deadlines.d1Retry).toBeUndefined();
+    expect(done.out).toEqual([]);
+    expect(done.records).toBeUndefined();
+    // Recorded twice, or another number: nothing changes.
+    expect(reduce(done.table, { t: "recorded", gameNo: 1 }, ctx(3200)).table).toBe(done.table);
+    expect(reduce(table, { t: "recorded", gameNo: 7 }, ctx(3200)).table.records).toHaveLength(1);
+  });
+
+  it("only the winning step carries it; a vote, a hello or a tick before the deadline do not", () => {
+    const { table } = won();
+    expect(vote(table, ANA, true).records).toBeUndefined();
+    expect(reduce(table, { t: "hello", who: BEN, name: "Ben" }, ctx(3100)).records).toBeUndefined();
+    expect(reduce(table, { t: "tick", retry: false }, ctx(3100)).records).toBeUndefined();
+  });
+
+  it("a failed write is retried by the alarm after 1 minute, then 10, then 60, then every 60", () => {
+    let table = won().table;
+    let at = 3000 + 60_000;
+    for (const delay of [600_000, 3_600_000, 3_600_000]) {
+      const tick = reduce(table, { t: "tick", retry: false }, ctx(at));
+      expect(tick.records?.map((record) => record.gameNo)).toEqual([1]);
+      expect(tick.table.deadlines.d1Retry?.at).toBe(at + delay);
+      expect(tick.out).toEqual([]);
+      table = tick.table;
+      at += delay;
+    }
+    // The snapshot is plain JSON: the pending record survives an eviction.
+    const reread = JSON.parse(JSON.stringify(table)) as Table;
+    expect(reduce(reread, { t: "tick", retry: false }, ctx(at)).records).toHaveLength(1);
+    const done = reduce(table, { t: "recorded", gameNo: 1 }, ctx(at));
+    expect(done.table.deadlines.d1Retry).toBeUndefined();
+  });
+
+  it("a rematch won before the first record was written keeps both pending", () => {
+    const first = won().table;
+    let table = vote(vote(first, ANA, true).table, BEN, true, 5000).table;
+    if (table.game === null) throw new Error("no game");
+    // The second game is won by hand (a real play is in the property tests).
+    table = reduce(
+      {
+        ...table,
+        game: {
+          ...table.game,
+          phase: "play",
+          turn: "bleu",
+          hands: { ...table.game.hands, bleu: ["5S"] },
+          pawns: {
+            ...table.game.pawns,
+            bleu0: { zone: "home", slot: 1 },
+            bleu1: { zone: "home", slot: 2 },
+            bleu2: { zone: "home", slot: 3 },
+            bleu3: { zone: "ring", progress: 66 },
+            rouge0: { zone: "home", slot: 0 },
+            rouge1: { zone: "home", slot: 1 },
+            rouge2: { zone: "home", slot: 2 },
+            rouge3: { zone: "home", slot: 3 },
+          },
+        },
+      },
+      client(ANA, { t: "act", base: table.seq, action: { t: "move", card: "5S", pawn: "bleu3" } }),
+      ctx(8000),
+    ).table;
+    expect(table.status).toBe("finished");
+    expect(table.records.map((record) => record.gameNo)).toEqual([1, 2]);
+    const one = reduce(table, { t: "recorded", gameNo: 1 }, ctx(8100)).table;
+    expect(one.records.map((record) => record.gameNo)).toEqual([2]);
+    expect(one.deadlines.d1Retry).toBeDefined();
+  });
+
+  it("a seat handed to the computer is recorded with its level", () => {
+    const end = won().table;
+    const away = reduce(end, { t: "gone", who: BEN }, ctx(3500)).table;
+    const table = vote(away, ANA, true).table;
+    expect(table.seats.jaune).toEqual({ kind: "human", who: BEN, handedOver: 3 });
+    // Fast-forward to the end of that game.
+    if (table.game === null) throw new Error("no game");
+    const record = gameRecordOf({
+      ...table,
+      status: "finished",
+      endedAt: 9000,
+      game: { ...table.game, phase: "won", winner: "jaune-vert" },
+    });
+    expect(record.seats[1]).toEqual({
+      colour: "jaune",
+      kind: "human",
+      name: "Ben",
+      level: 3,
+      handedOver: true,
+    });
+    expect(record.winner).toBe("jaune-vert");
   });
 });
