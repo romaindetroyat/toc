@@ -25,6 +25,8 @@
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
+  import { placeBubble, type Rect, riderRect, type Size } from "../board/bubbles.ts";
+  import ChatBubbles, { type BubbleSpot } from "../board/ChatBubbles.svelte";
   import type { Flight } from "../board/CardFlights.svelte";
   import {
     dealFlights,
@@ -463,6 +465,39 @@
   // --- « Messages rapides » (plan 02-08): the button, the key « M », the sheet ---
   let messagesOpen = $state(false);
   let messagesOpener = $state<HTMLElement | null>(null);
+
+  /**
+   * The controls a bubble keeps clear of (02-UI-SPEC « Received messages »): the hand's cards, the
+   * strips' buttons and chips, the info pill, the prompt row (or the action zone), the plates.
+   */
+  const BUBBLE_OBSTACLES = [
+    "[data-hand] [data-card]",
+    "[data-info-bar]",
+    "[data-settings-slot] button",
+    "[data-messages-button]",
+    "[data-players-button]",
+    "[data-action-zone]",
+    "[data-action-buttons] button",
+    "[data-tray-option]",
+    "[data-seven-chips] [data-step]",
+    "[data-seven-buttons] button",
+    "[data-paused-prompt]",
+    "[data-reconnect-banner]",
+    "[data-plate]",
+  ].join(", ");
+
+  /** A received message's bubble beside its sender's rider (bubbles.ts), in screen px. */
+  function placeChat(color: Color, size: Size, placed: readonly Rect[]): BubbleSpot | null {
+    if (boardEl === null) return null;
+    const box = boardEl.getBoundingClientRect();
+    const board = { x: box.left, y: box.top, w: box.width, h: box.height };
+    const obstacles = [...document.querySelectorAll(BUBBLE_OBSTACLES)]
+      .map((el) => el.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => ({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }));
+    const at = placeBubble(riderRect(color, k, board), board, size, obstacles, placed);
+    return { x: at.x, y: at.y, tail: at.side === "right" ? "left" : "right", tailAt: at.tailY };
+  }
 
   /** Opens the sheet; `opener` gets the focus back (« Messages », or what had it before « M »). */
   function openMessages(opener: HTMLElement | null) {
@@ -1118,6 +1153,13 @@
       </div>
 
       {#if online !== undefined && onlineTable !== null}
+        <ChatBubbles
+          onFrame={online.connection.onFrame}
+          table={onlineTable}
+          me={online.seat}
+          place={placeChat}
+          visible={!ended}
+        />
         <TablePlate
           table={onlineTable}
           me={online.seat}

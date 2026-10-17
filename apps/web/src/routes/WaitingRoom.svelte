@@ -8,6 +8,8 @@
   import type { TableConnection } from "../net/connection.svelte.ts";
   import { tableNotices } from "../net/notices.ts";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
+  import { placeAbove, type Rect, type Size } from "../board/bubbles.ts";
+  import ChatBubbles, { type BubbleSpot } from "../board/ChatBubbles.svelte";
   import InviteSheet, { takeNewTable } from "../ui/InviteSheet.svelte";
   import MessagesButton from "../ui/MessagesButton.svelte";
   import MessagesSheet from "../ui/MessagesSheet.svelte";
@@ -162,6 +164,24 @@
   // someone without a seat).
   let messagesOpen = $state(false);
   let messagesOpener = $state<HTMLElement | null>(null);
+
+  /** A received message's bubble, centred above its sender's seat tile, tail down (bubbles.ts). */
+  function placeChat(color: Color, size: Size, _placed: readonly Rect[]): BubbleSpot | null {
+    const tile = tiles[color];
+    if (tile === null) return null;
+    const box = tile.getBoundingClientRect();
+    const margin = 4;
+    const bounds = {
+      x: margin,
+      y: margin,
+      w: window.innerWidth - 2 * margin,
+      h: window.innerHeight - 2 * margin,
+    };
+    const rect = { x: box.left, y: box.top, w: box.width, h: box.height };
+    const at = placeAbove(rect, size, bounds);
+    const centre = rect.x + rect.w / 2 - at.x;
+    return { ...at, tail: "down", tailAt: Math.min(Math.max(centre, 16), size.w - 16) };
+  }
 
   function openMessages(opener: HTMLElement) {
     unlock();
@@ -333,6 +353,8 @@
 </main>
 
 {#if rotate}<RotatePrompt />{/if}
+
+<ChatBubbles onFrame={connection.onFrame} {table} me={mySeat} place={placeChat} visible={!rotate} />
 
 <TablePlate
   {table}

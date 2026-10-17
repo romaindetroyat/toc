@@ -8,7 +8,7 @@
 import { leftClearance, quarterTurnsFor, riderBox, SCENE } from "@toc/board";
 import { COLORS, type Color } from "@toc/engine";
 import { describe, expect, it } from "vitest";
-import { cornerLayout, compactLayout, PROMPT_ROW, STRIP_MIN } from "../cards/fan.ts";
+import { compactLayout, cornerLayout, PROMPT_ROW, STRIP_MIN } from "../cards/fan.ts";
 import {
   BUBBLE_GAP,
   BUBBLE_MAX_W,
@@ -146,6 +146,18 @@ describe("placeBubble: beside the rider, facing the middle", () => {
     expect(Math.abs(at.y + SIZE.h / 2 - 230)).toBeLessThanOrEqual(SIZE.h / 2 + 20 + 2);
   });
 
+  it("keeps off another bubble when it can, and off a control always", () => {
+    const rider = { x: 100, y: 200, w: 40, h: 60 };
+    const other = { x: 140, y: 190, w: 200, h: 80 };
+    const apart = placeBubble(rider, board, SIZE, [], [other]);
+    expect(apart.alone).toBe(true);
+    expect(intersects({ x: apart.x, y: apart.y, w: SIZE.w, h: SIZE.h }, other)).toBe(false);
+    // A board just as tall as the bubble: no room for both, the control wins.
+    const low = { x: 0, y: 200, w: 1000, h: SIZE.h };
+    const squeezed = placeBubble({ x: 100, y: 200, w: 40, h: 48 }, low, SIZE, [], [low]);
+    expect(squeezed).toMatchObject({ clear: true, alone: false });
+  });
+
   it("says so when nothing is clear, and keeps its place by the rider", () => {
     const rider = { x: 100, y: 200, w: 40, h: 60 };
     const at = placeBubble(rider, board, SIZE, [board]);
@@ -162,9 +174,12 @@ describe("the four bubbles at the target sizes", () => {
         const placed: Rect[] = [];
         for (const color of COLORS as readonly Color[]) {
           const rider = riderRect(color, k, screen.board);
-          const at = placeBubble(rider, screen.board, SIZE, [...screen.obstacles, ...placed]);
+          const at = placeBubble(rider, screen.board, SIZE, screen.obstacles, placed);
           const box = { x: at.x, y: at.y, w: SIZE.w, h: SIZE.h };
           expect(at.clear, `${color}`).toBe(true);
+          // Apart from each other too, where the board leaves room (not at 480 × 320, whose board is
+          // 351 px wide with 129 px between the left and the right riders).
+          if (screen.name !== "480 × 320") expect(at.alone, `${color} apart`).toBe(true);
           expect(inside(box, screen.board), `${color} inside the board`).toBe(true);
           for (const obstacle of screen.obstacles) {
             expect(intersects(box, obstacle), `${color} over ${JSON.stringify(obstacle)}`).toBe(
