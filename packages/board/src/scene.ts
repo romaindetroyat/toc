@@ -460,3 +460,60 @@ export function seatCard(seat: Color, k: number): { at: Point; angle: 0 | 90 | 1
   const [cx, cy] = scene.centre;
   return { at: [cx - n[0] * off, cy - n[1] * off], angle: ROT[q] as 0 | 90 | 180 | 270 };
 }
+
+// --- The galet's bare left side (plan 03-10) ---
+//
+// Romain, 2026-10-17, on the phone held sideways: « Cartes plus grandes en coin » — the hand spreads in
+// the bare corner at the bottom left of the galet. What the hand may cover is the galet's wood and
+// rim only, never a thing of the game: the boxes below are what must stay uncovered, in scene units.
+
+/** Around a ring cell: its disc (or losange, or carré), the ghost ring and halo of a knight on it. */
+const CELL_HALF = 0.62;
+/** Above a cell's centre: the head of a knight standing on it (lifted when selected). */
+const CELL_UP = 1.4;
+/** Around a home or stable dot, and above it the head of its (smaller) knight. */
+const DOT_HALF = 0.5;
+const DOT_UP = 1.2;
+
+/** Every box the hand must leave bare: [left, top, bottom] in scene units, for any seat k. */
+const KEEP_CLEAR: readonly (readonly [number, number, number])[] = (() => {
+  const s = GEOMETRY.scene.step;
+  const boxes: [number, number, number][] = GEOMETRY.cells.map(([x, y]) => [
+    x - CELL_HALF * s,
+    y - CELL_UP * s,
+    y + CELL_HALF * s,
+  ]);
+  // The drawing never turns: the dots and riders of seat 0 are every seat's places.
+  for (const color of COLORS) {
+    for (const slot of [0, 1, 2, 3] as const) {
+      for (const z of ["home", "stable"] as const) {
+        const [x, y] = sceneXY({ z, color, slot }, 0);
+        boxes.push([x - DOT_HALF * s, y - DOT_UP * s, y + DOT_HALF * s]);
+      }
+    }
+    // A rider (and the glow of a thinking seat around it), turned a quarter or not.
+    const r = riderBox(color, 0);
+    const half = r.angle % 180 === 0 ? r.w / 2 : r.h / 2;
+    const tall = r.angle % 180 === 0 ? r.h / 2 : r.w / 2;
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    boxes.push([cx - half, cy - tall, cy + tall]);
+  }
+  const felt = GEOMETRY.scene.felt;
+  boxes.push([felt.x, felt.y, felt.y + felt.h]);
+  return boxes;
+})();
+
+/**
+ * How far the galet stays bare from its left edge in the band of scene heights [y0, y1]: the scene x
+ * of the leftmost box of KEEP_CLEAR that meets the band (every ring cell with the knight, halo and
+ * ghost ring it may carry, every home and stable dot with its knight, the riders, the felt). The
+ * phone's hand may cover the galet left of it.
+ */
+export function leftClearance(y0: number, y1: number): number {
+  let x = GEOMETRY.scene.width;
+  for (const [left, top, bottom] of KEEP_CLEAR) {
+    if (bottom >= y0 && top <= y1 && left < x) x = left;
+  }
+  return Math.max(0, x);
+}

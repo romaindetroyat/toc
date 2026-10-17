@@ -6,6 +6,7 @@ import {
   bottomOf,
   KNIGHT,
   knightScale,
+  leftClearance,
   MOCKUP,
   type Point,
   quarterTurnsFor,
@@ -466,5 +467,48 @@ describe("knights", () => {
 
   it("has a head room of 0.02166", () => {
     expect(Math.abs(SCENE.headRoom - 0.02166)).toBeLessThan(0.0001);
+  });
+});
+
+describe("the galet's bare left side (plan 03-10)", () => {
+  const s = SCENE.step;
+
+  it("never reaches past a ring cell, its knight or a dot in the band it meets", () => {
+    for (const [x, y] of ring(0)) {
+      // The band of the cell itself, and a band only touching the knight's head above it.
+      expect(leftClearance(y, y)).toBeLessThanOrEqual(x - 0.62 * s + 1e-9);
+      expect(leftClearance(y - 1.3 * s, y - 1.3 * s)).toBeLessThanOrEqual(x - 0.62 * s + 1e-9);
+    }
+    for (const c of COLORS) {
+      for (const p of [
+        ...homes(c, 0),
+        ...SLOTS.map((slot) => sceneXY({ z: "stable", color: c, slot }, 0)),
+      ]) {
+        expect(leftClearance(p[1], p[1])).toBeLessThanOrEqual(p[0] - 0.5 * s + 1e-9);
+      }
+    }
+  });
+
+  it("leaves the bare corner at the bottom left, wider toward the bottom edge", () => {
+    const bottom = SCENE.height;
+    // Along the left side the cells come within a fraction of a step of the edge.
+    expect(leftClearance(700, 900)).toBeLessThan(0.5 * s);
+    // Under the lowest cells of the left side the corner opens.
+    const low = leftClearance(bottom - 0.4 * s, bottom);
+    expect(low).toBeGreaterThan(leftClearance(bottom - 3 * s, bottom));
+    expect(low).toBeGreaterThan(3 * s);
+  });
+
+  it("is the same for every seat at the bottom: the drawing never turns", () => {
+    // The boxes are taken for seat 0; every k puts the same cells and dots at the same places.
+    for (const k of KS) {
+      const all = [...ring(k), ...COLORS.flatMap((c) => homes(c, k))];
+      for (const [x, y] of all) expect(leftClearance(y, y)).toBeLessThanOrEqual(x);
+    }
+  });
+
+  it("is 0 or more, and the scene's width over an empty band", () => {
+    expect(leftClearance(-1000, -900)).toBe(SCENE.width);
+    expect(leftClearance(0, SCENE.height)).toBeGreaterThanOrEqual(0);
   });
 });
