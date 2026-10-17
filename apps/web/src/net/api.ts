@@ -78,3 +78,33 @@ export async function tableSummary(
   if (response.status !== 200) return "unknown";
   return parseTableSummary(body) ?? "unknown";
 }
+
+/**
+ * GET /api/tables/:id as a health check while a connection to the table does not open (plan 02-07):
+ * "gone" (the Worker's 404), "server" (a 5xx: « La table ne répond pas »), "ok", or "unknown"
+ * (offline, anything else).
+ */
+export async function tableHealth(
+  id: string,
+  deps: ApiDeps = browserApi,
+): Promise<"gone" | "server" | "ok" | "unknown"> {
+  if (!isTableId(id)) return "gone";
+  if (!deps.online()) return "unknown";
+  let response: Response;
+  try {
+    response = await deps.fetch(`/api/tables/${id}`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return "unknown";
+  }
+  if (response.status >= 500) return "server";
+  if (response.status === 200) return "ok";
+  if (response.status !== 404) return "unknown";
+  const body = await bodyOf(response);
+  const error =
+    typeof body === "object" && body !== null ? (body as { error?: unknown }).error : null;
+  return error === "not-found" ? "gone" : "unknown";
+}

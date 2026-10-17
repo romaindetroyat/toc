@@ -32,12 +32,40 @@
     online?: boolean;
     /** Called once the player has confirmed « Quitter la table ». */
     onleave?: () => void;
+    /**
+     * In an online game (plan 02-07): the leave's confirmation says the game pauses for the others,
+     * and « Raccourcis clavier » stays (as in the local game).
+     */
+    inGame?: boolean;
+    /**
+     * The chef de table in an online game (plan 02-07): « Arrêter la partie », confirmed with
+     * « Arrêter la partie ? » (the game is saved for everyone), in place of « Abandonner la partie ».
+     */
+    onstop?: () => void;
   };
 
-  let { onclose, opener = null, onabandon, online = false, onleave }: Props = $props();
+  let {
+    onclose,
+    opener = null,
+    onabandon,
+    online = false,
+    onleave,
+    inGame = false,
+    onstop,
+  }: Props = $props();
 
   let leaveOpen = $state(false);
   let leaveButton = $state<HTMLButtonElement | null>(null);
+  let stopOpen = $state(false);
+  let stopButton = $state<HTMLButtonElement | null>(null);
+  const leaveCopy = $derived(inGame ? tableCopy.confirm.leaveGame : tableCopy.confirm.leaveRoom);
+
+  /** The stop is confirmed: the sheet closes, the plate « Partie sauvegardée » comes. */
+  function confirmStop() {
+    stopOpen = false;
+    onstop?.();
+    onclose();
+  }
 
   // The buses follow the settings as long as the sheet is open (the game applies them too, and the
   // engine keeps them until it is unlocked).
@@ -109,7 +137,7 @@
       >
         {reglages.credits}
       </button>
-      {#if onabandon}
+      {#if onabandon || inGame}
         <!-- In a game, on a computer only: the same help as the « ? » key (plan 01-28). -->
         <button
           type="button"
@@ -135,6 +163,18 @@
       </button>
     {/if}
 
+    {#if onstop}
+      <button
+        type="button"
+        class="btn btn-text leave"
+        data-stop-game
+        bind:this={stopButton}
+        onclick={() => (stopOpen = true)}
+      >
+        {reglages.stopGame}
+      </button>
+    {/if}
+
     {#if onleave}
       <button
         type="button"
@@ -151,13 +191,25 @@
 
 {#if leaveOpen && onleave}
   <ConfirmDialog
-    title={tableCopy.confirm.leaveRoom.title}
-    body={tableCopy.confirm.leaveRoom.body}
-    safeLabel={tableCopy.confirm.leaveRoom.safe}
-    otherLabel={tableCopy.confirm.leaveRoom.other}
+    title={leaveCopy.title}
+    body={leaveCopy.body}
+    safeLabel={leaveCopy.safe}
+    otherLabel={leaveCopy.other}
     oncancel={() => (leaveOpen = false)}
     onconfirm={onleave}
     opener={leaveButton}
+  />
+{/if}
+
+{#if stopOpen && onstop}
+  <ConfirmDialog
+    title={tableCopy.confirm.stop.title}
+    body={tableCopy.confirm.stop.body}
+    safeLabel={tableCopy.confirm.stop.safe}
+    otherLabel={tableCopy.confirm.stop.other}
+    oncancel={() => (stopOpen = false)}
+    onconfirm={confirmStop}
+    opener={stopButton}
   />
 {/if}
 

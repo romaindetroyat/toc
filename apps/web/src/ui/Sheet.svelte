@@ -42,6 +42,11 @@
     closeLabel?: string;
     /** A confirmation makes its safe answer the primary button, focused on opening. */
     closeIsPrimary?: boolean;
+    /**
+     * The close button (the safe answer) takes the focus on opening even when it is not the primary
+     * one (the reclaim dialog's « Refuser », plan 02-07).
+     */
+    focusClose?: boolean;
     /** Element that gets the focus back on close; defaults to the element focused on opening. */
     opener?: HTMLElement | null;
     children: Snippet;
@@ -53,6 +58,7 @@
     closeOnBackdrop = true,
     closeLabel = "Fermer",
     closeIsPrimary = false,
+    focusClose = false,
     opener = null,
     children,
   }: Props = $props();
@@ -103,7 +109,7 @@
   // The focus moves into the sheet when it opens (on the dialog itself, so the title is read first; on
   // the safe answer of a confirmation).
   $effect(() => {
-    if (closeIsPrimary) closeButton?.focus({ preventScroll: true });
+    if (closeIsPrimary || focusClose) closeButton?.focus({ preventScroll: true });
     else dialog?.focus({ preventScroll: true });
   });
 

@@ -29,6 +29,10 @@
     gear?: boolean;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
+    /** An online game (plan 02-07): the confirmed « Quitter la table » of « Réglages ». */
+    onleave?: () => void;
+    /** An online game, the chef de table: the confirmed « Arrêter la partie ». */
+    onstop?: () => void;
     /** The computer player thinking about its move (session.thinking), if any. */
     thinking?: Color | null;
     /**
@@ -45,6 +49,8 @@
     form = "row",
     gear = true,
     onabandon,
+    onleave,
+    onstop,
     thinking = null,
     players,
   }: Props = $props();
@@ -203,7 +209,13 @@
 
     {#if gear}
       <div class="gear" data-settings-slot>
-        <SettingsButton {onabandon} />
+        <SettingsButton
+          {onabandon}
+          online={onleave !== undefined}
+          inGame={onleave !== undefined}
+          {onleave}
+          {onstop}
+        />
       </div>
     {/if}
 

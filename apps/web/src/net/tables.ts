@@ -132,6 +132,11 @@ export function statusText(status: TableStatus, missingIsMe = false): string {
   return copy.list.status[status];
 }
 
+/** Row line 2's status for this device's seat: « En pause : on t’attend » when its seat is missing. */
+export function rowStatus(summary: TableSummary, seat: Color | null): string {
+  return statusText(summary.status, seat !== null && summary.missing.includes(seat));
+}
+
 const DAY = 86_400_000;
 
 /** How long ago, in French (« il y a 5 minutes », « hier »), never in the future. */

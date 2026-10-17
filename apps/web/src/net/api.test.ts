@@ -1,6 +1,6 @@
 import type { TableSummary } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
-import { type ApiDeps, createTable, tableSummary } from "./api.ts";
+import { type ApiDeps, createTable, tableHealth, tableSummary } from "./api.ts";
 
 const ID = "abcdefghijklmnopqrstuv";
 
@@ -104,5 +104,17 @@ describe("tableSummary(id)", () => {
       const { api } = deps(response);
       expect(await tableSummary(ID, api)).toBe("unknown");
     }
+  });
+});
+
+describe("tableHealth(id) (plan 02-07)", () => {
+  it("tells a server error from a table that is gone, and from an answer it cannot read", async () => {
+    expect(await tableHealth(ID, deps(() => json({ error: "x" }, 500)).api)).toBe("server");
+    expect(await tableHealth(ID, deps(() => json({ error: "x" }, 503)).api)).toBe("server");
+    expect(await tableHealth(ID, deps(() => json({ error: "not-found" }, 404)).api)).toBe("gone");
+    expect(await tableHealth(ID, deps(() => json(SUMMARY, 200)).api)).toBe("ok");
+    expect(await tableHealth(ID, deps(() => json({ error: "x" }, 404)).api)).toBe("unknown");
+    expect(await tableHealth(ID, deps(() => json({}, 200), false).api)).toBe("unknown");
+    expect(await tableHealth("nope", deps(() => json({}, 200)).api)).toBe("gone");
   });
 });

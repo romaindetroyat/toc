@@ -13,9 +13,13 @@
     /** At an online table: no sound test, and « Quitter la table » when `onleave` is given. */
     online?: boolean;
     onleave?: () => void;
+    /** In an online game (not the waiting room): the leave's in-game confirmation (plan 02-07). */
+    inGame?: boolean;
+    /** The chef de table in an online game: « Arrêter la partie », confirmed first. */
+    onstop?: () => void;
   };
 
-  let { onabandon, online = false, onleave }: Props = $props();
+  let { onabandon, online = false, onleave, inGame = false, onstop }: Props = $props();
 
   let settingsOpen = $state(false);
   let gear = $state<HTMLButtonElement | null>(null);
@@ -33,7 +37,15 @@
 </button>
 
 {#if settingsOpen}
-  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} {onabandon} {online} {onleave} />
+  <SettingsSheet
+    onclose={() => (settingsOpen = false)}
+    opener={gear}
+    {onabandon}
+    {online}
+    {onleave}
+    {inGame}
+    {onstop}
+  />
 {/if}
 
 <style>

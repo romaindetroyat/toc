@@ -13,6 +13,13 @@
 // once; pageshow, visibilitychange to visible and online reconnect when the socket is not open. Each
 // table frame carries the server's clock: `serverOffset` (server − device) is measured on it, for the
 // pause's countdown.
+//
+// Own connection (plan 02-07, 02-UI-SPEC « Own connection »): `downSince` is set when the socket drops
+// (not by a final code), when the browser says offline (a ping then finds out at once) and on pagehide;
+// the welcome that follows clears it. `link` words it (plate.ts connectionState): nothing for 2 s, the
+// banner until 10 s, then the plate. The welcome is the only resync (no replay of missed events): the
+// remote game resets the Director to its view. Back online after a drop, the socket is reopened even
+// when it looks open, so that a welcome always comes. `reconnect()` is « Réessayer maintenant ».
 
 import type { PlayerView } from "@toc/engine";
 import {
@@ -27,6 +34,7 @@ import {
 } from "@toc/protocol";
 import ReconnectingWebSocket from "partysocket/ws";
 import type { Device } from "./device.ts";
+import { BANNER_MS, type ConnectionState, connectionState, PLATE_MS } from "./plate.ts";
 import type { RemoteConnection, StartBatch } from "./remoteGame.ts";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
@@ -37,6 +45,14 @@ export type TableConnection = RemoteConnection & {
   readonly closeCode: number | null;
   /** The server's clock minus the device's, in ms, measured on the latest table frame. */
   readonly serverOffset: number;
+  /** This device's own connection: nothing, the banner (2 to 10 s down), the plate (after 10 s). */
+  readonly link: ConnectionState;
+  /** How long the drop that the latest welcome ended lasted, in ms (null: the welcome ended none). */
+  readonly lastDownMs: number | null;
+  /** The server answered bad-frame: « La table ne répond pas ». */
+  readonly serverError: boolean;
+  /** « Réessayer maintenant », « Réessayer »: a new socket at once. */
+  reconnect(): void;
   close(): void;
 };
 
@@ -63,6 +79,38 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
   let view = $state.raw<PlayerView | null>(null);
   let seq = $state(0);
   let serverOffset = $state(0);
+  let downSince = $state<number | null>(null);
+  /** The device's clock for `link`, moved when the banner and the plate are due. */
+  let linkNow = $state(Date.now());
+  let lastDownMs = $state<number | null>(null);
+  let serverError = $state(false);
+  let linkTimers: ReturnType<typeof setTimeout>[] = [];
+
+  function clearLinkTimers(): void {
+    for (const timer of linkTimers) clearTimeout(timer);
+    linkTimers = [];
+  }
+
+  /** The connection is down from now (unless it already was). */
+  function markDown(): void {
+    if (ended || downSince !== null) return;
+    downSince = Date.now();
+    linkNow = downSince;
+    clearLinkTimers();
+    linkTimers = [BANNER_MS, PLATE_MS].map((delay) =>
+      setTimeout(() => {
+        linkNow = Date.now();
+      }, delay),
+    );
+  }
+
+  /** A welcome came (or the connection ended for good): up again. */
+  function markUp(): void {
+    lastDownMs = downSince === null ? null : Date.now() - downSince;
+    downSince = null;
+    linkNow = Date.now();
+    clearLinkTimers();
+  }
 
   const listeners = new Set<(frame: ServerFrame) => void>();
   /** The events of the latest game start, kept until a remote game takes them. */
@@ -88,6 +136,9 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
     if (frame.t === "welcome" || frame.t === "table") serverOffset = frame.table.now - Date.now();
     switch (frame.t) {
       case "welcome":
+        // Back at the table: the remote game resets the Director to this view (the only resync).
+        markUp();
+        serverError = false;
         you = frame.you;
         table = frame.table;
         view = frame.view;
@@ -109,6 +160,10 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
         keep(frame);
         return;
       case "error":
+        if (frame.code === "bad-frame") serverError = true;
+        return;
+      case "reclaimRequest":
+      case "reclaimResult":
         return;
     }
   }
@@ -146,11 +201,13 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
   socket.addEventListener("close", (event) => {
     stopHeartbeat();
     if (finalClose(event.code)) {
+      markUp();
       closeCode = event.code;
       ended = true;
       status = "closed";
     } else if (status !== "closed") {
       status = "connecting";
+      markDown();
     }
   });
   socket.addEventListener("message", (event) => {
@@ -173,25 +230,37 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
     // A close by us is not reconnected by partysocket: the page's return reconnects it.
     socket.close(1000, "pagehide");
     status = "connecting";
+    markDown();
   }
   function onBack(): void {
     if (ended || document.visibilityState === "hidden") return;
-    if (socket.readyState !== socket.OPEN && socket.readyState !== socket.CONNECTING) {
+    if (downSince !== null) {
+      // Back after a drop: a new socket, so that a welcome resyncs the game.
+      socket.reconnect();
+    } else if (socket.readyState !== socket.OPEN && socket.readyState !== socket.CONNECTING) {
       socket.reconnect();
     } else if (socket.readyState === socket.OPEN) {
       // A socket the phone froze may look open: a ping finds out at once.
       ping();
     }
   }
+  /** The browser lost the network: the connection is down; a ping finds out whether the socket is. */
+  function onOffline(): void {
+    if (ended) return;
+    markDown();
+    ping();
+  }
   window.addEventListener("pagehide", onPageHide);
   window.addEventListener("pageshow", onBack);
   window.addEventListener("online", onBack);
+  window.addEventListener("offline", onOffline);
   document.addEventListener("visibilitychange", onBack);
 
   function removePageListeners(): void {
     window.removeEventListener("pagehide", onPageHide);
     window.removeEventListener("pageshow", onBack);
     window.removeEventListener("online", onBack);
+    window.removeEventListener("offline", onOffline);
     document.removeEventListener("visibilitychange", onBack);
   }
 
@@ -217,6 +286,20 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
     get serverOffset() {
       return serverOffset;
     },
+    get link() {
+      return connectionState(downSince, linkNow, downSince === null);
+    },
+    get lastDownMs() {
+      return lastDownMs;
+    },
+    get serverError() {
+      return serverError;
+    },
+    reconnect() {
+      if (ended) return;
+      markDown();
+      socket.reconnect();
+    },
     send(frame) {
       if (status !== "open") return false;
       sendRaw(frame);
@@ -237,6 +320,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
       status = "closed";
       listeners.clear();
       stopHeartbeat();
+      clearLinkTimers();
       removePageListeners();
       socket.close(1000);
     },

@@ -10,8 +10,8 @@
     forgetTable,
     loadTables,
     restoreTable,
+    rowStatus,
     rowText,
-    statusText,
     type TableEntry,
     timeAgo,
   } from "../net/tables.ts";
@@ -22,7 +22,9 @@
   // « Mes parties en cours » (02-UI-SPEC, D-06): this device's tables, each row one tap from its table.
   // Rows render at once from the device list with « Vérification… », then each fills in as its summary
   // arrives (no spinner); offline, « État inconnu (hors ligne) » and the row still opens. A table the
-  // server no longer knows (404) leaves the list, with one « effacée » toast for all of them.
+  // server no longer knows (404) leaves the list, with one « effacée » toast for all of them. A paused
+  // table waiting for this device's seat reads « En pause : on t’attend » (plan 02-07); a saved one
+  // « Sauvegardée », and its row opens the saved plate.
   type Props = { storage: StorageLike | null };
 
   let { storage }: Props = $props();
@@ -77,7 +79,7 @@
     if (check === "unknown") return { first: copy.list.unknownPlayers, second: copy.list.offline };
     return {
       first: rowText(check, entry.seat),
-      second: copy.list.line2(statusText(check.status), timeAgo(check.updatedAt, now)),
+      second: copy.list.line2(rowStatus(check, entry.seat), timeAgo(check.updatedAt, now)),
     };
   }
 

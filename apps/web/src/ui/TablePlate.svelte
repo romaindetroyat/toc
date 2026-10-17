@@ -6,7 +6,7 @@
   import { fade, fly } from "svelte/transition";
   import { unlock } from "../audio/engine.ts";
   import { table as copy } from "../i18n/fr/table.ts";
-  import { type Plate, plateFor } from "../net/plate.ts";
+  import { type ConnectionState, type Plate, plateFor } from "../net/plate.ts";
   import { settings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
   import type { IconName } from "./icons.ts";
@@ -19,24 +19,40 @@
   // over the board only. Non-modal: a region named by its title, a polite live region for its
   // changes; the focus moves only when the choices or the level step appear (and back to the first
   // choice on « Retour »). Every button wakes the sound (the first gesture may be here).
+  // Plan 02-07: the connection plate (this device's own connection lost for 10 s) comes before every
+  // other, with « Retour à l’accueil » and « Réessayer maintenant »; the waiting room shows it too
+  // (no seat there: `me` is null, and the plate centres on the room).
 
   type Props = {
     table: TablePublic;
-    /** This device's seat. */
-    me: Color;
+    /** This device's seat (null in the waiting room before sitting). */
+    me: Color | null;
     /** The server's clock minus the device's (connection.serverOffset). */
     offset: number;
     /** The board's element: the plate is placed on it. */
     board: HTMLElement | null;
     send: (frame: ClientFrame) => void;
     onhome: () => void;
+    /** This device's own connection (plan 02-07): the plate when it is "plate". */
+    link?: ConnectionState;
+    /** « Réessayer maintenant ». */
+    onretry?: () => void;
   };
 
-  let { table, me, offset, board, send, onhome }: Props = $props();
+  let {
+    table,
+    me,
+    offset,
+    board,
+    send,
+    onhome,
+    link = "none",
+    onretry = () => {},
+  }: Props = $props();
 
   /** The device's clock, moved each second while a countdown shows (the only timer here). */
   let nowMs = $state(Date.now());
-  const plate = $derived<Plate | null>(plateFor(table, me, offset, nowMs));
+  const plate = $derived<Plate | null>(plateFor(table, me, offset, nowMs, link));
   const counting = $derived(plate?.kind === "pause");
 
   $effect(() => {
@@ -67,7 +83,9 @@
           ? step
           : plate.kind,
   );
-  const icon = $derived<IconName>(plate?.kind === "saved" ? "check" : "hourglass");
+  const icon = $derived<IconName>(
+    plate?.kind === "saved" ? "check" : plate?.kind === "connection" ? "wifi-off" : "hourglass",
+  );
   const several = $derived(plate?.kind === "choices" && plate.several);
 
   // --- Live region: said once when the pause begins, and when the choices come ---
@@ -81,7 +99,11 @@
       lastKind = now;
       if (current?.kind === "pause") announcement = current.announce;
       else if (current?.kind === "choices") announcement = copy.game.pause.chooseAnnounce;
-      else if (current?.kind === "waitingChoice" || current?.kind === "saved") {
+      else if (
+        current?.kind === "waitingChoice" ||
+        current?.kind === "saved" ||
+        current?.kind === "connection"
+      ) {
         announcement = `${current.title} ${current.body}`;
       } else announcement = "";
     });
@@ -91,7 +113,11 @@
   // checked option when the level step appears. An action on the element itself, run once it is in
   // the page (a bound reference may come a moment later). ---
   function focusFirst(node: HTMLElement) {
-    requestAnimationFrame(() => node.focus({ preventScroll: true }));
+    requestAnimationFrame(() => {
+      // A dialog open over the game (the reclaim's, a confirmation) keeps the focus.
+      if (document.querySelector("[data-sheet-layer]") !== null) return;
+      node.focus({ preventScroll: true });
+    });
   }
 
   function focusChecked(node: HTMLElement) {
@@ -120,6 +146,11 @@
   function home() {
     unlock();
     onhome();
+  }
+
+  function retry() {
+    unlock();
+    onretry();
   }
 
   // --- Place: centred on the board, never wider than it, kept 8 px inside the viewport ---
@@ -211,9 +242,16 @@
       <p class="body">{plate.body}</p>
     {/if}
 
-    {#if plate.kind === "pause"}
+    {#if plate.kind === "connection"}
+      <div class="pair">
+        <button type="button" class="btn btn-secondary" onclick={home}>{copy.home}</button>
+        <button type="button" class="btn btn-primary" data-retry onclick={retry}>
+          {copy.game.connection.retry}
+        </button>
+      </div>
+    {:else if plate.kind === "pause"}
       <p class="countdown" data-countdown aria-hidden="true">{plate.countdown}</p>
-    {:else if plate.kind === "choices" && step === "choices"}
+    {:else if plate.kind === "choices" && step === "choices" && me !== null}
       <div class="stack">
         <button
           type="button"
@@ -236,7 +274,7 @@
           {copy.game.pause.save}
         </button>
       </div>
-    {:else if plate.kind === "choices"}
+    {:else if plate.kind === "choices" && me !== null}
       <div class="level" use:focusChecked>
         <StrengthPicker
           color={me}

@@ -28,6 +28,39 @@ export const table = {
     body: "Cette table est ouverte dans un autre onglet ou sur un autre appareil. Une seule fenêtre peut jouer ta place.",
     here: "Jouer ici",
   },
+  /** A server error (5xx, bad-frame): « La table ne répond pas ». */
+  server: {
+    heading: "La table ne répond pas",
+    body: "Réessaie dans un instant. La partie est gardée.",
+    retry: "Réessayer",
+  },
+  /**
+   * The reclaim of one's own seat (D-12, plan 02-07): under « La partie a déjà commencé », one
+   * « C’est moi, {Nom} » per disconnected person's seat; then the request sent, or refused.
+   */
+  reclaim: {
+    heading: "C’est ta place ?",
+    body: (creator: string) =>
+      `Si tu as commencé la partie sur un autre appareil ou dans une autre appli, demande ta place. ${creator} devra confirmer.`,
+    itsMe: (name: string) => `C’est moi, ${name}`,
+    sent: {
+      heading: "Demande envoyée",
+      body: (creator: string) => `${creator} doit confirmer que c’est bien toi…`,
+    },
+    refused: {
+      heading: "Demande refusée",
+      body: (creator: string) =>
+        `${creator} n’a pas confirmé. Demande-lui directement, ou ouvre le lien sur l’appareil où tu as commencé.`,
+    },
+    /** The chef de table's dialog (ReclaimDialog). */
+    dialog: {
+      title: (name: string) => `Rendre sa place à ${name} ?`,
+      body: (typed: string, name: string, colour: string) =>
+        `Quelqu’un qui s’appelle « ${typed} » demande la place de ${name} (${colour}). Accepte seulement si c’est bien ${name}, sur un autre appareil.`,
+      accept: "Rendre sa place",
+      refuse: "Refuser",
+    },
+  },
   version: {
     heading: "Nouvelle version du jeu",
     body: "Recharge la page pour retrouver la partie.",
@@ -139,6 +172,17 @@ export const table = {
   game: {
     /** The prompt row and the action zone while the game waits. */
     paused: "Partie en pause",
+    /**
+     * This device's own connection (plan 02-07): the banner from 2 s, the plate from 10 s, the toast
+     * once the welcome is back.
+     */
+    connection: {
+      banner: "Connexion perdue. Reconnexion…",
+      title: "Connexion perdue",
+      body: "Le jeu essaie de se reconnecter. Vérifie le Wi-Fi ou les données mobiles. La partie est gardée.",
+      retry: "Réessayer maintenant",
+      back: "De retour à la table.",
+    },
     /** A seat the computer plays for its absent person, in the turn line and the prompts. */
     handedOverName: (name: string) => `${name} (ordinateur)`,
     pause: {
@@ -235,6 +279,20 @@ export const table = {
           : `${names} n’a pas de place et ne pourra pas jouer cette partie.`,
       safe: "Attendre",
       other: "Lancer quand même",
+    },
+    /** « Arrêter la partie » (the chef de table, from « Réglages », plan 02-07). */
+    stop: {
+      title: "Arrêter la partie ?",
+      body: "La partie est sauvegardée pour tout le monde. Vous la reprendrez avec le même lien, pendant 30 jours.",
+      safe: "Continuer à jouer",
+      other: "Arrêter la partie",
+    },
+    /** « Quitter la table » during a game (plan 02-07). */
+    leaveGame: {
+      title: "Quitter la table ?",
+      body: "La partie se met en pause pour les autres jusqu’à ton retour. Reviens avec le même lien ou par « Mes parties en cours ».",
+      safe: "Rester à la table",
+      other: "Quitter la table",
     },
     leaveRoom: {
       title: "Quitter la table ?",

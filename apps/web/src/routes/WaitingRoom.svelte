@@ -12,9 +12,11 @@
   import MoveSheet from "../ui/MoveSheet.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SeatTile from "../ui/SeatTile.svelte";
+  import Icon from "../ui/Icon.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import StrengthPicker from "../ui/StrengthPicker.svelte";
+  import TablePlate from "../ui/TablePlate.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
 
   // The waiting room (02-UI-SPEC « Waiting room », D-03): the 2 x 2 grid of seats (Bleu Jaune / Rouge
@@ -39,6 +41,11 @@
   };
 
   let { id, link, connection, table, you, myName, onleave, onhome }: Props = $props();
+
+  // This device's own connection (plan 02-07): the reconnect banner under the heading from 2 s, the
+  // connection plate from 10 s; the seats are inert meanwhile.
+  const down = $derived(connection.link !== "none");
+  let roomEl = $state<HTMLElement | null>(null);
 
   type Layout = "computer" | "two" | "one";
   const TWO_COLUMNS_FROM = 640;
@@ -193,13 +200,20 @@
   data-viewer={viewer}
   inert={rotate}
   aria-hidden={rotate ? "true" : undefined}
+  bind:this={roomEl}
 >
   <div class="columns">
     <section class="seats-column">
       <h1 class="t-heading heading" title={copy.lobby.heading(creator)}>
         {copy.lobby.heading(creator)}
       </h1>
-      <div class="grid">
+      {#if down}
+        <p class="reconnect-banner" data-reconnect-banner role="status">
+          <Icon name="wifi-off" size={16} />
+          <span>{copy.game.connection.banner}</span>
+        </p>
+      {/if}
+      <div class="grid" inert={down}>
         {#each COLORS as color (color)}
           <SeatTile
             {color}
@@ -304,6 +318,17 @@
 
 {#if rotate}<RotatePrompt />{/if}
 
+<TablePlate
+  {table}
+  me={mySeat}
+  offset={connection.serverOffset}
+  board={roomEl}
+  send={(frame) => connection.send(frame)}
+  {onhome}
+  link={connection.link}
+  onretry={() => connection.reconnect()}
+/>
+
 {#if moving !== null && host && table.seats[moving].kind === "human"}
   {@const from = moving}
   <MoveSheet
@@ -332,6 +357,25 @@
 {/if}
 
 <style>
+  /* The reconnect banner under the heading (plan 02-07): Label 700 cream on a bois sombre pill. */
+  .reconnect-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: max-content;
+    max-width: 100%;
+    height: 24px;
+    margin: 0;
+    padding: 0 var(--space-sm);
+    border-radius: 12px;
+    background: var(--bois-sombre);
+    color: var(--creme);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+
   .room {
     --gutter-l: calc(var(--space-md) + env(safe-area-inset-left, 0px));
     --gutter-r: calc(var(--space-md) + env(safe-area-inset-right, 0px));

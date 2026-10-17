@@ -59,6 +59,7 @@
   import DealBanner from "../ui/DealBanner.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
+  import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
@@ -74,16 +75,20 @@
   type Props = {
     /**
      * An online table (#/table/<id>): the server's controller and the seat it gave this device, which
-     * turns the board to that seat. Online there is no « Abandonner la partie » (plan 02-07 adds the
-     * online stop and leave) and the end plank's buttons lead to the home (plan 02-09: « Revanche »).
-     * `connection` gives the public table (the pause, the chef de table, who is online: plan 02-06);
-     * `onhome` leaves the table for the home (« Retour à l’accueil » of the saved plate).
+     * turns the board to that seat. Online there is no « Abandonner la partie »: « Réglages » offers
+     * « Arrêter la partie » to the chef de table and « Quitter la table » to everyone (plan 02-07), and
+     * the end plank's buttons lead to the home (plan 02-09: « Revanche »).
+     * `connection` gives the public table (the pause, the chef de table, who is online: plan 02-06)
+     * and this device's own connection (the banner and the plate, plan 02-07); `onhome` leaves the
+     * table for the home (« Retour à l’accueil » of the plates); `onleave` is the confirmed
+     * « Quitter la table » (the others' pause, the socket closed with 1000, the home).
      */
     online?: {
       makeController: ControllerFactory;
       seat: Color;
       connection: TableConnection;
       onhome: () => void;
+      onleave: () => void;
     };
   };
 
@@ -431,9 +436,27 @@
    * A plate is up (paused or saved): the board, the hand and the state buttons are inert under it;
    * the info pill and « Réglages » stay usable; the game shortcuts are ignored but « ? ».
    */
-  const plateUp = $derived(
+  const paused = $derived(
     onlineTable !== null && (onlineTable.status === "paused" || onlineTable.status === "saved"),
   );
+  /**
+   * This device's own connection (plan 02-07): from 2 s down the banner « Connexion perdue.
+   * Reconnexion… » takes the prompt row (or the action zone), from 10 s the connection plate.
+   */
+  const link = $derived(online?.connection.link ?? "none");
+  /** Under a plate or the reconnect banner the board, the hand and the state buttons are inert. */
+  const plateUp = $derived(paused || link !== "none");
+  /** « Arrêter la partie » for the chef de table while the game runs or waits (not once saved). */
+  const canStop = $derived(
+    online !== undefined &&
+      onlineTable !== null &&
+      onlineTable.host === online.seat &&
+      (onlineTable.status === "playing" || onlineTable.status === "paused"),
+  );
+
+  function stopGame() {
+    online?.connection.send({ t: "stop" });
+  }
   let previousTable: TablePublic | null = null;
   $effect(() => {
     const next = onlineTable;
@@ -833,8 +856,16 @@
 {/snippet}
 
 {#snippet pausedLine()}
-  <!-- While a plate is up the prompt row (or the action zone) says only « Partie en pause ». -->
-  <p class="paused-line" data-paused-prompt>{tableCopy.game.paused}</p>
+  {#if link !== "none"}
+    <!-- This device's own connection is down (plan 02-07): the reconnect banner, no motion. -->
+    <p class="reconnect-banner" data-reconnect-banner role="status">
+      <Icon name="wifi-off" size={16} />
+      <span>{tableCopy.game.connection.banner}</span>
+    </p>
+  {:else}
+    <!-- While a plate is up the prompt row (or the action zone) says only « Partie en pause ». -->
+    <p class="paused-line" data-paused-prompt>{tableCopy.game.paused}</p>
+  {/if}
 {/snippet}
 
 {#snippet hand()}
@@ -884,6 +915,8 @@
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
             onabandon={online === undefined ? abandon : undefined}
+            onleave={online?.onleave}
+            onstop={canStop ? stopGame : undefined}
             players={online !== undefined && onlineTable !== null
               ? { table: onlineTable, me: online.seat }
               : undefined}
@@ -894,7 +927,13 @@
           <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
-              <SettingsButton onabandon={online === undefined ? abandon : undefined} />
+              <SettingsButton
+                onabandon={online === undefined ? abandon : undefined}
+                online={online !== undefined}
+                inGame={online !== undefined}
+                onleave={online?.onleave}
+                onstop={canStop ? stopGame : undefined}
+              />
             </div>
             <div class="fast" inert={plateUp}>
               {@render zone("fast")}
@@ -1059,6 +1098,8 @@
           board={boardEl}
           send={(frame) => online.connection.send(frame)}
           onhome={online.onhome}
+          {link}
+          onretry={() => online.connection.reconnect()}
         />
       {/if}
 
@@ -1117,6 +1158,33 @@
    * compact mode it is the info, « Avance rapide », the board, the 7's or the tray's chips, the
    * buttons, the hand.
    */
+
+  /*
+   * The reconnect banner (plan 02-07): Label 700 cream on a bois sombre pill as wide as its text + 16,
+   * 24 high in the prompt row; the same in the action zone of the computer.
+   */
+  .reconnect-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    width: max-content;
+    max-width: 100%;
+    height: 24px;
+    margin: 0 auto;
+    padding: 0 var(--space-sm);
+    border-radius: 12px;
+    background: var(--bois-sombre);
+    color: var(--creme);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+
+  .reconnect-banner :global(svg) {
+    flex: none;
+  }
 
   /* « Partie en pause » in the prompt row (compact) or the action zone (bar), plan 02-06. */
   .paused-line {
