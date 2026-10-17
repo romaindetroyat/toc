@@ -208,3 +208,46 @@ describe("gameNotices (plan 02-06)", () => {
     ).toEqual(["Bruno est chef de table jusqu’au retour de Romain."]);
   });
 });
+
+describe("the table's « Avance rapide » (plan 02-10b)", () => {
+  const romain = table({ bleu: human("Romain"), jaune: human("Bruno") });
+  const fastRomain = { ...romain, fast: true };
+
+  it("tells everyone in the waiting room who switched it, never the chef de table", () => {
+    expect(tableNotices(romain, fastRomain, bruno("jaune", "jaune"))).toEqual([
+      "Romain a mis l’avance rapide.",
+    ]);
+    expect(tableNotices(fastRomain, romain, bruno("jaune", "jaune"))).toEqual([
+      "Romain a enlevé l’avance rapide.",
+    ]);
+    const host: Me = { name: "Romain", was: "bleu", seat: "bleu", host: true, asked: false };
+    expect(tableNotices(romain, fastRomain, host)).toEqual([]);
+    expect(tableNotices(null, fastRomain, bruno("jaune", "jaune"))).toEqual([]);
+  });
+
+  it("in the game, names the chef de table of the moment", () => {
+    const playing: TablePublic = {
+      ...romain,
+      status: "playing",
+      seats: { ...romain.seats, rouge: human("Paul") },
+      gameNo: 1,
+    };
+    const on = { ...playing, fast: true };
+    expect(gameNotices(playing, on, { seat: "jaune" })).toEqual([
+      "Romain a mis l’avance rapide.",
+    ]);
+    expect(gameNotices(on, playing, { seat: "rouge" })).toEqual([
+      "Romain a enlevé l’avance rapide.",
+    ]);
+    expect(gameNotices(playing, on, { seat: "bleu" })).toEqual([]);
+    // Romain away: Bruno holds the role and switches it; Paul hears Bruno's name.
+    const away = {
+      ...playing,
+      host: "jaune" as Color,
+      seats: { ...playing.seats, bleu: human("Romain", false) },
+    };
+    expect(gameNotices(away, { ...away, fast: true }, { seat: "rouge" })).toEqual([
+      "Bruno a mis l’avance rapide.",
+    ]);
+  });
+});
