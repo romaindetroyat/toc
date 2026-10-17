@@ -46,6 +46,7 @@ type Config = {
   compatibility_date?: string;
   durable_objects?: unknown;
   migrations?: unknown;
+  d1_databases?: { binding?: string; database_name?: string; migrations_dir?: string }[];
   vars?: Record<string, unknown>;
   assets?: { binding?: string; run_worker_first?: unknown };
   rules?: { type: string; globs: string[]; fallthrough?: boolean }[];
@@ -88,6 +89,16 @@ describe("wrangler configs", () => {
     expect(embedded.durable_objects).toEqual(upload.durable_objects);
     expect(embedded.migrations).toEqual(upload.migrations);
     expect(embedded.compatibility_date).toEqual(upload.compatibility_date);
+  });
+
+  // D-14: the D1 database is added by a deploy step once the token may create it. Until then neither
+  // file declares it (DB is optional, apps/worker/src/env.d.ts); then both declare the same block.
+  it("declares the same D1 database in both files, or none in either (D-14)", () => {
+    expect(embedded.d1_databases).toEqual(upload.d1_databases);
+    for (const block of upload.d1_databases ?? []) {
+      expect(block.binding).toBe("DB");
+      expect(block.migrations_dir).toBe("apps/worker/migrations");
+    }
   });
 
   it("routes /api and /ws to the Worker before the assets", () => {
