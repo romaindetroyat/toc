@@ -297,7 +297,7 @@ Plans:
 **Depends on**: Phase 3
 **Requirements**: ACCT-01, ACCT-02, ACCT-03, ACCT-04, ACCT-05, APP-01, APP-02, APP-03
 **Success Criteria** (what must be TRUE):
-  1. Un joueur crée un compte avec son pseudo grâce à un code reçu par e-mail, puis se connecte par passkey. En cas de besoin, il récupère son compte par e-mail. Il reste connecté entre les visites, y compris dans l'application installée ouverte à froid.
+  1. Un joueur crée un compte avec son pseudo grâce à une invitation, puis se connecte par passkey. En cas de besoin, il récupère son compte avec son code de secours (pas d'e-mail, choix de Romain). Il reste connecté entre les visites, y compris dans l'application installée ouverte à froid.
   2. Un joueur ajoute un ami avec un code ou un lien d'invitation, et il voit sa liste d'amis.
   3. Un joueur crée une table, invite des amis, répartit les places et les équipes, et règle la force de l'ordinateur pour chaque place libre. Il peut aussi lancer directement une partie solo contre trois joueurs gérés par l'ordinateur.
   4. Le jeu s'installe comme application sur téléphone et sur ordinateur, avec une icône et un écran de démarrage. Une nouvelle version ne recharge jamais une partie en cours : le joueur est invité à mettre à jour.
