@@ -85,10 +85,63 @@ export const table = {
     ownSeat: (colour: string) => `${colour} : toi`,
     /** Accessible name of another person's seat. */
     otherSeat: (colour: string, name: string, status: string) => `${colour} : ${name}, ${status}`,
+    /** Accessible name of the own seat when this device is the chef de table. */
+    ownSeatHost: (colour: string) => `${colour} : toi, chef de table`,
+    /** The creator's button on another person's seat. */
+    moveSeat: (name: string, colour: string) => `Déplacer ${name} (${colour})`,
+    /** « Libérer ma place » under the grid. */
+    stand: "Libérer ma place",
+    invite: "Inviter",
+    partner: "Partenaire",
+    noComputer: "Quatre joueurs à la table : pas d’ordinateur.",
+    /** « 1 joueur et 3 ordinateurs », « 4 joueurs et aucun ordinateur ». */
+    count: (people: number, computers: number) =>
+      `${people} ${people > 1 ? "joueurs" : "joueur"} et ${
+        computers === 0
+          ? "aucun ordinateur"
+          : `${computers} ${computers > 1 ? "ordinateurs" : "ordinateur"}`
+      }.`,
+    /** Others' view of a computer seat: « Rouge : ordinateur, Galopeur ». */
+    computerLine: (colour: string, level: string) => `${colour} : ordinateur, ${level}`,
+    /** « Sans place : Céline, Paul. » */
+    unseated: (names: readonly string[]) => `Sans place : ${names.join(", ")}.`,
+    full: {
+      heading: "La table est complète",
+      body: "Les quatre places sont prises. Une place peut se libérer avant le départ.",
+    },
+    /** The creator's « Déplacer {Nom} » sheet. */
+    move: {
+      title: (name: string) => `Déplacer ${name}`,
+      toFree: (colour: string) => `Vers ${colour} (place libre)`,
+      swap: (name: string, colour: string) => `Échanger avec ${name} (${colour})`,
+    },
     /** Toasts of the waiting room (tableNotices). */
     joined: (name: string) => `${name} a rejoint la table.`,
     left: (name: string) => `${name} a quitté la table.`,
     movedYou: (creator: string, colour: string) =>
       `${creator} a changé ta place : tu es maintenant ${colour}.`,
+  },
+  /** « A », « A et B », « A, B et C ». */
+  names: (names: readonly string[]) =>
+    names.length < 2
+      ? names.join("")
+      : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`,
+  /** Confirmations of the waiting room (02-UI-SPEC « Confirmations »). */
+  confirm: {
+    startWithout: {
+      title: (names: string) => `Lancer sans ${names} ?`,
+      body: (names: string, several: boolean) =>
+        several
+          ? `${names} n’ont pas de place et ne pourront pas jouer cette partie.`
+          : `${names} n’a pas de place et ne pourra pas jouer cette partie.`,
+      safe: "Attendre",
+      other: "Lancer quand même",
+    },
+    leaveRoom: {
+      title: "Quitter la table ?",
+      body: "Ta place sera libérée. Tu pourras revenir avec le même lien avant le départ.",
+      safe: "Rester à la table",
+      other: "Quitter la table",
+    },
   },
 } as const;

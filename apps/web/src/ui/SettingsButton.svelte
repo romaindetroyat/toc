@@ -10,9 +10,12 @@
   type Props = {
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
+    /** At an online table: no sound test, and « Quitter la table » when `onleave` is given. */
+    online?: boolean;
+    onleave?: () => void;
   };
 
-  let { onabandon }: Props = $props();
+  let { onabandon, online = false, onleave }: Props = $props();
 
   let settingsOpen = $state(false);
   let gear = $state<HTMLButtonElement | null>(null);
@@ -30,7 +33,7 @@
 </button>
 
 {#if settingsOpen}
-  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} {onabandon} />
+  <SettingsSheet onclose={() => (settingsOpen = false)} opener={gear} {onabandon} {online} {onleave} />
 {/if}
 
 <style>

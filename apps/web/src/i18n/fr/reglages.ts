@@ -17,4 +17,6 @@ export const reglages = {
 
   testSounds: "Tester les sons",
   credits: "Crédits et licences",
+  /** At an online table (plan 02-05): leave it, after a confirmation. */
+  leaveTable: "Quitter la table",
 } as const;

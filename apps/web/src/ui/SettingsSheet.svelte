@@ -4,6 +4,7 @@
   import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
   import { reglages } from "../i18n/fr/reglages.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreditsSheet from "./CreditsSheet.svelte";
@@ -24,9 +25,19 @@
      * by default).
      */
     onabandon?: (to?: string) => void;
+    /**
+     * At an online table (plan 02-05): « Tester les sons » is hidden (leaving the page would drop the
+     * table's connection), and « Quitter la table » is offered when `onleave` is given, confirmed first.
+     */
+    online?: boolean;
+    /** Called once the player has confirmed « Quitter la table ». */
+    onleave?: () => void;
   };
 
-  let { onclose, opener = null, onabandon }: Props = $props();
+  let { onclose, opener = null, onabandon, online = false, onleave }: Props = $props();
+
+  let leaveOpen = $state(false);
+  let leaveButton = $state<HTMLButtonElement | null>(null);
 
   // The buses follow the settings as long as the sheet is open (the game applies them too, and the
   // engine keeps them until it is unlocked).
@@ -85,9 +96,11 @@
     />
 
     <nav class="links">
-      <a class="btn btn-text" href="#/sons" bind:this={soundsLink} onclick={onSoundsClick}>
-        {reglages.testSounds}
-      </a>
+      {#if !online}
+        <a class="btn btn-text" href="#/sons" bind:this={soundsLink} onclick={onSoundsClick}>
+          {reglages.testSounds}
+        </a>
+      {/if}
       <button
         type="button"
         class="btn btn-text"
@@ -121,8 +134,32 @@
         {game.abandon.confirm}
       </button>
     {/if}
+
+    {#if onleave}
+      <button
+        type="button"
+        class="btn btn-text leave"
+        data-leave-table
+        bind:this={leaveButton}
+        onclick={() => (leaveOpen = true)}
+      >
+        {reglages.leaveTable}
+      </button>
+    {/if}
   </div>
 </Sheet>
+
+{#if leaveOpen && onleave}
+  <ConfirmDialog
+    title={tableCopy.confirm.leaveRoom.title}
+    body={tableCopy.confirm.leaveRoom.body}
+    safeLabel={tableCopy.confirm.leaveRoom.safe}
+    otherLabel={tableCopy.confirm.leaveRoom.other}
+    oncancel={() => (leaveOpen = false)}
+    onconfirm={onleave}
+    opener={leaveButton}
+  />
+{/if}
 
 {#if creditsOpen}
   <CreditsSheet onclose={() => (creditsOpen = false)} opener={creditsButton} />
@@ -149,7 +186,8 @@
   }
 
   /* The destructive text button (cream, underlined: the red fill is for the confirmation), at the bottom. */
-  .abandon {
+  .abandon,
+  .leave {
     align-self: flex-start;
   }
 
