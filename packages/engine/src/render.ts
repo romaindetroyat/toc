@@ -9,10 +9,10 @@
 import type { GameEvent } from "./events.ts";
 import { homeCount } from "./moves.ts";
 import { placeOf } from "./path.ts";
+import { firstPlayer } from "./state.ts";
 import {
   COLORS,
   type Color,
-  nextColor,
   type PawnId,
   type Place,
   pawnColor,
@@ -104,7 +104,7 @@ export function renderReduce(rs: RenderState, event: GameEvent): RenderState {
         posed: perColor((): CardId[] => []),
         dealer: event.dealer,
         dealIndex: event.dealIndex,
-        turn: nextColor(event.dealer),
+        turn: firstPlayer(event.dealer),
         phase: "exchange",
       };
     case "handDealt":

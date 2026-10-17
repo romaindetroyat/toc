@@ -10,11 +10,14 @@ import {
   endDeal,
   eventsFor,
   FULL_DECK,
+  firstPlayer,
   type GameEvent,
   type GameState,
   giveCard,
   nextColor,
   PARTNER,
+  renderInit,
+  renderReduce,
   sortHand,
   startGame,
   teamOf,
@@ -565,6 +568,54 @@ describe("eventsFor: the hidden-hand boundary of the event stream", () => {
     const source = frozen.find((e) => e.t === "handDealt" && e.seat === "jaune");
     if (own?.t === "handDealt" && source?.t === "handDealt") {
       expect(own.cards).not.toBe(source.cards);
+    }
+  });
+});
+
+describe("who starts the deal (R-03, G9; Romain 2026-10-17, plan 03-11)", () => {
+  it("is the seat after the dealer, clockwise", () => {
+    expect(COLORS.map((dealer) => firstPlayer(dealer))).toEqual(["jaune", "rouge", "vert", "bleu"]);
+    for (const dealer of COLORS) {
+      expect(firstPlayer(dealer)).toBe(nextColor(dealer));
+      expect(firstPlayer(dealer, DEFAULT_RULES)).toBe(nextColor(dealer));
+    }
+  });
+
+  it("is the seat whose turn it is at every deal of three packs, from every first dealer", () => {
+    for (const firstDealer of COLORS) {
+      let { state } = startGame({ firstDealer }, SEED);
+      const starters: Color[] = [];
+      for (let deal = 0; deal < 9; deal++) {
+        expect(state.phase).toBe("exchange");
+        expect(state.turn).toBe(firstPlayer(state.dealer));
+        const exchanged = exchangeAll(state).state;
+        expect(exchanged.phase).toBe("play");
+        expect(exchanged.turn).toBe(firstPlayer(state.dealer));
+        starters.push(exchanged.turn);
+        state = endDeal(emptyHands(exchanged)).state;
+      }
+      // Three deals per pack with the same starter, then the next seat (the dealer moved on).
+      const a = nextColor(firstDealer);
+      const b = nextColor(a);
+      const c = nextColor(b);
+      expect(starters).toEqual([a, a, a, b, b, b, c, c, c]);
+    }
+  });
+
+  it("is the turn the screen's reducer opens each deal with", () => {
+    let { state } = startGame({ firstDealer: "rouge" }, SEED);
+    let render = renderInit(viewFor(state, "bleu"));
+    expect(render.turn).toBe(firstPlayer(render.dealer));
+    for (let deal = 0; deal < 6; deal++) {
+      const played = emptyHands(exchangeAll(state).state);
+      const result = endDeal(played);
+      for (const event of eventsFor(result.events, "bleu")) {
+        render = renderReduce(render, event);
+        if (event.t === "dealt") expect(render.turn).toBe(firstPlayer(event.dealer));
+      }
+      state = result.state;
+      expect(render.dealer).toBe(state.dealer);
+      expect(render.turn).toBe(state.turn);
     }
   });
 });
