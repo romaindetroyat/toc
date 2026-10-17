@@ -108,6 +108,39 @@ describe("parseClientFrame", () => {
     expect(parseClientFrame(42)).toEqual({ ok: false });
   });
 
+  it("accepts the four lobby frames: stand, move, level, leave", () => {
+    expect(ok({ t: "stand" })).toEqual({ ok: true, frame: { t: "stand" } });
+    expect(ok({ t: "move", who: "jaune", to: "vert" })).toEqual({
+      ok: true,
+      frame: { t: "move", who: "jaune", to: "vert" },
+    });
+    for (const level of [1, 2, 3, 4, 5]) {
+      expect(ok({ t: "level", seat: "rouge", level })).toEqual({
+        ok: true,
+        frame: { t: "level", seat: "rouge", level },
+      });
+    }
+    expect(ok({ t: "leave" })).toEqual({ ok: true, frame: { t: "leave" } });
+  });
+
+  it("refuses a level outside 1 to 5, a string level, an unknown colour, an extra key", () => {
+    const refused: unknown[] = [
+      { t: "level", seat: "rouge", level: 0 },
+      { t: "level", seat: "rouge", level: 6 },
+      { t: "level", seat: "rouge", level: 2.5 },
+      { t: "level", seat: "rouge", level: "3" },
+      { t: "level", seat: "violet", level: 3 },
+      { t: "level", level: 3 },
+      { t: "move", who: "violet", to: "vert" },
+      { t: "move", who: "jaune", to: "noir" },
+      { t: "move", who: "jaune" },
+      { t: "move", who: "jaune", to: "vert", extra: true },
+      { t: "stand", seat: "bleu" },
+      { t: "leave", now: true },
+    ];
+    for (const frame of refused) expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
+  });
+
   it("refuses any text longer than MAX_FRAME_CHARS before parsing it", () => {
     const padded = JSON.stringify({ t: "hello", v: 1, token: TOKEN, name: "Ana" }).padEnd(
       MAX_FRAME_CHARS + 1,
@@ -164,6 +197,7 @@ describe("parseServerFrame", () => {
     creatorName: "Ana",
     gameNo: 0,
     thinking: null,
+    unseated: ["Céline"],
   };
 
   it("reads the four server frames", () => {
@@ -183,6 +217,10 @@ describe("parseServerFrame", () => {
       t: "error",
       code: "stale",
     });
+    expect(parseServerFrame(JSON.stringify({ t: "error", code: "table-full" }))).toEqual({
+      t: "error",
+      code: "table-full",
+    });
     const view = { kind: "view", seat: "bleu" };
     expect(
       parseServerFrame(JSON.stringify({ t: "events", seq: 3, events: [{ t: "turn" }], view })),
@@ -200,6 +238,11 @@ describe("parseServerFrame", () => {
     expect(
       parseServerFrame(JSON.stringify({ t: "table", table: { ...table, host: "violet" } })),
     ).toBeNull();
+    expect(
+      parseServerFrame(JSON.stringify({ t: "table", table: { ...table, unseated: [3] } })),
+    ).toBeNull();
+    const { unseated: _unseated, ...withoutUnseated } = table;
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: withoutUnseated }))).toBeNull();
   });
 });
 
