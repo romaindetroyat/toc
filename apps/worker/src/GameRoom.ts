@@ -3,6 +3,11 @@
 // frame, socket close and alarm becomes one reduce() call, then a synchronous SQLite commit, then the
 // per-person sends, then the alarm is moved to the table's next deadline.
 //
+// Alarms (debug slow-online-bots): production runs an alarm with Date.now() exactly at its scheduled
+// time, and the runtime keeps alarm times in whole milliseconds. The alarm is armed at the deadline
+// rounded up, and an alarm handler never arms its own time again (that alarm would be dropped until
+// production's rescan, a minute later).
+//
 // Nothing lives only in memory: `cached` is a copy of the snapshot, dropped on eviction and read again
 // from SQLite. Sockets carry their person in their attachment ({ who, helloAt }), which survives
 // hibernation. No timer function anywhere: deadlines are alarms (CLAUDE.md, Hibernation API).
@@ -84,6 +89,8 @@ export class GameRoom extends DurableObject<Env> {
   private armed: number | null | undefined;
   /** The missing DB binding was logged by this instance (once, plan 02-09). */
   private toldNoDatabase = false;
+  /** While an alarm handler runs: the time that alarm was scheduled for; else null. */
+  private firing: number | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -181,11 +188,18 @@ export class GameRoom extends DurableObject<Env> {
   async alarm(alarmInfo?: AlarmInvocationInfo): Promise<void> {
     // The alarm that fired is no longer set.
     this.armed = null;
-    // Silent sockets first: a person found gone pauses the game before the tick runs (NET-03).
-    this.sweepSilent(Date.now());
-    // A retry follows a failed invocation (over the Free plan's CPU limit, for instance): a computer
-    // decision still pending is then made at level 1, so the table never freezes (D-11).
-    await this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
+    // Nothing is armed again at or before this alarm's own time (arm). Absent when a test calls the
+    // handler itself.
+    this.firing = alarmInfo?.scheduledTime ?? null;
+    try {
+      // Silent sockets first: a person found gone pauses the game before the tick runs (NET-03).
+      this.sweepSilent(Date.now());
+      // A retry follows a failed invocation (over the Free plan's CPU limit, for instance): a
+      // computer decision still pending is then made at level 1, so the table never freezes (D-11).
+      await this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
+    } finally {
+      this.firing = null;
+    }
   }
 
   /**
@@ -308,8 +322,17 @@ export class GameRoom extends DurableObject<Env> {
     }
   }
 
-  /** Moves the one alarm to `at` (or removes it), only when it changed: each set is a row written. */
-  private arm(at: number | null): void {
+  /**
+   * Moves the one alarm to `deadline` (or removes it), only when it changed: each set is a row
+   * written. The runtime keeps whole milliseconds, truncated, and it drops an alarm that its own
+   * handler leaves at the time it fired for (no write, nothing scheduled: production then waits for
+   * its rescan, about a minute). So the alarm goes to the deadline rounded up, never below it (a
+   * computer's play time is fractional), and while an alarm runs, after that alarm's time (a computer
+   * due at once, a Champion's next slice).
+   */
+  private arm(deadline: number | null): void {
+    let at = deadline === null ? null : Math.ceil(deadline);
+    if (at !== null && this.firing !== null && at <= this.firing) at = this.firing + 1;
     if (at === this.armed) return;
     this.armed = at;
     if (at === null) void this.ctx.storage.deleteAlarm();

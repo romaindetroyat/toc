@@ -113,6 +113,9 @@ afterEach(() => {
   restore = null;
 });
 
+/** A computer's play and the commit just before it, which made it due. */
+type Turn = { due: Row; move: Row };
+
 /**
  * Ana and Bea sit bleu and jaune, the computers take rouge and vert at `levels` (Galopeur by default),
  * the game starts; the two people act as soon as they are due until the computers' plays in the log
@@ -120,8 +123,8 @@ afterEach(() => {
  */
 async function play(
   levels: Partial<Record<Color, 1 | 2 | 3 | 4 | 5>> | undefined,
-  enough: (plays: Row[]) => boolean,
-): Promise<{ id: string; turns: { due: Row; move: Row }[] }> {
+  enough: (turns: Turn[]) => boolean,
+): Promise<{ id: string; turns: Turn[] }> {
   const id = await createTable(
     levels === undefined ? { pace: "normal" } : { pace: "normal", levels },
   );
@@ -143,15 +146,16 @@ async function play(
   let lastSeq = -1;
   for (;;) {
     const log = await logOf(id);
-    const plays = log.filter((row) => row.bot !== null && row.action?.t !== "give");
-    if (enough(plays)) {
-      ana.ws.close(1000, "bye");
-      bea.ws.close(1000, "bye");
-      const turns = plays.map((move) => {
+    const turns = log
+      .filter((row) => row.bot !== null && row.action?.t !== "give")
+      .map((move) => {
         const due = log.find((row) => row.seq === move.seq - 1);
         if (due === undefined) throw new Error(`no row before ${move.seq}`);
         return { due, move };
       });
+    if (enough(turns)) {
+      ana.ws.close(1000, "bye");
+      bea.ws.close(1000, "bye");
       return { id, turns };
     }
     const table = await readTable(id);
@@ -184,7 +188,7 @@ async function play(
 }
 
 /** Each computer play, its delay after the commit that made it due, and the budget it had. */
-function report(turns: { due: Row; move: Row }[], extra: number) {
+function report(turns: Turn[], extra: number) {
   return turns.map(({ due, move }) => ({
     seat: move.seat,
     seq: move.seq,
@@ -196,7 +200,7 @@ function report(turns: { due: Row; move: Row }[], extra: number) {
 
 describe("computer players at the real pace", () => {
   it("two people and two Galopeurs: each computer plays within 3 s of the animation", async () => {
-    const { turns } = await play(undefined, (plays) => plays.length >= 4);
+    const { turns } = await play(undefined, (done) => done.length >= 4);
     const rows = report(turns, TURN_MS);
     console.log(`workerd delivery: ${JSON.stringify(rows)}`);
     for (const row of rows) expect(row.delay, JSON.stringify(row)).toBeLessThanOrEqual(row.budget);
@@ -204,12 +208,16 @@ describe("computer players at the real pace", () => {
 
   it("the same when every alarm runs at exactly its time, as in production", async () => {
     restore = deliverAsProduction();
-    const { turns } = await play(undefined, (plays) => plays.length >= 4);
+    // A computer made due by another computer's move (rouge then vert), inside that move's alarm.
+    const byComputer = (turn: Turn) => turn.due.bot !== null;
+    const { turns } = await play(
+      undefined,
+      (done) => done.length >= 12 || (done.length >= 4 && done.some(byComputer)),
+    );
     const rows = report(turns, TURN_MS);
     console.log(`production delivery: ${JSON.stringify(rows)}`);
     for (const row of rows) expect(row.delay, JSON.stringify(row)).toBeLessThanOrEqual(row.budget);
-    // rouge then vert: a computer made due by another computer's move, inside the alarm.
-    expect(rows.some((row, i) => row.seat === "vert" && rows[i - 1]?.seat === "rouge")).toBe(true);
+    expect(turns.some(byComputer)).toBe(true);
   }, 90_000);
 
   it("two Champions still decide in slices, one alarm each, within their cap", async () => {
@@ -217,9 +225,9 @@ describe("computer players at the real pace", () => {
     // Until a decision took more than one slice (a forced move takes one), at most ten plays.
     const { turns } = await play(
       { rouge: 5, vert: 5 },
-      (plays) =>
-        plays.length >= 10 ||
-        (plays.length >= 2 && plays.some((row) => (row.bot?.slices ?? 0) > 1)),
+      (done) =>
+        done.length >= 10 ||
+        (done.length >= 2 && done.some((turn) => (turn.move.bot?.slices ?? 0) > 1)),
     );
     const rows = report(turns, HARD_CAP_MS + 1_000);
     console.log(`production delivery, Champions: ${JSON.stringify(rows)}`);
