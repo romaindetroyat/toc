@@ -432,6 +432,22 @@ A 6 px border of the partner’s seat colour (`PALETTE.hex`: bleu `#1F4FA8`, jau
 
 `packages/board/src/scene.test.ts` (« the galet’s bare left side »), `apps/web/src/cards/cards.test.ts` (« the compact mode’s hand in the corner »), `e2e/compact.spec.ts` (`expectHand` in every state: each card under the info, shown at least 44 × 44, covering no drawn cell nor knight), `e2e/cibles.spec.ts` (44 px of each card on the screen), `e2e/finition.spec.ts` (`expectCardsShown`: each card’s top index on the screen at every size), `e2e/partie.spec.ts` (the border’s colour and width, the read name).
 
+## Qui commence la donne (plan 03-11)
+
+> **Note, 2026-10-17 (plan 03-11).** Romain: « Il faut aussi savoir quel joueur va jouer le premier la donne actuelle ». The rule is RULES.md R-03 / G9: the player after the dealer, clockwise, starts each of the three deals of a pack (the engine's exported `firstPlayer(dealer, rules)`, the one place that says it). The game showed the dealer (banner « On rebat les cartes. Donneur : X », the « D » disc on the felt, « Donneur : X · Donne n sur 3 ») but never the starter. The whole proposal below is **(à confirmer par Romain)**.
+
+| Element | Copy / look |
+|---------|-------------|
+| Deal banner, last line of every deal | « Tu commences. » when the player starts, « {Nom} commence. » otherwise (e.g. « Pégase commence. »); same `.sub` style as « Donne 1 sur 3 · 5 cartes ». The banner's polite live region reads it with the deal, so screen readers hear it with no new announcement |
+| Computer's bottom bar (info column) and the phone's sheet « Infos de la partie » | A third line « Commence : {Nom} » (« Commence : toi » for the player, like « Donneur : toi »), muted cream like the dealer line, under « Donneur : X · Donne n sur 3 » (that line is unchanged). Not in the hidden 56 px row form, nor in the info pill (its accessible name is unchanged) |
+| « 1er » token on the board | A walnut pill 34 × 24 px with a 2 px cream outline and cream « 1 » + superscript « er » (the « D » disc is a cream disc with a walnut letter: they never read alike), on the wood just outside the felt's rim (6 px gap) on the first player's side, centred in the bare wood between that side's stable and home lane (50 scene units off the felt's axis toward the stable at the top and the bottom). It stays for the whole deal, never takes a tap and is `aria-hidden` (the banner and the info line say it in words) |
+
+Why outside the felt and not at a corner of the card place like « D »: the top and bottom card places sit between the talon and the défausse, so a token at their corner touched a pile (seen at 1280 × 800, worse on phones where 24 px is up to 9 scene units per pixel). On the wood beside the felt it covers no ring cell, dot, knight, rider or pile at any size.
+
+### Proofs
+
+`packages/engine/test/deal.test.ts` (« who starts the deal »: next seat clockwise, the turn of every deal of three packs, the render reducer's turn), `apps/web/src/board/starterToken.test.ts` (outside the felt, clear of every cell, dot, knight head and rider at the measured board scales 2.00 to 8.89 units per px), `apps/web/src/i18n/commence.test.ts` (the copy), `e2e/commence.spec.ts` (banner line, token seat = the seat after `data-dealer`, « Commence : … » in the bar and the sheet, the token still there after the exchange, no overlap with the drawing's cells, numbers and dots, the knights, the piles or the felt on all four sides at 844 × 390, 750 × 342, 480 × 320 and 1280 × 800).
+
 ---
 
 ## Registry Safety
@@ -468,6 +484,7 @@ Choix du chercheur à l’intérieur des décisions D-01 à D-13 ; ils seront re
 10. **La taille** : 79 × 110 à 844 × 390 (au lieu de ≈ 80 × 112, pour que le milieu de chaque carte reste visible et touchable), 67 × 94 sur l’iPhone 13 de Playwright (750 × 342), 61 × 86 sur les plus petits téléphones.
 11. **Le liseré** : 6 px de la couleur du partenaire, avec un filet noyer à l’intérieur ; la carte n’est plus entourée d’ambre.
 12. **L’ordinateur** : des cartes de 106 × 148 dont le bas passe sous le bord de l’écran, pour garder la barre de 160 px et le plateau de 1227 px ; le rouge des cœurs et des carreaux un peu plus foncé.
+13. **Qui commence la donne** (plan 03-11, après « Il faut aussi savoir quel joueur va jouer le premier la donne actuelle », le 2026-10-17) : la bannière de chaque donne finit par « Tu commences. » ou « {Nom} commence. » ; un jeton « 1er » (pastille noyer, bord et texte crème) se pose sur le bois juste au bord du tapis, du côté du joueur qui commence, pendant toute la donne ; la barre du bas de l’ordinateur et la fiche « Infos de la partie » du téléphone disent « Commence : {Nom} ».
 
 ---
 
