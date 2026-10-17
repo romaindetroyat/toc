@@ -70,8 +70,10 @@ describe("hello and seats", () => {
     const second = reduce(first.table, { t: "hello", who: BEN, name: "Ben" }, ctx());
     expect(second.table.creator).toBe(ANA);
     expect(to(second.out, BEN)).toMatchObject([{ t: "welcome", you: { seat: null, host: false } }]);
-    // Nothing public changed: an unseated person is not part of the public table yet.
-    expect(to(second.out, ANA)).toEqual([]);
+    // The others see the newcomer among the people without a seat (« Sans place », plan 02-05).
+    expect(to(second.out, ANA)).toMatchObject([
+      { t: "table", table: { unseated: ["Ana", "Ben"] } },
+    ]);
     expect(second.table.people.map((p) => [p.who, p.seat])).toEqual([
       [ANA, null],
       [BEN, null],

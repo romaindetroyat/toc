@@ -7,7 +7,7 @@
 // The engine's apply() is the only judge of a move (NET-01): the seat comes from the person, never from
 // the frame, and a base that is not the table's seq is refused as stale (Pitfall 3).
 
-import { BOT_NAMES, type BotLevel } from "@toc/bots";
+import { BOT_NAMES, type BotLevel, parseBotLevel } from "@toc/bots";
 import {
   type Action,
   apply,
@@ -21,7 +21,15 @@ import {
   shuffle,
   startGame,
 } from "@toc/engine";
-import type { ActFrame, ErrorCode, ServerFrame, SitFrame, StartFrame } from "@toc/protocol";
+import type {
+  ActFrame,
+  ClientFrame,
+  ErrorCode,
+  HelloFrame,
+  LevelFrame,
+  MoveFrame,
+  ServerFrame,
+} from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
 import { eventsFrameFor, personOf, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
 import { copyTable, type Table } from "./table.ts";
@@ -34,7 +42,7 @@ export type Command =
   /** The alarm fired; `retry` when the runtime retries it after a failed invocation (D-11). */
   | { t: "tick"; retry: boolean }
   /** A frame of a person who said hello. */
-  | { t: "client"; who: string; frame: SitFrame | StartFrame | ActFrame };
+  | { t: "client"; who: string; frame: Exclude<ClientFrame, HelloFrame> };
 
 export type Ctx = {
   now: number;
@@ -135,25 +143,119 @@ function gone(table: Table, who: string): Reduced {
   return { table: next, out: publicChanges(table, next, new Set([who])), log: [] };
 }
 
+/**
+ * A change of the waiting room: a welcome to each online person whose seat changed (their `you`
+ * changed), a table frame to every other person online when the public table changed.
+ */
+function lobbyChange(before: Table, next: Table, now: number): Reduced {
+  next.lastActivity = now;
+  const moved = new Set<string>();
+  for (const person of next.people) {
+    const was = personOf(before, person.who)?.seat ?? null;
+    if (person.online && was !== person.seat) moved.add(person.who);
+  }
+  const out: Out[] = [...moved].map((who) => ({ to: who, frame: welcomeFor(next, who) }));
+  out.push(...publicChanges(before, next, moved));
+  return { table: next, out, log: [] };
+}
+
+const isFull = (table: Table) => COLORS.every((color) => table.seats[color].kind === "human");
+
 function sit(table: Table, who: string, seat: Color, now: number): Reduced {
   if (table.status !== "lobby") return refuse(table, who, "started");
   const holder = table.seats[seat];
   if (holder.kind === "human") {
-    if (holder.who !== who) return refuse(table, who, "seat-taken");
-    return { table, out: [{ to: who, frame: welcomeFor(table, who) }], log: [] };
+    if (holder.who === who) {
+      return { table, out: [{ to: who, frame: welcomeFor(table, who) }], log: [] };
+    }
+    // Someone without a seat finds the four seats held by people (D-12, « La table est complète »).
+    if (personOf(table, who)?.seat === null && isFull(table)) {
+      return refuse(table, who, "table-full");
+    }
+    return refuse(table, who, "seat-taken");
   }
   const next = copyTable(table);
   const person = personOf(next, who);
   if (person === undefined) return unchanged(table);
+  // The old seat is free again, at the table's level for that colour (Galopeur unless the host chose).
   if (person.seat !== null) next.seats[person.seat] = { kind: "free" };
   next.seats[seat] = { kind: "human", who };
   person.seat = seat;
+  return lobbyChange(table, next, now);
+}
+
+/** « Libérer ma place »: the person stays at the table without a seat. */
+function stand(table: Table, who: string, now: number): Reduced {
+  if (table.status !== "lobby") return refuse(table, who, "started");
+  const seat = personOf(table, who)?.seat ?? null;
+  if (seat === null) return unchanged(table);
+  const next = copyTable(table);
+  next.seats[seat] = { kind: "free" };
+  const person = personOf(next, who);
+  if (person !== undefined) person.seat = null;
+  return lobbyChange(table, next, now);
+}
+
+/** The host moves a person to a free seat, or swaps two people (D-03). */
+function move(table: Table, who: string, frame: MoveFrame, now: number): Reduced {
+  if (table.status !== "lobby") return refuse(table, who, "started");
+  if (table.creator !== who) return refuse(table, who, "not-host");
+  const from = table.seats[frame.who];
+  if (from.kind !== "human") return refuse(table, who, "illegal");
+  if (frame.who === frame.to) return unchanged(table);
+  const next = copyTable(table);
+  const mover = personOf(next, from.who);
+  if (mover === undefined) return unchanged(table);
+  const target = next.seats[frame.to];
+  if (target.kind === "human") {
+    next.seats[frame.who] = { kind: "human", who: target.who };
+    const other = personOf(next, target.who);
+    if (other !== undefined) other.seat = frame.who;
+  } else {
+    next.seats[frame.who] = { kind: "free" };
+  }
+  next.seats[frame.to] = { kind: "human", who: from.who };
+  mover.seat = frame.to;
+  return lobbyChange(table, next, now);
+}
+
+/** The host sets the strength of a free seat; saved at once, seen by everyone (D-03). */
+function level(table: Table, who: string, frame: LevelFrame, now: number): Reduced {
+  if (table.status !== "lobby") return refuse(table, who, "started");
+  if (table.creator !== who) return refuse(table, who, "not-host");
+  // The protocol already checked 1 to 5; the core checks again (T-02-21).
+  const value = parseBotLevel(frame.level);
+  if (value === null) return refuse(table, who, "bad-frame");
+  if (table.seats[frame.seat].kind !== "free") return refuse(table, who, "seat-taken");
+  if (table.levels[frame.seat] === value) return unchanged(table);
+  const next = copyTable(table);
+  next.levels[frame.seat] = value;
   next.lastActivity = now;
-  return {
-    table: next,
-    out: [{ to: who, frame: welcomeFor(next, who) }, ...publicChanges(table, next, new Set([who]))],
-    log: [],
-  };
+  return { table: next, out: publicChanges(table, next, new Set()), log: [] };
+}
+
+/**
+ * « Quitter la table » in the waiting room: the seat is freed and the person goes. The creator's record
+ * stays (unseated, offline) so the role and the name come back with them (plan 02-06 adds the
+ * hand-over). Once the game runs only someone without a seat may go this way (02-07 adds the rest).
+ */
+function leave(table: Table, who: string, now: number): Reduced {
+  const person = personOf(table, who);
+  if (person === undefined) return unchanged(table);
+  if (table.status !== "lobby" && person.seat !== null) return refuse(table, who, "started");
+  const next = copyTable(table);
+  if (person.seat !== null) next.seats[person.seat] = { kind: "free" };
+  if (who === next.creator) {
+    const creator = personOf(next, who);
+    if (creator !== undefined) {
+      creator.seat = null;
+      creator.online = false;
+    }
+  } else {
+    next.people = next.people.filter((each) => each.who !== who);
+  }
+  next.lastActivity = now;
+  return { table: next, out: publicChanges(table, next, new Set([who])), log: [] };
 }
 
 function start(table: Table, who: string, ctx: Ctx): Reduced {
@@ -241,6 +343,14 @@ export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
       switch (frame.t) {
         case "sit":
           return sit(table, command.who, frame.seat, ctx.now);
+        case "stand":
+          return stand(table, command.who, ctx.now);
+        case "move":
+          return move(table, command.who, frame, ctx.now);
+        case "level":
+          return level(table, command.who, frame, ctx.now);
+        case "leave":
+          return leave(table, command.who, ctx.now);
         case "start":
           return start(table, command.who, ctx);
         case "act":

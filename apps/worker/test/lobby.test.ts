@@ -24,7 +24,7 @@ describe("the waiting room", () => {
     await clo.next("welcome");
     expect(
       (await ana.next("table", (frame) => frame.table.unseated.includes("Clo"))).table.unseated,
-    ).toEqual(["Ben", "Clo"]);
+    ).toEqual(["Ana", "Ben", "Clo"]);
     await evictDurableObject(stub);
 
     ana.send({ t: "sit", seat: "bleu" });

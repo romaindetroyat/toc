@@ -61,9 +61,13 @@ function logAfter(id: string, seq: number): Promise<LogRow[]> {
   );
 }
 
+/** How long a frame may take: wall time, not a poll count (the CPU-heavy Node tests run alongside). */
+const FRAME_WAIT_MS = 60_000;
+
 /** Waits until `ready` holds (frames arrive asynchronously on the test's side of the sockets). */
 async function until(ready: () => boolean, what: string): Promise<void> {
-  for (let i = 0; i < 2000; i++) {
+  const deadline = Date.now() + FRAME_WAIT_MS;
+  while (Date.now() < deadline) {
     if (ready()) return;
     await new Promise((resolve) => setTimeout(resolve, 2));
   }

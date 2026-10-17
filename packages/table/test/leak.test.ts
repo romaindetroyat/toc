@@ -336,6 +336,17 @@ function playOne(config: {
   if (second !== undefined) {
     run({ t: "client", who: second.who, frame: { t: "sit", seat: creator.seat as Color } });
     run({ t: "client", who: second.who, frame: { t: "start" } });
+    // The waiting room's own commands (plan 02-05): a stand and a sit back, a move by someone else.
+    if (second.seat !== null) {
+      run({ t: "client", who: second.who, frame: { t: "stand" } });
+      run({ t: "client", who: second.who, frame: { t: "sit", seat: second.seat } });
+      run({ t: "client", who: second.who, frame: { t: "move", who: second.seat, to: "vert" } });
+    }
+  }
+  // The host sets the strength of a free seat.
+  const free = COLORS.find((color) => table.seats[color].kind === "free");
+  if (free !== undefined) {
+    run({ t: "client", who: creator.who, frame: { t: "level", seat: free, level: 4 } });
   }
   run({ t: "client", who: creator.who, frame: { t: "start" } });
   const absent = new Set<string>();
@@ -372,7 +383,14 @@ function playOne(config: {
         run({ t: "client", who: person.who, frame: { t: "act", base: table.seq, action } });
         seen.illegalActs += 1;
       } else if (kind === 4) {
-        run({ t: "client", who: person.who, frame: { t: "sit", seat: "vert" } });
+        // A waiting-room command during the game: refused (started).
+        const lobbyFrames = [
+          { t: "sit", seat: "vert" },
+          { t: "stand" },
+          { t: "move", who: "bleu", to: "vert" },
+          { t: "level", seat: "vert", level: 5 },
+        ] as const;
+        run({ t: "client", who: person.who, frame: lobbyFrames[i % lobbyFrames.length] as never });
       } else {
         run({ t: "tick", retry: false });
       }

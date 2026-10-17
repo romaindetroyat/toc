@@ -85,5 +85,10 @@ export const table = {
     ownSeat: (colour: string) => `${colour} : toi`,
     /** Accessible name of another person's seat. */
     otherSeat: (colour: string, name: string, status: string) => `${colour} : ${name}, ${status}`,
+    /** Toasts of the waiting room (tableNotices). */
+    joined: (name: string) => `${name} a rejoint la table.`,
+    left: (name: string) => `${name} a quitté la table.`,
+    movedYou: (creator: string, colour: string) =>
+      `${creator} a changé ta place : tu es maintenant ${colour}.`,
   },
 } as const;

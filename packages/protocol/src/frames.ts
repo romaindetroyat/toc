@@ -1,7 +1,7 @@
 // The table protocol: every frame a browser and the table's Durable Object exchange, validated with
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
-// Client → server: hello (always first), sit, start, act. Server → client: welcome (the one snapshot),
+// Client → server: hello (always first), sit, stand, move, level, leave, start, act. Server → client: welcome (the one snapshot),
 // events (one batch of play, already projected for its reader), table (public data only), error (a
 // code, never a message). No frame type carries a GameState, the deck rng, another seat's cards or a
 // token (RULE-19): `view` is a PlayerView built by viewFor, `events` went through eventsFor.
@@ -47,6 +47,9 @@ const actionSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("discard") }),
 ]);
 
+/** A computer's strength 1 to 5: a whole number, never a string (T-02-21). */
+const levelValue = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
+
 const clientFrameSchema = z.discriminatedUnion("t", [
   z.strictObject({
     t: z.literal("hello"),
@@ -55,6 +58,10 @@ const clientFrameSchema = z.discriminatedUnion("t", [
     name: z.string().check(z.maxLength(200)),
   }),
   z.strictObject({ t: z.literal("sit"), seat: colour }),
+  z.strictObject({ t: z.literal("stand") }),
+  z.strictObject({ t: z.literal("move"), who: colour, to: colour }),
+  z.strictObject({ t: z.literal("level"), seat: colour, level: levelValue }),
+  z.strictObject({ t: z.literal("leave") }),
   z.strictObject({ t: z.literal("start") }),
   z.strictObject({ t: z.literal("act"), base: count, action: actionSchema }),
 ]);
@@ -63,11 +70,30 @@ const clientFrameSchema = z.discriminatedUnion("t", [
 export type HelloFrame = { t: "hello"; v: number; token: string; name: string };
 /** Take a free seat of the waiting room (or move to it from one's own seat). */
 export type SitFrame = { t: "sit"; seat: Color };
+/** Leave one's seat in the waiting room (« Libérer ma place »). */
+export type StandFrame = { t: "stand" };
+/**
+ * The host moves the person on seat `who` to `to`: a free seat, or a person's seat (the two swap). Before
+ * the start only (D-03).
+ */
+export type MoveFrame = { t: "move"; who: Color; to: Color };
+/** The host sets the strength of a free seat's future computer (D-03). */
+export type LevelFrame = { t: "level"; seat: Color; level: Level };
+/** Leave the table (« Quitter la table »): in the waiting room the person and their seat go. */
+export type LeaveFrame = { t: "leave" };
 /** The host starts the game: the free seats become computer players. */
 export type StartFrame = { t: "start" };
 /** One action of the sender's seat, played on the table at `base` (its seq). */
 export type ActFrame = { t: "act"; base: number; action: Action };
-export type ClientFrame = HelloFrame | SitFrame | StartFrame | ActFrame;
+export type ClientFrame =
+  | HelloFrame
+  | SitFrame
+  | StandFrame
+  | MoveFrame
+  | LevelFrame
+  | LeaveFrame
+  | StartFrame
+  | ActFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
@@ -119,11 +145,20 @@ export type TablePublic = {
   gameNo: number;
   /** The computer player due to act. */
   thinking: Color | null;
+  /** The first names of the people at the table, online, without a seat (« Sans place »). */
+  unseated: string[];
 };
 
 export type You = { seat: Color | null; host: boolean };
 
-export type ErrorCode = "bad-frame" | "not-host" | "illegal" | "stale" | "seat-taken" | "started";
+export type ErrorCode =
+  | "bad-frame"
+  | "not-host"
+  | "illegal"
+  | "stale"
+  | "seat-taken"
+  | "started"
+  | "table-full";
 
 export const ERROR_CODES: readonly ErrorCode[] = [
   "bad-frame",
@@ -132,6 +167,7 @@ export const ERROR_CODES: readonly ErrorCode[] = [
   "stale",
   "seat-taken",
   "started",
+  "table-full",
 ];
 
 /** The one snapshot: on hello, after a stale act, after a seat change. */
@@ -163,6 +199,7 @@ const tablePublic = z.object({
   creatorName: z.nullable(z.string().check(z.maxLength(64))),
   gameNo: count,
   thinking: z.nullable(colour),
+  unseated: z.array(z.string().check(z.maxLength(64))).check(z.maxLength(64)),
 });
 /** The view and the events come from the engine's own builders on the server; the envelope is checked. */
 const view = z.custom<PlayerView>(

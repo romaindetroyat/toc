@@ -70,7 +70,9 @@ export async function connect(id: string, headers: Record<string, string> = {}):
       ws.send(JSON.stringify(frame));
     },
     async next(t, where) {
-      for (let attempt = 0; attempt < 2000; attempt++) {
+      // Wall time, not a poll count: the CPU-heavy Node tests run alongside (as in bots.test.ts).
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
         while (cursor < frames.length) {
           const frame = frames[cursor++] as ServerFrame;
           if (frame.t === t && (where === undefined || where(frame as never)))

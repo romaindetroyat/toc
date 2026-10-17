@@ -25,6 +25,7 @@ const TABLE: TablePublic = {
   creatorName: "Ana",
   gameNo: 1,
   thinking: null,
+  unseated: [],
 };
 
 function fakeConnection(options: { seat?: Color; seq?: number; start?: StartBatch | null } = {}) {

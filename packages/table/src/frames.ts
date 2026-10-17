@@ -6,6 +6,9 @@ import { COLORS, type Color, eventsFor, type GameEvent, viewFor } from "@toc/eng
 import type { EventsFrame, SeatPublic, TableFrame, TablePublic, WelcomeFrame } from "@toc/protocol";
 import type { Person, Table } from "./table.ts";
 
+/** The most « Sans place » names a public table lists (the protocol accepts up to 64). */
+const MAX_UNSEATED = 32;
+
 export function personOf(table: Table, who: string): Person | undefined {
   return table.people.find((person) => person.who === who);
 }
@@ -31,6 +34,10 @@ export function tablePublic(table: Table): TablePublic {
     }
   }
   const creator = table.creator === null ? undefined : personOf(table, table.creator);
+  const unseated = table.people
+    .filter((person) => person.seat === null && person.online)
+    .map((person) => person.name)
+    .slice(0, MAX_UNSEATED);
   return {
     status: table.status,
     seats,
@@ -38,6 +45,7 @@ export function tablePublic(table: Table): TablePublic {
     creatorName: creator?.name ?? null,
     gameNo: table.gameNo,
     thinking: table.thinking?.seat ?? null,
+    unseated,
   };
 }
 

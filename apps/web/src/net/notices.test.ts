@@ -83,9 +83,13 @@ describe("tableNotices", () => {
       "Romain a changé ta place : tu es maintenant Vert.",
     ]);
     expect(tableNotices(before, after, bruno("jaune", "vert", true))).toEqual([]);
-    // The host moves people; their own changes are their doing.
+    // The host moves people; their own changes are their doing (here a swap with Bruno).
+    const swapped = table({ bleu: human("Bruno"), jaune: human("Romain") }, [], "jaune");
+    expect(tableNotices(before, swapped, bruno("jaune", "bleu"))).toEqual([
+      "Romain a changé ta place : tu es maintenant Bleu.",
+    ]);
     expect(
-      tableNotices(before, after, {
+      tableNotices(before, swapped, {
         name: "Romain",
         was: "bleu",
         seat: "jaune",
