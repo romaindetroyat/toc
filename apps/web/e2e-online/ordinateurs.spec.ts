@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { exchange, zone } from "../e2e/jouer.ts";
-import { createTable, join, playOneMove, seatTile } from "./online.ts";
+import { createTable, join, playOneMove, seatTile, tablePicture } from "./online.ts";
 
 // The computer players of an online table (02-03, SC1): one person opens a table alone; the three other
 // seats are computers inside the Durable Object, at the natural pace of the local game (decide first,
@@ -60,11 +60,11 @@ test("alone at an online table, the computers think with the sign and play in be
       else await page.waitForTimeout(100);
     }
     if (!mine) throw new Error(`the person's turn ${turn + 1} never came`);
+    const before = await tablePicture(page);
     await playOneMove(page);
-    // The move is accepted: the action zone leaves the person's turn.
-    await expect(zone(page)).not.toHaveAttribute("data-state", /^(idle|preview)$/, {
-      timeout: 20_000,
-    });
+    // The move is accepted by the server: the table on screen (knights, felt) changes. The zone may
+    // come back to the person at once when the computers have no card left in the deal.
+    await expect.poll(() => tablePicture(page), { timeout: 20_000 }).not.toBe(before);
   }
   await expect(page.locator("[data-error-screen]")).toHaveCount(0);
   await expect(page.locator("[data-notice]")).toHaveCount(0);
