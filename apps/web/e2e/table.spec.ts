@@ -11,7 +11,7 @@ const partnerOf = (c: Color): Color => COLORS[(COLORS.indexOf(c) + 2) % 4] as Co
 const nextOf = (c: Color): Color => COLORS[(COLORS.indexOf(c) + 1) % 4] as Color;
 
 async function sit(page: Page, color: Color) {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("radio", { name: NAME[color], exact: true }).click();
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
@@ -81,7 +81,7 @@ for (const color of COLORS) {
 
 test("table: la couleur choisie est retenue au rechargement de l’accueil", async ({ page }) => {
   await sit(page, "vert");
-  await page.goto("/#/");
+  await page.goto("/#/ordinateur");
   await page.reload();
   await expect(page.getByRole("radio", { name: "Vert", exact: true })).toHaveAttribute(
     "aria-checked",

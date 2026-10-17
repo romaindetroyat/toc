@@ -23,7 +23,7 @@ async function stored(page: Page): Promise<Record<string, unknown>> {
 }
 
 test("force: une rangée par place de l’ordinateur, Galopeur la première fois", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await expect(page.getByRole("heading", { name: "Force de l’ordinateur" })).toBeVisible();
   const rows = page.locator("[data-strength-row]");
   await expect(rows).toHaveCount(3);
@@ -58,7 +58,7 @@ test("force: une rangée par place de l’ordinateur, Galopeur la première fois
 test("force: « Trotteur » pour le partenaire est retenu, aussi quand la couleur change", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await level(page, "partner", "Trotteur").click();
   await expect(level(page, "partner", "Trotteur")).toHaveAttribute("aria-checked", "true");
   await expect(level(page, "partner", "Galopeur")).toHaveAttribute("aria-checked", "false");
@@ -87,7 +87,7 @@ test("force: des niveaux abîmés en mémoire donnent Galopeur, sans erreur", as
     KEY,
     JSON.stringify({ botLevels: { partner: "5", left: 99, right: 4 } }),
   ] as const);
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await expect(level(page, "partner", "Galopeur")).toHaveAttribute("aria-checked", "true");
   await expect(level(page, "left", "Galopeur")).toHaveAttribute("aria-checked", "true");
   await expect(level(page, "right", "Pur-sang")).toHaveAttribute("aria-checked", "true");
@@ -119,7 +119,7 @@ test("force: « Jouer la partie » avec un Champion ouvre la partie sans erreur"
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await level(page, "right", "Champion").click();
   await expect(level(page, "right", "Champion")).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
@@ -150,7 +150,7 @@ const forms = (page: Page) =>
 
 async function openAt(page: Page, size: { width: number; height: number }) {
   await page.setViewportSize(size);
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await expect(page.locator("[data-strength-row]")).toHaveCount(3);
   await page.evaluate(() => document.fonts.ready);
 }
@@ -318,6 +318,7 @@ test("force: l’ordre de tabulation, puis les flèches dans une force avec reto
     level(page, "partner", "Galopeur"),
     level(page, "left", "Galopeur"),
     level(page, "right", "Galopeur"),
+    page.getByRole("link", { name: "Accueil" }),
     page.getByRole("button", { name: "Réglages" }),
     page.getByRole("button", { name: "Jouer la partie" }),
   ];
@@ -342,7 +343,7 @@ test("force: l’ordre de tabulation, puis les flèches dans une force avec reto
 test("force: le titre « Force 5 sur 5 », et l’option cochée en crème, jamais en ambre", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await expect(level(page, "partner", "Champion")).toHaveAttribute("title", "Force 5 sur 5");
   await expect(level(page, "partner", "Poulain")).toHaveAttribute("title", "Force 1 sur 5");
   const checked = await level(page, "partner", "Galopeur").evaluate((el) => {

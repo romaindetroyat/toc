@@ -140,8 +140,9 @@
         <p class="note">{launch.note}</p>
       </section>
 
-      <!-- One button row, DOM order = visual order: « Réglages » 16 px left of « Jouer la partie ». -->
+      <!-- One button row, DOM order = visual order: [Accueil] 16 [Réglages] 16 [Jouer la partie]. -->
       <div class="actions">
+        <a class="btn btn-text home" href="#/" data-home-link>{launch.home}</a>
         <button
           type="button"
           class="btn btn-text settings"
@@ -218,6 +219,7 @@
     gap: var(--space-md);
   }
 
+  .home,
   .settings {
     flex: none;
   }

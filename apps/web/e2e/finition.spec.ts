@@ -267,7 +267,7 @@ for (const size of SIZES) {
       page,
     }) => {
       // From the launch screen, then into a seeded game in test speed.
-      await page.goto("/");
+      await page.goto("/#/ordinateur");
       await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
       await page.goto(`/#/partie?graine=${SEED}&vitesse=test`);
       await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
@@ -595,7 +595,7 @@ test.describe("sans le son", () => {
       };
       Object.assign(window, { AudioContext: refuse, webkitAudioContext: refuse });
     });
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.getByRole("button", { name: "Réglages", exact: true }).click();
     await expect(page.getByRole("switch", { name: "Son", exact: true })).toHaveAttribute(
       "aria-checked",

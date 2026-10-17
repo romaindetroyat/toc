@@ -12,7 +12,7 @@ type TocWindow = Window & { __tocDebug?: { audio: { sounds?: Rendered } } };
 test("audio: seuls les sabots sont rendus, audibles et courts ; aucun hennissement ni son de carte", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
   const rendered = () =>
@@ -100,7 +100,7 @@ test("audio: « Jouer la partie » met la session en lecture avant le son, et le
   page,
 }, testInfo) => {
   await watchAudioSession(page);
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
   // The AudioContext was created once, with the session already in playback.
@@ -168,7 +168,7 @@ test.describe("le son muet de l’iPhone", () => {
   test("audio: la page cachée met le son muet en pause, et il ne reprend qu’au toucher suivant", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.getByRole("button", { name: "Jouer la partie" }).click();
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect.poll(() => keepAlivePlaying(page)).toBe(true);
@@ -184,7 +184,7 @@ test.describe("le son muet de l’iPhone", () => {
   });
 
   test("audio: « Son » coupé dans les réglages met le son muet en pause", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.getByRole("button", { name: "Jouer la partie" }).click();
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect.poll(() => keepAlivePlaying(page)).toBe(true);

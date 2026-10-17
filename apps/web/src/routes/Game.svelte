@@ -363,13 +363,13 @@
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
   }
 
-  /** « Changer de couleur »: back to the launch screen. */
+  /** « Changer de couleur »: back to the solo setup (#/ordinateur, 02-04). */
   function changeColour() {
     if (online !== undefined) {
       leave();
       return;
     }
-    location.hash = "#/";
+    location.hash = "#/ordinateur";
   }
 
   /** Online, both buttons of the end plank lead home for now (plan 02-09 gives them their own words). */
@@ -388,10 +388,10 @@
   let shortcutsOpener = $state.raw<HTMLElement | null>(null);
 
   /**
-   * « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back (or
-   * the sound test, when « Tester les sons » was asked for in the game).
+   * « Abandonner la partie », once confirmed: the game is disposed and the solo setup (#/ordinateur)
+   * comes back (or the sound test, when « Tester les sons » was asked for in the game).
    */
-  function abandon(to = "#/") {
+  function abandon(to = "#/ordinateur") {
     epoch++;
     session?.dispose();
     session = undefined;

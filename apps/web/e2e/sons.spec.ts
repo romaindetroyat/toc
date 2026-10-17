@@ -332,14 +332,14 @@ test.describe("page de test des sons à choix", () => {
     expect((await played(page)).filter((p) => p.id !== "sabot")).toEqual([]);
   });
 
-  test("sons: la page défile et le lien Retour ramène au lancement", async ({ page }) => {
+  test("sons: la page défile et le lien Retour ramène à l’accueil", async ({ page }) => {
     await page.goto("/#/sons");
     const scrollable = await page.evaluate(
       () => document.documentElement.scrollHeight > window.innerHeight,
     );
     expect(scrollable).toBe(true);
     await page.getByRole("link", { name: "Retour" }).click();
-    await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+    await expect(page.locator('[data-home-choice="ordinateur"]')).toBeVisible();
   });
 });
 
