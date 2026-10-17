@@ -120,6 +120,29 @@ describe("createRemoteGame", () => {
     expect(refused).toEqual(["illegal"]);
   });
 
+  it("stops at another game number (the rematch): nothing more reaches its Director (plan 02-09)", () => {
+    const connection = fakeConnection();
+    const director = fakeDirector();
+    const game = createRemoteGame(connection, director);
+    expect(game.gameNo).toBe(1);
+    game.start();
+    connection.emit({ t: "table", table: { ...TABLE, status: "finished", winner: "bleu-rouge" } });
+    connection.emit(eventsFrame(8, [{ t: "turn", seat: "rouge" }]));
+    expect(director.log).toEqual(["enqueue:turn"]);
+    connection.emit({ t: "table", table: { ...TABLE, gameNo: 2 } });
+    connection.emit(eventsFrame(9, [{ t: "turn", seat: "vert" }]));
+    connection.emit({
+      t: "welcome",
+      you: { seat: "jaune", host: false },
+      table: { ...TABLE, gameNo: 2 },
+      view: viewFor(STATE, "jaune"),
+      seq: 9,
+      chat: [],
+    });
+    expect(director.log).toEqual(["enqueue:turn"]);
+    expect(game.view().dealsPlayed).toBe(8);
+  });
+
   it("resets the director on a welcome during the game", () => {
     const connection = fakeConnection();
     const director = fakeDirector();
