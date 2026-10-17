@@ -271,6 +271,96 @@ describe("the quick messages (plan 02-08, D-07, D-13)", () => {
   });
 });
 
+describe("the end of a game and the rematch (plan 02-09, D-08, PLAY-07)", () => {
+  it("accepts rematch { agree } from the client, a boolean only", () => {
+    expect(ok({ t: "rematch", agree: true })).toEqual({
+      ok: true,
+      frame: { t: "rematch", agree: true },
+    });
+    expect(ok({ t: "rematch", agree: false })).toEqual({
+      ok: true,
+      frame: { t: "rematch", agree: false },
+    });
+    for (const frame of [
+      { t: "rematch" },
+      { t: "rematch", agree: "yes" },
+      { t: "rematch", agree: 1 },
+      { t: "rematch", agree: true, seat: "bleu" },
+    ]) {
+      expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
+    }
+  });
+
+  it("reads a finished table with its winner and every seat's vote", () => {
+    const seat = { kind: "human", name: "Ana", level: 3, online: true, handedOver: null };
+    const finished = {
+      status: "finished",
+      seats: {
+        bleu: seat,
+        jaune: { ...seat, name: "Ben", online: false },
+        rouge: { kind: "bot", name: "Éclair", level: 3, online: true, handedOver: null },
+        vert: { kind: "bot", name: "Tonnerre", level: 4, online: true, handedOver: null },
+      },
+      host: "bleu",
+      creatorName: "Ana",
+      gameNo: 1,
+      thinking: null,
+      unseated: [],
+      pause: null,
+      winner: "bleu-rouge",
+      rematch: { bleu: "yes", jaune: "offline", rouge: "bot", vert: "bot" },
+      now: 5_000,
+    };
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: finished }))).toEqual({
+      t: "table",
+      table: finished,
+    });
+    const playing = { ...finished, status: "playing", winner: null, rematch: null };
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: playing }))?.t).toBe("table");
+    for (const bad of [
+      { ...finished, winner: "bleu-jaune" },
+      { ...finished, rematch: { ...finished.rematch, jaune: "maybe" } },
+      { ...finished, rematch: { bleu: "yes" } },
+      { ...finished, status: "over" },
+    ]) {
+      expect(parseServerFrame(JSON.stringify({ t: "table", table: bad }))).toBeNull();
+    }
+    const { winner: _winner, ...withoutWinner } = finished;
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: withoutWinner }))).toBeNull();
+  });
+
+  it("accepts a near-end start position as a test option, at most 4096 characters", () => {
+    const before = {
+      pawns: {
+        bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
+        rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      },
+      hands: { bleu: ["5S"] },
+      turn: "bleu",
+    };
+    expect(parseCreateTestOptions({ test: { pace: "zero", before } })).toEqual({
+      pace: "zero",
+      before,
+    });
+    expect(
+      parseCreateTestOptions({
+        test: { pace: "zero", before: { ...before, phase: "play", dealer: "vert", dealIndex: 1 } },
+      }),
+    ).not.toBeNull();
+    for (const bad of [
+      { ...before, turn: "violet" },
+      { ...before, hands: { bleu: ["5Z"] } },
+      { ...before, pawns: { bleu: [{ h: 1 }, { h: 2 }, { h: 3 }] } },
+      { ...before, pawns: { bleu: [{ h: 4 }, { h: 2 }, { h: 3 }, "S"] } },
+      { ...before, extra: 1 },
+      { pawns: before.pawns },
+      { ...before, hands: { bleu: Array.from({ length: 1200 }, () => "5S") } },
+    ]) {
+      expect(parseCreateTestOptions({ test: { pace: "zero", before: bad } })).toBeNull();
+    }
+  });
+});
+
 describe("normalizeName", () => {
   it("trims, collapses spaces and applies NFC", () => {
     expect(normalizeName("  Ana ")).toBe("Ana");
@@ -305,8 +395,9 @@ describe("ids", () => {
   it("keeps distinct close codes for the three endings, and 4000 for a silent socket", () => {
     expect([CLOSE_ELSEWHERE, CLOSE_VERSION, CLOSE_GONE]).toEqual([4001, 4002, 4004]);
     expect(CLOSE_SILENT).toBe(4000);
-    // Version 3: stop, the online leave and the reclaim (an older client is closed with 4002).
-    expect(PROTOCOL_VERSION).toBe(3);
+    // Version 4 (plan 02-09): the finished table, its winner and the rematch votes; an older client,
+    // which cannot read status « finished », is closed with 4002.
+    expect(PROTOCOL_VERSION).toBe(4);
   });
 });
 
@@ -321,6 +412,8 @@ describe("parseServerFrame", () => {
     thinking: null,
     unseated: ["Céline"],
     pause: null,
+    winner: null,
+    rematch: null,
     now: 1_000,
   };
 

@@ -271,6 +271,9 @@ const seen = {
   /** Plan 02-08: quick messages sent by anyone (seated or not), and those refused for the pace. */
   chats: 0,
   rateLimited: 0,
+  /** Plan 02-09: rematch votes after the end, and the rematches they started (a new deal each). */
+  rematchVotes: 0,
+  rematches: 0,
 };
 
 /** A uniform integer in [0, n) from the walk's own stream. */
@@ -386,6 +389,15 @@ function playOne(config: {
     const game = gameOf(table);
     if (game.phase === "won") {
       seen.wins += 1;
+      // The rematch (plan 02-09): everyone online votes, the unseated too (refused); the new deal's
+      // frames go through the same checks.
+      const gameNo = table.gameNo;
+      for (const person of people) {
+        if (!online(person)) continue;
+        run({ t: "client", who: person.who, frame: { t: "rematch", agree: true } });
+        seen.rematchVotes += 1;
+      }
+      if (table.gameNo === gameNo + 1) seen.rematches += 1;
       return;
     }
     let roll: number;
@@ -478,6 +490,8 @@ function playOne(config: {
           { t: "stand" },
           { t: "move", who: "bleu", to: "vert" },
           { t: "level", seat: "vert", level: 5 },
+          // A vote before the end (plan 02-09): refused.
+          { t: "rematch", agree: true },
         ] as const;
         run({ t: "client", who: person.who, frame: lobbyFrames[i % lobbyFrames.length] as never });
       } else {

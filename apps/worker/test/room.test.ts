@@ -94,7 +94,7 @@ describe("a table, two people and two computers", () => {
     const stub = stubOf(id);
 
     const ana = await connect(id);
-    ana.send({ t: "hello", v: 3, token: token("a"), name: "Ana" });
+    ana.send({ t: "hello", v: 4, token: token("a"), name: "Ana" });
     expect(await ana.next("welcome")).toMatchObject({
       you: { seat: null, host: true },
       view: null,
@@ -102,7 +102,7 @@ describe("a table, two people and two computers", () => {
     await evictDurableObject(stub);
 
     const ben = await connect(id);
-    ben.send({ t: "hello", v: 3, token: token("b"), name: " Ben " });
+    ben.send({ t: "hello", v: 4, token: token("b"), name: " Ben " });
     expect(await ben.next("welcome")).toMatchObject({
       you: { seat: null, host: false },
       table: { creatorName: "Ana" },
@@ -199,10 +199,10 @@ describe("a table, two people and two computers", () => {
   it("closes an older socket of the same device with 4001", async () => {
     const id = await createTable();
     const first = await connect(id);
-    first.send({ t: "hello", v: 3, token: token("c"), name: "Clo" });
+    first.send({ t: "hello", v: 4, token: token("c"), name: "Clo" });
     await first.next("welcome");
     const second = await connect(id);
-    second.send({ t: "hello", v: 3, token: token("c"), name: "Clo" });
+    second.send({ t: "hello", v: 4, token: token("c"), name: "Clo" });
     await second.next("welcome");
     expect(await first.closed).toEqual({ code: 4001 });
   });
@@ -219,7 +219,7 @@ describe("a table, two people and two computers", () => {
     const client = await connect(id);
     client.send({ t: "start" });
     client.ws.send("x".repeat(5000));
-    client.send({ t: "hello", v: 3, token: token("e"), name: "Eve" });
+    client.send({ t: "hello", v: 4, token: token("e"), name: "Eve" });
     const welcome = await client.next("welcome");
     expect(welcome.you).toEqual({ seat: null, host: true });
     expect(client.frames.map((f) => f.t)).toEqual(["error", "welcome"]);

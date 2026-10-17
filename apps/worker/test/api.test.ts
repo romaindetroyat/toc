@@ -51,7 +51,7 @@ describe("GET /api/tables/:id", () => {
     const id = await createTable({ pace: "zero" });
     const ana = await connect(id);
     const anaToken = token("a");
-    ana.send({ t: "hello", v: 3, token: anaToken, name: "Ana" });
+    ana.send({ t: "hello", v: 4, token: anaToken, name: "Ana" });
     await ana.next("welcome");
     ana.send({ t: "sit", seat: "vert" });
     await ana.next("welcome", (frame) => frame.you.seat === "vert");
