@@ -61,7 +61,7 @@
   --creme-attenuee: #cdb89e; /* muted text on dark */
   --brun-aide-memoire: #a46f2a; /* borders and decoration only, never behind text */
   --carte: #fffdf6; /* card faces */
-  --carte-rouge: #c0201a; /* red suits */
+  --carte-rouge: #a8140e; /* red suits (deeper since 03-10: « valeurs plus contrastées ») */
   --carte-noire: #1a1a1a; /* black suits */
 
   /* Seat colours: board fills (glyphs, chips) and pawn bodies (knights). */

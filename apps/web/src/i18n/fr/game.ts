@@ -49,7 +49,11 @@ export const game = {
     pass: "Passer cette carte",
     waiting: (names: readonly string[]) => `En attente de ${names.join(", ")}…`,
     done: (card: string, partner: string) => `Échange fait. Tu as reçu ${card} ${de(partner)}.`,
-    receivedTag: "Reçue",
+    /**
+     * The card received from the partner wears only a thick border of the partner's colour (Romain,
+     * 2026-10-17: « Juste un liseré coloré »); its name says where it comes from.
+     */
+    received: (label: string, partner: string) => `${label}, reçue ${de(partner)}`,
   },
 
   turn: {

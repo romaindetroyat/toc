@@ -7,15 +7,15 @@
 </script>
 
 <script lang="ts">
-  import { MOTION, type Mode, REDUCED, scaleFor } from "@toc/board";
-  import { type CardId, type Playability, sortHand } from "@toc/engine";
+  import { leftClearance, MOTION, type Mode, REDUCED, SCENE, scaleFor } from "@toc/board";
+  import { type CardId, type Color, type Playability, sortHand } from "@toc/engine";
   import { tick, untrack } from "svelte";
   import {
-    COLUMN_CARD,
-    COLUMN_SHIFT,
+    CORNER_SHIFT,
+    type CornerStrip,
     cardSize,
-    columnHeight,
-    columnLayout,
+    cornerCard,
+    cornerLayout,
     fanLayout,
     fanSpread,
   } from "../cards/fan.ts";
@@ -32,18 +32,24 @@
     selected?: CardId | null;
     /** The card received from the partner, marked until it is played (D-21). */
     received?: CardId | null;
+    /** The partner, whose colour borders the received card and whose name is read with it. */
+    partner?: { color: Color; name: string } | null;
     /** The cards of a new deal are still on their way: the hand is held back, then turned face up. */
     concealed?: boolean;
     /** The pace of the card motions: the settings by default, `test` turns them off. */
     pace?: Mode | "test";
     onpick?: (card: CardId) => void;
     /**
-     * The compact mode of a phone held sideways (UI-SPEC addendum « Recette 3 de Romain », plan
-     * 01-47): a column of 52 x 73 cards in the 60 px strip at the left of the galet, each showing at
-     * least its top 44 px, the last one whole, bottom-aligned in a box that holds five; the selected
-     * card moves 6 px toward the board, nothing turns.
+     * The compact mode of a phone held sideways: the hand in the galet's corner (plan 03-10, Romain's
+     * « Cartes plus grandes en coin » of 2026-10-17, replacing the 52 x 73 column of 01-47). From the
+     * bottom of the left strip up, cards of cornerCard (80 x 112 at 390 px), each covering all of the
+     * one above but a slice of 44 px or more, each as far right as the galet's bare side allows
+     * (cornerLayout over leftClearance), running past the screen's left edge when the strip is
+     * narrower; the selected card moves 6 px toward the board, nothing turns.
      */
     compact?: boolean;
+    /** In the compact mode: the board, to measure the galet's bare corner against. */
+    board?: HTMLElement | null;
   };
 
   let {
@@ -52,26 +58,65 @@
     playability = {},
     selected = null,
     received = null,
+    partner = null,
     concealed = false,
     pace = settings.reduceMotion ? "reduced" : settings.fast ? "fast" : "normal",
     onpick,
     compact = false,
+    board = null,
   }: Props = $props();
 
   let viewportWidth = $state(0);
   let viewportHeight = $state(0);
   let width = $state(0);
   let active = $state(0);
+  let fanEl = $state<HTMLElement>();
 
   const cards = $derived(sortHand(hand));
-  const size = $derived(compact ? COLUMN_CARD : cardSize(viewportWidth, viewportHeight));
-  /** The column's box: the height of five cards (a hand never holds more), so it never jumps. */
-  const columnBox = $derived(columnHeight(Math.max(5, cards.length)));
+
+  /**
+   * The compact mode's strip (the fan fills it) and the board, measured: the strip's left edge on the
+   * screen (the safe-area inset), its size, and the board's top and width from the strip's corner.
+   */
+  let strip = $state<(CornerStrip & { left: number }) | null>(null);
+  $effect(() => {
+    const el = fanEl;
+    const galet = board;
+    if (!compact || el === undefined || galet === null) {
+      strip = null;
+      return;
+    }
+    const measure = () => {
+      const s = el.getBoundingClientRect();
+      const b = galet.getBoundingClientRect();
+      strip = {
+        left: s.left,
+        width: b.left - s.left,
+        height: s.height,
+        boardTop: b.top - s.top,
+        boardWidth: b.width,
+      };
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    observer.observe(galet);
+    return () => observer.disconnect();
+  });
+
+  const corner = $derived(cornerCard(strip?.height ?? 390));
+  /** The compact mode's cards: where each stands in the strip (its top-left corner), px. */
+  const tops = $derived(
+    compact && strip !== null ? cornerLayout(cards.length, strip, leftClearance, SCENE.width) : [],
+  );
+  const size = $derived(
+    compact ? { w: corner.w, h: corner.h } : cardSize(viewportWidth, viewportHeight),
+  );
   // The turned outer cards stay inside the screen: on a 320 px phone the fan spreads a little less.
-  // In the column nothing turns: each card's top comes from columnLayout, its dx stays 0.
+  // In the corner nothing turns: each card stands where cornerLayout puts it.
   const slots = $derived(
     compact
-      ? columnLayout(cards.length, columnBox).map(({ y }) => ({ dx: 0, drop: y, rotation: 0 }))
+      ? tops.map(({ x, y }) => ({ dx: x, drop: y, rotation: 0 }))
       : fanLayout(cards.length, fanSpread(cards.length, width, size.w, size.h), size.w),
   );
   const interactive = $derived(mode !== "waiting");
@@ -94,11 +139,14 @@
 
   /**
    * Where one card sits: its fan slot, raised by its state (8 px playable, 16 px selected). In the
-   * column the card stands at its top (`drop`) and only the selected one moves, 6 px toward the board.
+   * corner the card stands at its top-left corner (`dx`, `drop`) and only the selected one moves,
+   * 6 px toward the board.
    */
   function transformOf(card: CardId, slot: { dx: number; drop: number; rotation: number }): string {
     const state = stateOf(card);
-    if (compact) return `translate(${state === "selected" ? COLUMN_SHIFT : 0}px, ${slot.drop}px)`;
+    if (compact) {
+      return `translate(${slot.dx + (state === "selected" ? CORNER_SHIFT : 0)}px, ${slot.drop}px)`;
+    }
     if (state === "selected") return `translate(${slot.dx}px, ${slot.drop - 16}px) scale(1.06)`;
     const lift = state === "playable" ? 8 : 0;
     return `translate(${slot.dx}px, ${slot.drop - lift}px) rotate(${slot.rotation}deg)`;
@@ -164,8 +212,12 @@
   const roving = $derived(Math.min(active, Math.max(0, cards.length - 1)));
   let buttons = $state<Record<string, HTMLElement | undefined>>({});
 
+  /** How much of a corner card runs past the screen's left edge, px: its middle centres on the rest. */
+  const cutOf = (slot: { dx: number }) =>
+    compact && strip !== null ? Math.max(0, -(strip.left + slot.dx)) : 0;
+
   /**
-   * Arrow keys walk through the cards (Entrée and Espace select, as on any button); in the column the
+   * Arrow keys walk through the cards (Entrée and Espace select, as on any button); in the corner the
    * up and down arrows do too.
    */
   function onkeydown(event: KeyboardEvent) {
@@ -195,8 +247,8 @@
   aria-orientation={compact ? "vertical" : undefined}
   style:--card-w="{size.w}px"
   style:--card-h="{size.h}px"
-  style:--column-box={compact ? `${columnBox}px` : undefined}
   bind:clientWidth={width}
+  bind:this={fanEl}
   {onkeydown}
   data-hand
   data-mode={mode}
@@ -215,11 +267,13 @@
         class="slot"
         style:transform={transformOf(card, slot)}
         style:z-index={stateOf(card) === "selected" && !compact ? 10 : i + 1}
+        style:--cut={compact ? `${cutOf(slot)}px` : undefined}
+        style:--middle-top={compact && i < cards.length - 1 ? `${corner.slice}px` : undefined}
       >
         <Card
           {card}
           state={stateOf(card)}
-          received={card === received}
+          received={card === received ? partner : null}
           {interactive}
           tabindex={i === roving ? 0 : -1}
           bind:el={buttons[card]}
@@ -239,8 +293,8 @@
       {#if slot}
         <div
           class="slot hint-slot"
-          class:received={card === received}
           style:transform={transformOf(card, slot)}
+          style:--cut={compact ? `${cutOf(slot)}px` : undefined}
           aria-hidden="true"
         >
           <KeyHint label={String(i + 1)} at="card" />
@@ -251,10 +305,17 @@
 </div>
 
 <style>
+  /* The fan fills the computer's 160 px bar (--bar of Game.svelte). Its cards are 106 x 148 since
+     Romain's « Un peu plus grandes » (2026-10-17): their top stays 10 px under the bar's top, so their
+     lower edge (and more of it for the dropped outer cards) runs under the screen's bottom edge, where
+     the game screen clips it. The corner index is larger and bolder than the body text. */
   .fan {
     position: relative;
     width: 100%;
-    height: calc(var(--card-h) + 36px);
+    height: 160px;
+    --index-rank: 26px;
+    --index-suit: 22px;
+    --pip-size: 56px;
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
@@ -293,8 +354,8 @@
   .slot {
     position: absolute;
     left: calc(50% - var(--card-w) / 2);
-    /* Room under the card for the drop of the outer cards and the swing of their turned corners. */
-    bottom: 26px;
+    /* The card's top 10 px under the fan's top, whatever its height. */
+    bottom: calc(150px - var(--card-h));
     width: var(--card-w);
     height: var(--card-h);
     transform-origin: 50% 160%;
@@ -315,9 +376,9 @@
     pointer-events: none;
   }
 
-  /* The « Reçue » tag holds the top of the received card's slice: its digit sits just above it. */
-  .hint-slot.received :global(.key-hint) {
-    top: -22px;
+  /* The digit right of the larger rank. */
+  .hint-slot :global(.key-hint) {
+    left: 38px;
   }
 
   /* A new hand waits, invisible and out of reach, for the cards of the deal to land. */
@@ -326,36 +387,53 @@
     pointer-events: none;
   }
 
-  /* The compact mode (a phone held sideways): the box is the column of five cards, 58 px wide (a
-     card and the 6 px its selection moves toward the board), at the bottom of the strip. Every card
-     is whole, at the top its slot's translate gives; the next one covers all but its top 44 px. In
-     the column the selected card keeps its place in the stack (its outline and its 6 px move tell
-     it), so the cards under it still show their index. */
+  /* The compact mode (a phone held sideways, plan 03-10): the fan covers the whole left strip and
+     lets every tap through but those on its cards (the info pill stands at the strip's top). Each card
+     stands at the top-left corner its slot's translate gives, past the strip when cornerLayout says
+     so: over the galet's bare side and corner, and past the screen's left edge. The index stands
+     stacked in the top-right corner, the part of the card that is always seen, at a quarter of the
+     card's height (28 px at 112). The selected card keeps its place in the stack (its outline and its
+     6 px move tell it), so the cards under it still show their index. */
   .fan.compact {
-    width: calc(var(--card-w) + 6px);
-    height: var(--column-box);
-    margin: 0 auto;
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    --index-rank: calc(var(--card-h) * 0.25);
+    --index-suit: calc(var(--card-h) * 0.2);
+    --pip-size: calc(var(--card-h) * 0.4);
+    pointer-events: none;
   }
 
   .compact .slot {
     top: 0;
     left: 0;
     bottom: auto;
-    transform-origin: 50% 50%;
-  }
-
-  .compact .hint-slot {
     transform-origin: 0 0;
+    pointer-events: auto;
   }
 
-  /* Smaller middle marks on the smaller card. An unplayable card looks as at 40 % over the page, but
-     stays opaque: the cards overlap in the column, and a see-through card would show the one under
-     it. */
-  .compact .slot :global(.card[data-card] .big),
-  .compact .slot :global(.card[data-card] .letter) {
-    font-size: 30px;
+  .compact .slot :global(.card[data-card] .corner.top) {
+    left: auto;
+    right: 5px;
   }
 
+  .compact .slot :global(.card[data-card].received .corner.top) {
+    right: 9px;
+  }
+
+  /* The digit astride the card's top edge, at the left of the part on the screen. */
+  .compact .hint-slot {
+    width: var(--card-w);
+    pointer-events: none;
+  }
+
+  .compact .hint-slot :global(.key-hint) {
+    left: calc(var(--cut, 0px) + 4px);
+  }
+
+  /* An unplayable card is veiled, but stays opaque: the cards overlap, and a see-through card would
+     show the one under it. */
   .compact .slot :global(.card[data-card].unplayable) {
     opacity: 1;
   }
@@ -364,13 +442,14 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: rgb(43 29 18 / 0.6);
+    background: rgb(43 29 18 / 0.5);
     pointer-events: none;
   }
 
-  /* No room for two lines of text in the column: the heading shows, the body is read out. */
+  /* No room for two lines of text in the strip: the heading shows at its bottom, the body is read
+     out. */
   .compact .empty {
-    padding: 0;
+    padding: 0 0 var(--space-md);
     justify-content: flex-end;
   }
 

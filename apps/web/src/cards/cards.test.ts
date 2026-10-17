@@ -1,15 +1,16 @@
+import { leftClearance, SCENE } from "@toc/board";
 import { type CardId, FULL_DECK } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
 import { botLine, describeAction } from "../i18n/fr/game.ts";
 import { cardFace } from "./faces.ts";
 import {
-  COLUMN_CARD,
-  COLUMN_SHIFT,
-  COLUMN_STEP,
+  CORNER_MARGIN,
+  CORNER_SHIFT,
+  CORNER_TOP,
   cardSize,
-  columnHeight,
-  columnLayout,
+  cornerCard,
+  cornerLayout,
   fanLayout,
   fanReach,
   fanSpread,
@@ -19,7 +20,7 @@ import {
 describe("cardFace", () => {
   it("labels ranks and colours suits", () => {
     expect(cardFace("1S")).toMatchObject({ rankLabel: "A", suitGlyph: "♠", colour: "#1A1A1A" });
-    expect(cardFace("10H")).toMatchObject({ rankLabel: "10", suitGlyph: "♥", colour: "#C0201A" });
+    expect(cardFace("10H")).toMatchObject({ rankLabel: "10", suitGlyph: "♥", colour: "#A8140E" });
     expect(cardFace("11D")).toMatchObject({ rankLabel: "V", court: true });
     expect(cardFace("12C")).toMatchObject({ rankLabel: "D", suitGlyph: "♣" });
     expect(cardFace("13H")).toMatchObject({ rankLabel: "R", court: true });
@@ -30,7 +31,7 @@ describe("cardFace", () => {
     for (const card of FULL_DECK) {
       const face = cardFace(card);
       expect(face.rankLabel.length).toBeGreaterThan(0);
-      expect(["#C0201A", "#1A1A1A"]).toContain(face.colour);
+      expect(["#A8140E", "#1A1A1A"]).toContain(face.colour);
     }
   });
 });
@@ -126,44 +127,100 @@ describe("hand fan", () => {
 
   it("uses the regular card size from 600 px", () => {
     expect(cardSize(390, 844)).toEqual({ w: 72, h: 100 });
-    expect(cardSize(1280, 800)).toEqual({ w: 88, h: 124 });
+    expect(cardSize(1280, 800)).toEqual({ w: 106, h: 148 });
     expect(cardSize(480, 1000)).toEqual({ w: 72, h: 100 });
   });
 });
 
-describe("the compact mode's hand column (plan 01-47)", () => {
-  it("fits five 52 x 73 cards in 249 px, bottom-aligned", () => {
-    expect(COLUMN_CARD).toEqual({ w: 52, h: 73 });
-    expect(columnHeight(5)).toBe(249);
-    const slots = columnLayout(5, 249);
-    expect(slots).toHaveLength(5);
-    expect(slots[0]?.y).toBe(0);
-    // The last card is whole: its bottom is the box's bottom edge.
-    expect((slots[4]?.y ?? 0) + COLUMN_CARD.h).toBe(249);
+describe("the compact mode's hand in the corner (plan 03-10)", () => {
+  /** The strip of the compact mode at a window, insets 0 (Game.svelte: 60 px strips, 24 px row). */
+  const stripAt = (width: number, height: number) => {
+    const board = Math.min(width - 120, (height - 24) / 0.5);
+    return {
+      width: (width - board) / 2,
+      height,
+      boardTop: (height - 24 - board / 2) / 2 + 24,
+      boardWidth: board,
+    };
+  };
+  const SIZES = [
+    [844, 390],
+    [750, 342],
+    [667, 375],
+    [568, 320],
+    [480, 320],
+  ] as const;
+
+  it("makes the cards about 1.5 times the column's 52 x 73, 79 x 110 at 390 px", () => {
+    expect(cornerCard(390)).toEqual({ w: 79, h: 110, slice: 58 });
+    expect(cornerCard(342)).toEqual({ w: 67, h: 94, slice: 50 });
+    expect(cornerCard(375)).toEqual({ w: 75, h: 105, slice: 55 });
+    expect(cornerCard(320)).toEqual({ w: 61, h: 86, slice: 46 });
+    // Never larger than 80 x 112, whatever the height.
+    expect(cornerCard(800)).toEqual({ w: 80, h: 112, slice: 68 });
+    // A lower strip keeps 44 px slices and smaller cards.
+    expect(cornerCard(300).slice).toBe(44);
+    expect(cornerCard(300).h).toBe(300 - CORNER_TOP - 4 * 44);
   });
 
-  it("puts every card at least 44 px under the one before, so its index shows", () => {
-    expect(COLUMN_STEP).toBeGreaterThanOrEqual(44);
-    for (let n = 2; n <= 5; n++) {
-      const slots = columnLayout(n, 249);
-      for (let i = 1; i < slots.length; i++) {
-        expect((slots[i]?.y ?? 0) - (slots[i - 1]?.y ?? 0)).toBeGreaterThanOrEqual(44);
-      }
-      // Bottom-aligned in a taller box: the last card ends on its bottom edge.
-      expect((slots[n - 1]?.y ?? 0) + COLUMN_CARD.h).toBe(249);
+  it("shows the middle of every card: each slice passes its card's middle", () => {
+    for (let height = 280; height <= 600; height++) {
+      const { h, slice } = cornerCard(height);
+      expect(slice, `${height}`).toBeGreaterThanOrEqual(44);
+      expect(slice, `${height}`).toBeGreaterThan(h / 2);
+      expect(4 * slice + h, `${height}`).toBeLessThanOrEqual(height - CORNER_TOP);
     }
   });
 
-  it("takes one card's height for one card, and nothing for none", () => {
-    expect(columnHeight(1)).toBe(73);
-    expect(columnLayout(1, 73)).toEqual([{ y: 0 }]);
-    expect(columnLayout(1, 249)).toEqual([{ y: 176 }]);
-    expect(columnLayout(0, 249)).toEqual([]);
-    expect(columnHeight(0)).toBe(0);
+  it("stands the cards from the strip's bottom, a slice apart, under the info pill", () => {
+    for (const [width, height] of SIZES) {
+      const strip = stripAt(width, height);
+      const { h, slice } = cornerCard(height);
+      for (let n = 1; n <= 5; n++) {
+        const slots = cornerLayout(n, strip, leftClearance, SCENE.width);
+        expect(slots).toHaveLength(n);
+        expect((slots[n - 1]?.y ?? 0) + h).toBe(height);
+        for (let i = 1; i < n; i++) {
+          expect((slots[i]?.y ?? 0) - (slots[i - 1]?.y ?? 0)).toBe(slice);
+          expect(slice).toBeGreaterThanOrEqual(44);
+        }
+        expect(slots[0]?.y ?? 0).toBeGreaterThanOrEqual(CORNER_TOP);
+      }
+    }
   });
 
-  it("moves the selected card 6 px toward the board, inside a 60 px strip", () => {
-    expect(COLUMN_SHIFT).toBe(6);
-    expect(COLUMN_CARD.w + COLUMN_SHIFT).toBeLessThanOrEqual(60);
+  it("keeps every card, moved or not, off the cells, the knights and the dots", () => {
+    for (const [width, height] of SIZES) {
+      const strip = stripAt(width, height);
+      const { w, h } = cornerCard(height);
+      const scale = strip.boardWidth / SCENE.width;
+      const slots = cornerLayout(5, strip, leftClearance, SCENE.width);
+      for (const { x, y } of slots) {
+        const right = x + w + CORNER_SHIFT + CORNER_MARGIN;
+        const y0 = (y - strip.boardTop) / scale;
+        const y1 = (Math.min(y + h, height) - strip.boardTop) / scale;
+        expect(right).toBeLessThanOrEqual(strip.width + leftClearance(y0, y1) * scale + 1e-9);
+      }
+    }
+  });
+
+  it("shows at least 44 px of each card's width on the screen, and leans lower cards right", () => {
+    for (const [width, height] of SIZES) {
+      const strip = stripAt(width, height);
+      const { w } = cornerCard(height);
+      const slots = cornerLayout(5, strip, leftClearance, SCENE.width);
+      for (const [i, { x }] of slots.entries()) {
+        expect(x + w).toBeGreaterThanOrEqual(44);
+        const next = slots[i + 1];
+        if (next) expect(next.x).toBeGreaterThanOrEqual(x);
+      }
+    }
+  });
+
+  it("lays out nothing for no card or no board", () => {
+    expect(cornerLayout(0, stripAt(844, 390), leftClearance, SCENE.width)).toEqual([]);
+    expect(
+      cornerLayout(3, { ...stripAt(844, 390), boardWidth: 0 }, leftClearance, SCENE.width),
+    ).toEqual([]);
   });
 });

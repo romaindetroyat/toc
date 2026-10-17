@@ -6,7 +6,10 @@ export type CardFace = {
   rankLabel: string;
   /** ♠ ♥ ♦ ♣ */
   suitGlyph: string;
-  /** #C0201A for hearts and diamonds, #1A1A1A for spades and clubs. */
+  /**
+   * #A8140E for hearts and diamonds (#C0201A until 03-10: Romain's « valeurs plus contrastées »,
+   * 7.4:1 on the card instead of 6.0:1), #1A1A1A for spades and clubs.
+   */
   colour: string;
   /** Valet, Dame and Roi carry a figure (or, without one, a large letter between suit pips). */
   court: boolean;
@@ -14,7 +17,7 @@ export type CardFace = {
 
 const RANK_LABEL: Record<number, string> = { 1: "A", 11: "V", 12: "D", 13: "R" };
 const SUIT_GLYPH = { S: "♠", H: "♥", D: "♦", C: "♣" } as const;
-const RED = "#C0201A";
+const RED = "#A8140E";
 const BLACK = "#1A1A1A";
 
 export function cardFace(card: CardId): CardFace {

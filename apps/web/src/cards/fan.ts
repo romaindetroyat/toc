@@ -1,8 +1,11 @@
 // Geometry of the hand fan (UI-SPEC « Hand fan »). Pure, so the 320 px promise can be tested.
 
-/** Card size in px: 72 x 100 compact, 88 x 124 once min(viewport width, height) reaches 600. */
+/**
+ * Card size in px: 72 x 100 compact, 106 x 148 once min(viewport width, height) reaches 600 (the
+ * computer's bar; 88 x 124 until Romain's « Un peu plus grandes » of 2026-10-17, plan 03-10).
+ */
 export function cardSize(viewportWidth: number, viewportHeight: number): { w: number; h: number } {
-  return Math.min(viewportWidth, viewportHeight) >= 600 ? { w: 88, h: 124 } : { w: 72, h: 100 };
+  return Math.min(viewportWidth, viewportHeight) >= 600 ? { w: 106, h: 148 } : { w: 72, h: 100 };
 }
 
 export type FanSlot = {
@@ -60,34 +63,79 @@ export function fanSpread(n: number, width: number, cardW: number, cardH: number
   return width - 2 * beyond;
 }
 
-// --- The compact mode's hand column (UI-SPEC addendum « Recette 3 de Romain », plan 01-47) ---
+// --- The compact mode's hand in the corner (plan 03-10) ---
 //
-// On a phone held sideways the galet takes the full height and the hand stands in the 60 px strip at
-// its left: a column of 52 x 73 cards, none turned, each overlapping the one above so that every card
-// shows at least its top 44 px (its index), the last one whole, bottom-aligned. The selected card
-// moves 6 px toward the board.
+// Romain, 2026-10-17: « sur iphone c'est beaucoup plus difficile », then « Cartes plus grandes en
+// coin » — about 1.5 times the column's 52 x 73 cards, the values big, the board no smaller. The
+// cards stand from the bottom of the left strip up, each covering all of the one above but a slice
+// of at least 44 px, and each as far right as the galet's bare side allows (leftClearance of
+// @toc/board): the lower ones lean into the galet's bare corner. A card wider than that room runs
+// past the screen's left edge (on an iPhone, into the safe-area inset first): its value stands in
+// its top-right corner, which is always seen.
 
-/** The column's card size, px. */
-export const COLUMN_CARD = { w: 52, h: 73 } as const;
-
-/** The vertical step between two cards of the column, px: what shows of every card but the last. */
-export const COLUMN_STEP = 44;
-
+/** Over the hand, the info pill (44 px) and 4 px. */
+export const CORNER_TOP = 48;
 /** How far the selected card moves toward the board, px. */
-export const COLUMN_SHIFT = 6;
-
-/** The height `count` cards take in the column, px: (count − 1) steps and one whole card. */
-export function columnHeight(count: number): number {
-  return count <= 0 ? 0 : (count - 1) * COLUMN_STEP + COLUMN_CARD.h;
-}
+export const CORNER_SHIFT = 6;
+/** What stays between a card (moved) and the nearest thing of the game, px. */
+export const CORNER_MARGIN = 2;
 
 /**
- * `count` cards in a column box `height` px high: the top of each card, px from the box's top, every
- * card COLUMN_STEP under the one before, the last one whole and its bottom on the box's bottom edge.
- * A box lower than the cards need keeps the steps: the top cards then start above it.
+ * The hand's card and slice for a strip `height` px high: the largest card (up to 112 px high, 5:7)
+ * such that five of them fit under the info pill with each slice at least 3 px past the middle of
+ * its card, so the middle of every card is seen (and tapped): 79 x 110 cards and 58 px slices at
+ * 390 px, 67 x 94 and 50 px at 342, 61 x 86 and 46 px at 320. A strip lower than 306 px keeps
+ * 44 px slices and smaller cards.
  */
-export function columnLayout(count: number, height: number): { y: number }[] {
-  if (count <= 0) return [];
-  const top = height - columnHeight(count);
-  return Array.from({ length: count }, (_, i) => ({ y: top + i * COLUMN_STEP }));
+export function cornerCard(height: number): { w: number; h: number; slice: number } {
+  const room = height - CORNER_TOP;
+  let h = Math.min(112, Math.floor((room - 12) / 3));
+  // In a tall window the cards stay together at the bottom: a slice of at most 12 px past the middle.
+  let slice = Math.min(Math.floor(h / 2) + 12, Math.floor((room - h) / 4));
+  if (slice < 44) {
+    h = Math.max(40, room - 4 * 44);
+    slice = 44;
+  }
+  return { w: Math.round((h * 5) / 7), h, slice };
+}
+
+/** The strip and the board, px, the strip's top-left corner being (0, 0); the board at its right. */
+export type CornerStrip = {
+  /** The strip's width: the board's left edge is at x = width. */
+  width: number;
+  height: number;
+  /** The board's top edge and its width (its scale is width / SCENE.width). */
+  boardTop: number;
+  boardWidth: number;
+};
+
+/**
+ * `count` cards (at most five) of the corner hand: the top-left corner of each, px in the strip. The
+ * last card's bottom is on the strip's bottom edge, each card a slice higher than the next one (a box
+ * of five, so the cards never jump when one leaves). Each card's right edge is at the galet's bare
+ * room over its whole height, less CORNER_MARGIN and the CORNER_SHIFT of the selection, and never
+ * right of the card under it.
+ */
+export function cornerLayout(
+  count: number,
+  strip: CornerStrip,
+  clearance: (y0: number, y1: number) => number,
+  sceneWidth: number,
+): { x: number; y: number }[] {
+  if (count <= 0 || strip.boardWidth <= 0) return [];
+  const { w, h, slice } = cornerCard(strip.height);
+  const scale = strip.boardWidth / sceneWidth;
+  const toScene = (y: number) => (y - strip.boardTop) / scale;
+  const tops = Array.from({ length: count }, (_, i) => strip.height - h - (count - 1 - i) * slice);
+  const rights = tops.map(
+    (y) =>
+      strip.width +
+      clearance(toScene(y), toScene(Math.min(y + h, strip.height))) * scale -
+      CORNER_MARGIN -
+      CORNER_SHIFT,
+  );
+  for (let i = count - 2; i >= 0; i--) {
+    rights[i] = Math.min(rights[i] as number, rights[i + 1] as number);
+  }
+  return tops.map((y, i) => ({ x: Math.floor((rights[i] as number) - w), y }));
 }
