@@ -1,3 +1,4 @@
+import { type Action, apply, scenarioState, sevenPlans, viewFor } from "@toc/engine";
 import { describe, expect, it } from "vitest";
 import {
   CLOSE_ELSEWHERE,
@@ -53,6 +54,25 @@ describe("parseClientFrame", () => {
     }
   });
 
+  it("accepts every 7 the engine plays: a knight may come back (G5), up to seven parts", () => {
+    // Two knights on the ring and a 7: the engine lists every split, some of them in seven parts
+    // (bleu0, bleu1, bleu0, …). Each one it plays must reach it (NET-01: apply() is the judge).
+    const state = scenarioState(
+      { pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] }, hands: { bleu: ["7H"] }, turn: "bleu" },
+      [1, 2, 3, 4],
+    );
+    const plans = sevenPlans(viewFor(state, "bleu"), "bleu", "7H");
+    expect(Math.max(...plans.map((plan) => plan.length))).toBe(7);
+    for (const plan of plans) {
+      const action: Action = { t: "seven", card: "7H", plan };
+      expect(() => apply(state, "bleu", action)).not.toThrow();
+      expect(ok({ t: "act", base: 3, action }), JSON.stringify(plan)).toEqual({
+        ok: true,
+        frame: { t: "act", base: 3, action },
+      });
+    }
+  });
+
   it("normalizes the hello's first name and refuses an empty one", () => {
     const hello = (name: string) => ok({ t: "hello", v: 1, token: TOKEN, name });
     expect(hello("  Ana   Maria ")).toEqual({
@@ -87,7 +107,7 @@ describe("parseClientFrame", () => {
         action: {
           t: "seven",
           card: "7H",
-          plan: [1, 1, 1, 1, 3].map((steps, i) => ({ pawn: `bleu${i % 4}`, steps })),
+          plan: [0, 1, 0, 1, 0, 1, 0, 1].map((i) => ({ pawn: `bleu${i}`, steps: 1 })),
         },
       },
       {

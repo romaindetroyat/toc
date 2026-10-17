@@ -10,7 +10,7 @@ import {
   SELF,
 } from "cloudflare:test";
 import { type Action, type Color, type GameEvent, legalActions } from "@toc/engine";
-import type { EventsFrame } from "@toc/protocol";
+import type { EventsFrame, ServerFrame } from "@toc/protocol";
 import type { Table } from "@toc/table";
 import { describe, expect, it } from "vitest";
 import { load } from "../src/storage.ts";
@@ -223,5 +223,43 @@ describe("a table, two people and two computers", () => {
     const welcome = await client.next("welcome");
     expect(welcome.you).toEqual({ seat: null, host: true });
     expect(client.frames.map((f) => f.t)).toEqual(["error", "welcome"]);
+  });
+});
+
+describe("a 7 split in more than four parts (G5)", () => {
+  it("plays a 7 split in seven parts, a knight coming back (G5), and answers with its events", async () => {
+    // bleu's two knights on the ring and a 7 in hand, bleu to play (test option `before`).
+    const id = await createTable({
+      pace: "zero",
+      before: {
+        pawns: { bleu: [{ p: 5 }, { p: 20 }, "S", "S"] },
+        hands: { bleu: ["7H"] },
+        turn: "bleu",
+      },
+    });
+    const ana = await connect(id);
+    ana.send({ t: "hello", v: 4, token: token("a"), name: "Ana" });
+    await ana.next("welcome");
+    ana.send({ t: "sit", seat: "bleu" });
+    await ana.next("welcome", (frame) => frame.you.seat === "bleu");
+    ana.send({ t: "start" });
+    const start = await ana.next("events");
+    expect(start.view.hand).toEqual(["7H"]);
+    await evictDurableObject(stubOf(id));
+
+    const plan = [0, 1, 0, 1, 0, 1, 0].map((i) => ({ pawn: `bleu${i}`, steps: 1 }));
+    const from = ana.frames.length;
+    ana.send({ t: "act", base: start.seq, action: { t: "seven", card: "7H", plan } });
+    // The first answer to the act, whatever it is: its events, or an error.
+    let reply: ServerFrame | undefined;
+    for (let i = 0; i < 6000 && reply === undefined; i++) {
+      reply = ana.frames.slice(from).find((frame) => frame.t === "events" || frame.t === "error");
+      if (reply === undefined) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(reply).toMatchObject({ t: "events", seq: start.seq + 1 });
+    const pawns = reply?.t === "events" ? reply.view.pawns : null;
+    expect(pawns?.bleu0).toEqual({ zone: "ring", progress: 9 });
+    expect(pawns?.bleu1).toEqual({ zone: "ring", progress: 23 });
+    expect((await readTable(id)).seq).toBe(start.seq + 1);
   });
 });
