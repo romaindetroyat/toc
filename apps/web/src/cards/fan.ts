@@ -158,3 +158,51 @@ export function cornerLayout(
   }));
   return { card, slots };
 }
+
+// --- The left strip the compact layout gives the hand (plan 02-06c) ---
+//
+// Romain, 2026-10-17, asked whether the 02-06b column's smaller cards (56 px wide instead of 79 at
+// 844 x 390) should stay or the board shrink a little: « Plateau un peu réduit (Recommandé) ». The
+// left strip is as wide as the 03-10 card needs, the right one stays at 60 px: the board moves right
+// first (in a window with spare width) and only then gets narrower. The CSS of Game.svelte
+// (--hand-card, --hand-strip, --board-size) computes exactly this.
+
+/** Each side strip, at least, px; the prompt row over the board, px. */
+export const STRIP_MIN = 60;
+export const PROMPT_ROW = 24;
+/** What the strip adds to the card for the rounding of the real card (cornerCard rounds), px. */
+const STRIP_SLACK = 1.5;
+
+/**
+ * The target card's width for a strip `height` px high: cornerCard(height).w without its rounding
+ * (min(80, (h − 60) · 5/21, max(40, h − 224) · 5/7)), never under the real one by more than 0.5 px.
+ */
+export function cornerTargetWidth(height: number): number {
+  return Math.min(80, ((height - 60) * 5) / 21, (Math.max(40, height - 224) * 5) / 7);
+}
+
+/**
+ * The compact layout of a `width` x `height` window with its safe-area insets (`x` both sides
+ * together, `y` top and bottom together), the galet being `bare` of its width bare at its left: the
+ * board's width and the left strip's (the right strip takes what is left, at least 60 px). The left
+ * strip holds the target card, moved by CORNER_SHIFT, plus CORNER_MARGIN, over the galet's bare side:
+ * max(60, (card + 8 + 1.5 − bare · (w − x − 60)) / (1 − bare), card + 9.5 − bare · tall board), the
+ * first term for a board limited by the width, the second by the height.
+ */
+export function compactLayout(
+  width: number,
+  height: number,
+  insets: { x: number; y: number },
+  bare: number,
+  ratio = 0.5,
+): { board: number; left: number } {
+  const strip = height - insets.y;
+  const card = cornerTargetWidth(strip) + CORNER_SHIFT + CORNER_MARGIN + STRIP_SLACK;
+  const tall = (strip - PROMPT_ROW) / ratio;
+  const room = width - insets.x - STRIP_MIN;
+  const hand = Math.max(STRIP_MIN, (card - bare * room) / (1 - bare), card - bare * tall);
+  const board = Math.max(0, Math.min(room - hand, tall));
+  // The two columns share what the board leaves, the left never under the hand's strip.
+  const spare = width - insets.x - board;
+  return { board, left: Math.max(hand, spare / 2) };
+}

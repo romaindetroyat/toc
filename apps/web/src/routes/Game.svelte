@@ -14,7 +14,7 @@
     sortHand,
     teamOf,
   } from "@toc/engine";
-  import { MOTION, SCENE, scaleFor } from "@toc/board";
+  import { leftClearance, MOTION, SCENE, scaleFor } from "@toc/board";
   import {
     type EngineStatus,
     onStatus,
@@ -415,9 +415,15 @@
   const bar = $derived(screen.chrome === "bar");
   /**
    * Any other landscape screen (a phone held sideways): the galet on the full height under a 24 px
-   * prompt row, the hand and the buttons in two 60 px strips at its sides (plan 01-47).
+   * prompt row, the hand and the buttons in two strips at its sides (plan 01-47), the left one as
+   * wide as the hand's cards need (plan 02-06c).
    */
   const compact = $derived(screen.chrome === "compact");
+  /**
+   * How much of its width the galet stays bare at its left over its whole height, for the compact
+   * mode's left strip (plan 02-06c): the hand's column may stand over it.
+   */
+  const GALET_BARE = leftClearance(-Infinity, Infinity) / SCENE.width;
 
   // --- The online table (plan 02-06): the plate over the board, the toasts of the pause ---
   const onlineTable = $derived<TablePublic | null>(online?.connection.table ?? null);
@@ -854,6 +860,7 @@
   data-chrome={screen.chrome}
   style:--head-room={SCENE.headRoom}
   style:--board-ratio={SCENE.height / SCENE.width}
+  style:--galet-bare={GALET_BARE}
 >
   {#if startFailure}
     {fail(startFailure)}
@@ -1097,11 +1104,12 @@
    *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
    *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
    * - « compact », every other landscape screen (a phone held sideways, a small window): the board
-   *   on the full height under a 24 px prompt row, max(0, min(100vw − 2 × 60 px − insets,
-   *   (100dvh − 24 px − insets) / ratio)), with a strip of at least 60 px at each side: the info and
-   *   the hand at the left (its larger cards over the galet's bare corner and past the screen's left
-   *   edge, plan 03-10), « Avance rapide » and the state's buttons at the right. About 630 px wide
-   *   at 750 x 342, 724 at 844 x 390, 360 at 480 x 320 (plan 01-47).
+   *   on the full height under a 24 px prompt row, max(0, min(100vw − hand strip − 60 px − insets,
+   *   (100dvh − 24 px − insets) / ratio)), with at the left a strip as wide as the hand's 03-10
+   *   cards need (at least 60 px, plan 02-06c: Romain's « Plateau un peu réduit ») holding the info
+   *   and the hand (one column over the galet's bare side), and a strip of at least 60 px at the
+   *   right, « Avance rapide » and the state's buttons. About 618 px wide at 750 x 342, 701 at
+   *   844 x 390, 351 at 480 x 320.
    * - « rotate », every screen taller than wide: only the invitation, « Tourne ton téléphone » (or
    *   « Élargis la fenêtre » on a computer). The game is kept behind it, mounted but not displayed
    *   (.play.away), so no layout rule serves a screen taller than wide.
@@ -1179,9 +1187,11 @@
 
   /*
    * « compact », every other landscape screen (a phone held sideways, a small window; Romain's
-   * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: a strip of at least
-   * --strip at each side and the board between them, so the board is centred and the strips take
-   * what is left, max(--strip, (100vw − insets − board) / 2) each. In the middle column the
+   * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: the board between a
+   * left strip of at least --hand-strip (the hand's cards at their 03-10 size, plan 02-06c: « Plateau
+   * un peu réduit », 2026-10-17) and a right one of at least --strip; the strips share what the board
+   * leaves, so in a window with spare width the board is centred, or moved right as far as the hand
+   * needs, before it gets narrower. In the middle column the
    * --prompt-row over the board, the two kept together and centred in the height (a screen limited
    * by its width leaves the same room above and below them); the strips span the whole height. No
    * head room of its own: the prompt row is that room, a lifted top-row knight's head may rise into
@@ -1196,12 +1206,27 @@
       --strip: 60px;
       --strip-button: 58px;
       --prompt-row: 24px;
+      /* The hand's target card: cornerCard of the strip's height (fan.ts, cornerTargetWidth). */
+      --hand-card: min(
+        80px,
+        (100dvh - var(--inset-y) - 60px) * 5 / 21,
+        max(40px, 100dvh - var(--inset-y) - 224px) * 5 / 7
+      );
+      /* The board limited by the height alone. */
+      --board-tall: ((100dvh - var(--prompt-row) - var(--inset-y)) / var(--board-ratio));
+      /* The left strip: the card, moved 6 px when selected, 2 px of margin and 1.5 px for the card's
+         rounding, less the galet's bare side (--galet-bare of the board's width), whether the board
+         is limited by the width (the first term) or by the height (the second); fan.ts,
+         compactLayout. */
+      --hand-strip: max(
+        var(--strip),
+        (var(--hand-card) + 9.5px - var(--galet-bare) * (100vw - var(--inset-x) - var(--strip))) /
+          (1 - var(--galet-bare)),
+        var(--hand-card) + 9.5px - var(--galet-bare) * var(--board-tall)
+      );
       --board-size: max(
         0px,
-        min(
-          100vw - 2 * var(--strip) - var(--inset-x),
-          (100dvh - var(--prompt-row) - var(--inset-y)) / var(--board-ratio)
-        )
+        min(100vw - var(--hand-strip) - var(--strip) - var(--inset-x), var(--board-tall))
       );
     }
 
@@ -1212,7 +1237,7 @@
       margin: 0;
       padding: 0;
       gap: 0;
-      grid-template-columns: minmax(var(--strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
+      grid-template-columns: minmax(var(--hand-strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
       grid-template-rows: minmax(0, 1fr) var(--prompt-row) auto minmax(0, 1fr);
       grid-template-areas:
         "left . right"
@@ -1263,8 +1288,8 @@
     }
 
     /* The hand over the whole left strip, in front of the board: its cards stand from the strip's
-       bottom up to under the info (44 px), over the galet's bare corner and past the screen's left
-       edge (plan 03-10); the box lets every other tap through. */
+       bottom up to under the info (44 px), one column inside the strip and over the galet's bare
+       side (plans 03-10, 02-06b, 02-06c); the box lets every other tap through. */
     .hand {
       grid-area: left;
       align-self: stretch;

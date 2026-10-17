@@ -9,8 +9,10 @@ import {
   CORNER_SHIFT,
   CORNER_TOP,
   cardSize,
+  compactLayout,
   cornerCard,
   cornerLayout,
+  cornerTargetWidth,
   fanLayout,
   fanReach,
   fanSpread,
@@ -132,12 +134,21 @@ describe("hand fan", () => {
   });
 });
 
-describe("the compact mode's hand in the corner (plans 03-10 and 02-06b)", () => {
+describe("the compact mode's hand in the corner (plans 03-10, 02-06b and 02-06c)", () => {
+  /** The galet's bare side over its whole height, of its width (Game.svelte's --galet-bare). */
+  const BARE = leftClearance(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY) / SCENE.width;
   /**
-   * The strip of the compact mode at a window (Game.svelte: 60 px strips, 24 px row), the screen's
-   * insets left and right (`insetX`, both together) and at the bottom (`insetY`) taken off first.
+   * The left strip of the compact mode at a window (Game.svelte: the hand's strip at the left, 60 px
+   * at the right, 24 px row), the screen's insets left and right (`insetX`, both together) and at the
+   * bottom (`insetY`) taken off first.
    */
   const stripAt = (width: number, height: number, insetX = 0, insetY = 0) => {
+    const { board, left } = compactLayout(width, height, { x: insetX, y: insetY }, BARE);
+    const h = height - insetY;
+    return { width: left, height: h, boardTop: (h - 24 - board / 2) / 2 + 24, boardWidth: board };
+  };
+  /** The strip before plan 02-06c: 60 px at each side, the board centred. */
+  const narrowStripAt = (width: number, height: number, insetX = 0, insetY = 0) => {
     const board = Math.min(width - 120 - insetX, (height - 24 - insetY) / 0.5);
     const h = height - insetY;
     return {
@@ -156,6 +167,9 @@ describe("the compact mode's hand in the corner (plans 03-10 and 02-06b)", () =>
     // iPhone 14 and iPhone 15 Pro held sideways: 47 and 59 px each side, 21 px at the bottom.
     [844, 390, 94, 21],
     [852, 393, 118, 21],
+    [844, 390, 118, 21],
+    [750, 342, 118, 21],
+    [480, 320, 118, 21],
     // A small window, limited by its height: wider strips.
     [959, 400, 0, 0],
   ] as const;
@@ -240,9 +254,9 @@ describe("the compact mode's hand in the corner (plans 03-10 and 02-06b)", () =>
     }
   });
 
-  it("makes the cards the largest that fit: 56 x 79 by a 60 px strip, the tallest where the strip is wider", () => {
+  it("makes the cards the largest that fit: 56 x 79 by a 60 px strip (02-06b), the tallest where the strip is wider", () => {
     const sizeAt = (width: number, height: number, insetX = 0, insetY = 0) => {
-      const strip = stripAt(width, height, insetX, insetY);
+      const strip = narrowStripAt(width, height, insetX, insetY);
       const { card, slots } = cornerLayout(5, strip, leftClearance, SCENE.width);
       const bigger = cornerCard(strip.height, card.w + 1);
       const scale = strip.boardWidth / SCENE.width;
@@ -267,6 +281,47 @@ describe("the compact mode's hand in the corner (plans 03-10 and 02-06b)", () =>
       const { w } = sizeAt(width, height, insetX, insetY);
       expect(w).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  it("aims at the 03-10 card, never under the real one by more than the strip's 1.5 px", () => {
+    for (let height = 250; height <= 700; height++) {
+      const target = cornerTargetWidth(height);
+      const { w } = cornerCard(height);
+      expect(target + 1.5, `${height}`).toBeGreaterThanOrEqual(w);
+      expect(target, `${height}`).toBeLessThanOrEqual(w + 1);
+    }
+  });
+
+  it("gives the hand the 03-10 card with a board a little smaller (« Plateau un peu réduit »)", () => {
+    const at = (width: number, height: number, insetX = 0, insetY = 0) => {
+      const strip = stripAt(width, height, insetX, insetY);
+      const { card, slots } = cornerLayout(5, strip, leftClearance, SCENE.width);
+      return { w: card.w, h: card.h, x: slots[0]?.x, board: Math.round(strip.boardWidth) };
+    };
+    expect(at(844, 390)).toEqual({ w: 79, h: 110, x: 1, board: 701 });
+    expect(at(750, 342)).toEqual({ w: 67, h: 94, x: 1, board: 618 });
+    expect(at(480, 320)).toEqual({ w: 61, h: 86, x: 2, board: 351 });
+    expect(at(844, 390, 94, 21)).toEqual({ w: 74, h: 103, x: 1, board: 611 });
+    expect(at(844, 390, 118, 21)).toEqual({ w: 74, h: 103, x: 1, board: 587 });
+    for (const [width, height, insetX, insetY] of SIZES) {
+      const strip = stripAt(width, height, insetX, insetY);
+      const what = `${width} x ${height}, insets ${insetX}, ${insetY}`;
+      const { card } = cornerLayout(5, strip, leftClearance, SCENE.width);
+      // The 03-10 card of the strip's height.
+      expect(card, what).toEqual(cornerCard(strip.height));
+      // The board loses at most 4 % of its width; the right strip keeps its 60 px.
+      const before = narrowStripAt(width, height, insetX, insetY).boardWidth;
+      expect(strip.boardWidth, what).toBeGreaterThan(0.96 * before);
+      expect(strip.boardWidth, what).toBeLessThanOrEqual(before);
+      expect(width - insetX - strip.width - strip.boardWidth, what).toBeGreaterThanOrEqual(
+        60 - 1e-9,
+      );
+      expect(strip.width, what).toBeGreaterThanOrEqual(60);
+    }
+    // A window limited by its height whose strips were wide enough: the board as it was, centred.
+    const small = stripAt(959, 400);
+    expect(small.boardWidth).toBe(752);
+    expect(small.width).toBe((959 - 752) / 2);
   });
 
   it("lays out nothing for no card or no board", () => {

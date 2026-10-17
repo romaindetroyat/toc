@@ -46,7 +46,7 @@
      * pas ça »): every card the same size and the same left edge, inside the strip (never under the
      * Dynamic Island), as far right as the galet's bare side allows over the column's whole height
      * (cornerLayout over leftClearance); the selected card moves 6 px toward the board, nothing
-     * turns.
+     * turns. The strip is as wide as the 03-10 card needs (plan 02-06c, « Plateau un peu réduit »).
      */
     compact?: boolean;
     /** In the compact mode: the board, to measure the galet's bare corner against. */
