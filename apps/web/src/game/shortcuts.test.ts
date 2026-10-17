@@ -782,3 +782,56 @@ describe("keyIntent: « ? » opens the help", () => {
     }
   });
 });
+
+describe("keyIntent: « M » opens the quick messages online (plan 02-08)", () => {
+  const m = (extra: Partial<KeyInput> = {}) => press("m", extra);
+
+  it("opens « Messages rapides » in an online game, in every state, upper or lower case", () => {
+    for (const ui of [
+      { kind: "waiting" } as TurnUiState,
+      reach(QUEEN),
+      reach(ACE, { t: "tapCard", card: "1S" }),
+      ...ROWS.map((row) => row.ui),
+    ]) {
+      expect(keyIntent(m(), context(QUEEN, ui, { messages: true })), ui.kind).toEqual({
+        kind: "messages",
+      });
+    }
+    expect(keyIntent(press("M"), context(QUEEN, reach(QUEEN), { messages: true }))).toEqual({
+      kind: "messages",
+    });
+    // AZERTY: « M » sits where QWERTY has « ; ».
+    expect(
+      keyIntent(m({ code: "Semicolon" }), context(QUEEN, reach(QUEEN), { messages: true })),
+    ).toEqual({ kind: "messages" });
+  });
+
+  it("does nothing in the local game", () => {
+    expect(keyIntent(m(), context(QUEEN, reach(QUEEN)))).toBeNull();
+    expect(keyIntent(m(), context(QUEEN, reach(QUEEN), { messages: false }))).toBeNull();
+  });
+
+  it("does nothing with a sheet open, in a field, with a modifier, on auto-repeat", () => {
+    const idle = reach(QUEEN);
+    const online = { messages: true };
+    expect(keyIntent(m(), context(QUEEN, idle, { ...online, blocked: true }))).toBeNull();
+    expect(
+      keyIntent(m(), context(QUEEN, idle, { ...online, focus: { kind: "field" } })),
+    ).toBeNull();
+    for (const extra of [
+      { ctrlKey: true },
+      { metaKey: true },
+      { altKey: true },
+      { repeat: true },
+      { isComposing: true },
+    ]) {
+      expect(keyIntent(m(extra), context(QUEEN, idle, online)), JSON.stringify(extra)).toBeNull();
+    }
+  });
+
+  it("leaves « ? » as the help even on AZERTY's « M » key", () => {
+    expect(
+      keyIntent(press("?", { code: "KeyM" }), context(QUEEN, reach(QUEEN), { messages: true })),
+    ).toEqual({ kind: "help" });
+  });
+});
