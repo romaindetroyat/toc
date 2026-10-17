@@ -388,12 +388,14 @@ Applicable state considerations resolved: 15 covered, 3 backstop, 0 unresolved
 
 > **Note, 2026-10-17 (plan 02-06b).** Romain, with a screenshot from his iPhone held sideways (Dynamic Island on the left): « Sur iphone, la carte du bas est décalée, je ne veux pas ça ». The lowest card (a Dame) stood much further right than the others, over the board's bottom-left ring cells, while the upper ones ran left under the Dynamic Island. The hand is now **one straight vertical column**: every card the same size and the same left edge, never left of the strip (which starts after `env(safe-area-inset-left)`, about 47–59 px on an iPhone held sideways), no per-card horizontal offset. The rows « Card », « Horizontal place » and « Middle » and the size table below are replaced accordingly; the 03-10 card size is kept wherever the strip leaves room for it, which on a phone it does not: on every iPhone held sideways the board is width-limited and the strip is 60 px, so the cards are the largest uniform 5:7 cards that fit there, 56 × 79 (about 1.08 times the 01-47 column's 52 × 73).
 
+> **Note, 2026-10-17 (plan 02-06c).** Romain was asked: « Sur iPhone, les cartes sont maintenant bien alignées, mais pour tenir dans la bande à gauche du plateau elles sont plus petites qu'avant (56 px de large au lieu de 79). Que préfères-tu ? » He answered « **Plateau un peu réduit (Recommandé)** ». In the compact mode the **left strip is now as wide as the 03-10 card needs** and the right strip stays at 60 px, so the board stands a little right of the middle and is a little narrower (about 3 %: 701 px instead of 724 at 844 × 390), and the column's cards are the 03-10 cards again (79 × 110 at 844 × 390). In a window with spare width the board first moves right into it; it only narrows when there is none left (959 × 400 keeps its 752 px board, centred). This answer takes precedence over « Plateau sur toute la hauteur » (row « Board » below, and plan 01-47) on phones only, and only by the minimum needed. Every 02-06b guarantee stays: one left edge (the selected card 6 px right), nothing in the safe area, no ring cell or other thing of the game covered, the partner's border, the top-right index.
+
 Measured before building, from `packages/board` (insets 0): the galet’s bare bottom-left corner is a quarter disc of about 110 px from the screen corner, and along the left strip the ring’s cells stand 2 to 7 px right of the board’s edge. Whole 80 px cards cannot stand there without covering cells. So the hand is a cascade of large cards from the bottom of the left strip up, each pushed as far right as the scene geometry allows (the lower ones lean into the corner), and running past the screen’s left edge when the strip is narrower than the card. On an iPhone the safe-area inset (about 47 px each side in landscape) gives the cards that room first, so they show (nearly) whole there.
 
 | Property | Value |
 |----------|-------|
 | Card | `cornerLayout(...).card` (`apps/web/src/cards/fan.ts`): the largest `cornerCard(height, maxWidth)` that fits the column's room (below); `cornerCard` is the largest 5:7 card, at most 80 × 112 (and at most `maxWidth` wide), such that five fit under the info pill (48 px) with each slice at least 3 px past the middle of its card (the middle of every card is seen and tapped). One size for every card |
-| Board | Unchanged (formula of 01-47): no shrinking |
+| Board | Plan 02-06c (« Plateau un peu réduit »): `max(0, min(100vw − hand strip − 60 px − insets, (100dvh − 24 px − insets) / 0.5))`, between a left strip of at least `--hand-strip` and a right strip of at least 60 px that share the spare width (`Game.svelte`; `compactLayout` in `apps/web/src/cards/fan.ts` computes the same). `--hand-strip = max(60 px, (card + 9.5 px − bare · (100vw − insets − 60 px)) / (1 − bare), card + 9.5 px − bare · tall board)`: the target card `min(80, (h − 60) · 5/21, max(40, h − 224) · 5/7)` px (the 03-10 card of the strip's height `h`, unrounded), plus the 6 px of the selection, 2 px of margin and 1.5 px for the card's rounding, less the galet's bare side, `bare` = `leftClearance` over the whole galet / scene width (22.59 / 3200, `--galet-bare`), for a board limited by the width (first term) or by the height (second) |
 | Order and slices | Ascending value from top to bottom; the last card on the strip’s bottom edge, each card a slice above the next (a box of five: nothing jumps when a card leaves); slice = min(h/2 + 12, (height − 48 − h) / 4), at least 44 |
 | Horizontal place | One column (plan 02-06b): every card at the same `x = max(0, floor(room − w))` in the strip, where `room` is the strip's width plus `leftClearance(y0, y1)` (`packages/board/src/scene.ts`) over the **whole box of five cards** (the leftmost thing of the game in that band: a ring cell with the knight, halo and ghost ring it may carry, a home or stable dot with its knight, a rider with its thinking glow, the felt), less 2 px and the 6 px of the selection. Never left of the strip, so never in the safe-area inset (under the Dynamic Island); the same `x` whatever the number of cards |
 | Index | Rank over suit, stacked in the card’s **top-right** corner (the part always on the screen, as on a four-index deck): rank 25 % of the card’s height (27.5 px at 110), suit 20 %, weight 800 |
@@ -403,20 +405,23 @@ Measured before building, from `packages/board` (insets 0): the galet’s bare b
 | Taps | The cards only: the hand’s box covers the left strip but lets every other tap through (the info pill stays reachable); the 7’s step chips and « Lequel ? »’s chips still take the hand’s place, unchanged |
 | Keyboard | Digits 1–5, arrows up and down, unchanged; the digit (computer only) astride the card’s top edge, 4 px from its left |
 
-Sizes at the target windows since plan 02-06b (the column's `x` is in the strip, which starts after the left inset; every card is whole on the screen):
+Sizes at the target windows since plan 02-06c (the column's `x` is in the strip, which starts after the left inset; every card is whole on the screen; the right strip is 60 px but at 959 × 400; in parentheses, plan 02-06b's 60 px strip):
 
-| Window | Insets (left/right, bottom) | Board width | Strip | Card | Slice | Column `x` |
-|--------|-----------------------------|-------------|-------|------|-------|------------|
-| 844 × 390 | 0, 0 (Chromium) | 724 px | 60 px | 56 × 79 | 51 px | 1 px |
-| 750 × 342 | 0, 0 (Chromium) | 630 px | 60 px | 56 × 79 | 51 px | 0 |
-| 667 × 375 | 0, 0 (Chromium) | 547 px | 60 px | 55 × 77 | 50 px | 0 |
-| 568 × 320 | 0, 0 (Chromium) | 448 px | 60 px | 55 × 77 | 48 px | 0 |
-| 480 × 320 | 0, 0 (Chromium) | 360 px | 60 px | 54 × 75 | 49 px | 0 |
-| 844 × 390 (iPhone 14) | 47, 21 | 630 px | 60 px | 56 × 79 | 51 px | 0 (screen x 47) |
-| 852 × 393 (iPhone 15 Pro) | 59, 21 | 614 px | 60 px | 56 × 79 | 51 px | 0 (screen x 59) |
-| 959 × 400 (small window) | 0, 0 | 752 px | 103.5 px | 80 × 112 | 60 px | 20 px |
+| Window | Insets (left/right, bottom) | Board width | Left strip | Card | Slice | Column `x` |
+|--------|-----------------------------|-------------|------------|------|-------|------------|
+| 844 × 390 | 0, 0 (Chromium) | 700.9 px (724) | 83.1 px | 79 × 110 (56 × 79) | 58 px | 1 px |
+| 750 × 342 | 0, 0 (Chromium) | 617.7 px (630) | 72.3 px | 67 × 94 (56 × 79) | 50 px | 1 px |
+| 667 × 375 | 0, 0 (Chromium) | 526.2 px (547) | 80.8 px | 75 × 105 (55 × 77) | 55 px | 1 px |
+| 568 × 320 | 0, 0 (Chromium) | 439.7 px (448) | 68.3 px | 61 × 86 (55 × 77) | 46 px | 2 px |
+| 480 × 320 | 0, 0 (Chromium) | 351.1 px (360) | 68.9 px | 61 × 86 (54 × 75) | 46 px | 2 px |
+| 844 × 390 (iPhone 14) | 47, 21 | 611.2 px (630) | 78.8 px | 74 × 103 (56 × 79) | 54 px | 1 px (screen x 48) |
+| 844 × 390 | 59, 21 | 587.1 px (606) | 78.9 px | 74 × 103 (56 × 79) | 54 px | 1 px (screen x 60) |
+| 852 × 393 (iPhone 15 Pro) | 59, 21 | 594.4 px (614) | 79.6 px | 74 × 104 (56 × 79) | 55 px | 1 px (screen x 60) |
+| 750 × 342 | 59, 21 | 503.9 px (512) | 68.1 px | 62 × 87 (55 × 77) | 46 px | 1 px (screen x 60) |
+| 480 × 320 | 59, 21 | 240.6 px (242) | 61.4 px | 54 × 75 (53 × 74) | 44 px | 1 px (screen x 60) |
+| 959 × 400 (small window) | 0, 0 | 752 px (752) | 103.5 px | 80 × 112 | 60 px | 20 px |
 
-The galet's bare side along the left strip is only 2 to 7 px wide at its narrowest (the ring's cells at mid-height), and the column spans the whole height, so a 60 px strip holds cards 56 px wide at most (60 + 5 − 2 − 6 = 57, 5:7). A window wider than its height allows (the board height-limited) has wider strips and gets the 03-10 cards. (Before plan 02-06b: 79 × 110 at 844 × 390, 67 × 94 at 750 × 342, 61 × 86 at 320 px high, each card at its own `x`, past the screen's left edge.)
+The galet's bare side along the left strip is only 2 to 7 px wide at its narrowest (the ring's cells at mid-height; about 5 px over the column's whole height on a 700 px board), and the column spans the whole height, so a 60 px strip held cards 56 px wide at most (60 + 5 − 2 − 6 = 57, 5:7; plan 02-06b). Since plan 02-06c the strip is widened to fit the 03-10 card of its height: with the iPhone's 21 px bottom inset that card is 74 × 103 (the strip is 369 px high), as in plan 03-10. A window wider than its height allows (the board height-limited) has wider strips already and keeps its centred board. (Before plan 02-06b: 79 × 110 at 844 × 390, 67 × 94 at 750 × 342, 61 × 86 at 320 px high, each card at its own `x`, past the screen's left edge.)
 
 ### The card received from the partner
 
@@ -485,7 +490,7 @@ Choix du chercheur à l’intérieur des décisions D-01 à D-13 ; ils seront re
 6. **Le résumé des équipes** (« Ton équipe : … », « Adversaires : … ») remplacé à l’écran par les lignes de force ; « Réglages » à gauche de « Jouer la partie ».
 7. **Le banc d’essai** à l’adresse `#/banc`, dans toutes les versions, sans aucun lien vers lui.
 8. **Les seuils du verdict** du banc : 95 % des coups en moins d’une seconde, aucun coup au-delà de 2 s, aucune image figée plus de 100 ms.
-9. **La main dans le coin** (plan 03-10, puis 02-06b après « Sur iphone, la carte du bas est décalée, je ne veux pas ça », le 2026-10-17) : les cartes montent depuis le bas de la bande de gauche en **une seule colonne droite**, toutes de la même taille et au même bord gauche, jamais sous l’encoche de l’iPhone ; la colonne va aussi à droite que le galet le permet sur toute sa hauteur, sans couvrir de case. Sur un téléphone la bande fait 60 px : les cartes y font 56 × 79 (79 × 110 avant, mais en escalier et sous l’encoche). La valeur est en haut à droite de la carte.
+9. **La main dans le coin** (plan 03-10, puis 02-06b après « Sur iphone, la carte du bas est décalée, je ne veux pas ça », le 2026-10-17) : les cartes montent depuis le bas de la bande de gauche en **une seule colonne droite**, toutes de la même taille et au même bord gauche, jamais sous l’encoche de l’iPhone ; la colonne va aussi à droite que le galet le permet sur toute sa hauteur, sans couvrir de case. La valeur est en haut à droite de la carte. Puis, le même jour, à la question « Sur iPhone, les cartes sont maintenant bien alignées, mais pour tenir dans la bande à gauche du plateau elles sont plus petites qu'avant (56 px de large au lieu de 79). Que préfères-tu ? », Romain a répondu « Plateau un peu réduit » (plan 02-06c) : la bande de gauche s’élargit juste assez pour les cartes de 03-10 (79 × 110 à 844 × 390), le plateau se décale un peu vers la droite et perd environ 3 % de sa largeur (701 px au lieu de 724).
 10. **La taille** : 79 × 110 à 844 × 390 (au lieu de ≈ 80 × 112, pour que le milieu de chaque carte reste visible et touchable), 67 × 94 sur l’iPhone 13 de Playwright (750 × 342), 61 × 86 sur les plus petits téléphones.
 11. **Le liseré** : 6 px de la couleur du partenaire, avec un filet noyer à l’intérieur ; la carte n’est plus entourée d’ambre.
 12. **L’ordinateur** : des cartes de 106 × 148 dont le bas passe sous le bord de l’écran, pour garder la barre de 160 px et le plateau de 1227 px ; le rouge des cœurs et des carreaux un peu plus foncé.
