@@ -64,7 +64,7 @@ test("quatre navigateurs jouent une partie entière à la même table, chacun ne
     await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
   }
 
-  const { stats, taps, ms } = await playTogether(players.map(({ page }) => page));
+  const { stats, taps, retaps, ms } = await playTogether(players.map(({ page }) => page));
 
   // Every page shows the plank, each from its own side, and the two sides agree on the winner.
   const results: Record<string, string | null> = {};
@@ -118,7 +118,7 @@ test("quatre navigateurs jouent une partie entière à la même table, chacun ne
   const posed = stats.reduce((sum, tally) => sum + tally.posed, 0);
   const sevens = stats.reduce((sum, tally) => sum + tally.sevens, 0);
   const valets = stats.reduce((sum, tally) => sum + tally.valets, 0);
-  const line = `${testInfo.project.name}: ${plays} coups joués (${sevens} sept, ${valets} valets), ${posed} mains posées, ${deals} donnes, ${taps} touchers, ${checked} trames vérifiées, gagnants ${winner}, ${Math.round(ms / 1000)} s`;
+  const line = `${testInfo.project.name}: ${plays} coups joués (${sevens} sept, ${valets} valets), ${posed} mains posées, ${deals} donnes, ${taps} touchers (${retaps} repris), ${checked} trames vérifiées, gagnants ${winner}, ${Math.round(ms / 1000)} s`;
   test.info().annotations.push({ type: "partie", description: line });
   console.log(`quatre.spec: ${line}`);
 

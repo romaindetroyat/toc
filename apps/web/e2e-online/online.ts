@@ -162,21 +162,39 @@ export function listenFrames(page: Page, seat: () => Seat | null): Received[] {
   return received;
 }
 
+/** What a page shows when the four-player loop stalls: its prompt state and any plate over the board. */
+async function stallState(page: Page): Promise<string> {
+  const s = await snapshot(page);
+  const plate = await page
+    .locator("[data-plate]")
+    .getAttribute("data-plate", { timeout: 500 })
+    .catch(() => null);
+  return `${s.state ?? "-"}${s.end ? " end" : ""}${plate === null ? "" : ` plate ${plate}`}`;
+}
+
 /**
  * Four people at one table (plan 02-10): every page passes its card at each deal, and whichever page
  * has something to tap taps it (jouer.ts's plainest player: the first card, the first knight, the
  * most steps of a 7, a dead hand posed), until every page shows the end plank. The server deals and
- * judges every move. Throws after `capMs`.
+ * judges every move. A tap whose control went away meanwhile (the screen changed under it, for
+ * instance after a reconnection's welcome) fails after 15 s and the page is read again, at most
+ * MAX_RETAPS times. Throws after `capMs`, with each page's state.
  */
 export async function playTogether(
   pages: Page[],
   capMs = 15 * 60_000,
-): Promise<{ stats: GameStats[]; taps: number; ms: number }> {
+): Promise<{ stats: GameStats[]; taps: number; retaps: number; ms: number }> {
+  const MAX_RETAPS = 10;
   const stats = pages.map(() => newStats());
+  for (const page of pages) page.setDefaultTimeout(15_000);
   const started = Date.now();
   let taps = 0;
+  let retaps = 0;
   for (;;) {
-    if (Date.now() - started > capMs) throw new Error(`the game did not end within ${capMs} ms`);
+    if (Date.now() - started > capMs) {
+      const states = await Promise.all(pages.map(stallState));
+      throw new Error(`the game did not end within ${capMs} ms (pages: ${states.join(" | ")})`);
+    }
     let ended = 0;
     let acted = false;
     for (const [i, page] of pages.entries()) {
@@ -185,12 +203,18 @@ export async function playTogether(
         ended += 1;
         continue;
       }
-      if (await playStep(page, s, stats[i] as GameStats)) {
-        taps += 1;
+      try {
+        if (await playStep(page, s, stats[i] as GameStats)) {
+          taps += 1;
+          acted = true;
+        }
+      } catch (error) {
+        retaps += 1;
+        if (retaps > MAX_RETAPS) throw error;
         acted = true;
       }
     }
-    if (ended === pages.length) return { stats, taps, ms: Date.now() - started };
+    if (ended === pages.length) return { stats, taps, retaps, ms: Date.now() - started };
     if (!acted) await (pages[0] as Page).waitForTimeout(20);
   }
 }
