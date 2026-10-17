@@ -50,7 +50,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Comptes et amis (ACCT)
 
-- [ ] **ACCT-01** : Un joueur crée un compte (pseudo) et se connecte par passkey, avec un code reçu par e-mail pour l'inscription et la récupération.
+- [ ] **ACCT-01** : Un joueur crée un compte (pseudo unique) sur invitation et se connecte par passkey ; il récupère son compte avec un code de secours. *(Sans e-mail, choix de Romain le 2026-10-17 : « Pas d'e-mail ».)*
 - [ ] **ACCT-02** : La session reste ouverte entre les visites, y compris dans l'application installée.
 - [ ] **ACCT-03** : Un joueur ajoute un ami avec un code ou un lien d'invitation, et voit sa liste d'amis.
 - [ ] **ACCT-04** : Un joueur crée une table, invite des amis, répartit les places et les équipes, et règle le niveau de l'ordinateur pour chaque place libre.
