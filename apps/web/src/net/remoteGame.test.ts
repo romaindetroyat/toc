@@ -142,6 +142,22 @@ describe("createRemoteGame", () => {
     expect(game.names).toEqual({ bleu: "Ana", jaune: "toi", rouge: "Tornado", vert: "Ourasi" });
   });
 
+  it("names a seat the computer plays for its absent person « {Nom} (ordinateur) » (plan 02-06)", () => {
+    const connection = fakeConnection({ seat: "jaune" });
+    const game = createRemoteGame(connection, fakeDirector());
+    game.start();
+    connection.emit({
+      t: "table",
+      table: {
+        ...TABLE,
+        seats: { ...TABLE.seats, bleu: { ...TABLE.seats.bleu, online: false, handedOver: 4 } },
+      },
+    });
+    expect(game.names.bleu).toBe("Ana (ordinateur)");
+    connection.emit({ t: "table", table: TABLE });
+    expect(game.names.bleu).toBe("Ana");
+  });
+
   it("deals the start events once the screen starts, then plays what came after", () => {
     const first = eventsFrame(1, [{ t: "dealt", dealer: "vert", dealIndex: 0, size: 5 }]);
     const later = eventsFrame(2, [{ t: "turn", seat: "bleu" }]);
