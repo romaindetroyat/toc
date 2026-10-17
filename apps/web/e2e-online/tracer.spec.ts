@@ -1,10 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
-import { exchange, playSimpleMove, snapshot, zone } from "../e2e/jouer.ts";
+import { exchange, zone } from "../e2e/jouer.ts";
 import {
   createTable,
   deviceOptions,
   join,
   knightPlaces,
+  playOneMove,
   seatTile,
   tablePicture,
 } from "./online.ts";
@@ -13,50 +14,6 @@ import {
 // colour (Bleu, Jaune), the creator starts, the server deals, and a move played in one browser shows
 // up in the other. The two other seats are computer players inside the Durable Object, at once under
 // the test pace.
-
-/** Plays one move of the page whose turn it is: a simple card, else the first playable thing. */
-async function playOneMove(page: Page): Promise<void> {
-  const s = await snapshot(page);
-  if (s.state === "deadHand") {
-    await page.getByRole("button", { name: "Poser mes cartes" }).click();
-    return;
-  }
-  const simple = page.locator(
-    '[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])',
-  );
-  if ((await simple.count()) > 0) {
-    await playSimpleMove(page);
-    return;
-  }
-  // Only a 7 or a Valet: take it through to « Jouer », the first knight and the largest step each time.
-  await page.locator(`[data-hand] [data-card="${s.playable[0]}"]`).click();
-  for (let i = 0; i < 200; i++) {
-    const now = await snapshot(page);
-    if (now.state !== "sevenBuilding" && now.state !== "cardSelected" && !now.seven) {
-      if (now.state === "preview") {
-        await page.getByRole("button", { name: /^Jouer/ }).click();
-        return;
-      }
-      if (now.state === "modeChoice") await page.locator("button[data-mode]").first().click();
-      else if (now.state === "tray") await page.locator("[data-tray-option]").first().click();
-      else if (now.halos.length > 0)
-        await page.locator(`[data-hit="${now.halos[0]}"]`).click({ force: true });
-      else await page.waitForTimeout(20);
-      continue;
-    }
-    if (now.done) {
-      await page.getByRole("button", { name: "Jouer", exact: true }).click();
-      return;
-    }
-    if (now.tray.length > 0) await page.locator("[data-tray-option]").first().click();
-    else if (now.chips.length > 0)
-      await page.locator(`[data-seven-chips] [data-step="${Math.max(...now.chips)}"]`).click();
-    else if (now.halos.length > 0)
-      await page.locator(`[data-hit="${now.halos[0]}"]`).click({ force: true });
-    else await page.waitForTimeout(20);
-  }
-  throw new Error("the move never finished");
-}
 
 test("two browsers join one table by its link and each sees the other's move", async ({
   browser,

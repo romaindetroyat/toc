@@ -5,6 +5,7 @@ import {
   type Page,
   type TestInfo,
 } from "@playwright/test";
+import { playSimpleMove, snapshot } from "../e2e/jouer.ts";
 
 // Shared helpers of the online specs: a table created through the Worker, a browser that opens its link
 // and types a first name, the seat tiles of the waiting room.
@@ -72,4 +73,48 @@ export function feltCards(page: Page): Promise<{ cards: string[]; discard: strin
 /** The whole table as one comparable text: the knights and the felt. */
 export async function tablePicture(page: Page): Promise<string> {
   return JSON.stringify({ knights: await knightPlaces(page), felt: await feltCards(page) });
+}
+
+/** Plays one move of the page whose turn it is: a simple card, else the first playable thing. */
+export async function playOneMove(page: Page): Promise<void> {
+  const s = await snapshot(page);
+  if (s.state === "deadHand") {
+    await page.getByRole("button", { name: "Poser mes cartes" }).click();
+    return;
+  }
+  const simple = page.locator(
+    '[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])',
+  );
+  if ((await simple.count()) > 0) {
+    await playSimpleMove(page);
+    return;
+  }
+  // Only a 7 or a Valet: take it through to « Jouer », the first knight and the largest step each time.
+  await page.locator(`[data-hand] [data-card="${s.playable[0]}"]`).click();
+  for (let i = 0; i < 200; i++) {
+    const now = await snapshot(page);
+    if (now.state !== "sevenBuilding" && now.state !== "cardSelected" && !now.seven) {
+      if (now.state === "preview") {
+        await page.getByRole("button", { name: /^Jouer/ }).click();
+        return;
+      }
+      if (now.state === "modeChoice") await page.locator("button[data-mode]").first().click();
+      else if (now.state === "tray") await page.locator("[data-tray-option]").first().click();
+      else if (now.halos.length > 0)
+        await page.locator(`[data-hit="${now.halos[0]}"]`).click({ force: true });
+      else await page.waitForTimeout(20);
+      continue;
+    }
+    if (now.done) {
+      await page.getByRole("button", { name: "Jouer", exact: true }).click();
+      return;
+    }
+    if (now.tray.length > 0) await page.locator("[data-tray-option]").first().click();
+    else if (now.chips.length > 0)
+      await page.locator(`[data-seven-chips] [data-step="${Math.max(...now.chips)}"]`).click();
+    else if (now.halos.length > 0)
+      await page.locator(`[data-hit="${now.halos[0]}"]`).click({ force: true });
+    else await page.waitForTimeout(20);
+  }
+  throw new Error("the move never finished");
 }
