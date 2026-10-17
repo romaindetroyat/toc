@@ -6,6 +6,10 @@
 // events frame comes back, built for this seat only. A stale act is silent (the server sends a fresh
 // welcome, which resets the Director); an illegal one reaches onRefused, which words it like a refused
 // local move. Pure TypeScript: the connection is passed in, so Node tests use a fake one.
+//
+// One remote game is one game number (plan 02-09): once a table frame or a welcome names another
+// game (the rematch started), this controller stops feeding its Director, so the end plank stays over
+// the finished board until the screen builds the next game's controller.
 
 import { type Color, type GameEvent, nextColor, type PlayerView, teamOf } from "@toc/engine";
 import type { ClientFrame, EventsFrame, ServerFrame, TablePublic, You } from "@toc/protocol";
@@ -34,6 +38,8 @@ export type RemoteDirector = GameDirector & { reset(view: PlayerView): void };
 export type RemoteGame = GameController & {
   /** Called when the server refuses the human's action as illegal. */
   onRefused(listener: () => void): () => void;
+  /** The table's game number this controller plays. */
+  readonly gameNo: number;
 };
 
 const SELF = "toi";
@@ -48,6 +54,9 @@ export function createRemoteGame(
   let view: PlayerView | null = startBatch?.first.view ?? connection.view;
   let seq = startBatch?.first.seq ?? connection.seq;
   let table = connection.table;
+  const gameNo = table?.gameNo ?? 0;
+  /** Set once the server names another game: later frames of play are not this game's. */
+  let over = false;
   if (view === null) throw new Error("createRemoteGame: no view");
   const opening: GameEvent[] = startBatch?.first.events ?? [];
 
@@ -63,6 +72,11 @@ export function createRemoteGame(
   }
 
   function handle(frame: ServerFrame): void {
+    if ((frame.t === "table" || frame.t === "welcome") && frame.table.gameNo !== gameNo) {
+      over = true;
+    }
+    // The finished game stays as it ended (its names too) until the screen replaces it.
+    if (over && frame.t !== "error") return;
     switch (frame.t) {
       case "events":
         seq = frame.seq;
@@ -113,6 +127,7 @@ export function createRemoteGame(
 
   return {
     human,
+    gameNo,
     get names() {
       return names();
     },

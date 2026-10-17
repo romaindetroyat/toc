@@ -45,6 +45,7 @@
   import type { DebugParams } from "../game/debugParams.ts";
   import { game as copy } from "../i18n/fr/game.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
+  import { seats as seatNames } from "../i18n/fr/seats.ts";
   import type { TableConnection } from "../net/connection.svelte.ts";
   import { gameNotices } from "../net/notices.ts";
   import {
@@ -85,7 +86,9 @@
      * `connection` gives the public table (the pause, the chef de table, who is online: plan 02-06)
      * and this device's own connection (the banner and the plate, plan 02-07); `onhome` leaves the
      * table for the home (« Retour à l’accueil » of the plates); `onleave` is the confirmed
-     * « Quitter la table » (the others' pause, the socket closed with 1000, the home).
+     * « Quitter la table » (the others' pause, the socket closed with 1000, the home); `onquit` is
+     * the end plank's « Quitter la table » (plan 02-09: the table also leaves « Mes parties en
+     * cours »).
      */
     online?: {
       makeController: ControllerFactory;
@@ -93,6 +96,7 @@
       connection: TableConnection;
       onhome: () => void;
       onleave: () => void;
+      onquit: () => void;
     };
   };
 
@@ -355,6 +359,10 @@
     if (!alive || mine !== epoch) return;
     const created = createSession(env, debug, colour, online?.makeController);
     session = created;
+    // Online, the game number this screen plays (a higher one is the rematch, plan 02-09).
+    playingGameNo = online?.connection.table?.gameNo ?? null;
+    endVotes = null;
+    rematchClosing = false;
     // The pawns must be mounted before the first bot can move.
     await tick();
     if (alive && mine === epoch) created.start();
@@ -394,7 +402,7 @@
     location.hash = "#/ordinateur";
   }
 
-  /** Online, both buttons of the end plank lead home for now (plan 02-09 gives them their own words). */
+  /** Online the end plank has its own buttons (plan 02-09); these two only lead home, as a fallback. */
   function leave() {
     epoch++;
     session?.dispose();
@@ -522,6 +530,63 @@
   const render = $derived(session?.render ?? null);
   /** The end screen is up: the rest of the game screen is inert behind it. */
   const ended = $derived(render !== null && render.phase === "won" && render.winner !== null);
+
+  // --- The rematch (plan 02-09, D-08; 02-UI-SPEC « End plank », « Motion ») ---
+  /** The table's game number the session on screen plays (online). */
+  let playingGameNo = $state<number | null>(null);
+  /** The votes of the finished game, kept while the plank closes (the server moved on). */
+  let endVotes = $state.raw<TablePublic["rematch"]>(null);
+  /** The plank is closing before the new game's deal. */
+  let rematchClosing = $state(false);
+  /** The server started another game at this table: the rematch everyone agreed to. */
+  const rematchStarted = $derived(
+    online !== undefined &&
+      onlineTable !== null &&
+      playingGameNo !== null &&
+      onlineTable.gameNo > playingGameNo,
+  );
+  $effect(() => {
+    const table = onlineTable;
+    if (table?.status === "finished" && table.gameNo === playingGameNo) endVotes = table.rematch;
+  });
+  /** The discs' names: « Toi » for this device, the seats' first names and horse names. */
+  const discNames = $derived.by(() => {
+    const names = {} as Record<Color, string>;
+    for (const color of COLORS) {
+      names[color] =
+        color === online?.seat
+          ? copy.end.you
+          : (onlineTable?.seats[color].name ?? seatNames[color].name);
+    }
+    return names;
+  });
+  // « Tout le monde est d’accord : nouvelle partie ! » for 1 s, the plank out (300 ms, 150 ms
+  // reduced), then the new game from its opening deal. Without the plank (a reconnect that finds the
+  // next game already running) the new game comes at once.
+  const REMATCH_LINE_MS = 1000;
+  $effect(() => {
+    if (!rematchStarted || online === undefined) return;
+    const plank = untrack(() => ended);
+    const reduced = untrack(
+      () =>
+        settings.reduceMotion ||
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
+    );
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const restart = () => guarded(begin({ vitesse: opened.vitesse }, online.seat));
+    if (!plank) restart();
+    else {
+      timers.push(
+        setTimeout(() => {
+          rematchClosing = true;
+          timers.push(setTimeout(restart, reduced ? 150 : 300));
+        }, REMATCH_LINE_MS),
+      );
+    }
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  });
   /** The end plank's score: the knights home of the human's team (« nous ») and of the other. */
   const endScore = $derived.by(() => {
     const score = { nous: 0, eux: 0 };
@@ -1204,6 +1269,17 @@
           stats={session.stats}
           onreplay={replay}
           onchange={changeColour}
+          online={online === undefined
+            ? undefined
+            : {
+                me: online.seat,
+                votes: endVotes,
+                starting: rematchStarted,
+                names: discNames,
+                closing: rematchClosing,
+                onrematch: (agree) => online.connection.send({ t: "rematch", agree }),
+                onleave: online.onquit,
+              }}
         />
       {/if}
     {/if}

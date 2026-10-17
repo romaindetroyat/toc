@@ -202,7 +202,11 @@
     home();
   }
 
-  /** « Quitter la table » in the waiting room: the seat is freed, the table leaves this device's list. */
+  /**
+   * « Quitter la table » in the waiting room (the seat is freed) and on the end plank (plan 02-09: the
+   * person goes offline, the others see the disc turn to « hors ligne »): the table leaves this
+   * device's list, the socket closes with 1000, the home.
+   */
   function leave() {
     unlock();
     connection?.send({ t: "leave" });
@@ -245,7 +249,9 @@
   />
 {:else if screenState === "partie" && you?.seat && connection !== null}
   <!-- A paused or saved game stays on the game screen, under its plate (plan 02-06). -->
-  <Game online={{ makeController, seat: you.seat, connection, onhome: home, onleave: leaveGame }} />
+  <Game
+    online={{ makeController, seat: you.seat, connection, onhome: home, onleave: leaveGame, onquit: leave }}
+  />
   {#if request !== null && info !== null}
     {@const asked = request}
     <ReclaimDialog

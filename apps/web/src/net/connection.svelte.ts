@@ -161,6 +161,12 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
           collecting = true;
           start = null;
         }
+        // The rematch (plan 02-09): the table frame of the new game comes before its opening deal,
+        // which the next remote game plays from the start.
+        if (table !== null && frame.table.gameNo > table.gameNo) {
+          collecting = true;
+          start = null;
+        }
         table = frame.table;
         return;
       case "events":

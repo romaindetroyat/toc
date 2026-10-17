@@ -54,7 +54,7 @@ describe("voteState", () => {
 describe("voteLine", () => {
   it("words each state as the copy table says", () => {
     expect(voteLine(votes({}), "bleu", NAMES)).toBe(
-      "Revanche : il faut l’accord de tout le monde.",
+      "Revanche : il faut l’accord de tout le monde.",
     );
     expect(voteLine(votes({ bleu: "yes" }), "bleu", NAMES)).toBe(
       "Tu es d’accord. En attente de Bruno et Céline…",
@@ -67,7 +67,7 @@ describe("voteLine", () => {
       "Bruno et Céline veulent une revanche.",
     );
     expect(voteLine(votes({ bleu: "yes", jaune: "yes", vert: "yes" }), "bleu", NAMES)).toBe(
-      "Tout le monde est d’accord : nouvelle partie !",
+      "Tout le monde est d’accord : nouvelle partie !",
     );
   });
 
@@ -79,7 +79,7 @@ describe("voteLine", () => {
   });
 
   it("the starting line wins over the votes (the server already reset them)", () => {
-    expect(voteLine(null, "bleu", NAMES)).toBe("Tout le monde est d’accord : nouvelle partie !");
+    expect(voteLine(null, "bleu", NAMES)).toBe("Tout le monde est d’accord : nouvelle partie !");
   });
 });
 

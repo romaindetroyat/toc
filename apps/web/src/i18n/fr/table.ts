@@ -254,6 +254,28 @@ export const table = {
         `${colour} : ${[name, ...tags, status].join(", ")}.`,
     },
   },
+  /**
+   * The online end plank (02-UI-SPEC « End plank (online) », D-08, plan 02-09): « Revanche » in place
+   * of « Rejouer », « Quitter la table » in place of « Changer de couleur », the vote discs and line.
+   */
+  rematch: {
+    agree: "Revanche",
+    leave: "Quitter la table",
+    group: "Accord pour la revanche",
+    nobody: "Revanche : il faut l’accord de tout le monde.",
+    /** « Tu es d’accord. En attente de Bruno et Céline… » (`names` already joined). */
+    mine: (names: string) => `Tu es d’accord. En attente ${of(names)}…`,
+    /** « Bruno veut une revanche. », « Bruno et Céline veulent une revanche. » */
+    others: (names: string, several: boolean) =>
+      several ? `${names} veulent une revanche.` : `${names} veut une revanche.`,
+    all: "Tout le monde est d’accord : nouvelle partie !",
+    disc: {
+      yes: (name: string) => `${name}, d’accord`,
+      no: (name: string) => `${name}, pas encore`,
+      offline: (name: string) => `${name}, hors ligne`,
+      bot: (name: string) => `${name} (ordinateur), d’accord`,
+    },
+  },
   /** « Inviter à la table » (02-UI-SPEC « Invite sheet », D-02). */
   invite: {
     title: "Inviter à la table",
