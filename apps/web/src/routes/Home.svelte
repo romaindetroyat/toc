@@ -121,7 +121,7 @@
       {/if}
       <div class="tiles">
         <ChoiceTile
-          choice="ordinateur"
+          data-home-choice="ordinateur"
           href="#/ordinateur"
           picture="knight"
           label={accueil.home.solo.label}
@@ -129,7 +129,7 @@
           compact={layout !== "computer"}
         />
         <ChoiceTile
-          choice="table"
+          data-home-choice="table"
           picture="users"
           label={creating ? accueil.name.busy : accueil.home.online.label}
           busy={creating}

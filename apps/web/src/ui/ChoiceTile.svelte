@@ -6,8 +6,8 @@
   // label (Body 700) over the sub line (Label 400 at 80 %). A link for the solo choice, a button for the
   // online one. Never amber: the home has no accent.
   type Props = {
-    /** The test hook value: data-home-choice="ordinateur|table". */
-    choice: "ordinateur" | "table";
+    /** The test hook, set by the home: data-home-choice="ordinateur|table". */
+    "data-home-choice": "ordinateur" | "table";
     label: string;
     sub: string;
     /** The pictogram: the knight in walnut (solo) or the `users` icon (online). */
@@ -21,7 +21,7 @@
   };
 
   let {
-    choice,
+    "data-home-choice": choice,
     label,
     sub,
     picture,
