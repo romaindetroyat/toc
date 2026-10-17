@@ -130,7 +130,10 @@ describe("the kept messages", () => {
     expect(table.chat[29]?.at).toBe(390_000);
     expect(welcomeFor(table, CLO).chat).toEqual(table.chat);
     // A returning person reads them too.
-    const back = run(table, [{ t: "gone", who: BEN }, { t: "hello", who: BEN, name: "Ben" }]);
+    const back = run(table, [
+      { t: "gone", who: BEN },
+      { t: "hello", who: BEN, name: "Ben" },
+    ]);
     const welcome = to(back.out, BEN).find((frame) => frame.t === "welcome");
     expect(welcome).toMatchObject({ chat: table.chat });
   });
@@ -148,7 +151,8 @@ describe("the kept messages", () => {
   it("never puts a person id in a chat frame or a welcome", () => {
     let table = lobby();
     table = say(table, ANA, "cheval", 5000).table;
-    const text = JSON.stringify([welcomeFor(table, BEN), say(table, BEN, "aie", 6000).out]);
+    const sent = say(table, BEN, "aie", 6000).out.map((each) => each.frame);
+    const text = JSON.stringify([welcomeFor(table, BEN), sent]);
     for (const who of [ANA, BEN, CLO]) expect(text).not.toContain(who);
   });
 });

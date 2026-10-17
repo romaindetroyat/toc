@@ -2,14 +2,16 @@
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
 // Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume,
-// stop, reclaim, reclaimAnswer. Server → client: welcome (the one snapshot), events (one batch of play,
-// already projected for its reader), table (public data only), error (a code, never a message), and
-// the reclaim's reclaimRequest (to the chef de table) and reclaimResult (to the one who asked). No frame type carries a GameState, the deck rng, another seat's cards or a
+// stop, reclaim, reclaimAnswer, chat. Server → client: welcome (the one snapshot), events (one batch of
+// play, already projected for its reader), table (public data only), error (a code, never a message),
+// the reclaim's reclaimRequest (to the chef de table) and reclaimResult (to the one who asked), and chat
+// (a quick message: a seat and one of twelve ids). No frame type carries a GameState, the deck rng, another seat's cards or a
 // token (RULE-19): `view` is a PlayerView built by viewFor, `events` went through eventsFor.
 // Later plans add frames to these unions: each is a strict object in a discriminated union on "t".
 
 import { type Action, COLORS, type Color, type GameEvent, type PlayerView } from "@toc/engine";
 import * as z from "zod/mini";
+import { CHAT_KEEP, QUICK_MESSAGES, type QuickMessageId } from "./messages.ts";
 import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
 
 /**
@@ -18,6 +20,8 @@ import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
  * of version 1 never pings, so the silence sweep would close it).
  * 3 (plan 02-07): stop, the leave during a game and the reclaim; a chef de table of version 2 would
  * drop the reclaim's request and leave the one who asked waiting.
+ * Plan 02-08 adds chat without a bump: an older page never sends it and drops the frames it does not
+ * know (the chat frame, the welcome's chat key), and deploys are atomic.
  */
 export const PROTOCOL_VERSION = 3;
 
@@ -82,6 +86,7 @@ const clientFrameSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("stop") }),
   z.strictObject({ t: z.literal("reclaim"), seat: colour }),
   z.strictObject({ t: z.literal("reclaimAnswer"), seat: colour, accept: z.boolean() }),
+  z.strictObject({ t: z.literal("chat"), msg: z.enum(QUICK_MESSAGES) }),
 ]);
 
 /** The first frame of every socket: the protocol version, the device token and the first name. */
@@ -121,6 +126,8 @@ export type StopFrame = { t: "stop" };
 export type ReclaimFrame = { t: "reclaim"; seat: Color };
 /** The host's answer to a reclaim of `seat` (« Rendre sa place » or « Refuser »). */
 export type ReclaimAnswerFrame = { t: "reclaimAnswer"; seat: Color; accept: boolean };
+/** A quick message (D-07): one of the twelve ids, never text; the server adds the sender's seat. */
+export type ChatSendFrame = { t: "chat"; msg: QuickMessageId };
 export type ClientFrame =
   | HelloFrame
   | SitFrame
@@ -134,7 +141,8 @@ export type ClientFrame =
   | ResumeFrame
   | StopFrame
   | ReclaimFrame
-  | ReclaimAnswerFrame;
+  | ReclaimAnswerFrame
+  | ChatSendFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
@@ -226,7 +234,8 @@ export type ErrorCode =
   | "started"
   | "table-full"
   | "paused"
-  | "refused";
+  | "refused"
+  | "rate";
 
 export const ERROR_CODES: readonly ErrorCode[] = [
   "bad-frame",
@@ -238,7 +247,11 @@ export const ERROR_CODES: readonly ErrorCode[] = [
   "table-full",
   "paused",
   "refused",
+  "rate",
 ];
+
+/** One quick message as the table keeps it: the sender's seat, the id, the server's time. */
+export type ChatEntry = { from: Color; msg: QuickMessageId; at: number };
 
 /** The one snapshot: on hello, after a stale act, after a seat change. */
 export type WelcomeFrame = {
@@ -250,6 +263,8 @@ export type WelcomeFrame = {
   seq: number;
   /** Present when this hello took the seat back from the computer (« Tu reprends ta place. »). */
   regained?: true;
+  /** The last quick messages the table kept (at most CHAT_KEEP), oldest first. */
+  chat: ChatEntry[];
 };
 /** One batch of play: eventsFor(events, seat) and the reader's view after it. */
 export type EventsFrame = { t: "events"; seq: number; events: GameEvent[]; view: PlayerView };
@@ -262,13 +277,16 @@ export type ReclaimRequestFrame = { t: "reclaimRequest"; seat: Color; name: stri
  * already asked for, or there is no host); accepted comes with a welcome on the seat.
  */
 export type ReclaimResultFrame = { t: "reclaimResult"; accepted: boolean };
+/** A quick message, to everyone online at the table (the sender included). */
+export type ChatFrame = { t: "chat" } & ChatEntry;
 export type ServerFrame =
   | WelcomeFrame
   | EventsFrame
   | TableFrame
   | ErrorFrame
   | ReclaimRequestFrame
-  | ReclaimResultFrame;
+  | ReclaimResultFrame
+  | ChatFrame;
 
 const level = z.int().check(z.minimum(1), z.maximum(5));
 const seatPublic = z.object({
@@ -309,6 +327,8 @@ const events = z.array(
   ),
 );
 
+const chatEntry = z.object({ from: colour, msg: z.enum(QUICK_MESSAGES), at: count });
+
 const serverFrameSchema = z.discriminatedUnion("t", [
   z.object({
     t: z.literal("welcome"),
@@ -317,6 +337,7 @@ const serverFrameSchema = z.discriminatedUnion("t", [
     view: z.nullable(view),
     seq: count,
     regained: z.optional(z.literal(true)),
+    chat: z.array(chatEntry).check(z.maxLength(CHAT_KEEP)),
   }),
   z.object({ t: z.literal("events"), seq: count, events, view }),
   z.object({ t: z.literal("table"), table: tablePublic }),
@@ -327,6 +348,7 @@ const serverFrameSchema = z.discriminatedUnion("t", [
     name: z.string().check(z.maxLength(64)),
   }),
   z.object({ t: z.literal("reclaimResult"), accepted: z.boolean() }),
+  z.object({ t: z.literal("chat"), from: colour, msg: z.enum(QUICK_MESSAGES), at: count }),
 ]);
 
 /** A server frame from the socket, or null when it does not have the expected shape. */

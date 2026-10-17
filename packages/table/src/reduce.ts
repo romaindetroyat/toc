@@ -27,6 +27,7 @@ import {
 } from "@toc/engine";
 import type {
   ActFrame,
+  ChatSendFrame,
   ClientFrame,
   ErrorCode,
   HelloFrame,
@@ -38,7 +39,8 @@ import type {
   ServerFrame,
 } from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
-import { eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
+import { canChat, keepMessage, overRate } from "./chat.ts";
+import { chatFrame, eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
 import {
   applyChoice,
   hostOf,
@@ -460,6 +462,23 @@ function reclaimAnswer(table: Table, who: string, frame: ReclaimAnswerFrame, now
 }
 
 /**
+ * A quick message (plan 02-08): a seated person only (else refused), CHAT_RATE per CHAT_WINDOW_MS
+ * (else rate, to the sender only, and nothing kept); then a chat frame to everyone online at the table,
+ * the sender included, and the message kept. Open in every status.
+ */
+function chat(table: Table, who: string, frame: ChatSendFrame, now: number): Reduced {
+  if (!canChat(table, who)) return refuse(table, who, "refused");
+  if (overRate(table, who, now)) return refuse(table, who, "rate");
+  const next = copyTable(table);
+  const entry = keepMessage(next, who, frame.msg, now);
+  if (entry === null) return unchanged(table);
+  const out: Out[] = next.people
+    .filter((person) => person.online)
+    .map((person) => ({ to: person.who, frame: chatFrame(entry) }));
+  return { table: next, out, log: [] };
+}
+
+/**
  * The alarm: every due deadline of the table. The sweep only re-arms itself (the Durable Object
  * closed the silent sockets before this tick); the pause's minute lets the host choose; then the
  * computer player due.
@@ -587,6 +606,8 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
           return reclaim(table, command.who, frame, ctx.now);
         case "reclaimAnswer":
           return reclaimAnswer(table, command.who, frame, ctx.now);
+        case "chat":
+          return chat(table, command.who, frame, ctx.now);
       }
     }
   }

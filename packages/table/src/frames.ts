@@ -3,7 +3,15 @@
 // only. Nothing here copies a GameState field by hand, and no `who` (a token hash) is ever put in.
 
 import { COLORS, type Color, eventsFor, type GameEvent, viewFor } from "@toc/engine";
-import type { EventsFrame, SeatPublic, TableFrame, TablePublic, WelcomeFrame } from "@toc/protocol";
+import type {
+  ChatEntry,
+  ChatFrame,
+  EventsFrame,
+  SeatPublic,
+  TableFrame,
+  TablePublic,
+  WelcomeFrame,
+} from "@toc/protocol";
 import { hostOf } from "./presence.ts";
 import { personOf, type Table } from "./table.ts";
 
@@ -85,9 +93,16 @@ export function welcomeFor(
     table: tablePublic(table, now),
     view: table.game !== null && seat !== null ? viewFor(table.game, seat) : null,
     seq: table.seq,
+    // An older snapshot has no messages (copyTable fills them in on the next change).
+    chat: (table.chat ?? []).map((entry) => ({ ...entry })),
   };
   if (regained) frame.regained = true;
   return frame;
+}
+
+/** A quick message for everyone at the table: the sender's seat, the id, the server's time. */
+export function chatFrame(entry: ChatEntry): ChatFrame {
+  return { t: "chat", from: entry.from, msg: entry.msg, at: entry.at };
 }
 
 /** One batch of play for the person on `seat`: the events projected for that seat and its view. */

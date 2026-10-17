@@ -137,6 +137,7 @@ const FRAME_TYPES = new Set([
   "error",
   "reclaimRequest",
   "reclaimResult",
+  "chat",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -214,6 +215,13 @@ export function structuralProblems(
     const keys = Object.keys(frame).sort();
     if (keys.join(",") !== "accepted,t" || typeof frame.accepted !== "boolean") {
       problems.push(`reclaimResult is not exactly { t, accepted }: ${keys.join(",")}`);
+    }
+  }
+  // A quick message (plan 02-08): a seat, one id, a time; no name, no text, no person.
+  if (frame.t === "chat") {
+    const keys = Object.keys(frame).sort();
+    if (keys.join(",") !== "at,from,msg,t") {
+      problems.push(`chat is not exactly { t, from, msg, at }: ${keys.join(",")}`);
     }
   }
   if (frame.t === "events") {

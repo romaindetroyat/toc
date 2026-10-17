@@ -6,6 +6,7 @@
 
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
 import { COLORS, type Color, type GameState, type Rng } from "@toc/engine";
+import type { ChatEntry } from "@toc/protocol";
 
 export type Person = {
   who: string;
@@ -126,6 +127,13 @@ export type Table = {
   pause: Pause | null;
   /** The computer player due and its decision, or null (its seat is TablePublic.thinking). */
   thinking: PendingThink | null;
+  /** The last quick messages (plan 02-08, chat.ts): at most CHAT_KEEP, oldest first. */
+  chat: ChatEntry[];
+  /**
+   * Server-only: the times of each person's accepted messages inside the rate window, by `who`
+   * (chat.ts). Never put in a frame.
+   */
+  chatTimes: Record<string, number[]>;
   test: TestOptions | null;
 };
 
@@ -162,6 +170,8 @@ export function createTable(options: {
     reclaims: {},
     pause: null,
     thinking: null,
+    chat: [],
+    chatTimes: {},
     test: options.test ?? null,
   };
 }
@@ -170,8 +180,10 @@ export function createTable(options: {
 export function copyTable(table: Table): Table {
   const copy = JSON.parse(JSON.stringify(table)) as Table;
   // A snapshot written before plan 02-03 has no pending think, before plan 02-06 no pause, before
-  // plan 02-07 no reclaims and no expiry.
+  // plan 02-07 no reclaims and no expiry, before plan 02-08 no messages.
   copy.thinking ??= null;
+  copy.chat ??= [];
+  copy.chatTimes ??= {};
   copy.pause ??= null;
   copy.reclaims ??= {};
   copy.deadlines.expire ??= { at: copy.lastActivity + EXPIRY_MS };

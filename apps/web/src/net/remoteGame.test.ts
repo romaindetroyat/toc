@@ -129,6 +129,7 @@ describe("createRemoteGame", () => {
       table: TABLE,
       view: { ...viewFor(STATE, "jaune"), dealsPlayed: 2 },
       seq: 12,
+      chat: [],
     });
     expect(director.log).toEqual(["reset:jaune"]);
     expect(game.view().dealsPlayed).toBe(2);

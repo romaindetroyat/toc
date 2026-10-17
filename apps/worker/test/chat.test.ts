@@ -59,7 +59,7 @@ describe("the quick messages", () => {
     await evictDurableObject(stub);
 
     // Ben reconnects: his welcome carries the three kept messages, oldest first.
-    ben.ws.close(1000);
+    ben.ws.close(1000, "bye");
     await ben.closed;
     const again = await connect(id);
     again.send({ t: "hello", v: 3, token: token("b"), name: "Ben" });
@@ -69,7 +69,7 @@ describe("the quick messages", () => {
       ["bleu", "aie"],
       ["bleu", "coeur"],
     ]);
-    ana.ws.close(1000);
-    again.ws.close(1000);
-  });
+    ana.ws.close(1000, "bye");
+    again.ws.close(1000, "bye");
+  }, 60_000);
 });

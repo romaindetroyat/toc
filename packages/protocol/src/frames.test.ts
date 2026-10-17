@@ -428,7 +428,13 @@ describe("parseServerFrame", () => {
     expect(parseServerFrame(welcome([{ from: "bleu", msg: "salut", at: 1 }]))).toBeNull();
     expect(
       parseServerFrame(
-        JSON.stringify({ t: "welcome", you: { seat: null, host: false }, table, view: null, seq: 0 }),
+        JSON.stringify({
+          t: "welcome",
+          you: { seat: null, host: false },
+          table,
+          view: null,
+          seq: 0,
+        }),
       ),
     ).toBeNull();
   });

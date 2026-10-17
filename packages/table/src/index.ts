@@ -6,7 +6,15 @@ export {
   stillDue,
   thinkTick,
 } from "./bots.ts";
-export { eventsFrameFor, personOf, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
+export { CHAT_KEEP, CHAT_RATE, CHAT_WINDOW_MS, canChat } from "./chat.ts";
+export {
+  chatFrame,
+  eventsFrameFor,
+  personOf,
+  tableFrame,
+  tablePublic,
+  welcomeFor,
+} from "./frames.ts";
 export {
   applyChoice,
   HANDOVER_LEVEL,
