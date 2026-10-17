@@ -215,7 +215,7 @@ describe("leak oracle on the real frames of a whole game", () => {
       } catch (error) {
         const now = await readTable(id);
         throw new Error(
-          `${String(error)} (socket close ${client.closeCode()}, table ${now.status} seq ${now.seq}, last frames ${JSON.stringify(client.frames.slice(-3).map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]))})`,
+          `${String(error)} (action ${JSON.stringify(action)}, socket close ${client.closeCode()}, table ${now.status} seq ${now.seq}, last frames ${JSON.stringify(client.frames.slice(-3).map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]))})`,
         );
       }
       humanActs += 1;

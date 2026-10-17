@@ -30,6 +30,13 @@ import { type Client, connect, createTable, token } from "./helpers.ts";
 const stubOf = (id: string) => env.GAME_ROOM.getByName(id);
 const STEP_CAP = 4000;
 const EVICT_EVERY = 20;
+/**
+ * The Champions' deal evicts every second step. Under the test pace the alarm also fires by itself and
+ * may play most of the deal between two steps, so the drive can end within twenty steps; it always
+ * takes at least three (Ana's give, at least one play of hers, the read that finds the deal over), so
+ * every second step puts at least two evictions inside the deal.
+ */
+const CHAMPION_EVICT_EVERY = 2;
 /** Each setAlarm() is billed as one row written (Cloudflare Durable Objects pricing). */
 const ALARM_ROWS = 1;
 
@@ -68,6 +75,15 @@ async function until(ready: () => boolean, what: string): Promise<void> {
   throw new Error(`timed out waiting for ${what}`);
 }
 
+/** The last frames a client received, short: type, seq, error code. */
+function lastFrames(client: Client): string {
+  return JSON.stringify(
+    client.frames
+      .slice(-3)
+      .map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]),
+  );
+}
+
 function viewAt(client: Client, seq: number): PlayerView | null {
   for (let i = client.frames.length - 1; i >= 0; i--) {
     const frame = client.frames[i] as ServerFrame;
@@ -96,12 +112,13 @@ async function seatAna(test: unknown, start = true): Promise<{ id: string; ana: 
 /**
  * Drives the table until `done` holds: Ana acts when she is due (randomLegal on her own view), the
  * alarm is run when a computer is due (it also fires by itself), the object is evicted every
- * EVICT_EVERY steps.
+ * `evictEvery` steps.
  */
 async function drive(
   id: string,
   ana: Client,
   done: (table: Table) => boolean,
+  evictEvery = EVICT_EVERY,
 ): Promise<{ table: Table; alarms: number; acts: number; evictions: number }> {
   const stub = stubOf(id);
   let rng: Rng = [20261017, 3, 5, 7];
@@ -109,7 +126,7 @@ async function drive(
   let acts = 0;
   let evictions = 0;
   for (let step = 0; step < STEP_CAP; step++) {
-    if (step % EVICT_EVERY === 0) {
+    if (step % evictEvery === 0) {
       await evictDurableObject(stub);
       evictions += 1;
     }
@@ -127,14 +144,18 @@ async function drive(
     let action: Action;
     [action, rng] = randomLegal(viewAt(ana, table.seq) as PlayerView, "bleu", rng);
     ana.send({ t: "act", base: table.seq, action });
-    await until(
-      () => viewAt(ana, table.seq + 1) !== null,
-      `Ana's events after her act at ${table.seq} (socket close ${ana.closeCode()}, last frames: ${JSON.stringify(
-        ana.frames
-          .slice(-3)
-          .map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]),
-      )})`,
-    );
+    try {
+      await until(
+        () => viewAt(ana, table.seq + 1) !== null,
+        `Ana's events after her act at ${table.seq}`,
+      );
+    } catch (error) {
+      // Read after the wait, not when it began: what the socket got meanwhile, where the table is.
+      const now = await readTable(id);
+      throw new Error(
+        `${String(error)} (action ${JSON.stringify(action)}, socket close ${ana.closeCode()}, table ${now.status} seq ${now.seq}, last frames ${lastFrames(ana)})`,
+      );
+    }
     acts += 1;
   }
   throw new Error("the table did not get there within the step cap");
@@ -164,7 +185,12 @@ describe("computer players in the Durable Object", () => {
       pace: "zero",
       levels: { jaune: 5, rouge: 5, vert: 5 },
     });
-    const run = await drive(id, ana, (table) => (table.game?.dealsPlayed ?? 0) >= 1);
+    const run = await drive(
+      id,
+      ana,
+      (table) => (table.game?.dealsPlayed ?? 0) >= 1,
+      CHAMPION_EVICT_EVERY,
+    );
     const log = await logOf(id);
     const champions = log.filter((row) => row.bot !== null);
     expect(champions.length).toBeGreaterThan(3);
