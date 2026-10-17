@@ -98,6 +98,7 @@ describe("tableSummary(id)", () => {
       () => new Response("<html>", { status: 200 }),
       () => json({ ...SUMMARY, status: "nope" }, 200),
       () => json({ ...SUMMARY, who: "hash" }, 200),
+      () => new Response("<html>Not found</html>", { status: 404 }),
     ]) {
       const { api } = deps(response);
       expect(await tableSummary(ID, api)).toBe("unknown");

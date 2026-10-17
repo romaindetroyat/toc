@@ -47,8 +47,9 @@ export async function createTable(deps: ApiDeps = browserApi): Promise<CreateRes
 }
 
 /**
- * GET /api/tables/:id: the public summary, "gone" when the table does not exist (404, or an id that
- * cannot be one), "unknown" when the answer cannot be had (offline, a server error, not a summary).
+ * GET /api/tables/:id: the public summary, "gone" when the table does not exist (the Worker's 404, or
+ * an id that cannot be one), "unknown" when the answer cannot be had (offline, a server error, another
+ * 404, not a summary).
  */
 export async function tableSummary(
   id: string,
@@ -66,7 +67,14 @@ export async function tableSummary(
   } catch {
     return "unknown";
   }
-  if (response.status === 404) return "gone";
+  const body = await bodyOf(response);
+  // Only the Worker's own 404 erases a table from the list: a 404 page from anything else on the way
+  // (a captive portal, a misrouted host) leaves the state unknown.
+  if (response.status === 404) {
+    const error =
+      typeof body === "object" && body !== null ? (body as { error?: unknown }).error : null;
+    return error === "not-found" ? "gone" : "unknown";
+  }
   if (response.status !== 200) return "unknown";
-  return parseTableSummary(await bodyOf(response)) ?? "unknown";
+  return parseTableSummary(body) ?? "unknown";
 }

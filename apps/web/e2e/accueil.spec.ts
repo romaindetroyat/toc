@@ -164,3 +164,40 @@ test("accueil : au clavier, la roue puis les deux choix", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#\/ordinateur$/);
 });
+
+test("accueil : vingt parties, la liste défile dans sa colonne, jamais la page", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const colours = ["bleu", "jaune", "rouge", "vert"];
+    localStorage.setItem(
+      "toc.tables.v1",
+      JSON.stringify(
+        Array.from({ length: 20 }, (_, n) => ({
+          id: `table${String(n).padStart(17, "0")}`,
+          seat: colours[n % 4],
+          joinedAt: 1_792_000_000_000 - n,
+        })),
+      ),
+    );
+  });
+  await page.route("**/api/tables/*", (route) => route.fulfill({ status: 503, body: "" }));
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.goto("/");
+    // The server cannot answer (503): every row stays in the list, its state unknown.
+    await expect(page.locator("[data-table-row]")).toHaveCount(20);
+    await expect(page.locator("[data-table-row]").first()).toHaveCSS("height", "64px");
+    expect(await scroll(page)).toEqual({ sideways: 0, down: 0 });
+    const list = await page.locator("[data-home] .list").evaluate((el) => ({
+      overflow: el.scrollHeight - el.clientHeight,
+      bottom: el.getBoundingClientRect().bottom,
+    }));
+    expect(list.overflow).toBeGreaterThan(0);
+    expect(list.bottom).toBeLessThanOrEqual(size.height);
+    await expect(tile(page, "table")).toBeInViewport({ ratio: 1 });
+  }
+});

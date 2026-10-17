@@ -29,6 +29,40 @@ export const table = {
     reload: "Recharger la page",
   },
   home: "Retour à l’accueil",
+  /** « Mes parties en cours » on the home (02-UI-SPEC « Home », rows 3 to 9). */
+  list: {
+    nobody: "Personne d’autre pour l’instant",
+    /** « Avec Bruno », « Avec Bruno et Céline », « Avec Bruno, Tornado et Céline ». */
+    with: (names: readonly string[]) =>
+      names.length < 2
+        ? `Avec ${names.join("")}`
+        : `Avec ${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`,
+    /** Line 1 before the summary has answered (checking, or offline). */
+    unknownPlayers: "Table en ligne",
+    status: {
+      lobby: "Salle d’attente",
+      playing: "En cours",
+      paused: "En pause",
+      pausedForYou: "En pause : on t’attend",
+      saved: "Sauvegardée",
+      finished: "Terminée",
+    },
+    checking: "Vérification…",
+    offline: "État inconnu (hors ligne)",
+    line2: (status: string, time: string) => `${status} · ${time}`,
+    /** The row's accessible name. */
+    rowLabel: (first: string, second: string, colour: string | null) =>
+      colour === null
+        ? `Reprendre la partie : ${first}, ${second}.`
+        : `Reprendre la partie : ${first}, ${second}. Ta couleur : ${colour}.`,
+    remove: "Retirer cette partie de la liste",
+    removed: "Partie retirée de la liste.",
+    restore: "Remettre",
+    expired: (n: number) =>
+      n === 1
+        ? "Une partie arrêtée depuis plus de 30 jours a été effacée."
+        : `${n} parties arrêtées depuis plus de 30 jours ont été effacées.`,
+  },
   create: "Créer une table en ligne",
   lobby: {
     heading: (creator: string) => `Table de ${creator}`,

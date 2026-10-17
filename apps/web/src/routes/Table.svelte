@@ -11,6 +11,7 @@
   import { connectTable, type TableConnection } from "../net/connection.svelte.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import { createRemoteGame } from "../net/remoteGame.ts";
+  import { rememberTable } from "../net/tables.ts";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SeatChip from "../ui/SeatChip.svelte";
   import Game from "./Game.svelte";
@@ -79,6 +80,14 @@
   const you = $derived(connection?.you ?? null);
   const info = $derived(connection?.table ?? null);
   const closeCode = $derived(connection?.closeCode ?? null);
+
+  // The first welcome adds the table to « Mes parties en cours » on this device, and a change of this
+  // device's seat updates it (D-06).
+  const seatNow = $derived(you === null ? undefined : you.seat);
+  $effect(() => {
+    if (seatNow === undefined) return;
+    rememberTable(storage, id, seatNow, Date.now());
+  });
 
   /** What the screen shows now. */
   const screenState = $derived.by(() => {

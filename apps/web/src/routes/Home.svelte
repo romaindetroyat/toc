@@ -6,6 +6,7 @@
   import ChoiceTile from "../ui/ChoiceTile.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import TableList from "../ui/TableList.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import { showToast } from "../ui/toast.svelte.ts";
 
@@ -163,10 +164,7 @@
     <section class="tables" aria-labelledby="tables-heading">
       <h2 id="tables-heading" class="t-heading">{accueil.home.listHeading}</h2>
       <div class="list">
-        <div class="empty" data-tables-empty>
-          <p class="empty-heading">{accueil.home.emptyHeading}</p>
-          <p class="empty-body">{accueil.home.emptyBody}</p>
-        </div>
+        <TableList {storage} />
       </div>
     </section>
   </div>
@@ -254,19 +252,6 @@
   .list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .empty p {
-    margin: 0;
-  }
-
-  .empty-heading {
-    font-weight: 700;
-  }
-
-  .empty-body {
-    color: var(--creme-attenuee);
   }
 
   /* Computer (BAR_QUERY): the header centred, two columns centred as a group 24 apart: the tiles and

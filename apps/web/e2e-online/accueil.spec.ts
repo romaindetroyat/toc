@@ -41,7 +41,7 @@ test("créer une table depuis l’accueil, la retrouver dans « Mes parties en c
   await expect(row(ana, id)).toContainText("Salle d’attente");
   await expect(row(ana, id).getByRole("link")).toHaveAttribute("href", `#/table/${id}`);
   await expect(row(ana, id).getByRole("link")).toHaveAccessibleName(
-    /^Reprendre la partie : Personne d’autre pour l’instant, Salle d’attente · .+\. Ta couleur : Bleu\.$/,
+    /^Reprendre la partie\s: Personne d’autre pour l’instant, Salle d’attente · .+\. Ta couleur\s: Bleu\.$/,
   );
 
   // Ben opens the link: the prompt says who invites him; he sits on Jaune.
@@ -102,7 +102,7 @@ test("hors ligne, « Créer une table en ligne » ne fait que le dire", async ({
   await context.setOffline(true);
   await page.locator('[data-home-choice="table"]').click();
   await expect(toast(page)).toContainText(
-    "Pas de connexion : la table en ligne a besoin d’Internet.",
+    "Pas de connexion\u00a0: la table en ligne a besoin d’Internet.",
   );
   await expect(page).toHaveURL(/#?\/?$/);
   await expect(page.locator("[data-name-prompt]")).toHaveCount(0);
