@@ -21,7 +21,7 @@ import {
   type Rng,
   viewFor,
 } from "@toc/engine";
-import type { ServerFrame } from "@toc/protocol";
+import { QUICK_MESSAGES, type QuickMessageId, type ServerFrame } from "@toc/protocol";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -217,6 +217,11 @@ describe("the leak oracle", () => {
       ),
     ).toEqual([]);
     expect(problems({ t: "error", code: "stale" })).toEqual([]);
+    // A quick message (plan 02-08) is a seat, an id and a time: nothing else.
+    expect(problems({ t: "chat", from: "jaune", msg: "aie", at: 3 })).toEqual([]);
+    expect(problems({ t: "chat", from: "jaune", msg: "aie", at: 3, name: "Ben" })).toContain(
+      "chat is not exactly { t, from, msg, at }: at,from,msg,name,t",
+    );
     expect(structuralProblems({ t: "secret" }, "bleu")).toEqual(["not a known server frame"]);
     expect(canonical({ b: 1, a: [{ d: 1, c: 2 }] })).toBe(canonical({ a: [{ c: 2, d: 1 }], b: 1 }));
     expect(sameJson({ b: 1, a: [{ d: 1, c: 2 }] }, { a: [{ c: 2, d: 1 }], b: 1 })).toBe(true);
@@ -263,6 +268,9 @@ const seen = {
   reclaims: 0,
   reclaimAccepts: 0,
   reclaimRefusals: 0,
+  /** Plan 02-08: quick messages sent by anyone (seated or not), and those refused for the pace. */
+  chats: 0,
+  rateLimited: 0,
 };
 
 /** A uniform integer in [0, n) from the walk's own stream. */
@@ -385,7 +393,7 @@ function playOne(config: {
     if (roll < config.noise) {
       // Noise: a disconnect, a reconnect, a stale act, an illegal act, a sit during the game, a tick.
       let kind: number;
-      [kind, rng] = pick(rng, 9);
+      [kind, rng] = pick(rng, 10);
       let who: number;
       [who, rng] = pick(rng, people.length);
       const person = people[who] as Person;
@@ -431,6 +439,17 @@ function playOne(config: {
               seen.reclaimAccepts += 1;
             } else seen.reclaimRefusals += 1;
           }
+        }
+        continue;
+      }
+      if (kind === 9) {
+        // A burst of quick messages (plan 02-08): the fourth within the window answers rate.
+        const msg = QUICK_MESSAGES[i % QUICK_MESSAGES.length] as QuickMessageId;
+        for (let burst = 0; burst < 4; burst++) {
+          run({ t: "client", who: person.who, frame: { t: "chat", msg } });
+          const seated = table.people.find((each) => each.who === person.who)?.seat != null;
+          if (seated && table.chat[table.chat.length - 1]?.at !== now) seen.rateLimited += 1;
+          seen.chats += 1;
         }
         continue;
       }

@@ -10,6 +10,7 @@ import {
   parseCreateTestOptions,
   parseServerFrame,
 } from "./frames.ts";
+import { QUICK_MESSAGES } from "./messages.ts";
 import { isTableId, normalizeName, toBase64Url } from "./names.ts";
 
 const TOKEN = "A".repeat(43);
@@ -211,6 +212,65 @@ describe("stop, leave and the reclaim of one's own seat (plan 02-07)", () => {
   });
 });
 
+describe("the quick messages (plan 02-08, D-07, D-13)", () => {
+  it("lists Romain's twelve ids in the order of the palette", () => {
+    expect(QUICK_MESSAGES).toEqual([
+      "bien-joue",
+      "aie",
+      "merci-partenaire",
+      "a-toi",
+      "pardon",
+      "presque",
+      "bravo",
+      "rire",
+      "applaudir",
+      "surpris",
+      "cheval",
+      "coeur",
+    ]);
+  });
+
+  it("accepts a chat frame with each of the twelve ids", () => {
+    for (const msg of QUICK_MESSAGES) {
+      expect(ok({ t: "chat", msg })).toEqual({ ok: true, frame: { t: "chat", msg } });
+    }
+  });
+
+  it("refuses free text, a number, an empty message, an extra key, a sender", () => {
+    for (const frame of [
+      { t: "chat" },
+      { t: "chat", msg: "Bien joué !" },
+      { t: "chat", msg: "salut" },
+      { t: "chat", msg: "" },
+      { t: "chat", msg: 3 },
+      { t: "chat", msg: ["aie"] },
+      { t: "chat", msg: "aie", from: "bleu" },
+      { t: "chat", msg: "aie", text: "coucou" },
+      { t: "chat", msg: "<b>aie</b>" },
+    ]) {
+      expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
+    }
+  });
+
+  it("reads a chat frame from a seat and the rate error, and refuses any other chat", () => {
+    const chat = { t: "chat", from: "jaune", msg: "coeur", at: 12_000 };
+    expect(parseServerFrame(JSON.stringify(chat))).toEqual(chat);
+    expect(parseServerFrame(JSON.stringify({ t: "error", code: "rate" }))).toEqual({
+      t: "error",
+      code: "rate",
+    });
+    for (const frame of [
+      { ...chat, from: "violet" },
+      { ...chat, from: null },
+      { ...chat, msg: "Bien joué !" },
+      { ...chat, at: -1 },
+      { t: "chat", from: "jaune", msg: "coeur" },
+    ]) {
+      expect(parseServerFrame(JSON.stringify(frame)), JSON.stringify(frame)).toBeNull();
+    }
+  });
+});
+
 describe("normalizeName", () => {
   it("trims, collapses spaces and applies NFC", () => {
     expect(normalizeName("  Ana ")).toBe("Ana");
@@ -273,6 +333,7 @@ describe("parseServerFrame", () => {
           table,
           view: null,
           seq: 0,
+          chat: [],
         }),
       )?.t,
     ).toBe("welcome");
@@ -324,6 +385,7 @@ describe("parseServerFrame", () => {
       view: null,
       seq: 4,
       regained: true,
+      chat: [],
     };
     expect(parseServerFrame(JSON.stringify(welcome))).toEqual(welcome);
     for (const code of ["paused", "refused"]) {
@@ -347,6 +409,28 @@ describe("parseServerFrame", () => {
     ).toBeNull();
     expect(parseServerFrame(JSON.stringify({ t: "reclaimRequest", seat: "jaune" }))).toBeNull();
     expect(parseServerFrame(JSON.stringify({ t: "reclaimResult", accepted: "no" }))).toBeNull();
+  });
+
+  it("reads a welcome with the kept messages, oldest first, at most 30", () => {
+    const entry = (i: number) => ({ from: "bleu", msg: "aie", at: 1_000 + i });
+    const welcome = (chat: unknown) =>
+      JSON.stringify({
+        t: "welcome",
+        you: { seat: "bleu", host: true },
+        table,
+        view: null,
+        seq: 0,
+        chat,
+      });
+    const kept = Array.from({ length: 30 }, (_, i) => entry(i));
+    expect(parseServerFrame(welcome(kept))).toMatchObject({ chat: kept });
+    expect(parseServerFrame(welcome([...kept, entry(30)]))).toBeNull();
+    expect(parseServerFrame(welcome([{ from: "bleu", msg: "salut", at: 1 }]))).toBeNull();
+    expect(
+      parseServerFrame(
+        JSON.stringify({ t: "welcome", you: { seat: null, host: false }, table, view: null, seq: 0 }),
+      ),
+    ).toBeNull();
   });
 
   it("refuses a frame of another shape", () => {
