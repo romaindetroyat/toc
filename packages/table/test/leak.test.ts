@@ -4,6 +4,9 @@
 // people) through reduce() with random disconnects and reconnects, stale and illegal acts, and runs
 // the oracle on every frame that leaves the reducer, as the Durable Object would send it (JSON text).
 
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { randomLegal } from "@toc/bots";
 import {
   type Action,
@@ -27,6 +30,7 @@ import {
   cardIdsIn,
   frameProblems,
   leakedCards,
+  sameJson,
   structuralProblems,
 } from "../src/oracle.ts";
 
@@ -61,6 +65,25 @@ function gameOf(table: Table): GameState {
 }
 
 describe("the leak oracle", () => {
+  it("is a test instrument: no server source imports it", () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return sources(path);
+        return entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts") ? [path] : [];
+      });
+    const files = [
+      ...sources(join(root, "packages", "table", "src")),
+      ...sources(join(root, "apps", "worker", "src")),
+    ];
+    expect(files.length).toBeGreaterThan(5);
+    const importers = files.filter((file) =>
+      /from\s+["'][^"']*oracle(\.ts)?["']/.test(readFileSync(file, "utf8")),
+    );
+    expect(importers).toEqual([]);
+  });
+
   it("reads card ids in a text, and nothing else", () => {
     expect(cardIdsIn('{"hand":["1S","13H","10D","7C"],"pawn":"bleu1","cell":13}')).toEqual([
       "1S",
@@ -188,6 +211,9 @@ describe("the leak oracle", () => {
     expect(problems({ t: "error", code: "stale" })).toEqual([]);
     expect(structuralProblems({ t: "secret" }, "bleu")).toEqual(["not a known server frame"]);
     expect(canonical({ b: 1, a: [{ d: 1, c: 2 }] })).toBe(canonical({ a: [{ c: 2, d: 1 }], b: 1 }));
+    expect(sameJson({ b: 1, a: [{ d: 1, c: 2 }] }, { a: [{ c: 2, d: 1 }], b: 1 })).toBe(true);
+    expect(sameJson({ a: [1, 2] }, { a: [2, 1] })).toBe(false);
+    expect(sameJson({ a: 1 }, { a: 1, b: null })).toBe(false);
   });
 });
 
@@ -260,7 +286,7 @@ function step(
         expect(received.view).toBeNull();
         seen.unseatedWelcomes += 1;
       } else {
-        expect(canonical(received.view)).toBe(canonical(viewFor(after, seat)));
+        expect(sameJson(received.view, viewFor(after, seat))).toBe(true);
       }
     }
   }
@@ -336,7 +362,8 @@ function playOne(config: {
         run({ t: "hello", who: person.who, name: person.name });
         if (absent.delete(person.who) && person.seat !== null) seen.reconnects += 1;
       } else if (kind === 2 && person.seat !== null) {
-        const [action] = randomLegal(viewFor(game, person.seat), person.seat, rng);
+        // An act on an older base (a double tap, a replay after a reconnect): refused before apply.
+        const action: Action = { t: "discard" };
         run({ t: "client", who: person.who, frame: { t: "act", base: table.seq - 1, action } });
         seen.staleActs += 1;
       } else if (kind === 3) {
@@ -391,7 +418,7 @@ describe("no frame carries a hidden card (pure core, random games with reconnect
       ),
       { numRuns: GAMES, seed: 20261017, endOnFailure: true },
     );
-    if (process.env.TOC_LEAK_STATS === "1") console.info(JSON.stringify(seen));
+    if (process.env.TOC_LEAK_STATS === "1") process.stdout.write(`${JSON.stringify(seen)}\n`);
     expect(seen.games).toBeGreaterThanOrEqual(GAMES);
     for (const [key, count] of Object.entries(seen)) {
       expect(count, key).toBeGreaterThan(0);
