@@ -4,7 +4,7 @@
 
 import { COLORS, type Color, eventsFor, type GameEvent, viewFor } from "@toc/engine";
 import type { EventsFrame, SeatPublic, TableFrame, TablePublic, WelcomeFrame } from "@toc/protocol";
-import { dueBot, type Person, type Table } from "./table.ts";
+import type { Person, Table } from "./table.ts";
 
 export function personOf(table: Table, who: string): Person | undefined {
   return table.people.find((person) => person.who === who);
@@ -37,7 +37,7 @@ export function tablePublic(table: Table): TablePublic {
     host: creator?.seat ?? null,
     creatorName: creator?.name ?? null,
     gameNo: table.gameNo,
-    thinking: table.deadlines.bot === undefined ? null : dueBot(table),
+    thinking: table.thinking?.seat ?? null,
   };
 }
 

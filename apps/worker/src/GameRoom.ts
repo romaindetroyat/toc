@@ -139,10 +139,12 @@ export class GameRoom extends DurableObject<Env> {
     this.left(ws);
   }
 
-  async alarm(): Promise<void> {
+  async alarm(alarmInfo?: AlarmInvocationInfo): Promise<void> {
     // The alarm that fired is no longer set.
     this.armed = null;
-    this.run({ t: "tick" });
+    // A retry follows a failed invocation (over the Free plan's CPU limit, for instance): a computer
+    // decision still pending is then made at level 1, so the table never freezes (D-11).
+    this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
   }
 
   /** A socket closed: the person is gone when no other open socket is theirs. */

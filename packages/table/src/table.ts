@@ -4,7 +4,7 @@
 // A person is known by `who`, the SHA-256 of the table id and the device token, computed by the
 // Durable Object: the token itself never reaches the table, and `who` never leaves the server.
 
-import { type BotLevel, DEFAULT_BOT_LEVEL } from "@toc/bots";
+import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
 import { COLORS, type Color, type GameState, type Rng } from "@toc/engine";
 
 export type Person = {
@@ -24,6 +24,34 @@ export type Seat =
 export type TestOptions = {
   /** `zero`: the computer players act at once instead of waiting for the animations. */
   pace: "zero" | "normal";
+  /** The strength of computer seats, until the waiting room's picker exists (plan 02-05). */
+  levels?: Partial<Record<Color, BotLevel>>;
+};
+
+/**
+ * The decision of the computer player that is due (plan 02-03, packages/table/src/bots.ts), kept with
+ * the table so it survives eviction: decided first, played when its think time is over. Server-only:
+ * never put in a frame (the checkpoint holds the bot's own candidate actions).
+ */
+export type PendingThink = {
+  seat: Color;
+  /** The seq it was due at in play; "exchange" while it gives (seq moves with every give). */
+  base: number | "exchange";
+  level: BotLevel;
+  /** When it became due (the commit that made it due). */
+  dueAt: number;
+  /** The animation of the batch that made it due, in ms (0 under the zero test pace). */
+  waitMs: number;
+  /** The Champion's search so far (null before its first slice and for every other think). */
+  checkpoint: ThinkerCheckpoint;
+  /** Ticks spent on the decision so far. */
+  slices: number;
+  /** The decision, once fixed. */
+  thought: Thought | null;
+  /** When the decision is played, once fixed. */
+  playAt: number | null;
+  /** The decision was made at level 1 because the alarm was retried (D-11). */
+  fallback: boolean;
 };
 
 export type Table = {
@@ -43,8 +71,10 @@ export type Table = {
   gameNo: number;
   /** The computer players' random stream: first dealer, horse names, then their choices. */
   botRng: Rng;
-  /** When the next computer action is due, for the game at `seq`. */
+  /** When the computer player due must next be ticked (decide, a slice, or play), for `seq`. */
   deadlines: { bot?: { at: number; seq: number } };
+  /** The computer player due and its decision, or null (its seat is TablePublic.thinking). */
+  thinking: PendingThink | null;
   test: TestOptions | null;
 };
 
@@ -68,23 +98,27 @@ export function createTable(options: {
       vert: { kind: "free" },
     },
     levels: {
-      bleu: DEFAULT_BOT_LEVEL,
-      jaune: DEFAULT_BOT_LEVEL,
-      rouge: DEFAULT_BOT_LEVEL,
-      vert: DEFAULT_BOT_LEVEL,
+      bleu: options.test?.levels?.bleu ?? DEFAULT_BOT_LEVEL,
+      jaune: options.test?.levels?.jaune ?? DEFAULT_BOT_LEVEL,
+      rouge: options.test?.levels?.rouge ?? DEFAULT_BOT_LEVEL,
+      vert: options.test?.levels?.vert ?? DEFAULT_BOT_LEVEL,
     },
     game: null,
     seq: 0,
     gameNo: 0,
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: {},
+    thinking: null,
     test: options.test ?? null,
   };
 }
 
 /** A deep copy: the table is plain JSON (it is stored as such), so the reducer never edits its input. */
 export function copyTable(table: Table): Table {
-  return JSON.parse(JSON.stringify(table)) as Table;
+  const copy = JSON.parse(JSON.stringify(table)) as Table;
+  // A snapshot written before plan 02-03 has no pending think.
+  copy.thinking ??= null;
+  return copy;
 }
 
 /** The earliest deadline of the table, or null: the Durable Object arms its one alarm at it. */

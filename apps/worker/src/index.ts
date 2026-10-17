@@ -5,7 +5,7 @@
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
 // handleRequest answers null for what is not its own, so both deploy entries can share it.
 
-import { isTableId, toBase64Url } from "@toc/protocol";
+import { isTableId, parseCreateTestOptions, toBase64Url } from "@toc/protocol";
 import type { TestOptions } from "@toc/table";
 import { GameRoom } from "./GameRoom.ts";
 
@@ -30,13 +30,10 @@ function sameOrigin(request: Request, url: URL): boolean {
   return origin === null || origin === url.origin;
 }
 
-/** The test options of a creation body, honoured only in test mode. */
+/** The test options of a creation body (pace, computer levels), honoured only in test mode. */
 function testOptions(body: unknown, env: Env): TestOptions | null {
-  if (env.TOC_TEST_MODE !== "1" || typeof body !== "object" || body === null) return null;
-  const test = (body as { test?: unknown }).test;
-  if (typeof test !== "object" || test === null) return null;
-  const pace = (test as { pace?: unknown }).pace;
-  return pace === "zero" || pace === "normal" ? { pace } : null;
+  if (env.TOC_TEST_MODE !== "1") return null;
+  return parseCreateTestOptions(body);
 }
 
 async function createTableRoute(request: Request, env: Env, url: URL): Promise<Response> {

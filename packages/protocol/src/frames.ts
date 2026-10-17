@@ -203,3 +203,35 @@ export function parseServerFrame(raw: unknown): ServerFrame | null {
   const parsed = serverFrameSchema.safeParse(data);
   return parsed.success ? (parsed.data as ServerFrame) : null;
 }
+
+// --- Table creation (POST /api/tables) ---
+
+/**
+ * The test options of a creation body, honoured by the Worker only under TOC_TEST_MODE=1 (T-02-07):
+ * `pace` "zero" makes the computers act at once; `levels` sets the strength of computer seats until the
+ * waiting room's picker exists (plan 02-05).
+ */
+export type CreateTestOptions = {
+  pace: "zero" | "normal";
+  levels?: Partial<Record<Color, Level>>;
+};
+
+const testLevel = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
+const createTestSchema = z.strictObject({
+  pace: z.enum(["zero", "normal"]),
+  levels: z.optional(
+    z.strictObject({
+      bleu: z.optional(testLevel),
+      jaune: z.optional(testLevel),
+      rouge: z.optional(testLevel),
+      vert: z.optional(testLevel),
+    }),
+  ),
+});
+
+/** The test options of a parsed creation body, or null when absent or malformed. */
+export function parseCreateTestOptions(body: unknown): CreateTestOptions | null {
+  if (typeof body !== "object" || body === null) return null;
+  const parsed = createTestSchema.safeParse((body as { test?: unknown }).test);
+  return parsed.success ? (parsed.data as CreateTestOptions) : null;
+}

@@ -7,8 +7,7 @@
 // The engine's apply() is the only judge of a move (NET-01): the seat comes from the person, never from
 // the frame, and a base that is not the table's seq is refused as stale (Pitfall 3).
 
-import { eventsDuration } from "@toc/board";
-import { BOT_NAMES, chooseAction } from "@toc/bots";
+import { BOT_NAMES, type BotLevel } from "@toc/bots";
 import {
   type Action,
   apply,
@@ -21,19 +20,19 @@ import {
   type Rng,
   shuffle,
   startGame,
-  viewFor,
 } from "@toc/engine";
 import type { ActFrame, ErrorCode, ServerFrame, SitFrame, StartFrame } from "@toc/protocol";
+import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
 import { eventsFrameFor, personOf, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
-import { copyTable, dueBot, type Table } from "./table.ts";
+import { copyTable, type Table } from "./table.ts";
 
 export type Command =
   /** A socket said hello: `who` is the hash of the table id and its device token. */
   | { t: "hello"; who: string; name: string }
   /** The last socket of `who` closed. */
   | { t: "gone"; who: string }
-  /** The alarm fired. */
-  | { t: "tick" }
+  /** The alarm fired; `retry` when the runtime retries it after a failed invocation (D-11). */
+  | { t: "tick"; retry: boolean }
   /** A frame of a person who said hello. */
   | { t: "client"; who: string; frame: SitFrame | StartFrame | ActFrame };
 
@@ -45,6 +44,9 @@ export type Ctx = {
 
 export type Out = { to: string; frame: ServerFrame };
 
+/** How a computer player's move was decided: its level, the ticks it took, a retry's fallback. */
+export type BotInfo = { level: BotLevel; slices: number; fallback: boolean };
+
 /** One accepted change of the game, for the server-only event log. */
 export type LogEntry = {
   seq: number;
@@ -52,6 +54,8 @@ export type LogEntry = {
   seat: Color | null;
   action: Action | null;
   events: GameEvent[];
+  /** Present for a computer player's move. */
+  bot?: BotInfo;
 };
 
 export type Reduced = { table: Table; out: Out[]; log: LogEntry[] };
@@ -74,17 +78,6 @@ function publicChanges(before: Table, after: Table, skip: ReadonlySet<string>): 
     .map((person) => ({ to: person.who, frame }));
 }
 
-/** Arms the computer deadline for the game at `table.seq`, or clears it when no computer is due. */
-function schedule(table: Table, events: readonly GameEvent[], now: number): void {
-  const bot = dueBot(table);
-  if (bot === null) {
-    delete table.deadlines.bot;
-    return;
-  }
-  const wait = table.test?.pace === "zero" ? 0 : eventsDuration(events, "normal");
-  table.deadlines.bot = { at: now + wait, seq: table.seq };
-}
-
 /** An accepted change of the game: the new state, the log line, one events frame per seated person. */
 function commitPlay(
   before: Table,
@@ -93,20 +86,27 @@ function commitPlay(
   seat: Color | null,
   action: Action | null,
   now: number,
+  bot?: BotInfo,
 ): Reduced {
   next.game = played.state;
   next.seq += 1;
   next.lastActivity = now;
-  schedule(next, played.events, now);
+  scheduleBot(next, played.events, now);
   const out: Out[] = [];
   for (const person of next.people) {
     if (person.seat === null) continue;
     out.push({ to: person.who, frame: eventsFrameFor(next, played.events, person.seat) });
   }
   out.push(...publicChanges(before, next, new Set()));
-  const log: LogEntry[] = [
-    { seq: next.seq, gameNo: next.gameNo, seat, action, events: played.events },
-  ];
+  const entry: LogEntry = {
+    seq: next.seq,
+    gameNo: next.gameNo,
+    seat,
+    action,
+    events: played.events,
+  };
+  if (bot !== undefined) entry.bot = bot;
+  const log: LogEntry[] = [entry];
   return { table: next, out, log };
 }
 
@@ -199,20 +199,32 @@ function act(table: Table, who: string, frame: ActFrame, now: number): Reduced {
   return commitPlay(table, copyTable(table), played, seat, frame.action, now);
 }
 
-function tick(table: Table, now: number): Reduced {
+function tick(table: Table, now: number, retry: boolean): Reduced {
   const deadline = table.deadlines.bot;
   if (deadline === undefined || now < deadline.at) return unchanged(table);
-  const bot = dueBot(table);
-  if (deadline.seq !== table.seq || bot === null || table.game === null) {
-    // A deadline for another state (alarms come at least once): re-armed for this one, nothing played.
-    const next = copyTable(table);
-    schedule(next, [], now);
+  const next = copyTable(table);
+  const pending = next.thinking;
+  if (deadline.seq !== next.seq || pending === null || !stillDue(next, pending)) {
+    // A deadline for another state (alarms come at least once): recomputed, nothing played.
+    if (pending !== null && !stillDue(next, pending)) next.thinking = null;
+    scheduleBot(next, [], now);
     return { table: next, out: publicChanges(table, next, new Set()), log: [] };
   }
-  const thought = chooseAction(viewFor(table.game, bot), bot, table.levels[bot], table.botRng);
-  const next = copyTable(table);
-  next.botRng = thought.rng;
-  return commitPlay(table, next, apply(table.game, bot, thought.action), bot, thought.action, now);
+  const thought = thinkTick(next, now, retry);
+  const game = next.game;
+  if (thought === null || game === null) {
+    // Decided or one slice further: the deadline moves to the next slice or the play time.
+    scheduleBot(next, [], now);
+    return { table: next, out: publicChanges(table, next, new Set()), log: [] };
+  }
+  const seat = pending.seat;
+  const bot: BotInfo = {
+    level: pending.fallback ? FALLBACK_LEVEL : pending.level,
+    slices: pending.slices,
+    fallback: pending.fallback,
+  };
+  next.thinking = null;
+  return commitPlay(table, next, apply(game, seat, thought.action), seat, thought.action, now, bot);
 }
 
 export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
@@ -222,7 +234,7 @@ export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
     case "gone":
       return gone(table, command.who);
     case "tick":
-      return tick(table, ctx.now);
+      return tick(table, ctx.now, command.retry);
     case "client": {
       if (personOf(table, command.who) === undefined) return unchanged(table);
       const frame = command.frame;

@@ -21,7 +21,8 @@ export function createSchema(sql: SqlStorage): void {
        seat TEXT,
        action TEXT,
        events TEXT NOT NULL,
-       at INTEGER NOT NULL
+       at INTEGER NOT NULL,
+       bot TEXT
      )`,
   );
 }
@@ -40,23 +41,34 @@ export function load(sql: SqlStorage): Table | null {
   return row === undefined ? null : (JSON.parse(String(row.table_json)) as Table);
 }
 
-/** The new snapshot and the log lines of one reduce, in one synchronous batch. */
-export function commit(sql: SqlStorage, table: Table, log: readonly LogEntry[], at: number): void {
-  sql.exec(
+/**
+ * The new snapshot and the log lines of one reduce, in one synchronous batch. Returns the rows written
+ * (Free plan: 100 000 a day; a computer's level, slices and fallback go with its log line).
+ */
+export function commit(
+  sql: SqlStorage,
+  table: Table,
+  log: readonly LogEntry[],
+  at: number,
+): number {
+  let rows = 0;
+  rows += sql.exec(
     `INSERT INTO snapshot (id, seq, table_json) VALUES (1, ?, ?)
      ON CONFLICT (id) DO UPDATE SET seq = excluded.seq, table_json = excluded.table_json`,
     table.seq,
     JSON.stringify(table),
-  );
+  ).rowsWritten;
   for (const entry of log) {
-    sql.exec(
-      "INSERT OR REPLACE INTO events (seq, game_no, seat, action, events, at) VALUES (?, ?, ?, ?, ?, ?)",
+    rows += sql.exec(
+      "INSERT OR REPLACE INTO events (seq, game_no, seat, action, events, at, bot) VALUES (?, ?, ?, ?, ?, ?, ?)",
       entry.seq,
       entry.gameNo,
       entry.seat,
       entry.action === null ? null : JSON.stringify(entry.action),
       JSON.stringify(entry.events),
       at,
-    );
+      entry.bot === undefined ? null : JSON.stringify(entry.bot),
+    ).rowsWritten;
   }
+  return rows;
 }
