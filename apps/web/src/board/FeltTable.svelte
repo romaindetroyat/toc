@@ -184,17 +184,28 @@
       stroke={CREAM}
       stroke-width={2 * px}
     />
+    <!-- « 1 » and a raised « er » as two texts meeting at the pill's middle (« 1 » ends there, « er »
+         starts there): no tspan with baseline-shift, which WebKit drew over the « 1 » (plan 02-06b). -->
     <text
       class="disc"
-      x={token.at[0]}
-      y={token.at[1]}
+      x={token.at[0] - 0.5 * px}
+      y={token.at[1] + 1 * px}
       font-size={15 * px}
-      text-anchor="middle"
+      text-anchor="end"
       dominant-baseline="central"
       fill={CREAM}
+      data-starter-part="1">1</text
     >
-      1<tspan font-size={10 * px} baseline-shift="super">er</tspan>
-    </text>
+    <text
+      class="disc"
+      x={token.at[0] + 0.5 * px}
+      y={token.at[1] - 3.5 * px}
+      font-size={10 * px}
+      text-anchor="start"
+      dominant-baseline="central"
+      fill={CREAM}
+      data-starter-part="er">er</text
+    >
   </g>
 
   <!-- The dealer disc « D », at the top-right corner (on the screen) of the dealer's card place. -->

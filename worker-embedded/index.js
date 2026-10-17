@@ -1,5 +1,9 @@
 // Worker serving the built app from files bundled into the script (see wrangler.embarque.jsonc).
+// The table server (apps/worker: /api/*, /ws/*, the GameRoom Durable Object) answers first.
+import { GameRoom, handleRequest } from "../apps/worker/src/index.ts";
 import files from "./manifest.js";
+
+export { GameRoom };
 
 const TYPES = {
   html: "text/html; charset=utf-8",
@@ -19,7 +23,9 @@ const TYPES = {
 };
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
+    const served = await handleRequest(request, env);
+    if (served !== null) return served;
     const { pathname } = new URL(request.url);
     let path = pathname === "/" ? "/index.html" : pathname;
     if (!(path in files)) {

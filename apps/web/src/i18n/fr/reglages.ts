@@ -17,4 +17,18 @@ export const reglages = {
 
   testSounds: "Tester les sons",
   credits: "Crédits et licences",
+  /** At an online table (plan 02-05): leave it, after a confirmation. */
+  leaveTable: "Quitter la table",
+  /** The chef de table's « Arrêter la partie » in an online game (plan 02-07). */
+  stopGame: "Arrêter la partie",
+  /**
+   * The table-wide « Avance rapide » (plan 02-10b): the chef de table switches it, the others see it
+   * disabled with the chef de table's name.
+   */
+  tableFast: "Avance rapide",
+  tableFastHelper:
+    "Pour toute la table : les ordinateurs jouent presque aussitôt et les coups vont plus vite.",
+  tableFastOthers: (host: string) => `Seul le chef de table, ${host}, peut la changer.`,
+  /** The gear's accessible name while the table is fast. */
+  openLabelFast: "Réglages (avance rapide pour toute la table)",
 } as const;

@@ -13,8 +13,8 @@ Le parcours part du cœur du jeu. On écrit d'abord les règles maison, que Roma
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Une vraie partie sur un appareil** *(close le 2026-10-15 à la demande de Romain, « Close, essais restants notés » ; essais restants dans 01-UAT.md)* - Règles validées, moteur, plateau galet, cavaliers animés et bruitages, partie complète contre l'ordinateur
-- [ ] **Phase 2: Jouer en ligne entre proches** - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, chat, revanche et reprise
-- [ ] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
+- [x] **Phase 2: Jouer en ligne entre proches** *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 02-UAT.md)* - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, messages rapides, revanche et reprise
+- [x] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 03-UAT.md)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
 - [ ] **Phase 4: Comptes, amis et application installable** - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
 - [ ] **Phase 5: Suivi, apprentissage et finition** - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
 
@@ -200,9 +200,47 @@ Plans:
   2. Aucun joueur ne peut connaître la main d'un autre, même en examinant les messages reçus par son appareil, y compris après une reconnexion. Les cartes jouées restent visibles de tous.
   3. Un joueur qui recharge la page ou perd le réseau retrouve la partie dans son état exact. Pendant son absence, la partie est en pause, et tous les joueurs le voient. Passé le délai, le créateur de la table choisit entre trois options : attendre encore, confier la place à l'ordinateur (le joueur la récupère à son retour) ou sauvegarder la partie.
   4. Le créateur de la table peut arrêter une partie à tout moment. Les joueurs la reprennent plus tard, même plusieurs jours après, dans l'état exact où elle était : mains, donne en cours, position des pions, joueur dont c'est le tour.
-  5. Les joueurs d'une table discutent par chat texte pendant la partie. À la fin, l'équipe gagnante est annoncée à tous, et la table peut enchaîner une revanche avec les mêmes joueurs.
+  5. Les joueurs d'une table échangent des messages rapides (phrases et émojis, sans clavier) pendant la partie. À la fin, l'équipe gagnante est annoncée à tous, et la table peut enchaîner une revanche avec les mêmes joueurs.
 
-**Plans**: TBD
+**Plans:** 14/14 plans executed (the plans run one after the other on the main tree; each runs only the Playwright specs it touches; 02-01 starts with Romain's approval of the five new packages; 02-10 runs everything, plays a game between four browsers, creates the D1 database if the token allows it, deploys to https://toc.romaindetroyat.workers.dev and writes 02-UAT.md)
+
+Plans:
+**Wave 1**
+- [x] 02-01-PLAN.md — Traceur : deux navigateurs à la même table par son lien, chaque coup validé par le serveur, chacun ne voyant que sa main
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 02-02-PLAN.md — Aucune main ne fuit, même après une reconnexion, et la construction du déploiement vérifiée
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 02-03-PLAN.md — Les ordinateurs de la table en ligne : rythme naturel et Champion en tranches (offre gratuite)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 02-04-PLAN.md — L'accueil : jouer contre l'ordinateur ou créer une table, le prénom, « Mes parties en cours »
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 02-05-PLAN.md — La salle d'attente et l'invitation (lien, code QR)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 02-06-PLAN.md — Un joueur s'absente : la pause pour tous, puis le choix du chef de table
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 02-07-PLAN.md — Recharger, perdre le réseau, arrêter et reprendre des jours après, « C'est moi »
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 02-08-PLAN.md — Les messages rapides
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 02-09-PLAN.md — La fin de partie pour tous, la revanche, et la trace de chaque partie (D1)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 02-10-PLAN.md — Vérification finale, une partie à quatre navigateurs, la mise en ligne et la recette de Romain
+
+**Additifs** *(demandes de Romain du 2026-10-17)*
+- [x] 02-04b-PLAN.md — Le logo de Romain comme icône de l'application et sur l'accueil
+- [x] 02-06b-PLAN.md — La main du téléphone en une colonne droite, hors de l'encoche, et un « 1er » net
+- [x] 02-06c-PLAN.md — Des cartes de nouveau grandes sur le téléphone, avec un plateau un peu réduit
+- [x] 02-10b-PLAN.md — « Avance rapide » pour toute la table, réglée par le chef de table
+
 **UI hint**: yes
 
 ### Phase 3: L'ordinateur à la force choisie
@@ -292,7 +330,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
-| 2. Jouer en ligne entre proches | 0/TBD | Not started | - |
-| 3. L'ordinateur à la force choisie | 11/11 | In Progress | - |
+| 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
+| 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |

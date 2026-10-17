@@ -1,7 +1,8 @@
 {
   // Variante de wrangler.jsonc pour les environnements où l'envoi des ressources statiques
   // est bloqué (conteneur cloud derrière un proxy qui remplace le jeton d'envoi).
-  // Même Worker « toc », mais les fichiers du build sont embarqués dans le script.
+  // Même Worker « toc », mais les fichiers du build sont embarqués dans le script ; le point
+  // d'entrée essaie d'abord le serveur de apps/worker (/api/*, /ws/*, la table de jeu).
   //   pnpm --filter @toc/web build && node tools/build-embedded-worker.mjs
   //   wrangler deploy -c wrangler.embarque.jsonc
   "$schema": "./node_modules/wrangler/config-schema.json",
@@ -9,8 +10,19 @@
   "main": "./worker-embedded/index.js",
   "compatibility_date": "2026-10-01",
   "find_additional_modules": false,
+  // Les globs sont testés sur le chemin importé par worker-embedded/manifest.js
+  // (« ../apps/web/dist/... ») et « * » y franchit les « / » : seuls les scripts du build web
+  // deviennent des modules texte ; zod et le serveur restent dans index.js
+  // (tools/check-bundle.mjs le vérifie sur la sortie de --dry-run).
   "rules": [
-    { "type": "Text", "globs": ["**/dist/**/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
+    { "type": "Text", "globs": ["**/apps/web/dist/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
     { "type": "Data", "globs": ["**/*.png", "**/*.webp", "**/*.woff2", "**/*.ico", "**/*.mp3", "**/*.m4a", "**/*.ogg", "**/*.wav"], "fallthrough": false }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "toc", "database_id": "a5700309-470a-469c-a76a-d3e0c5774335", "migrations_dir": "apps/worker/migrations" }
   ]
 }

@@ -21,6 +21,11 @@ export type Settings = {
   reduceMotion: boolean;
   /** Fast-forward the bots. */
   fast: boolean;
+  /**
+   * The table-wide « Avance rapide » this device's chef de table chose last (plan 02-10b): a table
+   * this device creates starts with it.
+   */
+  tableFast: boolean;
   lastColor: Color;
   /** The strength of each computer seat, remembered per role (D-03). */
   botLevels: BotLevels;
@@ -31,6 +36,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   sfx: true,
   reduceMotion: false,
   fast: false,
+  tableFast: false,
   lastColor: "bleu",
   botLevels: { partner: DEFAULT_BOT_LEVEL, left: DEFAULT_BOT_LEVEL, right: DEFAULT_BOT_LEVEL },
 };
@@ -79,6 +85,7 @@ export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Sett
     sfx: bool(own("sfx"), DEFAULT_SETTINGS.sfx),
     reduceMotion: bool(own("reduceMotion"), prefersReducedMotion),
     fast: bool(own("fast"), DEFAULT_SETTINGS.fast),
+    tableFast: bool(own("tableFast"), DEFAULT_SETTINGS.tableFast),
     lastColor: colour(own("lastColor"), DEFAULT_SETTINGS.lastColor),
     botLevels: levels(own("botLevels")),
   };

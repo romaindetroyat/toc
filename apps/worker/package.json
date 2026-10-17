@@ -1,0 +1,19 @@
+{
+  "name": "@toc/worker",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "types": "wrangler types -c ../../wrangler.jsonc ./worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@toc/engine": "workspace:*",
+    "@toc/protocol": "workspace:*",
+    "@toc/table": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.4",
+    "@toc/bots": "workspace:*"
+  }
+}

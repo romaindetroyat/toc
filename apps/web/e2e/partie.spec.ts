@@ -288,7 +288,7 @@ test("fin de partie : « Victoire ! », les chiffres, « Changer de couleur » r
   }
 
   await page.getByRole("button", { name: "Changer de couleur" }).click();
-  await expect(page).toHaveURL(/#\/$/);
+  await expect(page).toHaveURL(/#\/ordinateur$/);
   await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
 });
 

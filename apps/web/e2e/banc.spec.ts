@@ -172,7 +172,7 @@ test.describe("banc : la mesure sur cet appareil", () => {
   }) => {
     const urls: string[] = [];
     page.on("request", (request) => urls.push(request.url()));
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await expect(page.getByRole("button", { name: /Jouer la partie/ })).toBeVisible();
     await page.waitForLoadState("networkidle");
     expect(urls.filter((url) => url.includes("Bench"))).toEqual([]);

@@ -1,11 +1,17 @@
 <script lang="ts">
   import { type Color, firstPlayer, PARTNER, type RenderState } from "@toc/engine";
+  import type { TablePublic } from "@toc/protocol";
   import { game } from "../i18n/fr/game.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings } from "../settings/store.svelte.ts";
   import InfoBar from "./InfoBar.svelte";
   import SeatChip from "./SeatChip.svelte";
   import SettingsButton from "./SettingsButton.svelte";
+  import Icon from "./Icon.svelte";
+  import MessagesButton from "./MessagesButton.svelte";
   import Sheet from "./Sheet.svelte";
+  import TablePlayers from "./TablePlayers.svelte";
+  import type { TableSpeed } from "./tableSpeed.ts";
 
   type Props = {
     render: RenderState;
@@ -25,8 +31,24 @@
     gear?: boolean;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
+    /** An online game (plan 02-07): the confirmed « Quitter la table » of « Réglages ». */
+    onleave?: () => void;
+    /** An online game, the chef de table: the confirmed « Arrêter la partie ». */
+    onstop?: () => void;
     /** The computer player thinking about its move (session.thinking), if any. */
     thinking?: Color | null;
+    /**
+     * An online table (plan 02-06): « À la table », the players list, as a section of the pill's
+     * sheet (phone) or behind a 44 px button on a fourth row of the column form (computer).
+     */
+    players?: { table: TablePublic; me: Color };
+    /**
+     * An online game (plan 02-08): « Messages » on the column form's fourth row, next to « À la
+     * table »; opens « Messages rapides » (the key « M » does too).
+     */
+    onmessages?: (opener: HTMLElement) => void;
+    /** An online table (plan 02-10b): the table-wide « Avance rapide » of its gear. */
+    tableSpeed?: TableSpeed;
   };
 
   let {
@@ -36,10 +58,17 @@
     form = "row",
     gear = true,
     onabandon,
+    onleave,
+    onstop,
     thinking = null,
+    players,
+    onmessages,
+    tableSpeed,
   }: Props = $props();
 
   let infoOpen = $state(false);
+  let playersOpen = $state(false);
+  let playersButton = $state<HTMLButtonElement | null>(null);
   let pill = $state<HTMLButtonElement | null>(null);
 
   const partner = $derived(PARTNER[human]);
@@ -118,6 +147,12 @@
       <div class="sheet-info" data-info-sheet>
         <InfoBar {render} {human} {names} {thinking} form="column" gear={false} />
       </div>
+      {#if players !== undefined}
+        <section class="players-section" aria-labelledby="players-heading" data-players-section>
+          <h3 id="players-heading" class="players-heading">{tableCopy.game.players.title}</h3>
+          <TablePlayers table={players.table} me={players.me} />
+        </section>
+      {/if}
     </Sheet>
   {/if}
 {:else}
@@ -147,8 +182,14 @@
           {#if ownTurn}
             <span class="name">{game.info.ownTurn}</span>
           {:else}
-            <span class="prefix" class:respire-texte={breathing}>{game.info.turnPrefix(turnName)}</span
-            ><span class="name" class:respire-texte={breathing}>{turnName}</span>
+            <!-- Prefix and name in one box: the row's gap never splits « Tour d’Ana ». -->
+            <span class="who"
+              ><span class="prefix" class:respire-texte={breathing}
+                >{game.info.turnPrefix(turnName)}</span
+              ><span class="name other" class:respire-texte={breathing} title={turnName}
+                >{turnName}</span
+              ></span
+            >
             {#if breathing}
               <span class="respire-mark" aria-hidden="true">…</span>
             {/if}
@@ -179,10 +220,48 @@
 
     {#if gear}
       <div class="gear" data-settings-slot>
-        <SettingsButton {onabandon} />
+        <SettingsButton
+          {onabandon}
+          online={onleave !== undefined}
+          inGame={onleave !== undefined}
+          {onleave}
+          {onstop}
+          {tableSpeed}
+        />
+      </div>
+    {/if}
+
+    {#if form === "column" && gear && players !== undefined}
+      <!-- The computer's fourth row: « À la table » (plan 02-06), then « Messages » (plan 02-08). -->
+      <div class="table-row" data-table-row-buttons>
+        <button
+          type="button"
+          class="round"
+          aria-label={tableCopy.game.players.title}
+          title={tableCopy.game.players.title}
+          aria-haspopup="dialog"
+          data-players-button
+          bind:this={playersButton}
+          onclick={() => (playersOpen = true)}
+        >
+          <Icon name="users" size={24} />
+        </button>
+        {#if onmessages !== undefined}
+          <MessagesButton onopen={onmessages} keys />
+        {/if}
       </div>
     {/if}
   </header>
+
+  {#if playersOpen && players !== undefined}
+    <Sheet
+      title={tableCopy.game.players.title}
+      onclose={() => (playersOpen = false)}
+      opener={playersButton}
+    >
+      <TablePlayers table={players.table} me={players.me} />
+    </Sheet>
+  {/if}
 {/if}
 
 <style>
@@ -252,8 +331,23 @@
     flex: none;
   }
 
+  /* Another player's name: a first name online may be 20 letters, « (ordinateur) » may follow (plan
+     02-06): cut with « … » at 128 px, the full name in its title and in the text read aloud
+     (02-UI-SPEC « Long names »). Horse names fit whole. */
+  .name.other {
+    max-width: 128px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .prefix {
     flex: none;
+    white-space: pre;
+  }
+
+  .who {
+    display: flex;
+    min-width: 0;
   }
 
   /* The turn's glyph chip, in its own box so that it can breathe (scale about its centre). */
@@ -380,6 +474,40 @@
 
   .sheet-info {
     padding: var(--space-xs) 0;
+  }
+
+  .players-section {
+    margin-top: var(--space-md);
+  }
+
+  .players-heading {
+    margin: 0 0 var(--space-xs);
+    font-size: var(--heading-size);
+    font-weight: 700;
+    line-height: var(--heading-line);
+  }
+
+  /* The fourth row of the column form: 44 px buttons, left-aligned, 4 px under the pills. */
+  .table-row {
+    flex: 1 1 100%;
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch);
+    height: var(--touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: transparent;
+    color: var(--creme);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Compact rule: « Tour de » is hidden visually and the middle zone narrows to 96. */

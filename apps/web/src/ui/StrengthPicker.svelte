@@ -4,6 +4,10 @@
   // « Strength row », a container query): inline from 488 (identity block 96 wide, then the picker,
   // 48 high), stacked from 384 (identity line over the picker, 72 high), narrow below (the picker on
   // two rows, 116 high). The form the container query picked is exposed as data-form.
+  // The waiting room of an online table (plan 02-05) uses the « seat » role: the identity line is the
+  // small chip and the role word « Ordinateur », and the row is marked with its colour. The pause
+  // plate's level step (plan 02-06) uses the « handover » role: no identity line, the group named by
+  // `label` (« Quelle force pour l’ordinateur ? »), the row marked data-strength-row="handover".
   import { BOT_LEVELS, type BotLevel, parseBotLevel } from "@toc/bots";
   import type { Color } from "@toc/engine";
   import { bots } from "../i18n/fr/bots.ts";
@@ -13,14 +17,20 @@
 
   type Props = {
     color: Color;
-    /** partner: the seat in front; left: the next seat clockwise; right: the previous seat. */
-    role: "partner" | "left" | "right";
+    /**
+     * partner: the seat in front; left: the next seat clockwise; right: the previous seat; seat: a free
+     * seat of the waiting room (role word « Ordinateur »); handover: the pause plate's level step (no
+     * identity line).
+     */
+    role: "partner" | "left" | "right" | "seat" | "handover";
+    /** The group's accessible name for the « handover » role. */
+    label?: string;
     value: BotLevel;
     onchange: (level: BotLevel) => void;
     disabled?: boolean;
   };
 
-  let { color, role, value, onchange, disabled = false }: Props = $props();
+  let { color, role, label, value, onchange, disabled = false }: Props = $props();
 
   type Form = "inline" | "stacked" | "narrow";
   type LevelKey = `${BotLevel}`;
@@ -30,11 +40,21 @@
     title: bots.optionTitle(level),
   }));
 
-  const roleWord = $derived(role === "partner" ? bots.role.partner : bots.role.opponent);
+  const roleWord = $derived(
+    role === "seat"
+      ? bots.role.seat
+      : role === "partner"
+        ? bots.role.partner
+        : bots.role.opponent,
+  );
   const group = $derived(
-    role === "partner"
-      ? bots.groupPartner(seats[color].name)
-      : bots.groupOpponent(seats[color].name),
+    role === "handover"
+      ? (label ?? bots.heading)
+      : role === "seat"
+      ? bots.groupSeat(seats[color].name)
+      : role === "partner"
+        ? bots.groupPartner(seats[color].name)
+        : bots.groupOpponent(seats[color].name),
   );
 
   let row = $state<HTMLDivElement>();
@@ -64,12 +84,19 @@
   }
 </script>
 
-<div class="strength-row" data-strength-row={role} data-form={form} bind:this={row}>
+<div
+  class="strength-row"
+  data-strength-row={role === "seat" ? color : role}
+  data-form={form}
+  bind:this={row}
+>
   <div class="body" bind:this={body}>
-    <p class="identity">
-      <SeatChip {color} small />
-      <span class="role">{roleWord}</span>
-    </p>
+    {#if role !== "handover"}
+      <p class="identity">
+        <SeatChip {color} small />
+        <span class="role">{roleWord}</span>
+      </p>
+    {/if}
     <div class="picker">
       <Segmented
         {options}

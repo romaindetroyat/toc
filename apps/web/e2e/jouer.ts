@@ -121,88 +121,99 @@ export type GameStats = {
   plays: number;
 };
 
+/** A new, empty tally of a game played on screen. */
+export function newStats(): GameStats {
+  return {
+    dealSizes: [],
+    dealers: new Set(),
+    banners: new Set(),
+    posed: 0,
+    sevens: 0,
+    valets: 0,
+    plays: 0,
+  };
+}
+
+/**
+ * One tap of the plainest player on what the screen shows (`s`, read just before): the exchange with
+ * the first card, a dead hand posed, the first card that can be played, the first knight lit, the
+ * most steps of a 7. Counts what it does in `stats`. Returns false when there was nothing to tap (the
+ * computers or the other players are playing, an animation runs).
+ */
+export async function playStep(page: Page, s: Snapshot, stats: GameStats): Promise<boolean> {
+  if (s.seven) {
+    // The 7, knight by knight: tap a lit knight, then the largest number of steps that is still allowed.
+    if (s.done) {
+      await page.getByRole("button", { name: "Jouer", exact: true }).click();
+      stats.sevens += 1;
+      stats.plays += 1;
+    } else if (s.tray.length > 0) {
+      await page.locator("[data-tray-option]").first().click();
+    } else if (s.chips.length > 0) {
+      await page.locator(`[data-seven-chips] [data-step="${Math.max(...s.chips)}"]`).click();
+    } else if (s.halos.length > 0) {
+      await tapKnight(page, s.halos[0] as string);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  switch (s.state) {
+    case "exchange": {
+      stats.dealSizes.push(s.handSize);
+      if (s.dealer !== null) stats.dealers.add(s.dealer);
+      await page.locator("[data-hand] [data-card]").first().click();
+      await page.getByRole("button", { name: "Passer cette carte" }).click();
+      return true;
+    }
+    case "deadHand":
+      await page.getByRole("button", { name: "Poser mes cartes" }).click();
+      stats.posed += 1;
+      return true;
+    case "idle":
+    case "finishedPrompt": {
+      const card = s.playable[0];
+      if (card === undefined) return false;
+      if (card.startsWith("11")) stats.valets += 1;
+      await page.locator(`[data-hand] [data-card="${card}"]`).click();
+      return true;
+    }
+    case "modeChoice":
+      await page.locator("button[data-mode]").first().click();
+      return true;
+    case "tray":
+      await page.locator("[data-tray-option]").first().click();
+      return true;
+    case "cardSelected":
+    case "jackPick":
+    case "jackTarget":
+      if (s.halos.length === 0) return false;
+      await tapKnight(page, s.halos[0] as string);
+      return true;
+    case "preview":
+      await page.getByRole("button", { name: /^Jouer/ }).click();
+      stats.plays += 1;
+      return true;
+    default:
+      // The computer players are thinking or their moves are playing.
+      return false;
+  }
+}
+
 /**
  * Plays the game on screen until its end screen shows: the exchange with the first card, a dead hand
  * posed, the first card that can be played, the first knight lit, the most steps of a 7. The computer
  * players play by themselves.
  */
 export async function playToEnd(page: Page): Promise<GameStats> {
-  const dealSizes: number[] = [];
-  const dealers = new Set<string>();
-  const banners = new Set<string>();
-  let posed = 0;
-  let sevens = 0;
-  let valets = 0;
-  let plays = 0;
-
+  const stats = newStats();
   for (let step = 0; step < 20_000; step++) {
     const s = await snapshot(page);
     if (s.end) break;
-    if (s.banner !== null) banners.add(s.banner.replace(/\s+/g, " ").trim());
-    if (s.posedOnFelt) posed = Math.max(posed, 1);
-
-    if (s.seven) {
-      // The 7, knight by knight: tap a lit knight, then the largest number of steps that is still allowed.
-      if (s.done) {
-        await page.getByRole("button", { name: "Jouer", exact: true }).click();
-        sevens += 1;
-        plays += 1;
-      } else if (s.tray.length > 0) {
-        await page.locator("[data-tray-option]").first().click();
-      } else if (s.chips.length > 0) {
-        await page.locator(`[data-seven-chips] [data-step="${Math.max(...s.chips)}"]`).click();
-      } else if (s.halos.length > 0) {
-        await tapKnight(page, s.halos[0] as string);
-      } else {
-        await page.waitForTimeout(20);
-      }
-      continue;
-    }
-
-    switch (s.state) {
-      case "exchange": {
-        dealSizes.push(s.handSize);
-        if (s.dealer !== null) dealers.add(s.dealer);
-        await page.locator("[data-hand] [data-card]").first().click();
-        await page.getByRole("button", { name: "Passer cette carte" }).click();
-        break;
-      }
-      case "deadHand":
-        await page.getByRole("button", { name: "Poser mes cartes" }).click();
-        posed += 1;
-        break;
-      case "idle":
-      case "finishedPrompt": {
-        const card = s.playable[0];
-        if (card === undefined) {
-          await page.waitForTimeout(20);
-          break;
-        }
-        if (card.startsWith("11")) valets += 1;
-        await page.locator(`[data-hand] [data-card="${card}"]`).click();
-        break;
-      }
-      case "modeChoice":
-        await page.locator("button[data-mode]").first().click();
-        break;
-      case "tray":
-        await page.locator("[data-tray-option]").first().click();
-        break;
-      case "cardSelected":
-      case "jackPick":
-      case "jackTarget":
-        if (s.halos.length > 0) await tapKnight(page, s.halos[0] as string);
-        else await page.waitForTimeout(20);
-        break;
-      case "preview":
-        await page.getByRole("button", { name: /^Jouer/ }).click();
-        plays += 1;
-        break;
-      default:
-        // The computer players are thinking or their moves are playing.
-        await page.waitForTimeout(20);
-    }
+    if (s.banner !== null) stats.banners.add(s.banner.replace(/\s+/g, " ").trim());
+    if (s.posedOnFelt) stats.posed = Math.max(stats.posed, 1);
+    if (!(await playStep(page, s, stats))) await page.waitForTimeout(20);
   }
-
-  return { dealSizes, dealers, banners, posed, sevens, valets, plays };
+  return stats;
 }

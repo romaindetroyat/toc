@@ -1,11 +1,37 @@
 <script lang="ts">
   import { COLORS, type Color, type Team, teamOf } from "@toc/engine";
   import { PALETTE } from "@toc/board";
+  import type { RematchVote } from "@toc/protocol";
   import { onMount } from "svelte";
   import type { GameStats } from "../game/GameController.ts";
   import { game } from "../i18n/fr/game.ts";
   import { seats } from "../i18n/fr/seats.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
+  import { discLabel, voteLine } from "../net/votes.ts";
   import { settings } from "../settings/store.svelte.ts";
+  import Icon from "./Icon.svelte";
+
+  /**
+   * The online plank (02-UI-SPEC « End plank (D-08, PLAY-07) », plan 02-09): « Revanche » (a toggle)
+   * and « Quitter la table » in place of « Rejouer » and « Changer de couleur », the four vote discs
+   * and the vote line. No quick messages here (the game behind is inert, 02-08).
+   */
+  export type OnlinePlank = {
+    /** This device's seat. */
+    me: Color;
+    /** Each seat's answer from the server (null until its finished table arrives). */
+    votes: Record<Color, RematchVote> | null;
+    /** Everyone online agreed: the new game has started on the server. */
+    starting: boolean;
+    /** The discs' names: « Toi » for this device, first names, horse names. */
+    names: Record<Color, string>;
+    /** The rematch starts: the plank closes (300 ms, 150 ms fade under reduced motion). */
+    closing: boolean;
+    /** « Revanche »: agree, or withdraw with a second tap. */
+    onrematch: (agree: boolean) => void;
+    /** « Quitter la table »: leave the table, forget it on this device, go home. */
+    onleave: () => void;
+  };
 
   type Props = {
     /** Whether the human's team won. */
@@ -22,9 +48,32 @@
     onreplay: () => void;
     /** « Changer de couleur »: back to the launch screen. */
     onchange: () => void;
+    /** An online table: the rematch vote replaces the two local buttons. */
+    online?: OnlinePlank;
   };
 
-  let { won, winner, score, names, stats, onreplay, onchange }: Props = $props();
+  let { won, winner, score, names, stats, onreplay, onchange, online }: Props = $props();
+
+  /** This device agreed (or the rematch is starting). */
+  const agreed = $derived(
+    online !== undefined && (online.starting || online.votes?.[online.me] === "yes"),
+  );
+  const line = $derived.by(() => {
+    if (online === undefined) return "";
+    if (online.starting) return voteLine(null, online.me, online.names);
+    if (online.votes === null) return tableCopy.rematch.nobody;
+    return voteLine(online.votes, online.me, online.names);
+  });
+  /** A disc's state; once the rematch starts, the last « no » (the last to agree) became a yes. */
+  function voteOf(color: Color): RematchVote {
+    const vote = online?.votes?.[color] ?? (online?.starting ? "yes" : "no");
+    return online?.starting && vote === "no" ? "yes" : vote;
+  }
+
+  function toggle() {
+    if (online === undefined || online.starting) return;
+    online.onrematch(!agreed);
+  }
 
   const result = $derived(stats());
   // The winning team's two colours, the human's own knight first (« Toi », then the partner).
@@ -64,7 +113,14 @@
   drawn as a sharp offset copy (UI-SPEC « ombres sans flou »). One column on a computer, two on a phone
   held sideways (lower than 600 px).
 -->
-<div class="scrim" class:still={settings.reduceMotion} data-end-screen data-result={won ? "win" : "loss"}>
+<div
+  class="scrim"
+  class:still={settings.reduceMotion}
+  class:online={online !== undefined}
+  class:closing={online?.closing === true}
+  data-end-screen
+  data-result={won ? "win" : "loss"}
+>
   <div
     class="plank"
     role="dialog"
@@ -143,14 +199,64 @@
         <span data-stat="captures">{game.end.captures(result.captured.nous, result.captured.eux)}</span>
       </p>
 
-      <div class="buttons">
-        <button type="button" class="btn btn-primary" bind:this={replay} onclick={onreplay}>
-          {game.end.replay}
-        </button>
-        <button type="button" class="btn wood" bind:this={change} onclick={onchange}>
-          {game.end.changeColour}
-        </button>
-      </div>
+      {#if online !== undefined}
+        <div class="vote">
+          <ul class="discs" role="list" aria-label={tableCopy.rematch.group}>
+            {#each COLORS as color (color)}
+              {@const vote = voteOf(color)}
+              <li class="vote-disc" data-rematch-vote={color} data-vote={vote}>
+                <svg class="glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  {#if color === "bleu"}
+                    <circle cx="8" cy="8" r="6" />
+                  {:else if color === "jaune"}
+                    <path d="M8 2 L14.5 13.5 L1.5 13.5 Z" />
+                  {:else if color === "rouge"}
+                    <rect x="2.5" y="2.5" width="11" height="11" />
+                  {:else}
+                    <path
+                      d="M8 1.5 L9.9 5.8 L14.5 6.2 L11 9.3 L12.1 13.9 L8 11.5 L3.9 13.9 L5 9.3 L1.5 6.2 L6.1 5.8 Z"
+                    />
+                  {/if}
+                </svg>
+                <span class="badge" aria-hidden="true">
+                  <Icon
+                    name={vote === "offline" ? "wifi-off" : vote === "no" ? "hourglass" : "check"}
+                    size={10}
+                  />
+                </span>
+                <span class="sr-only">{discLabel(online.names[color], vote)}</span>
+              </li>
+            {/each}
+          </ul>
+          <p class="vote-line" aria-live="polite" data-vote-line>{line}</p>
+        </div>
+        <div class="buttons">
+          <button
+            type="button"
+            class="btn btn-primary"
+            aria-pressed={agreed}
+            bind:this={replay}
+            onclick={toggle}
+          >
+            {#if agreed}
+              <Icon name="check" size={20} />
+            {/if}
+            {tableCopy.rematch.agree}
+          </button>
+          <button type="button" class="btn wood" bind:this={change} onclick={online.onleave}>
+            {tableCopy.rematch.leave}
+          </button>
+        </div>
+      {:else}
+        <div class="buttons">
+          <button type="button" class="btn btn-primary" bind:this={replay} onclick={onreplay}>
+            {game.end.replay}
+          </button>
+          <button type="button" class="btn wood" bind:this={change} onclick={onchange}>
+            {game.end.changeColour}
+          </button>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -435,6 +541,101 @@
       0 3px 0 rgb(42 26 14 / 0.45);
   }
 
+  /* Online (plan 02-09): the four vote discs and the line under them, above the buttons. */
+  .vote {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-xs);
+    align-self: stretch;
+  }
+
+  .discs {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A 28 px disc: the seat's glyph in its colour on cream, a 1 px ink line, a 14 px state badge. */
+  .vote-disc {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border: 1px solid var(--ink);
+    border-radius: 50%;
+    background: var(--cream);
+  }
+
+  .vote-disc[data-rematch-vote="bleu"] {
+    --seat: var(--seat-bleu);
+  }
+  .vote-disc[data-rematch-vote="jaune"] {
+    --seat: var(--seat-jaune);
+  }
+  .vote-disc[data-rematch-vote="rouge"] {
+    --seat: var(--seat-rouge);
+  }
+  .vote-disc[data-rematch-vote="vert"] {
+    --seat: var(--seat-vert);
+  }
+
+  .glyph {
+    fill: var(--seat);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+  }
+
+  .badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 1px solid var(--ink);
+    border-radius: 50%;
+    background: var(--cream);
+    color: var(--ink);
+  }
+
+  .vote-disc[data-vote="no"] .badge,
+  .vote-disc[data-vote="offline"] .badge {
+    color: var(--track);
+  }
+
+  .vote-line {
+    text-wrap: balance;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    color: var(--track);
+  }
+
+  .buttons .btn[aria-pressed] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+  }
+
+  /* The rematch starts: the plank goes (300 ms; a 150 ms fade under reduced motion). */
+  .scrim.closing,
+  .scrim.closing .plank {
+    animation: plank-out 300ms ease-in both;
+  }
+
+  .scrim.still.closing,
+  .scrim.still.closing .plank {
+    animation: fade-out 150ms ease-in both;
+  }
+
   /* A phone held sideways: two columns, the title and the team at the left, the rest at the right. */
   @media (max-height: 599px) {
     .plank {
@@ -493,6 +694,19 @@
     }
   }
 
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes plank-out {
+    to {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
   @keyframes plank-in {
     from {
       opacity: 0;
@@ -510,6 +724,23 @@
     .scrim,
     .plank {
       animation: fade 150ms ease-out both;
+    }
+
+    .scrim.closing,
+    .scrim.closing .plank {
+      animation: fade-out 150ms ease-in both;
+    }
+  }
+
+  /* Online on a very low screen: the stats line is read, not shown, so the plank never scrolls. */
+  @media (max-height: 359px) {
+    .online .stats {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 </style>

@@ -11,7 +11,7 @@ const partnerOf = (c: Color): Color => COLORS[(COLORS.indexOf(c) + 2) % 4] as Co
 const nextOf = (c: Color): Color => COLORS[(COLORS.indexOf(c) + 1) % 4] as Color;
 
 async function sit(page: Page, color: Color) {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("radio", { name: NAME[color], exact: true }).click();
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
@@ -81,7 +81,7 @@ for (const color of COLORS) {
 
 test("table: la couleur choisie est retenue au rechargement de l’accueil", async ({ page }) => {
   await sit(page, "vert");
-  await page.goto("/#/");
+  await page.goto("/#/ordinateur");
   await page.reload();
   await expect(page.getByRole("radio", { name: "Vert", exact: true })).toHaveAttribute(
     "aria-checked",
@@ -157,18 +157,19 @@ test("table: les cavaliers regardent dans le sens de la marche, tête gardée su
 // Knights at three sizes for the human legibility check (UI-SPEC backstop), on landscape screens
 // only (« paysage obligatoire »; a screen taller than wide shows « Tourne ton téléphone »). A ring
 // knight is 0.95 step, about 0.0318 x the board width:
-// - 844 x 390, the phone held sideways (compact mode, the board on the full height, plan 01-47):
-//   min(844 − 2 × 60, (390 − 24) / 0.5) = 724 px, a knight about 23 px wide;
+// - 844 x 390, the phone held sideways (compact mode, the board on the full height, plan 01-47, a
+//   left strip as wide as the hand's 79 x 110 cards need, plan 02-06c):
+//   min(844 − 83.1 − 60, (390 − 24) / 0.5) = 700.9 px, a knight about 22 px wide;
 // - 1440 x 900, a computer (bar): min(1440 − 32, (900 − 160) / 0.52166, 1600) = 1408 px, about 45 px;
 // - 3200 x 1900 with the board forced to 3200 px, past the 1600 px cap: about 102 px.
-// The shots keep their names by board width (knights-724.png, knights-1408.png, knights-3200.png).
+// The shots keep their names by board width (knights-701.png, knights-1408.png, knights-3200.png).
 const HEIGHT_PER_WIDTH = 0.5 + 0.02166;
 
 test.describe("cavaliers à trois tailles", () => {
   test.skip(({ isMobile }) => isMobile, "explicit viewports: the desktop project takes the shots");
 
   for (const { width, height, board: expected, forced } of [
-    { width: 844, height: 390, board: Math.min(844 - 2 * 60, (390 - 24) / 0.5) },
+    { width: 844, height: 390, board: Math.min(844 - 83.12 - 60, (390 - 24) / 0.5) },
     { width: 1440, height: 900, board: Math.min(1440 - 32, (900 - 160) / HEIGHT_PER_WIDTH, 1600) },
     { width: 3200, height: 1900, board: 3200, forced: true },
   ]) {

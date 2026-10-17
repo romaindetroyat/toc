@@ -332,14 +332,14 @@ test.describe("page de test des sons à choix", () => {
     expect((await played(page)).filter((p) => p.id !== "sabot")).toEqual([]);
   });
 
-  test("sons: la page défile et le lien Retour ramène au lancement", async ({ page }) => {
+  test("sons: la page défile et le lien Retour ramène à l’accueil", async ({ page }) => {
     await page.goto("/#/sons");
     const scrollable = await page.evaluate(
       () => document.documentElement.scrollHeight > window.innerHeight,
     );
     expect(scrollable).toBe(true);
     await page.getByRole("link", { name: "Retour" }).click();
-    await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+    await expect(page.locator('[data-home-choice="ordinateur"]')).toBeVisible();
   });
 });
 
@@ -432,7 +432,7 @@ test.describe("crédits et licences", () => {
     await expect(dialog.getByText("Nunito", { exact: true })).toBeVisible();
     await expect(dialog.getByText("The Nunito Project Authors · OFL-1.1")).toBeVisible();
     await expect(dialog.getByText("Généré par le code").first()).toBeVisible();
-    for (const title of ["Sons", "Polices", "Icônes", "Plateau", "Cavaliers", "Cartes"]) {
+    for (const title of ["Sons", "Polices", "Icônes", "Plateau", "Cavaliers", "Cartes", "Logo"]) {
       await expect(dialog.getByRole("heading", { name: title, level: 3 })).toHaveCount(1);
     }
     // The court figures name their author and their licence.
@@ -446,8 +446,11 @@ test.describe("crédits et licences", () => {
     await expect(
       plateau.nth(1).getByText(/Romain · Utilisés avec l’accord de l’auteur/),
     ).toBeVisible();
+    // Romain's logo (2026-10-17) has its own group.
+    const logo = dialog.locator('[data-credits-group="Logo"] li[data-credit="logo"]');
+    await expect(logo.getByText(/Logo fourni par Romain, 2026-10-17/)).toBeVisible();
     // One entry per row of the manifest, shown as text (the ambience row went with the ambience).
-    await expect(dialog.locator("li[data-credit]")).toHaveCount(17);
+    await expect(dialog.locator("li[data-credit]")).toHaveCount(18);
     await expect(dialog.getByText("Ambiance", { exact: true })).toHaveCount(0);
     await expect(dialog.locator("a")).toHaveCount(0);
   });

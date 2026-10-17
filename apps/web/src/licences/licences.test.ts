@@ -185,13 +185,14 @@ describe("uncoveredAssets", () => {
   });
 });
 
-// Bundled asset files: the fonts and the card art under apps/web/src/assets, and the recorded sounds
-// under apps/web/public/audio when that directory exists. Only the file names are listed (no import).
+// Bundled asset files: the fonts, the card art and the home logo under apps/web/src/assets, the
+// recorded sounds under apps/web/public/audio when that directory exists, and the app icons
+// (apps/web/public/icons, apps/web/public/favicon.ico). Only the file names are listed (no import).
 const bundled = [
   ...Object.keys(import.meta.glob("../assets/**/*")).map((file) => `apps/web/src/${file.slice(3)}`),
-  ...Object.keys(import.meta.glob("../../public/audio/**/*")).map(
-    (file) => `apps/web/${file.slice(6)}`,
-  ),
+  ...Object.keys(
+    import.meta.glob(["../../public/audio/**/*", "../../public/icons/**/*", "../../public/*.ico"]),
+  ).map((file) => `apps/web/${file.slice(6)}`),
 ];
 
 describe("bundled asset files", () => {
@@ -204,6 +205,20 @@ describe("bundled asset files", () => {
 
   it("have a row in assets/audio/LICENSES.md (FX-05)", () => {
     expect(uncoveredAssets(bundled, parseLicences(raw))).toEqual([]);
+  });
+
+  it("include the app icons and the home logo (02-04b)", () => {
+    expect(bundled).toContain("apps/web/public/icons/icon-192.png");
+    expect(bundled).toContain("apps/web/public/icons/maskable-512.png");
+    expect(bundled).toContain("apps/web/public/favicon.ico");
+    expect(bundled).toContain("apps/web/src/assets/logo/logo-128.webp");
+  });
+
+  it("have a « logo » row for Romain's logo (2026-10-17)", () => {
+    const logo = parseLicences(raw).filter((entry) => entry.type === "logo");
+    expect(logo).toHaveLength(1);
+    expect(logo[0]?.source).toContain("Logo fourni par Romain, 2026-10-17");
+    expect(logo[0]?.auteur).toBe("Romain");
   });
 
   it("have a « cartes » row for the court figures, with the author and the licence", () => {

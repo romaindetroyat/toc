@@ -8,7 +8,7 @@ test("lancement: Bleu préselectionné, partenaire et adversaires affichés", as
   page,
   isMobile,
 }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   const colours = page.getByRole("radiogroup", { name: "Choisis ta couleur" });
   await expect(colours).toBeVisible();
   // The four colour tiles (the strength pickers of phase 3 are radio groups of their own).
@@ -56,7 +56,7 @@ test("lancement: Bleu préselectionné, partenaire et adversaires affichés", as
 });
 
 test("lancement: le choix est retenu, les flèches déplacent la sélection", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await radio(page, "Jaune").click();
   await expect(radio(page, "Jaune")).toHaveAttribute("aria-checked", "true");
   await expect(radio(page, "Vert")).toHaveAccessibleDescription("Partenaire");
@@ -99,7 +99,7 @@ test("lancement: JSON abîmé, valeurs hors limites ou stockage qui lève, aucun
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript(init);
-    await page.goto("http://localhost:4173/");
+    await page.goto("http://localhost:4173/#/ordinateur");
     await expect(radio(page, "Bleu")).toHaveAttribute("aria-checked", "true");
     // Choosing still works in memory, silently.
     await radio(page, "Vert").click();
@@ -118,13 +118,13 @@ test("lancement: aucune requête vers un hôte tiers, polices et icônes servies
     const url = new URL(request.url());
     if (url.protocol === "http:" || url.protocol === "https:") origins.add(url.origin);
   });
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.evaluate(() => document.fonts.ready);
   expect([...origins]).toEqual(["http://localhost:4173"]);
 });
 
 test("lancement: « Jouer la partie » ouvre la partie avec le son débloqué", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
   await expect(page.locator("body")).toHaveAttribute("data-audio", "running");

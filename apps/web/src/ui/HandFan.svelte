@@ -14,7 +14,6 @@
     CORNER_SHIFT,
     type CornerStrip,
     cardSize,
-    cornerCard,
     cornerLayout,
     fanLayout,
     fanSpread,
@@ -42,10 +41,12 @@
     /**
      * The compact mode of a phone held sideways: the hand in the galet's corner (plan 03-10, Romain's
      * « Cartes plus grandes en coin » of 2026-10-17, replacing the 52 x 73 column of 01-47). From the
-     * bottom of the left strip up, cards of cornerCard (80 x 112 at 390 px), each covering all of the
-     * one above but a slice of 44 px or more, each as far right as the galet's bare side allows
-     * (cornerLayout over leftClearance), running past the screen's left edge when the strip is
-     * narrower; the selected card moves 6 px toward the board, nothing turns.
+     * bottom of the left strip up, each card covering all of the one above but a slice of 44 px or
+     * more, in one straight column (plan 02-06b, Romain's « la carte du bas est décalée, je ne veux
+     * pas ça »): every card the same size and the same left edge, inside the strip (never under the
+     * Dynamic Island), as far right as the galet's bare side allows over the column's whole height
+     * (cornerLayout over leftClearance); the selected card moves 6 px toward the board, nothing
+     * turns. The strip is as wide as the 03-10 card needs (plan 02-06c, « Plateau un peu réduit »).
      */
     compact?: boolean;
     /** In the compact mode: the board, to measure the galet's bare corner against. */
@@ -75,10 +76,10 @@
   const cards = $derived(sortHand(hand));
 
   /**
-   * The compact mode's strip (the fan fills it) and the board, measured: the strip's left edge on the
-   * screen (the safe-area inset), its size, and the board's top and width from the strip's corner.
+   * The compact mode's strip (the fan fills it; it starts after the safe-area inset) and the board,
+   * measured: the strip's size, and the board's top and width from the strip's corner.
    */
-  let strip = $state<(CornerStrip & { left: number }) | null>(null);
+  let strip = $state<CornerStrip | null>(null);
   $effect(() => {
     const el = fanEl;
     const galet = board;
@@ -90,7 +91,6 @@
       const s = el.getBoundingClientRect();
       const b = galet.getBoundingClientRect();
       strip = {
-        left: s.left,
         width: b.left - s.left,
         height: s.height,
         boardTop: b.top - s.top,
@@ -104,11 +104,17 @@
     return () => observer.disconnect();
   });
 
-  const corner = $derived(cornerCard(strip?.height ?? 390));
-  /** The compact mode's cards: where each stands in the strip (its top-left corner), px. */
-  const tops = $derived(
-    compact && strip !== null ? cornerLayout(cards.length, strip, leftClearance, SCENE.width) : [],
+  /** The compact mode's hand: its card (one size for all) and where each stands in the strip, px. */
+  const cornerHand = $derived(
+    cornerLayout(
+      compact ? cards.length : 0,
+      strip ?? { width: 0, height: 390, boardTop: 0, boardWidth: 0 },
+      leftClearance,
+      SCENE.width,
+    ),
   );
+  const corner = $derived(cornerHand.card);
+  const tops = $derived(compact && strip !== null ? cornerHand.slots : []);
   const size = $derived(
     compact ? { w: corner.w, h: corner.h } : cardSize(viewportWidth, viewportHeight),
   );
@@ -212,10 +218,6 @@
   const roving = $derived(Math.min(active, Math.max(0, cards.length - 1)));
   let buttons = $state<Record<string, HTMLElement | undefined>>({});
 
-  /** How much of a corner card runs past the screen's left edge, px: its middle centres on the rest. */
-  const cutOf = (slot: { dx: number }) =>
-    compact && strip !== null ? Math.max(0, -(strip.left + slot.dx)) : 0;
-
   /**
    * Arrow keys walk through the cards (Entrée and Espace select, as on any button); in the corner the
    * up and down arrows do too.
@@ -267,7 +269,6 @@
         class="slot"
         style:transform={transformOf(card, slot)}
         style:z-index={stateOf(card) === "selected" && !compact ? 10 : i + 1}
-        style:--cut={compact ? `${cutOf(slot)}px` : undefined}
         style:--middle-top={compact && i < cards.length - 1 ? `${corner.slice}px` : undefined}
       >
         <Card
@@ -294,7 +295,6 @@
         <div
           class="slot hint-slot"
           style:transform={transformOf(card, slot)}
-          style:--cut={compact ? `${cutOf(slot)}px` : undefined}
           aria-hidden="true"
         >
           <KeyHint label={String(i + 1)} at="card" />
@@ -387,13 +387,13 @@
     pointer-events: none;
   }
 
-  /* The compact mode (a phone held sideways, plan 03-10): the fan covers the whole left strip and
-     lets every tap through but those on its cards (the info pill stands at the strip's top). Each card
-     stands at the top-left corner its slot's translate gives, past the strip when cornerLayout says
-     so: over the galet's bare side and corner, and past the screen's left edge. The index stands
-     stacked in the top-right corner, the part of the card that is always seen, at a quarter of the
-     card's height (28 px at 112). The selected card keeps its place in the stack (its outline and its
-     6 px move tell it), so the cards under it still show their index. */
+  /* The compact mode (a phone held sideways, plans 03-10 and 02-06b): the fan covers the whole left
+     strip and lets every tap through but those on its cards (the info pill stands at the strip's top).
+     Each card stands at the top-left corner its slot's translate gives: one straight column, inside
+     the strip, its right part over the galet's bare side. The index stands stacked in the top-right
+     corner, the part of the card the next one never covers, at a quarter of the card's height (28 px
+     at 112). The selected card keeps its place in the stack (its outline and its 6 px move tell it),
+     so the cards under it still show their index. */
   .fan.compact {
     position: absolute;
     inset: 0;
@@ -422,14 +422,14 @@
     right: 9px;
   }
 
-  /* The digit astride the card's top edge, at the left of the part on the screen. */
+  /* The digit astride the card's top edge, at its left. */
   .compact .hint-slot {
     width: var(--card-w);
     pointer-events: none;
   }
 
   .compact .hint-slot :global(.key-hint) {
-    left: calc(var(--cut, 0px) + 4px);
+    left: 4px;
   }
 
   /* An unplayable card is veiled, but stays opaque: the cards overlap, and a see-through card would

@@ -41,7 +41,7 @@ const stored = async (page: Page) =>
   JSON.parse((await page.evaluate((key) => localStorage.getItem(key), KEY)) ?? "{}");
 
 async function openFromLaunch(page: Page) {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("button", { name: "Réglages", exact: true }).click();
   await expect(dialog(page, "Réglages")).toBeVisible();
 }
@@ -121,7 +121,7 @@ test.describe("depuis l’écran de lancement", () => {
   test("réglages: d’anciens réglages avec l’ambiance se chargent, et l’ambiance disparaît au prochain changement", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.evaluate(
       (key) =>
         localStorage.setItem(
@@ -246,7 +246,7 @@ test.describe("en pleine partie", () => {
   test("réglages: aucune ambiance ne démarre dans la partie, ni au retour de la page", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.getByRole("button", { name: "Jouer la partie" }).click();
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
@@ -390,7 +390,7 @@ test.describe("abandonner la partie", () => {
     await abandonLink(page).click();
     await confirm(page).getByRole("button", { name: "Abandonner la partie" }).click();
 
-    await expect(page).toHaveURL(/#\/$/);
+    await expect(page).toHaveURL(/#\/ordinateur$/);
     await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
     await expect(page.locator("[data-board]")).toHaveCount(0);
     await expect(page.locator("[data-sheet-layer]")).toHaveCount(0);
@@ -437,7 +437,7 @@ test.describe("le son ne démarre pas", () => {
       };
       Object.assign(window, { AudioContext: refuse, webkitAudioContext: refuse });
     });
-    await page.goto("/");
+    await page.goto("/#/ordinateur");
     await page.getByRole("button", { name: "Jouer la partie" }).click();
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
 
@@ -453,7 +453,7 @@ test.describe("le son ne démarre pas", () => {
 
     // The game goes on without sound: an exchange, then a move, from a seeded game in test speed.
     await page.evaluate((seed) => {
-      location.hash = "#/";
+      location.hash = "#/ordinateur";
       setTimeout(() => {
         location.hash = `#/partie?graine=${seed}&vitesse=test`;
       }, 0);
@@ -489,7 +489,7 @@ test.describe("un problème inattendu", () => {
     await expect(screen).not.toContainText("Error");
 
     await screen.getByRole("button", { name: "Recharger la page" }).click();
-    await expect(page.getByRole("button", { name: "Jouer la partie" })).toBeVisible();
+    await expect(page.locator('[data-home-choice="ordinateur"]')).toBeVisible();
     await expect(page).toHaveURL(/#\/$/);
     expect(logged.length).toBeGreaterThan(0);
   });

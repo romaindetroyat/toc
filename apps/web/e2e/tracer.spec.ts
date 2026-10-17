@@ -144,7 +144,7 @@ async function openPosition(page: Page, etat: unknown, extra = "") {
 }
 
 test("tracer: Jouer la partie -> plateau -> la main du joueur et l’échange", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/ordinateur");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page).toHaveURL(/#\/partie$/);
 

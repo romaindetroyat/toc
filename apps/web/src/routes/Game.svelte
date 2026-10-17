@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { TablePublic } from "@toc/protocol";
   import { type Component, flushSync, onMount, tick, untrack } from "svelte";
   import {
     type CardId,
@@ -13,7 +14,7 @@
     sortHand,
     teamOf,
   } from "@toc/engine";
-  import { MOTION, SCENE, scaleFor } from "@toc/board";
+  import { leftClearance, MOTION, SCENE, scaleFor } from "@toc/board";
   import {
     type EngineStatus,
     onStatus,
@@ -24,6 +25,8 @@
   } from "../audio/engine.ts";
   import * as fx from "../board/animator.ts";
   import Board, { type Burst } from "../board/Board.svelte";
+  import { placeBubble, type Rect, riderRect, type Size } from "../board/bubbles.ts";
+  import ChatBubbles, { type BubbleSpot } from "../board/ChatBubbles.svelte";
   import type { Flight } from "../board/CardFlights.svelte";
   import {
     dealFlights,
@@ -41,7 +44,12 @@
   import { mixFromSettings } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
   import { game as copy } from "../i18n/fr/game.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
+  import { seats as seatNames } from "../i18n/fr/seats.ts";
+  import type { TableConnection } from "../net/connection.svelte.ts";
+  import { gameNotices } from "../net/notices.ts";
   import {
+    type ControllerFactory,
     createSession,
     loadDebugParams,
     type Session,
@@ -49,20 +57,51 @@
   } from "../game/session.svelte.ts";
   import { type FocusTarget, keyIntent, litKnights } from "../game/shortcuts.ts";
   import type { TurnUiEvent } from "../game/turnUi.ts";
-  import { settings } from "../settings/store.svelte.ts";
+  import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
+  import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import MessagesButton from "../ui/MessagesButton.svelte";
+  import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import type { TableSpeed } from "../ui/tableSpeed.ts";
   import SevenPanel from "../ui/SevenPanel.svelte";
+  import TablePlate from "../ui/TablePlate.svelte";
+  import SeatBadges from "../board/SeatBadges.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
+
+  type Props = {
+    /**
+     * An online table (#/table/<id>): the server's controller and the seat it gave this device, which
+     * turns the board to that seat. Online there is no « Abandonner la partie »: « Réglages » offers
+     * « Arrêter la partie » to the chef de table and « Quitter la table » to everyone (plan 02-07), and
+     * the end plank's buttons lead to the home (plan 02-09: « Revanche »).
+     * `connection` gives the public table (the pause, the chef de table, who is online: plan 02-06)
+     * and this device's own connection (the banner and the plate, plan 02-07); `onhome` leaves the
+     * table for the home (« Retour à l’accueil » of the plates); `onleave` is the confirmed
+     * « Quitter la table » (the others' pause, the socket closed with 1000, the home); `onquit` is
+     * the end plank's « Quitter la table » (plan 02-09: the table also leaves « Mes parties en
+     * cours »).
+     */
+    online?: {
+      makeController: ControllerFactory;
+      seat: Color;
+      connection: TableConnection;
+      onhome: () => void;
+      onleave: () => void;
+      onquit: () => void;
+    };
+  };
+
+  let { online }: Props = $props();
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -319,8 +358,18 @@
     missed = false;
     await tick();
     if (!alive || mine !== epoch) return;
-    const created = createSession(env, debug, colour);
+    const created = createSession(
+      env,
+      debug,
+      colour,
+      online?.makeController,
+      () => online?.connection.table?.fast === true,
+    );
     session = created;
+    // Online, the game number this screen plays (a higher one is the rematch, plan 02-09).
+    playingGameNo = online?.connection.table?.gameNo ?? null;
+    endVotes = null;
+    rematchClosing = false;
     // The pawns must be mounted before the first bot can move.
     await tick();
     if (alive && mine === epoch) created.start();
@@ -330,7 +379,9 @@
     guarded(
       (async () => {
         opened = await loadDebugParams(location.hash);
-        if (alive) await begin(opened);
+        // Online the server holds the game: only the test speed of the debug parameters applies.
+        if (online !== undefined) opened = { vitesse: opened.vitesse };
+        if (alive) await begin(opened, online?.seat);
       })(),
     );
     return () => {
@@ -342,11 +393,27 @@
 
   /** « Rejouer »: a new game with the same colour (and the same speed under test). */
   function replay() {
+    if (online !== undefined) {
+      leave();
+      return;
+    }
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
   }
 
-  /** « Changer de couleur »: back to the launch screen. */
+  /** « Changer de couleur »: back to the solo setup (#/ordinateur, 02-04). */
   function changeColour() {
+    if (online !== undefined) {
+      leave();
+      return;
+    }
+    location.hash = "#/ordinateur";
+  }
+
+  /** Online the end plank has its own buttons (plan 02-09); these two only lead home, as a fallback. */
+  function leave() {
+    epoch++;
+    session?.dispose();
+    session = undefined;
     location.hash = "#/";
   }
 
@@ -358,10 +425,10 @@
   let shortcutsOpener = $state.raw<HTMLElement | null>(null);
 
   /**
-   * « Abandonner la partie », once confirmed: the game is disposed and the launch screen comes back (or
-   * the sound test, when « Tester les sons » was asked for in the game).
+   * « Abandonner la partie », once confirmed: the game is disposed and the solo setup (#/ordinateur)
+   * comes back (or the sound test, when « Tester les sons » was asked for in the game).
    */
-  function abandon(to = "#/") {
+  function abandon(to = "#/ordinateur") {
     epoch++;
     session?.dispose();
     session = undefined;
@@ -372,14 +439,181 @@
   const bar = $derived(screen.chrome === "bar");
   /**
    * Any other landscape screen (a phone held sideways): the galet on the full height under a 24 px
-   * prompt row, the hand and the buttons in two 60 px strips at its sides (plan 01-47).
+   * prompt row, the hand and the buttons in two strips at its sides (plan 01-47), the left one as
+   * wide as the hand's cards need (plan 02-06c).
    */
   const compact = $derived(screen.chrome === "compact");
+  /**
+   * How much of its width the galet stays bare at its left over its whole height, for the compact
+   * mode's left strip (plan 02-06c): the hand's column may stand over it.
+   */
+  const GALET_BARE = leftClearance(-Infinity, Infinity) / SCENE.width;
+
+  // --- The online table (plan 02-06): the plate over the board, the toasts of the pause ---
+  const onlineTable = $derived<TablePublic | null>(online?.connection.table ?? null);
+  /**
+   * A plate is up (paused or saved): the board, the hand and the state buttons are inert under it;
+   * the info pill and « Réglages » stay usable; the game shortcuts are ignored but « ? ».
+   */
+  const paused = $derived(
+    onlineTable !== null && (onlineTable.status === "paused" || onlineTable.status === "saved"),
+  );
+  /**
+   * This device's own connection (plan 02-07): from 2 s down the banner « Connexion perdue.
+   * Reconnexion… » takes the prompt row (or the action zone), from 10 s the connection plate.
+   */
+  const link = $derived(online?.connection.link ?? "none");
+  /** Under a plate or the reconnect banner the board, the hand and the state buttons are inert. */
+  const plateUp = $derived(paused || link !== "none");
+  /** « Arrêter la partie » for the chef de table while the game runs or waits (not once saved). */
+  const canStop = $derived(
+    online !== undefined &&
+      onlineTable !== null &&
+      onlineTable.host === online.seat &&
+      (onlineTable.status === "playing" || onlineTable.status === "paused"),
+  );
+
+  function stopGame() {
+    online?.connection.send({ t: "stop" });
+  }
+
+  /**
+   * The table-wide « Avance rapide » of « Réglages » (plan 02-10b): the chef de table switches it
+   * (and this device remembers the choice for the tables it creates), the others see it.
+   */
+  const tableSpeed = $derived.by((): TableSpeed | undefined => {
+    if (online === undefined || onlineTable === null) return undefined;
+    const table = onlineTable;
+    const canSet = table.host !== null && table.host === online.seat;
+    return {
+      fast: table.fast,
+      canSet,
+      hostName: (table.host === null ? null : table.seats[table.host].name) ?? table.creatorName ?? "",
+      onset: (fast) => {
+        if (!canSet) return;
+        updateSettings({ tableFast: fast });
+        online.connection.send({ t: "speed", fast });
+      },
+    };
+  });
+
+  // --- « Messages rapides » (plan 02-08): the button, the key « M », the sheet ---
+  let messagesOpen = $state(false);
+  let messagesOpener = $state<HTMLElement | null>(null);
+
+  /**
+   * The controls a bubble keeps clear of (02-UI-SPEC « Received messages »): the hand's cards, the
+   * strips' buttons and chips, the info pill, the prompt row (or the action zone), the plates.
+   */
+  const BUBBLE_OBSTACLES = [
+    "[data-hand] [data-card]",
+    "[data-info-bar]",
+    "[data-settings-slot] button",
+    "[data-messages-button]",
+    "[data-players-button]",
+    "[data-action-zone]",
+    "[data-action-buttons] button",
+    "[data-tray-option]",
+    "[data-seven-chips] [data-step]",
+    "[data-seven-buttons] button",
+    "[data-paused-prompt]",
+    "[data-reconnect-banner]",
+    "[data-plate]",
+  ].join(", ");
+
+  /** A received message's bubble beside its sender's rider (bubbles.ts), in screen px. */
+  function placeChat(color: Color, size: Size, placed: readonly Rect[]): BubbleSpot | null {
+    if (boardEl === null) return null;
+    const box = boardEl.getBoundingClientRect();
+    const board = { x: box.left, y: box.top, w: box.width, h: box.height };
+    const obstacles = [...document.querySelectorAll(BUBBLE_OBSTACLES)]
+      .map((el) => el.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => ({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }));
+    const at = placeBubble(riderRect(color, k, board), board, size, obstacles, placed);
+    return { x: at.x, y: at.y, tail: at.side === "right" ? "left" : "right", tailAt: at.tailY };
+  }
+
+  /** Opens the sheet; `opener` gets the focus back (« Messages », or what had it before « M »). */
+  function openMessages(opener: HTMLElement | null) {
+    if (online === undefined) return;
+    messagesOpener = opener;
+    messagesOpen = true;
+  }
+  let previousTable: TablePublic | null = null;
+  $effect(() => {
+    const next = onlineTable;
+    const seat = online?.seat;
+    if (next === null || seat === undefined) return;
+    untrack(() => {
+      const notices = gameNotices(previousTable, next, { seat });
+      previousTable = next;
+      const first = notices[0];
+      if (first !== undefined) showToast(first);
+    });
+  });
 
   const k = $derived(session?.k ?? 0);
   const render = $derived(session?.render ?? null);
   /** The end screen is up: the rest of the game screen is inert behind it. */
   const ended = $derived(render !== null && render.phase === "won" && render.winner !== null);
+
+  // --- The rematch (plan 02-09, D-08; 02-UI-SPEC « End plank », « Motion ») ---
+  /** The table's game number the session on screen plays (online). */
+  let playingGameNo = $state<number | null>(null);
+  /** The votes of the finished game, kept while the plank closes (the server moved on). */
+  let endVotes = $state.raw<TablePublic["rematch"]>(null);
+  /** The plank is closing before the new game's deal. */
+  let rematchClosing = $state(false);
+  /** The server started another game at this table: the rematch everyone agreed to. */
+  const rematchStarted = $derived(
+    online !== undefined &&
+      onlineTable !== null &&
+      playingGameNo !== null &&
+      onlineTable.gameNo > playingGameNo,
+  );
+  $effect(() => {
+    const table = onlineTable;
+    if (table?.status === "finished" && table.gameNo === playingGameNo) endVotes = table.rematch;
+  });
+  /** The discs' names: « Toi » for this device, the seats' first names and horse names. */
+  const discNames = $derived.by(() => {
+    const names = {} as Record<Color, string>;
+    for (const color of COLORS) {
+      names[color] =
+        color === online?.seat
+          ? copy.end.you
+          : (onlineTable?.seats[color].name ?? seatNames[color].name);
+    }
+    return names;
+  });
+  // « Tout le monde est d’accord : nouvelle partie ! » for 1 s, the plank out (300 ms, 150 ms
+  // reduced), then the new game from its opening deal. Without the plank (a reconnect that finds the
+  // next game already running) the new game comes at once.
+  const REMATCH_LINE_MS = 1000;
+  $effect(() => {
+    if (!rematchStarted || online === undefined) return;
+    const plank = untrack(() => ended);
+    const reduced = untrack(
+      () =>
+        settings.reduceMotion ||
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
+    );
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const restart = () => guarded(begin({ vitesse: opened.vitesse }, online.seat));
+    if (!plank) restart();
+    else {
+      timers.push(
+        setTimeout(() => {
+          rematchClosing = true;
+          timers.push(setTimeout(restart, reduced ? 150 : 300));
+        }, REMATCH_LINE_MS),
+      );
+    }
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  });
   /** The end plank's score: the knights home of the human's team (« nous ») and of the other. */
   const endScore = $derived.by(() => {
     const score = { nous: 0, eux: 0 };
@@ -579,6 +813,7 @@
       lit: candidates,
       concealed,
       focus: focusTarget(),
+      messages: online !== undefined,
       blocked:
         session === undefined ||
         view === undefined ||
@@ -586,6 +821,8 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
+    // Under a plate only « ? » and « M » reach the game.
+    if (plateUp && intent.kind !== "help" && intent.kind !== "messages") return;
     // The key is handled: no native action (a focused card or button is not also activated). It is
     // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
     // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
@@ -595,6 +832,11 @@
       const active = document.activeElement;
       shortcutsOpener = active instanceof HTMLElement && active !== document.body ? active : null;
       shortcutsOpen = true;
+      return;
+    }
+    if (intent.kind === "messages") {
+      const active = document.activeElement;
+      openMessages(active instanceof HTMLElement && active !== document.body ? active : null);
       return;
     }
     for (const each of intent.events) {
@@ -652,6 +894,16 @@
   let playEl = $state<HTMLElement | null>(null);
   /** The board's box (the stage is exactly the galet): the phone's hand measures its corner on it. */
   let stageEl = $state<HTMLElement | null>(null);
+  /** The board itself (the plate is placed on it), once the game is drawn. */
+  let boardEl = $state<HTMLElement | null>(null);
+  const drawnBoard = $derived(render !== null);
+  $effect(() => {
+    const stage = stageEl;
+    void drawnBoard;
+    void tick().then(() => {
+      boardEl = stage?.querySelector<HTMLElement>("[data-board]") ?? null;
+    });
+  });
   /** The element of the game that had the focus when the invitation appeared. */
   let focusBefore: HTMLElement | null = null;
   let wasPrompting = false;
@@ -710,6 +962,7 @@
       {bar}
       {compact}
       {part}
+      fastToggle={online === undefined}
       {view}
       human={session.human}
       names={session.names}
@@ -749,6 +1002,19 @@
   {/if}
 {/snippet}
 
+{#snippet pausedLine()}
+  {#if link !== "none"}
+    <!-- This device's own connection is down (plan 02-07): the reconnect banner, no motion. -->
+    <p class="reconnect-banner" data-reconnect-banner role="status">
+      <Icon name="wifi-off" size={16} />
+      <span>{tableCopy.game.connection.banner}</span>
+    </p>
+  {:else}
+    <!-- While a plate is up the prompt row (or the action zone) says only « Partie en pause ». -->
+    <p class="paused-line" data-paused-prompt>{tableCopy.game.paused}</p>
+  {/if}
+{/snippet}
+
 {#snippet hand()}
   {#if session !== undefined && view !== undefined}
     <HandFan
@@ -772,6 +1038,7 @@
   data-chrome={screen.chrome}
   style:--head-room={SCENE.headRoom}
   style:--board-ratio={SCENE.height / SCENE.width}
+  style:--galet-bare={GALET_BARE}
 >
   {#if startFailure}
     {fail(startFailure)}
@@ -794,21 +1061,43 @@
             names={session.names}
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
-            onabandon={abandon}
+            onabandon={online === undefined ? abandon : undefined}
+            onleave={online?.onleave}
+            onstop={canStop ? stopGame : undefined}
+            {tableSpeed}
+            players={online !== undefined && onlineTable !== null
+              ? { table: onlineTable, me: online.seat }
+              : undefined}
+            onmessages={online !== undefined ? openMessages : undefined}
           />
         </div>
 
         {#if compact}
-          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays. -->
+          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays;
+               online « Messages » takes that slot (the server paces the computers, plan 02-08) and
+               stays usable under a plate. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
-              <SettingsButton onabandon={abandon} />
+              <SettingsButton
+                onabandon={online === undefined ? abandon : undefined}
+                online={online !== undefined}
+                inGame={online !== undefined}
+                onleave={online?.onleave}
+                onstop={canStop ? stopGame : undefined}
+                {tableSpeed}
+              />
             </div>
-            {@render zone("fast")}
+            {#if online !== undefined}
+              <MessagesButton onopen={openMessages} keys />
+            {:else}
+              <div class="fast" inert={plateUp}>
+                {@render zone("fast")}
+              </div>
+            {/if}
           </div>
         {/if}
 
-        <div class="stage" bind:this={stageEl}>
+        <div class="stage" bind:this={stageEl} inert={plateUp}>
           <Board
             {k}
             {render}
@@ -818,6 +1107,11 @@
             thinking={session.thinking}
             ontapis={() => (tapisOpen = true)}
           >
+            {#snippet badges()}
+              {#if onlineTable !== null}
+                <SeatBadges {k} table={onlineTable} />
+              {/if}
+            {/snippet}
             {#snippet under(px)}
               <Overlay
                 layer="under"
@@ -886,6 +1180,7 @@
                left strip, its buttons in the right one. The region takes no box of its own. -->
           <section
             class="seven"
+            inert={plateUp}
             data-seven-panel
             data-selected={flow.selected ?? ""}
             aria-label={copy.seven.title}
@@ -902,17 +1197,21 @@
           </section>
         {:else if flow.kind === "sevenBuilding"}
           <!-- The 7 splitter replaces the action zone and the hand (UI-SPEC). -->
-          <div class="seven">
+          <div class="seven" inert={plateUp}>
             {@render seven("all")}
           </div>
         {:else if compact}
           <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
                and the hand (or the « Lequel ? » chips) at the bottom of the left one. -->
           <div class="prompt-row">
-            {@render zone("prompt")}
+            {#if plateUp}
+              {@render pausedLine()}
+            {:else}
+              {@render zone("prompt")}
+            {/if}
           </div>
           {#if ui.kind === "tray"}
-            <div class="chips">
+            <div class="chips" inert={plateUp}>
               <PawnTray
                 options={ui.options}
                 part="chips"
@@ -922,31 +1221,72 @@
               />
             </div>
           {/if}
-          <div class="actions">
-            {@render zone("buttons")}
+          <div class="actions" inert={plateUp}>
+            {#if !plateUp}
+              {@render zone("buttons")}
+            {/if}
           </div>
           {#if ui.kind !== "tray"}
-            <div class="hand">
+            <div class="hand" inert={plateUp}>
               {@render hand()}
             </div>
           {/if}
         {:else}
-          <div class="action">
-            {@render zone("all")}
+          <div class="action" inert={plateUp}>
+            {#if plateUp}
+              {@render pausedLine()}
+            {:else}
+              {@render zone("all")}
+            {/if}
           </div>
 
-          <div class="hand">
+          <div class="hand" inert={plateUp}>
             {@render hand()}
           </div>
         {/if}
       </div>
+
+      {#if online !== undefined && onlineTable !== null}
+        <ChatBubbles
+          onFrame={online.connection.onFrame}
+          table={onlineTable}
+          me={online.seat}
+          place={placeChat}
+          visible={!ended}
+        />
+        <TablePlate
+          table={onlineTable}
+          me={online.seat}
+          offset={online.connection.serverOffset}
+          board={boardEl}
+          send={(frame) => online.connection.send(frame)}
+          onhome={online.onhome}
+          {link}
+          onretry={() => online.connection.reconnect()}
+        />
+      {/if}
 
       {#if tapisOpen}
         <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
       {/if}
 
       {#if shortcutsOpen}
-        <ShortcutsSheet opener={shortcutsOpener} onclose={() => (shortcutsOpen = false)} />
+        <ShortcutsSheet
+          opener={shortcutsOpener}
+          online={online !== undefined}
+          onclose={() => (shortcutsOpen = false)}
+        />
+      {/if}
+
+      {#if messagesOpen && online !== undefined && onlineTable !== null && !ended}
+        <MessagesSheet
+          chat={online.connection.chat}
+          table={onlineTable}
+          me={online.seat}
+          opener={messagesOpener}
+          onsend={(msg) => online.connection.send({ t: "chat", msg })}
+          onclose={() => (messagesOpen = false)}
+        />
       {/if}
 
       {#if ended && render.winner !== null && endNames !== undefined}
@@ -958,6 +1298,17 @@
           stats={session.stats}
           onreplay={replay}
           onchange={changeColour}
+          online={online === undefined
+            ? undefined
+            : {
+                me: online.seat,
+                votes: endVotes,
+                starting: rematchStarted,
+                names: discNames,
+                closing: rematchClosing,
+                onrematch: (agree) => online.connection.send({ t: "rematch", agree }),
+                onleave: online.onquit,
+              }}
         />
       {/if}
     {/if}
@@ -983,11 +1334,12 @@
    *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
    *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
    * - « compact », every other landscape screen (a phone held sideways, a small window): the board
-   *   on the full height under a 24 px prompt row, max(0, min(100vw − 2 × 60 px − insets,
-   *   (100dvh − 24 px − insets) / ratio)), with a strip of at least 60 px at each side: the info and
-   *   the hand at the left (its larger cards over the galet's bare corner and past the screen's left
-   *   edge, plan 03-10), « Avance rapide » and the state's buttons at the right. About 630 px wide
-   *   at 750 x 342, 724 at 844 x 390, 360 at 480 x 320 (plan 01-47).
+   *   on the full height under a 24 px prompt row, max(0, min(100vw − hand strip − 60 px − insets,
+   *   (100dvh − 24 px − insets) / ratio)), with at the left a strip as wide as the hand's 03-10
+   *   cards need (at least 60 px, plan 02-06c: Romain's « Plateau un peu réduit ») holding the info
+   *   and the hand (one column over the galet's bare side), and a strip of at least 60 px at the
+   *   right, « Avance rapide » and the state's buttons. About 618 px wide at 750 x 342, 701 at
+   *   844 x 390, 351 at 480 x 320.
    * - « rotate », every screen taller than wide: only the invitation, « Tourne ton téléphone » (or
    *   « Élargis la fenêtre » on a computer). The game is kept behind it, mounted but not displayed
    *   (.play.away), so no layout rule serves a screen taller than wide.
@@ -995,6 +1347,48 @@
    * compact mode it is the info, « Avance rapide », the board, the 7's or the tray's chips, the
    * buttons, the hand.
    */
+
+  /*
+   * The reconnect banner (plan 02-07): Label 700 cream on a bois sombre pill as wide as its text + 16,
+   * 24 high in the prompt row; the same in the action zone of the computer.
+   */
+  .reconnect-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    width: max-content;
+    max-width: 100%;
+    height: 24px;
+    margin: 0 auto;
+    padding: 0 var(--space-sm);
+    border-radius: 12px;
+    background: var(--bois-sombre);
+    color: var(--creme);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+
+  .reconnect-banner :global(svg) {
+    flex: none;
+  }
+
+  /* « Partie en pause » in the prompt row (compact) or the action zone (bar), plan 02-06. */
+  .paused-line {
+    margin: 0;
+    color: var(--creme);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: 24px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .fast {
+    display: contents;
+  }
 
   /* The game's wrapper takes no box of its own; behind the invitation it is not displayed at all. */
   .play {
@@ -1050,9 +1444,11 @@
 
   /*
    * « compact », every other landscape screen (a phone held sideways, a small window; Romain's
-   * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: a strip of at least
-   * --strip at each side and the board between them, so the board is centred and the strips take
-   * what is left, max(--strip, (100vw − insets − board) / 2) each. In the middle column the
+   * « Plateau sur toute la hauteur » of 2026-10-15, plan 01-47). Three columns: the board between a
+   * left strip of at least --hand-strip (the hand's cards at their 03-10 size, plan 02-06c: « Plateau
+   * un peu réduit », 2026-10-17) and a right one of at least --strip; the strips share what the board
+   * leaves, so in a window with spare width the board is centred, or moved right as far as the hand
+   * needs, before it gets narrower. In the middle column the
    * --prompt-row over the board, the two kept together and centred in the height (a screen limited
    * by its width leaves the same room above and below them); the strips span the whole height. No
    * head room of its own: the prompt row is that room, a lifted top-row knight's head may rise into
@@ -1067,12 +1463,27 @@
       --strip: 60px;
       --strip-button: 58px;
       --prompt-row: 24px;
+      /* The hand's target card: cornerCard of the strip's height (fan.ts, cornerTargetWidth). */
+      --hand-card: min(
+        80px,
+        (100dvh - var(--inset-y) - 60px) * 5 / 21,
+        max(40px, 100dvh - var(--inset-y) - 224px) * 5 / 7
+      );
+      /* The board limited by the height alone. */
+      --board-tall: ((100dvh - var(--prompt-row) - var(--inset-y)) / var(--board-ratio));
+      /* The left strip: the card, moved 6 px when selected, 2 px of margin and 1.5 px for the card's
+         rounding, less the galet's bare side (--galet-bare of the board's width), whether the board
+         is limited by the width (the first term) or by the height (the second); fan.ts,
+         compactLayout. */
+      --hand-strip: max(
+        var(--strip),
+        (var(--hand-card) + 9.5px - var(--galet-bare) * (100vw - var(--inset-x) - var(--strip))) /
+          (1 - var(--galet-bare)),
+        var(--hand-card) + 9.5px - var(--galet-bare) * var(--board-tall)
+      );
       --board-size: max(
         0px,
-        min(
-          100vw - 2 * var(--strip) - var(--inset-x),
-          (100dvh - var(--prompt-row) - var(--inset-y)) / var(--board-ratio)
-        )
+        min(100vw - var(--hand-strip) - var(--strip) - var(--inset-x), var(--board-tall))
       );
     }
 
@@ -1083,7 +1494,7 @@
       margin: 0;
       padding: 0;
       gap: 0;
-      grid-template-columns: minmax(var(--strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
+      grid-template-columns: minmax(var(--hand-strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
       grid-template-rows: minmax(0, 1fr) var(--prompt-row) auto minmax(0, 1fr);
       grid-template-areas:
         "left . right"
@@ -1134,8 +1545,8 @@
     }
 
     /* The hand over the whole left strip, in front of the board: its cards stand from the strip's
-       bottom up to under the info (44 px), over the galet's bare corner and past the screen's left
-       edge (plan 03-10); the box lets every other tap through. */
+       bottom up to under the info (44 px), one column inside the strip and over the galet's bare
+       side (plans 03-10, 02-06b, 02-06c); the box lets every other tap through. */
     .hand {
       grid-area: left;
       align-self: stretch;

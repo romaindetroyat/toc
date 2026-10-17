@@ -2,8 +2,10 @@
   import KnightDefs from "./board/KnightDefs.svelte";
   import { game } from "./i18n/fr/game.ts";
   import Game from "./routes/Game.svelte";
+  import Home from "./routes/Home.svelte";
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
+  import Table from "./routes/Table.svelte";
   import Toast from "./ui/Toast.svelte";
 
   /** Debug builds only (route #/panne): an error thrown while the screen is drawn, to see the error screen. */
@@ -16,7 +18,7 @@
     throw error;
   }
 
-  /** A fresh start: back on the launch screen, so a reload cannot loop into the same error. */
+  /** A fresh start: back on the home « Accueil », so a reload cannot loop into the same error. */
   function reload() {
     location.hash = "#/";
     location.reload();
@@ -24,7 +26,10 @@
 
   let hash = $state(location.hash);
   // The hash may carry a query (#/partie?debug=geometry): the route is what precedes the "?".
-  const route = $derived(hash.split("?")[0]);
+  const route = $derived(hash.split("?")[0] ?? "");
+  /** An online table's link: #/table/<id> (the id is checked by the route). */
+  const TABLE_PREFIX = "#/table/";
+  const tableId = $derived(route.startsWith(TABLE_PREFIX) ? route.slice(TABLE_PREFIX.length) : null);
 
   $effect(() => {
     const onHashChange = () => {
@@ -42,6 +47,13 @@
 <svelte:boundary onerror={(error) => console.error(error)}>
   {#if route === "#/partie"}
     <Game />
+  {:else if route === "#/ordinateur"}
+    <!-- The solo setup (the launch screen of phases 1 and 3), one tap from the home (02-04, D-09). -->
+    <Launch />
+  {:else if tableId !== null}
+    {#key tableId}
+      <Table id={tableId} />
+    {/key}
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}
@@ -55,7 +67,7 @@
   {:else if __TOC_DEBUG__ && route === "#/panne"}
     {explode()}
   {:else}
-    <Launch />
+    <Home />
   {/if}
 
   {#snippet failed()}

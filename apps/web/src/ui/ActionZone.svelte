@@ -59,6 +59,11 @@
      * the right strip; « fast », « Avance rapide » as a 44 x 44 icon at the top of that strip.
      */
     part?: "all" | "prompt" | "buttons" | "fast";
+    /**
+     * « Avance rapide » may show (the local game). Online it is hidden: the server paces the computers
+     * for everyone (plan 02-08, 02-UI-SPEC « Chrome changes »).
+     */
+    fastToggle?: boolean;
   };
 
   let {
@@ -66,6 +71,7 @@
     bar = false,
     compact = false,
     part = "all",
+    fastToggle = true,
     view,
     human,
     names,
@@ -209,7 +215,9 @@
   const key = $derived(`${ui.kind}|${hint ?? ""}|${missed}|${thinking ?? ""}|${lines.join("/")}`);
   const fadeMs = $derived(settings.reduceMotion ? 0 : 150);
   const showFast = $derived(
-    (ui.kind === "waiting" || ui.kind === "empty" || ui.kind === "posed") && view.phase !== "won",
+    fastToggle &&
+      (ui.kind === "waiting" || ui.kind === "empty" || ui.kind === "posed") &&
+      view.phase !== "won",
   );
 </script>
 

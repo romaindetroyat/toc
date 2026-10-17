@@ -6,7 +6,7 @@
 //
 // Outputs (committed):
 //   apps/web/src/assets/fonts/{nunito,caveat}-{latin,latin-ext}.woff2 + OFL-{Nunito,Caveat}.txt
-//   apps/web/src/ui/icons.ts (12 Lucide icons as data, ISC licence header)
+//   apps/web/src/ui/icons.ts (18 Lucide icons as data, ISC licence header)
 
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -24,7 +24,7 @@ const FAMILIES = [
 ];
 const SUBSETS = ["latin", "latin-ext"];
 
-/** Exactly the icons of UI-SPEC « Design System ». */
+/** Exactly the icons of UI-SPEC « Design System » (phase 1, then the six of 02-UI-SPEC). */
 const ICON_NAMES = [
   "settings",
   "fast-forward",
@@ -38,6 +38,12 @@ const ICON_NAMES = [
   "copy",
   "chevron-down",
   "rotate-ccw",
+  "users",
+  "share-2",
+  "message-circle",
+  "wifi-off",
+  "bot",
+  "crown",
 ];
 
 mkdirSync(fontsOut, { recursive: true });

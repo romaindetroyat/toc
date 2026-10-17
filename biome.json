@@ -11,6 +11,8 @@
       "!**/*.svelte",
       "!**/node_modules",
       "!**/dist",
+      "!apps/worker/worker-configuration.d.ts",
+      "!.wrangler",
       "!apps/web/public",
       "!docs",
       "!assets",

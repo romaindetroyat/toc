@@ -18,6 +18,7 @@ export const credits = {
     { type: "plateau", title: "Plateau" },
     { type: "cavaliers", title: "Cavaliers" },
     { type: "cartes", title: "Cartes" },
+    { type: "logo", title: "Logo" },
   ],
   /** Rows of a type the list above does not know still appear, under this heading. */
   otherGroup: "Autres",
@@ -41,5 +42,6 @@ export const credits = {
     "plateau-cavaliers": "Cavaliers du plateau",
     cavaliers: "Cavaliers",
     cartes: "Figures des cartes (Valet, Dame, Roi)",
+    logo: "Logo et icônes de l’application",
   } as Record<string, string>,
 } as const;

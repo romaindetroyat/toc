@@ -8,15 +8,19 @@
     onclose: () => void;
     /** Element that gets the focus back on close. */
     opener?: HTMLElement | null;
+    /** At an online table: the row « M — Ouvrir les messages rapides » too (plan 02-08). */
+    online?: boolean;
   };
 
-  let { onclose, opener = null }: Props = $props();
+  let { onclose, opener = null, online = false }: Props = $props();
+
+  const rows = $derived(clavier.rows.filter((row) => online || !("online" in row)));
 </script>
 
 <Sheet title={clavier.title} closeLabel={clavier.close} {onclose} {opener}>
   <p class="intro">{clavier.intro}</p>
   <dl class="rows" data-shortcuts-sheet>
-    {#each clavier.rows as row (row.action)}
+    {#each rows as row (row.action)}
       <div class="row" data-shortcut-row>
         <dt class="keys">
           {#each row.keys as key, i (key)}
