@@ -100,6 +100,7 @@ describe("stand and sit", () => {
       name: null,
       level: 3,
       online: true,
+      handedOver: null,
     });
     expect(to(out, BEN)).toMatchObject([{ t: "welcome", you: { seat: "vert" } }]);
   });

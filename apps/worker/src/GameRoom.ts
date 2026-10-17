@@ -6,12 +6,21 @@
 // Nothing lives only in memory: `cached` is a copy of the snapshot, dropped on eviction and read again
 // from SQLite. Sockets carry their person in their attachment ({ who, helloAt }), which survives
 // hibernation. No timer function anywhere: deadlines are alarms (CLAUDE.md, Hibernation API).
+//
+// Presence (plan 02-06, 02-RESEARCH Pattern 7, Pitfall 5): a socket closing is a `gone` (the fast
+// path, the page's pagehide closes with 1000). A locked phone may keep its socket open without a
+// word: the client pings every 20 s, the runtime answers "pong" without waking the object and
+// records when (getWebSocketAutoResponseTimestamp). Every alarm first closes, with 4000, each socket
+// whose last sign of life (that timestamp, else its hello) is older than SILENCE_MS, and runs `gone`
+// for its person when no other socket of theirs is open; the table keeps a sweep deadline every
+// SWEEP_MS while a game runs or waits, so such an alarm comes.
 
 import { DurableObject } from "cloudflare:workers";
 import type { Rng } from "@toc/engine";
 import {
   CLOSE_ELSEWHERE,
   CLOSE_GONE,
+  CLOSE_SILENT,
   CLOSE_VERSION,
   PROTOCOL_VERSION,
   parseClientFrame,
@@ -24,6 +33,7 @@ import {
   createTable,
   nextDeadline,
   reduce,
+  SILENCE_MS,
   summary,
   type Table,
   type TestOptions,
@@ -153,9 +163,39 @@ export class GameRoom extends DurableObject<Env> {
   async alarm(alarmInfo?: AlarmInvocationInfo): Promise<void> {
     // The alarm that fired is no longer set.
     this.armed = null;
+    // Silent sockets first: a person found gone pauses the game before the tick runs (NET-03).
+    this.sweepSilent(Date.now());
     // A retry follows a failed invocation (over the Free plan's CPU limit, for instance): a computer
     // decision still pending is then made at level 1, so the table never freezes (D-11).
     this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
+  }
+
+  /**
+   * Closes every socket silent for more than SILENCE_MS (no answered ping since, no hello) with 4000,
+   * then runs `gone` for each of their people who has no other open socket (T-02-26).
+   */
+  private sweepSilent(now: number): void {
+    const sockets = this.ctx.getWebSockets();
+    const silent = new Set<string>();
+    for (const ws of sockets) {
+      const { who, helloAt } = attachmentOf(ws);
+      const answered = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
+      if (now - Math.max(answered, helloAt) <= SILENCE_MS) continue;
+      // Its close handler must not run `gone` a second time: the attachment forgets the person.
+      ws.serializeAttachment({ who: null, helloAt: 0 } satisfies Attachment);
+      try {
+        ws.close(CLOSE_SILENT, "silencieux");
+      } catch {
+        // Already closing.
+      }
+      if (who !== null) silent.add(who);
+    }
+    for (const who of silent) {
+      const still = sockets.some(
+        (other) => other.readyState === WebSocket.OPEN && attachmentOf(other).who === who,
+      );
+      if (!still) this.run({ t: "gone", who });
+    }
   }
 
   /** A socket closed: the person is gone when no other open socket is theirs. */

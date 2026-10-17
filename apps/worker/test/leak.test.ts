@@ -162,7 +162,7 @@ describe("leak oracle on the real frames of a whole game", () => {
         won = true;
         break;
       }
-      // Ben's socket closes (a phone locked, a tunnel): the table goes on without him.
+      // Ben's socket closes (a phone locked, a tunnel): the table pauses until he is back.
       if (!away && drops < DROPS.length && step >= (DROPS[drops] as number)) {
         ben.ws.close(1000, "bye");
         await ben.closed;
@@ -185,8 +185,8 @@ describe("leak oracle on the real frames of a whole game", () => {
         game.phase === "exchange"
           ? ((["bleu", "jaune"] as const).find((c) => game.given[c] === null) as Color)
           : game.turn;
-      if (seat !== "bleu" && seat !== "jaune") throw new Error(`no computer due, ${seat} to play`);
-      if (seat === "jaune" && away) {
+      // While Ben is away the game is paused for him (plan 02-06): he comes back to resume it.
+      if ((seat === "jaune" || table.status === "paused") && away) {
         // Ben comes back: a new socket, hello with the same device token.
         ben = await connect(id);
         readers.push({ name: `ben#${reconnects + 2}`, client: ben, seat: "jaune", seatedFrom: 0 });
@@ -203,6 +203,7 @@ describe("leak oracle on the real frames of a whole game", () => {
         reconnects += 1;
         continue;
       }
+      if (seat !== "bleu" && seat !== "jaune") throw new Error(`no computer due, ${seat} to play`);
       // The human due plays from the view its own socket received for this seq.
       const client = seat === "bleu" ? ana : ben;
       await until(() => viewAt(client, table.seq) !== null, `${seat}'s view at ${table.seq}`);

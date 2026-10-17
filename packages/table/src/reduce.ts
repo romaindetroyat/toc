@@ -28,16 +28,27 @@ import type {
   HelloFrame,
   LevelFrame,
   MoveFrame,
+  PauseFrame,
   ServerFrame,
 } from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
-import { eventsFrameFor, personOf, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
-import { copyTable, type Table } from "./table.ts";
+import { eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
+import {
+  applyChoice,
+  hostOf,
+  onGone,
+  onHello,
+  onPauseChoiceDue,
+  resume as resumeGame,
+  SWEEP_MS,
+  wantsSweep,
+} from "./presence.ts";
+import { copyTable, personOf, type Table } from "./table.ts";
 
 export type Command =
   /** A socket said hello: `who` is the hash of the table id and its device token. */
   | { t: "hello"; who: string; name: string }
-  /** The last socket of `who` closed. */
+  /** The last socket of `who` closed, or the Durable Object swept it as silent (plan 02-06). */
   | { t: "gone"; who: string }
   /** The alarm fired; `retry` when the runtime retries it after a failed invocation (D-11). */
   | { t: "tick"; retry: boolean }
@@ -76,11 +87,12 @@ function refuse(table: Table, who: string, code: ErrorCode): Reduced {
 
 /**
  * A table frame to every person online who is not already sent a snapshot, when the public table
- * changed (someone sat, left, came back, the game started, another computer is now due).
+ * changed (someone sat, left, came back, the game started or paused, another computer is now due).
+ * The frame carries the server's clock `now`; the comparison leaves it out.
  */
-function publicChanges(before: Table, after: Table, skip: ReadonlySet<string>): Out[] {
-  if (JSON.stringify(tablePublic(before)) === JSON.stringify(tablePublic(after))) return [];
-  const frame = tableFrame(after);
+function publicChanges(before: Table, after: Table, skip: ReadonlySet<string>, now: number): Out[] {
+  if (JSON.stringify(tablePublic(before, 0)) === JSON.stringify(tablePublic(after, 0))) return [];
+  const frame = tableFrame(after, now);
   return after.people
     .filter((person) => person.online && !skip.has(person.who))
     .map((person) => ({ to: person.who, frame }));
@@ -105,7 +117,7 @@ function commitPlay(
     if (person.seat === null) continue;
     out.push({ to: person.who, frame: eventsFrameFor(next, played.events, person.seat) });
   }
-  out.push(...publicChanges(before, next, new Set()));
+  out.push(...publicChanges(before, next, new Set(), now));
   const entry: LogEntry = {
     seq: next.seq,
     gameNo: next.gameNo,
@@ -128,19 +140,26 @@ function hello(table: Table, who: string, name: string, now: number): Reduced {
     person.online = true;
   }
   next.lastActivity = now;
+  // Back at the table: the pause may end, a handed-over seat is theirs again (plan 02-06).
+  const { regained } = onHello(next, who, now);
   return {
     table: next,
-    out: [{ to: who, frame: welcomeFor(next, who) }, ...publicChanges(table, next, new Set([who]))],
+    out: [
+      { to: who, frame: welcomeFor(next, who, now, regained) },
+      ...publicChanges(table, next, new Set([who]), now),
+    ],
     log: [],
   };
 }
 
-function gone(table: Table, who: string): Reduced {
+function gone(table: Table, who: string, now: number): Reduced {
   if (personOf(table, who)?.online !== true) return unchanged(table);
   const next = copyTable(table);
   const person = personOf(next, who);
   if (person !== undefined) person.online = false;
-  return { table: next, out: publicChanges(table, next, new Set([who])), log: [] };
+  // A seated person missing during a game pauses it for everyone (NET-03, D-04).
+  onGone(next, who, now);
+  return { table: next, out: publicChanges(table, next, new Set([who]), now), log: [] };
 }
 
 /**
@@ -154,8 +173,8 @@ function lobbyChange(before: Table, next: Table, now: number): Reduced {
     const was = personOf(before, person.who)?.seat ?? null;
     if (person.online && was !== person.seat) moved.add(person.who);
   }
-  const out: Out[] = [...moved].map((who) => ({ to: who, frame: welcomeFor(next, who) }));
-  out.push(...publicChanges(before, next, moved));
+  const out: Out[] = [...moved].map((who) => ({ to: who, frame: welcomeFor(next, who, now) }));
+  out.push(...publicChanges(before, next, moved, now));
   return { table: next, out, log: [] };
 }
 
@@ -231,7 +250,7 @@ function level(table: Table, who: string, frame: LevelFrame, now: number): Reduc
   const next = copyTable(table);
   next.levels[frame.seat] = value;
   next.lastActivity = now;
-  return { table: next, out: publicChanges(table, next, new Set()), log: [] };
+  return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
 }
 
 /**
@@ -255,7 +274,7 @@ function leave(table: Table, who: string, now: number): Reduced {
     next.people = next.people.filter((each) => each.who !== who);
   }
   next.lastActivity = now;
-  return { table: next, out: publicChanges(table, next, new Set([who])), log: [] };
+  return { table: next, out: publicChanges(table, next, new Set([who]), now), log: [] };
 }
 
 function start(table: Table, who: string, ctx: Ctx): Reduced {
@@ -282,12 +301,14 @@ function start(table: Table, who: string, ctx: Ctx): Reduced {
 
 function act(table: Table, who: string, frame: ActFrame, now: number): Reduced {
   const seat = personOf(table, who)?.seat ?? null;
+  // Nothing is played while the game waits for someone, or once it is saved (D-04).
+  if (table.status === "paused" || table.status === "saved") return refuse(table, who, "paused");
   if (table.status !== "playing" || table.game === null || seat === null) {
     return refuse(table, who, "illegal");
   }
   if (frame.base !== table.seq) {
     const stale = refuse(table, who, "stale");
-    stale.out.push({ to: who, frame: welcomeFor(table, who) });
+    stale.out.push({ to: who, frame: welcomeFor(table, who, now) });
     return stale;
   }
   let played: { state: GameState; events: GameEvent[] };
@@ -301,7 +322,56 @@ function act(table: Table, who: string, frame: ActFrame, now: number): Reduced {
   return commitPlay(table, copyTable(table), played, seat, frame.action, now);
 }
 
+/**
+ * The host's choice after the pause's minute (NET-04): the derived host only (T-02-24), while the
+ * host is choosing only.
+ */
+function pause(table: Table, who: string, frame: PauseFrame, now: number): Reduced {
+  if (table.status !== "paused" || table.pause === null) return refuse(table, who, "refused");
+  if (hostOf(table) !== who) return refuse(table, who, "not-host");
+  if (!table.pause.choosing) return refuse(table, who, "refused");
+  // The protocol already checked 1 to 5; the core checks again.
+  const level = frame.level === undefined ? undefined : parseBotLevel(frame.level);
+  if (level === null) return refuse(table, who, "bad-frame");
+  const next = copyTable(table);
+  applyChoice(next, frame.choice, level, now);
+  next.lastActivity = now;
+  return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
+}
+
+/** « Reprendre la partie »: the host, on a saved game only. */
+function resume(table: Table, who: string, now: number): Reduced {
+  if (table.status !== "saved") return refuse(table, who, "refused");
+  if (hostOf(table) !== who) return refuse(table, who, "not-host");
+  const next = copyTable(table);
+  resumeGame(next, now);
+  next.lastActivity = now;
+  return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
+}
+
+/**
+ * The alarm: every due deadline of the table. The sweep only re-arms itself (the Durable Object
+ * closed the silent sockets before this tick); the pause's minute lets the host choose; then the
+ * computer player due.
+ */
 function tick(table: Table, now: number, retry: boolean): Reduced {
+  let base = table;
+  const { sweep, pauseChoice } = table.deadlines;
+  if (
+    (sweep !== undefined && now >= sweep.at) ||
+    (pauseChoice !== undefined && now >= pauseChoice.at)
+  ) {
+    base = copyTable(table);
+    if (sweep !== undefined && now >= sweep.at) base.deadlines.sweep = { at: now + SWEEP_MS };
+    if (pauseChoice !== undefined && now >= pauseChoice.at) onPauseChoiceDue(base, now);
+  }
+  const played = botTick(base, now, retry);
+  if (played.table !== base) return played;
+  if (base === table) return unchanged(table);
+  return { table: base, out: publicChanges(table, base, new Set(), now), log: [] };
+}
+
+function botTick(table: Table, now: number, retry: boolean): Reduced {
   const deadline = table.deadlines.bot;
   if (deadline === undefined || now < deadline.at) return unchanged(table);
   const next = copyTable(table);
@@ -310,14 +380,14 @@ function tick(table: Table, now: number, retry: boolean): Reduced {
     // A deadline for another state (alarms come at least once): recomputed, nothing played.
     if (pending !== null && !stillDue(next, pending)) next.thinking = null;
     scheduleBot(next, [], now);
-    return { table: next, out: publicChanges(table, next, new Set()), log: [] };
+    return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
   }
   const thought = thinkTick(next, now, retry);
   const game = next.game;
   if (thought === null || game === null) {
     // Decided or one slice further: the deadline moves to the next slice or the play time.
     scheduleBot(next, [], now);
-    return { table: next, out: publicChanges(table, next, new Set()), log: [] };
+    return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
   }
   const seat = pending.seat;
   const bot: BotInfo = {
@@ -329,12 +399,27 @@ function tick(table: Table, now: number, retry: boolean): Reduced {
   return commitPlay(table, next, apply(game, seat, thought.action), seat, thought.action, now, bot);
 }
 
+/**
+ * One command of the Durable Object. After it, the sweep deadline is armed while a game runs or waits
+ * with a seated person online, and removed otherwise (presence.ts).
+ */
 export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
+  const result = route(table, command, ctx);
+  const wanted = wantsSweep(result.table);
+  const armed = result.table.deadlines.sweep !== undefined;
+  if (wanted === armed) return result;
+  const next = result.table === table ? copyTable(table) : result.table;
+  if (wanted) next.deadlines.sweep = { at: ctx.now + SWEEP_MS };
+  else delete next.deadlines.sweep;
+  return { ...result, table: next };
+}
+
+function route(table: Table, command: Command, ctx: Ctx): Reduced {
   switch (command.t) {
     case "hello":
       return hello(table, command.who, command.name, ctx.now);
     case "gone":
-      return gone(table, command.who);
+      return gone(table, command.who, ctx.now);
     case "tick":
       return tick(table, ctx.now, command.retry);
     case "client": {
@@ -355,6 +440,10 @@ export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
           return start(table, command.who, ctx);
         case "act":
           return act(table, command.who, frame, ctx.now);
+        case "pause":
+          return pause(table, command.who, frame, ctx.now);
+        case "resume":
+          return resume(table, command.who, ctx.now);
       }
     }
   }

@@ -30,7 +30,7 @@ import {
   type Thought,
 } from "@toc/bots";
 import { type GameEvent, next as nextRandom, viewFor } from "@toc/engine";
-import { dueBot, type PendingThink, type Table } from "./table.ts";
+import { computerLevel, dueBot, type PendingThink, type Table } from "./table.ts";
 
 /**
  * Units of the Champion's search per alarm invocation. One rollout (1 + CHAMPION_PLIES = 5 units) is
@@ -54,7 +54,8 @@ export function speedOf(table: Table): Speed {
 export function stillDue(table: Table, pending: PendingThink): boolean {
   const game = table.game;
   if (table.status !== "playing" || game === null) return false;
-  if (table.seats[pending.seat].kind !== "bot") return false;
+  // A seat given back to its person (plan 02-06) is no longer the computer's.
+  if (computerLevel(table, pending.seat) === null) return false;
   if (pending.base === "exchange") {
     return game.phase === "exchange" && game.given[pending.seat] === null;
   }
@@ -79,7 +80,7 @@ export function scheduleBot(table: Table, events: readonly GameEvent[], now: num
         : {
             seat,
             base: game.phase === "exchange" ? "exchange" : table.seq,
-            level: table.levels[seat],
+            level: computerLevel(table, seat) ?? table.levels[seat],
             dueAt: now,
             waitMs: speedOf(table) === "test" ? 0 : eventsDuration(events, "normal"),
             checkpoint: null,

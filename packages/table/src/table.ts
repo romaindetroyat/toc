@@ -17,7 +17,11 @@ export type Person = {
 
 export type Seat =
   | { kind: "free" }
-  | { kind: "human"; who: string }
+  /**
+   * A person's seat. `handedOver`: the chef de table gave it to the computer at this strength while
+   * its person is away (D-04); null (or absent in a snapshot from before plan 02-06) otherwise.
+   */
+  | { kind: "human"; who: string; handedOver?: BotLevel | null }
   | { kind: "bot"; name: string };
 
 /** Test-only options, honoured only when the Worker runs with TOC_TEST_MODE=1 (T-02-07). */
@@ -26,6 +30,19 @@ export type TestOptions = {
   pace: "zero" | "normal";
   /** The strength of computer seats, until the waiting room's picker exists (plan 02-05). */
   levels?: Partial<Record<Color, BotLevel>>;
+  /** The pause's minute, shortened for the end-to-end tests (plan 02-06). */
+  pauseMs?: number;
+};
+
+/**
+ * The pause (plan 02-06, D-04): the seats whose people are missing (in the order they went), when it
+ * began, when the host may choose, and whether the host is choosing now.
+ */
+export type Pause = {
+  missing: Color[];
+  since: number;
+  choiceAt: number;
+  choosing: boolean;
 };
 
 /**
@@ -55,11 +72,19 @@ export type PendingThink = {
 };
 
 export type Table = {
-  status: "lobby" | "playing";
+  /**
+   * lobby → playing (start) → paused (a seated person is missing, D-04) → playing (back, or handed
+   * to the computer) or saved (« Sauvegarder et arrêter », or nobody online at the end of the
+   * minute) → playing or paused (« Reprendre la partie »).
+   */
+  status: "lobby" | "playing" | "paused" | "saved";
   createdAt: number;
   lastActivity: number;
   tableId: string;
-  /** The first person who said hello: the creator, and the host (plan 02-06 adds the hand-over). */
+  /**
+   * The first person who said hello: the creator. The host (« chef de table ») is derived from it on
+   * every change (presence.ts hostOf, D-05), never stored.
+   */
   creator: string | null;
   people: Person[];
   seats: Record<Color, Seat>;
@@ -71,8 +96,18 @@ export type Table = {
   gameNo: number;
   /** The computer players' random stream: first dealer, horse names, then their choices. */
   botRng: Rng;
-  /** When the computer player due must next be ticked (decide, a slice, or play), for `seq`. */
-  deadlines: { bot?: { at: number; seq: number } };
+  /**
+   * The table's deadlines, one alarm for all (02-RESEARCH Pattern 3): when the computer player due
+   * must next be ticked (decide, a slice, or play) for `seq`; when the pause's minute is over; when
+   * the silent sockets are next swept (presence.ts).
+   */
+  deadlines: {
+    bot?: { at: number; seq: number };
+    pauseChoice?: { at: number };
+    sweep?: { at: number };
+  };
+  /** The pause while the status is "paused"; else null. */
+  pause: Pause | null;
   /** The computer player due and its decision, or null (its seat is TablePublic.thinking). */
   thinking: PendingThink | null;
   test: TestOptions | null;
@@ -108,6 +143,7 @@ export function createTable(options: {
     gameNo: 0,
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: {},
+    pause: null,
     thinking: null,
     test: options.test ?? null,
   };
@@ -116,24 +152,45 @@ export function createTable(options: {
 /** A deep copy: the table is plain JSON (it is stored as such), so the reducer never edits its input. */
 export function copyTable(table: Table): Table {
   const copy = JSON.parse(JSON.stringify(table)) as Table;
-  // A snapshot written before plan 02-03 has no pending think.
+  // A snapshot written before plan 02-03 has no pending think, before plan 02-06 no pause.
   copy.thinking ??= null;
+  copy.pause ??= null;
   return copy;
+}
+
+export function personOf(table: Table, who: string): Person | undefined {
+  return table.people.find((person) => person.who === who);
 }
 
 /** The earliest deadline of the table, or null: the Durable Object arms its one alarm at it. */
 export function nextDeadline(table: Table): number | null {
-  return table.deadlines.bot?.at ?? null;
+  const { bot, pauseChoice, sweep } = table.deadlines;
+  const times = [bot?.at, pauseChoice?.at, sweep?.at].filter(
+    (at): at is number => at !== undefined,
+  );
+  return times.length === 0 ? null : Math.min(...times);
+}
+
+/**
+ * The strength the computer plays `color` at: a computer seat's level, or the level a person's seat
+ * was handed over at (D-04); null for a person playing their own seat and for a free seat.
+ */
+export function computerLevel(table: Table, color: Color): BotLevel | null {
+  const seat = table.seats[color];
+  if (seat.kind === "bot") return table.levels[color];
+  if (seat.kind === "human") return seat.handedOver ?? null;
+  return null;
 }
 
 /**
  * The computer player that must act now: during the exchange the first computer seat (COLORS order)
- * that has not given yet, in play the turn seat when a computer holds it; else null.
+ * that has not given yet, in play the turn seat when a computer holds it; else null. A seat handed
+ * over to the computer counts as a computer seat; nobody is due while the game is paused or saved.
  */
 export function dueBot(table: Table): Color | null {
   const game = table.game;
   if (table.status !== "playing" || game === null || game.phase === "won") return null;
-  const isBot = (color: Color) => table.seats[color].kind === "bot";
+  const isBot = (color: Color) => computerLevel(table, color) !== null;
   if (game.phase === "exchange") {
     return (
       COLORS.find((c) => isBot(c) && game.given[c] === null && game.hands[c].length > 0) ?? null

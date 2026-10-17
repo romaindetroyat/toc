@@ -1,7 +1,7 @@
 // The table protocol: every frame a browser and the table's Durable Object exchange, validated with
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
-// Client → server: hello (always first), sit, stand, move, level, leave, start, act. Server → client: welcome (the one snapshot),
+// Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume. Server → client: welcome (the one snapshot),
 // events (one batch of play, already projected for its reader), table (public data only), error (a
 // code, never a message). No frame type carries a GameState, the deck rng, another seat's cards or a
 // token (RULE-19): `view` is a PlayerView built by viewFor, `events` went through eventsFor.
@@ -11,12 +11,18 @@ import { type Action, COLORS, type Color, type GameEvent, type PlayerView } from
 import * as z from "zod/mini";
 import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
 
-/** Bumped when a frame changes shape: an older client is closed with CLOSE_VERSION (Pitfall 10). */
-export const PROTOCOL_VERSION = 1;
+/**
+ * Bumped when a frame changes shape: an older client is closed with CLOSE_VERSION (Pitfall 10).
+ * 2 (plan 02-06): the table may be paused or saved, and a client must ping every PING_MS (a client
+ * of version 1 never pings, so the silence sweep would close it).
+ */
+export const PROTOCOL_VERSION = 2;
 
 /** The longest client frame, in characters, checked before JSON.parse (T-02-05). */
 export const MAX_FRAME_CHARS = 4096;
 
+/** The server closed a socket silent for too long (no ping): the client reconnects (4000). */
+export const CLOSE_SILENT = 4000;
 /** The same device opened the table in another tab or on another device (4001). */
 export const CLOSE_ELSEWHERE = 4001;
 /** The client speaks another protocol version: reload the page (4002). */
@@ -64,6 +70,12 @@ const clientFrameSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("leave") }),
   z.strictObject({ t: z.literal("start") }),
   z.strictObject({ t: z.literal("act"), base: count, action: actionSchema }),
+  z.strictObject({
+    t: z.literal("pause"),
+    choice: z.enum(["wait", "bot", "save"]),
+    level: z.optional(levelValue),
+  }),
+  z.strictObject({ t: z.literal("resume") }),
 ]);
 
 /** The first frame of every socket: the protocol version, the device token and the first name. */
@@ -85,6 +97,15 @@ export type LeaveFrame = { t: "leave" };
 export type StartFrame = { t: "start" };
 /** One action of the sender's seat, played on the table at `base` (its seq). */
 export type ActFrame = { t: "act"; base: number; action: Action };
+/** What the host chose for the missing players after the pause's minute (D-04). */
+export type PauseChoice = "wait" | "bot" | "save";
+/**
+ * The host's choice once the pause's minute is over: wait one more minute, give the missing seats to
+ * the computer at `level` (only with "bot"; Galopeur when left out), or save and stop (NET-04).
+ */
+export type PauseFrame = { t: "pause"; choice: PauseChoice; level?: Level };
+/** The host resumes a saved game (« Reprendre la partie »). */
+export type ResumeFrame = { t: "resume" };
 export type ClientFrame =
   | HelloFrame
   | SitFrame
@@ -93,14 +114,17 @@ export type ClientFrame =
   | LevelFrame
   | LeaveFrame
   | StartFrame
-  | ActFrame;
+  | ActFrame
+  | PauseFrame
+  | ResumeFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
 /**
  * A client frame from untrusted text: too long, not JSON, an unknown type, an extra key, a seat, card
  * or pawn outside the engine's formats, a 7 plan of more than four parts, a base that is not a natural
- * number, or a first name that normalizes to nothing are all refused. The hello's name comes back
+ * number, a first name that normalizes to nothing, or a level with a pause choice other than "bot" are
+ * all refused. The hello's name comes back
  * normalized (normalizeName).
  */
 export function parseClientFrame(raw: unknown): ParsedClientFrame {
@@ -115,6 +139,10 @@ export function parseClientFrame(raw: unknown): ParsedClientFrame {
   if (!parsed.success) return { ok: false };
   // The regexes above pin every card and pawn id to the engine's template literal types.
   const frame = parsed.data as ClientFrame;
+  // A level goes with the hand-over only.
+  if (frame.t === "pause" && frame.choice !== "bot" && frame.level !== undefined) {
+    return { ok: false };
+  }
   if (frame.t !== "hello") return { ok: true, frame };
   const name = normalizeName(frame.name);
   return name === null ? { ok: false } : { ok: true, frame: { ...frame, name } };
@@ -133,13 +161,29 @@ export type SeatPublic = {
   level: Level;
   /** A person has a live socket; always true for a computer. */
   online: boolean;
+  /** A person's seat the computer plays for, at this strength, until they return; else null. */
+  handedOver: Level | null;
+};
+
+/**
+ * The pause (D-04): the seats whose people are missing, when it began, when the host may choose
+ * (server time, ms since the epoch) and whether the host is choosing now.
+ */
+export type PausePublic = {
+  missing: Color[];
+  since: number;
+  choiceAt: number;
+  choosing: boolean;
 };
 
 /** What anyone at the table may know of it. No token, no hash, no card. */
 export type TablePublic = {
-  status: "lobby" | "playing";
+  status: "lobby" | "playing" | "paused" | "saved";
   seats: Record<Color, SeatPublic>;
-  /** The host's seat (the creator), or null while the host has no seat. */
+  /**
+   * The host's seat (« chef de table »): the creator, or while the creator is away during a game the
+   * first person online clockwise from the creator's seat (D-05); null when there is none.
+   */
   host: Color | null;
   creatorName: string | null;
   gameNo: number;
@@ -147,6 +191,10 @@ export type TablePublic = {
   thinking: Color | null;
   /** The first names of the people at the table, online, without a seat (« Sans place »). */
   unseated: string[];
+  /** The pause, while the status is "paused"; else null. */
+  pause: PausePublic | null;
+  /** The server's clock when the frame was built (ms since the epoch): the countdown's reference. */
+  now: number;
 };
 
 export type You = { seat: Color | null; host: boolean };
@@ -158,7 +206,9 @@ export type ErrorCode =
   | "stale"
   | "seat-taken"
   | "started"
-  | "table-full";
+  | "table-full"
+  | "paused"
+  | "refused";
 
 export const ERROR_CODES: readonly ErrorCode[] = [
   "bad-frame",
@@ -168,6 +218,8 @@ export const ERROR_CODES: readonly ErrorCode[] = [
   "seat-taken",
   "started",
   "table-full",
+  "paused",
+  "refused",
 ];
 
 /** The one snapshot: on hello, after a stale act, after a seat change. */
@@ -178,6 +230,8 @@ export type WelcomeFrame = {
   /** viewFor(state, you.seat) while a game runs and the reader has a seat; else null. */
   view: PlayerView | null;
   seq: number;
+  /** Present when this hello took the seat back from the computer (« Tu reprends ta place. »). */
+  regained?: true;
 };
 /** One batch of play: eventsFor(events, seat) and the reader's view after it. */
 export type EventsFrame = { t: "events"; seq: number; events: GameEvent[]; view: PlayerView };
@@ -191,15 +245,24 @@ const seatPublic = z.object({
   name: z.nullable(z.string().check(z.maxLength(64))),
   level,
   online: z.boolean(),
+  handedOver: z.nullable(level),
+});
+const pausePublic = z.object({
+  missing: z.array(colour).check(z.maxLength(4)),
+  since: count,
+  choiceAt: count,
+  choosing: z.boolean(),
 });
 const tablePublic = z.object({
-  status: z.enum(["lobby", "playing"]),
+  status: z.enum(["lobby", "playing", "paused", "saved"]),
   seats: z.object({ bleu: seatPublic, jaune: seatPublic, rouge: seatPublic, vert: seatPublic }),
   host: z.nullable(colour),
   creatorName: z.nullable(z.string().check(z.maxLength(64))),
   gameNo: count,
   thinking: z.nullable(colour),
   unseated: z.array(z.string().check(z.maxLength(64))).check(z.maxLength(64)),
+  pause: z.nullable(pausePublic),
+  now: count,
 });
 /** The view and the events come from the engine's own builders on the server; the envelope is checked. */
 const view = z.custom<PlayerView>(
@@ -222,6 +285,7 @@ const serverFrameSchema = z.discriminatedUnion("t", [
     table: tablePublic,
     view: z.nullable(view),
     seq: count,
+    regained: z.optional(z.literal(true)),
   }),
   z.object({ t: z.literal("events"), seq: count, events, view }),
   z.object({ t: z.literal("table"), table: tablePublic }),
@@ -251,6 +315,8 @@ export function parseServerFrame(raw: unknown): ServerFrame | null {
 export type CreateTestOptions = {
   pace: "zero" | "normal";
   levels?: Partial<Record<Color, Level>>;
+  /** The pause's minute, shortened for the end-to-end tests (plan 02-06), 500 ms to 60 s. */
+  pauseMs?: number;
 };
 
 const testLevel = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
@@ -264,6 +330,7 @@ const createTestSchema = z.strictObject({
       vert: z.optional(testLevel),
     }),
   ),
+  pauseMs: z.optional(z.int().check(z.minimum(500), z.maximum(60_000))),
 });
 
 /** The test options of a parsed creation body, or null when absent or malformed. */

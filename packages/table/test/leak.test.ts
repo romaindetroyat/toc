@@ -24,7 +24,15 @@ import {
 import type { ServerFrame } from "@toc/protocol";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createTable, dueBot, type Out, reduce, type Table, welcomeFor } from "../src/index.ts";
+import {
+  createTable,
+  dueBot,
+  hostOf,
+  type Out,
+  reduce,
+  type Table,
+  welcomeFor,
+} from "../src/index.ts";
 import {
   canonical,
   cardIdsIn,
@@ -240,6 +248,13 @@ const seen = {
   unseatedWelcomes: 0,
   /** Error frames checked. */
   errors: 0,
+  /** Games paused because a seated person went (plan 02-06). */
+  pauses: 0,
+  /** The host's choices after the minute: wait, hand over, save; and resumes of a saved game. */
+  waits: 0,
+  handOvers: 0,
+  saves: 0,
+  resumes: 0,
 };
 
 /** A uniform integer in [0, n) from the walk's own stream. */
@@ -367,8 +382,10 @@ function playOne(config: {
       [who, rng] = pick(rng, people.length);
       const person = people[who] as Person;
       if (kind === 0 && online(person)) {
+        const wasPlaying = table.status === "playing";
         run({ t: "gone", who: person.who });
         absent.add(person.who);
+        if (wasPlaying && table.status === "paused") seen.pauses += 1;
       } else if (kind === 1 || (kind === 0 && !online(person))) {
         run({ t: "hello", who: person.who, name: person.name });
         if (absent.delete(person.who) && person.seat !== null) seen.reconnects += 1;
@@ -394,6 +411,56 @@ function playOne(config: {
       } else {
         run({ t: "tick", retry: false });
       }
+      continue;
+    }
+    // The pause (plan 02-06): the minute passes and the host chooses, someone comes back, or the
+    // host resumes a saved game; a choice by someone else is refused (an error frame, checked too).
+    if (table.status === "paused" || table.status === "saved") {
+      const host = people.find((person) => person.who === hostOf(table));
+      const other = people.find((person) => person.who !== host?.who && online(person));
+      let kind: number;
+      [kind, rng] = pick(rng, 6);
+      if (other !== undefined && kind === 5) {
+        run({ t: "client", who: other.who, frame: { t: "pause", choice: "save" } });
+        continue;
+      }
+      if (table.status === "saved") {
+        const back = people.find((person) => person.seat !== null && !online(person));
+        if (host !== undefined && (kind < 3 || back === undefined)) {
+          run({ t: "client", who: host.who, frame: { t: "resume" } });
+          seen.resumes += 1;
+        } else {
+          if (back === undefined) throw new Error("saved with everyone online and no host");
+          run({ t: "hello", who: back.who, name: back.name });
+          absent.delete(back.who);
+        }
+        continue;
+      }
+      const pause = table.pause;
+      if (pause === null) throw new Error("paused without a pause");
+      if (!pause.choosing && kind < 4) {
+        // The minute is over: the alarm's tick.
+        now = Math.max(now, pause.choiceAt - 1);
+        run({ t: "tick", retry: false });
+        continue;
+      }
+      if (pause.choosing && host !== undefined && kind < 4) {
+        const choice = (["wait", "bot", "bot", "save"] as const)[kind] as "wait" | "bot" | "save";
+        const level = choice === "bot" ? (((i % 5) + 1) as 1 | 2 | 3 | 4 | 5) : undefined;
+        run({
+          t: "client",
+          who: host.who,
+          frame: level === undefined ? { t: "pause", choice } : { t: "pause", choice, level },
+        });
+        if (choice === "wait") seen.waits += 1;
+        else if (choice === "bot") seen.handOvers += 1;
+        else seen.saves += 1;
+        continue;
+      }
+      const missing = pause.missing[0] as Color;
+      const back = people.find((person) => person.seat === missing) as Person;
+      run({ t: "hello", who: back.who, name: back.name });
+      if (absent.delete(back.who)) seen.reconnects += 1;
       continue;
     }
     // Progress: the computer due plays, else the human due acts (after coming back if away).

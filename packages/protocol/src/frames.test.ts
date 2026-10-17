@@ -148,7 +148,10 @@ describe("parseClientFrame", () => {
       frame: { t: "pause", choice: "wait" },
     });
     expect(ok({ t: "pause", choice: "save" }).ok).toBe(true);
-    expect(ok({ t: "pause", choice: "bot" })).toEqual({ ok: true, frame: { t: "pause", choice: "bot" } });
+    expect(ok({ t: "pause", choice: "bot" })).toEqual({
+      ok: true,
+      frame: { t: "pause", choice: "bot" },
+    });
     expect(ok({ t: "pause", choice: "bot", level: 4 })).toEqual({
       ok: true,
       frame: { t: "pause", choice: "bot", level: 4 },
@@ -262,7 +265,10 @@ describe("parseServerFrame", () => {
     const paused = {
       ...table,
       status: "paused",
-      seats: { ...table.seats, jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: null } },
+      seats: {
+        ...table.seats,
+        jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: null },
+      },
       pause: { missing: ["jaune"], since: 1_000, choiceAt: 61_000, choosing: false },
     };
     expect(parseServerFrame(JSON.stringify({ t: "table", table: paused }))).toEqual({
@@ -272,11 +278,23 @@ describe("parseServerFrame", () => {
     const handed = {
       ...table,
       status: "playing",
-      seats: { ...table.seats, jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: 4 } },
+      seats: {
+        ...table.seats,
+        jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: 4 },
+      },
     };
     expect(parseServerFrame(JSON.stringify({ t: "table", table: handed }))?.t).toBe("table");
-    expect(parseServerFrame(JSON.stringify({ t: "table", table: { ...table, status: "saved" } }))?.t).toBe("table");
-    const welcome = { t: "welcome", you: { seat: "jaune", host: false }, table: handed, view: null, seq: 4, regained: true };
+    expect(
+      parseServerFrame(JSON.stringify({ t: "table", table: { ...table, status: "saved" } }))?.t,
+    ).toBe("table");
+    const welcome = {
+      t: "welcome",
+      you: { seat: "jaune", host: false },
+      table: handed,
+      view: null,
+      seq: 4,
+      regained: true,
+    };
     expect(parseServerFrame(JSON.stringify(welcome))).toEqual(welcome);
     for (const code of ["paused", "refused"]) {
       expect(parseServerFrame(JSON.stringify({ t: "error", code }))).toEqual({ t: "error", code });
@@ -289,12 +307,21 @@ describe("parseServerFrame", () => {
     expect(parseServerFrame(JSON.stringify({ t: "table", table: withoutNow }))).toBeNull();
     expect(
       parseServerFrame(
-        JSON.stringify({ t: "table", table: { ...table, pause: { missing: ["violet"], since: 0, choiceAt: 0, choosing: false } } }),
+        JSON.stringify({
+          t: "table",
+          table: {
+            ...table,
+            pause: { missing: ["violet"], since: 0, choiceAt: 0, choosing: false },
+          },
+        }),
       ),
     ).toBeNull();
     expect(
       parseServerFrame(
-        JSON.stringify({ t: "table", table: { ...table, seats: { ...table.seats, bleu: { ...seat, handedOver: 9 } } } }),
+        JSON.stringify({
+          t: "table",
+          table: { ...table, seats: { ...table.seats, bleu: { ...seat, handedOver: 9 } } },
+        }),
       ),
     ).toBeNull();
     expect(parseServerFrame(JSON.stringify({ t: "error", code: "boom" }))).toBeNull();

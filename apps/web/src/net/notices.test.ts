@@ -3,12 +3,13 @@ import type { SeatPublic, TablePublic } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import { type Me, tableNotices } from "./notices.ts";
 
-const free: SeatPublic = { kind: "free", name: null, level: 3, online: true };
+const free: SeatPublic = { kind: "free", name: null, level: 3, online: true, handedOver: null };
 const human = (name: string, online = true): SeatPublic => ({
   kind: "human",
   name,
   level: 3,
   online,
+  handedOver: null,
 });
 
 function table(
@@ -24,6 +25,8 @@ function table(
     gameNo: 0,
     thinking: null,
     unseated,
+    pause: null,
+    now: 0,
   };
 }
 

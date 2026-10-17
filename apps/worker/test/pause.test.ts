@@ -104,7 +104,9 @@ describe("the pause in the Durable Object", () => {
       if ((await logOf(id)).some((row) => row.seat === "jaune" && row.bot?.level === 4)) break;
       await runDurableObjectAlarm(stub);
     }
-    expect((await logOf(id)).some((row) => row.seat === "jaune" && row.bot?.level === 4)).toBe(true);
+    expect((await logOf(id)).some((row) => row.seat === "jaune" && row.bot?.level === 4)).toBe(
+      true,
+    );
 
     // Ben comes back: the seat is his again at once, the computer's turn for it dropped.
     await evictDurableObject(stub);
@@ -115,15 +117,20 @@ describe("the pause in the Durable Object", () => {
     const back = await readTable(id);
     expect(back.seats.jaune).toMatchObject({ kind: "human", handedOver: null });
     expect(back.thinking?.seat).not.toBe("jaune");
-    await tableOf(ana, (table) => table.seats.jaune.handedOver === null && table.seats.jaune.online);
+    await tableOf(
+      ana,
+      (table) => table.seats.jaune.handedOver === null && table.seats.jaune.online,
+    );
 
     // Ben's new socket never pings: once its hello is SILENCE_MS old, the next alarm closes it with
     // 4000 and the game pauses again.
     await evictDurableObject(stub);
+    const benSeat = back.seats.jaune;
+    if (benSeat.kind !== "human") throw new Error("jaune is not Ben's");
     await runInDurableObject(stub, (_room, state) => {
       for (const ws of state.getWebSockets()) {
         const attachment = ws.deserializeAttachment() as { who: string | null; helloAt: number };
-        if (attachment.who === back.seats.jaune.who) {
+        if (attachment.who === benSeat.who) {
           expect(state.getWebSocketAutoResponseTimestamp(ws)).toBeNull();
           ws.serializeAttachment({ ...attachment, helloAt: Date.now() - SILENCE_MS - 5_000 });
         }

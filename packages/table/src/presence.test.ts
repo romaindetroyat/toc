@@ -58,15 +58,20 @@ function seen(out: Out[], who: string): TablePublic {
  * the table without a seat. `pauseMs` is the test option of the pause's minute.
  */
 function started(pauseMs?: number): Table {
-  const test = pauseMs === undefined ? { pace: "zero" as const } : { pace: "zero" as const, pauseMs };
-  const lobby = run(createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8], test }), [
-    { t: "hello", who: ANA, name: "Ana" },
-    { t: "hello", who: BEN, name: "Ben" },
-    { t: "hello", who: CLO, name: "Clo" },
-    client(ANA, { t: "sit", seat: "bleu" }),
-    client(BEN, { t: "sit", seat: "jaune" }),
-    client(CLO, { t: "sit", seat: "rouge" }),
-  ], 1000).table;
+  const test =
+    pauseMs === undefined ? { pace: "zero" as const } : { pace: "zero" as const, pauseMs };
+  const lobby = run(
+    createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8], test }),
+    [
+      { t: "hello", who: ANA, name: "Ana" },
+      { t: "hello", who: BEN, name: "Ben" },
+      { t: "hello", who: CLO, name: "Clo" },
+      client(ANA, { t: "sit", seat: "bleu" }),
+      client(BEN, { t: "sit", seat: "jaune" }),
+      client(CLO, { t: "sit", seat: "rouge" }),
+    ],
+    1000,
+  ).table;
   const table = reduce(lobby, client(ANA, { t: "start" }), ctx(2000)).table;
   return reduce(table, { t: "hello", who: DAN, name: "Dan" }, ctx(2000)).table;
 }
@@ -83,7 +88,12 @@ describe("a seated person gone during the game pauses it for everyone (NET-03)",
     expect(before.thinking).not.toBeNull();
     const { table, out } = benGone();
     expect(table.status).toBe("paused");
-    expect(table.pause).toEqual({ missing: ["jaune"], since: 3000, choiceAt: 3000 + PAUSE_MS, choosing: false });
+    expect(table.pause).toEqual({
+      missing: ["jaune"],
+      since: 3000,
+      choiceAt: 3000 + PAUSE_MS,
+      choosing: false,
+    });
     expect(table.deadlines.bot).toBeUndefined();
     expect(table.deadlines.pauseChoice).toEqual({ at: 3000 + PAUSE_MS });
     expect(table.thinking).toBeNull();
@@ -91,8 +101,18 @@ describe("a seated person gone during the game pauses it for everyone (NET-03)",
     for (const who of [ANA, CLO, DAN]) {
       const shown = seen(out, who);
       expect(shown.status).toBe("paused");
-      expect(shown.pause).toEqual({ missing: ["jaune"], since: 3000, choiceAt: 63_000, choosing: false });
-      expect(shown.seats.jaune).toMatchObject({ kind: "human", name: "Ben", online: false, handedOver: null });
+      expect(shown.pause).toEqual({
+        missing: ["jaune"],
+        since: 3000,
+        choiceAt: 63_000,
+        choosing: false,
+      });
+      expect(shown.seats.jaune).toMatchObject({
+        kind: "human",
+        name: "Ben",
+        online: false,
+        handedOver: null,
+      });
       expect(shown.now).toBe(3000);
     }
     expect(to(out, BEN)).toEqual([]);
@@ -104,12 +124,21 @@ describe("a seated person gone during the game pauses it for everyone (NET-03)",
 
   it("adds a second missing seat without moving the minute", () => {
     const { table } = reduce(benGone().table, { t: "gone", who: CLO }, ctx(10_000));
-    expect(table.pause).toEqual({ missing: ["jaune", "rouge"], since: 3000, choiceAt: 63_000, choosing: false });
+    expect(table.pause).toEqual({
+      missing: ["jaune", "rouge"],
+      since: 3000,
+      choiceAt: 63_000,
+      choosing: false,
+    });
   });
 
   it("refuses every act while paused and changes nothing", () => {
     const paused = benGone().table;
-    const refused = reduce(paused, client(ANA, { t: "act", base: paused.seq, action: { t: "discard" } }), ctx(4000));
+    const refused = reduce(
+      paused,
+      client(ANA, { t: "act", base: paused.seq, action: { t: "discard" } }),
+      ctx(4000),
+    );
     expect(to(refused.out, ANA)).toEqual([{ t: "error", code: "paused" }]);
     expect(refused.table).toBe(paused);
   });
@@ -123,11 +152,15 @@ describe("a seated person gone during the game pauses it for everyone (NET-03)",
   });
 
   it("only marks a person offline in the waiting room (no pause)", () => {
-    const lobby = run(createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8], test: { pace: "zero" } }), [
-      { t: "hello", who: ANA, name: "Ana" },
-      { t: "hello", who: BEN, name: "Ben" },
-      client(BEN, { t: "sit", seat: "jaune" }),
-    ], 1000).table;
+    const lobby = run(
+      createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8], test: { pace: "zero" } }),
+      [
+        { t: "hello", who: ANA, name: "Ana" },
+        { t: "hello", who: BEN, name: "Ben" },
+        client(BEN, { t: "sit", seat: "jaune" }),
+      ],
+      1000,
+    ).table;
     const { table } = reduce(lobby, { t: "gone", who: BEN }, ctx(2000));
     expect(table.status).toBe("lobby");
     expect(table.pause).toBeNull();
@@ -156,7 +189,14 @@ describe("the minute, then the host's choice (NET-04, D-04)", () => {
 
   it("saves the game by itself when nobody is online at the end of the minute", () => {
     let table = benGone().table;
-    table = run(table, [{ t: "gone", who: ANA }, { t: "gone", who: CLO }], 4000).table;
+    table = run(
+      table,
+      [
+        { t: "gone", who: ANA },
+        { t: "gone", who: CLO },
+      ],
+      4000,
+    ).table;
     const due = reduce(table, { t: "tick", retry: false }, ctx(63_000));
     expect(due.table.status).toBe("saved");
     expect(due.table.pause).toBeNull();
@@ -180,9 +220,18 @@ describe("the minute, then the host's choice (NET-04, D-04)", () => {
 
   it("« Attendre encore une minute » restarts the minute", () => {
     const choosing = reduce(benGone().table, { t: "tick", retry: false }, ctx(63_000)).table;
-    const { table, out } = reduce(choosing, client(ANA, { t: "pause", choice: "wait" }), ctx(70_000));
+    const { table, out } = reduce(
+      choosing,
+      client(ANA, { t: "pause", choice: "wait" }),
+      ctx(70_000),
+    );
     expect(table.status).toBe("paused");
-    expect(table.pause).toEqual({ missing: ["jaune"], since: 3000, choiceAt: 130_000, choosing: false });
+    expect(table.pause).toEqual({
+      missing: ["jaune"],
+      since: 3000,
+      choiceAt: 130_000,
+      choosing: false,
+    });
     expect(table.deadlines.pauseChoice).toEqual({ at: 130_000 });
     expect(seen(out, CLO).pause?.choiceAt).toBe(130_000);
   });
@@ -191,7 +240,11 @@ describe("the minute, then the host's choice (NET-04, D-04)", () => {
     let table = benGone().table;
     table = reduce(table, { t: "gone", who: CLO }, ctx(4000)).table;
     table = reduce(table, { t: "tick", retry: false }, ctx(63_000)).table;
-    const { table: next, out } = reduce(table, client(ANA, { t: "pause", choice: "bot", level: 4 }), ctx(64_000));
+    const { table: next, out } = reduce(
+      table,
+      client(ANA, { t: "pause", choice: "bot", level: 4 }),
+      ctx(64_000),
+    );
     expect(next.status).toBe("playing");
     expect(next.pause).toBeNull();
     expect(next.seats.jaune).toEqual({ kind: "human", who: BEN, handedOver: 4 });
@@ -224,7 +277,11 @@ describe("the minute, then the host's choice (NET-04, D-04)", () => {
 
   it("« Sauvegarder et arrêter » saves: no computer plays, and a tick changes nothing", () => {
     const choosing = reduce(benGone().table, { t: "tick", retry: false }, ctx(63_000)).table;
-    const { table, out } = reduce(choosing, client(ANA, { t: "pause", choice: "save" }), ctx(64_000));
+    const { table, out } = reduce(
+      choosing,
+      client(ANA, { t: "pause", choice: "save" }),
+      ctx(64_000),
+    );
     expect(table.status).toBe("saved");
     expect(table.pause).toBeNull();
     expect(table.deadlines.bot).toBeUndefined();
@@ -232,20 +289,32 @@ describe("the minute, then the host's choice (NET-04, D-04)", () => {
     expect(seen(out, CLO).status).toBe("saved");
     const tick = reduce(table, { t: "tick", retry: false }, ctx(200_000));
     expect(tick.log).toEqual([]);
-    const act = reduce(table, client(ANA, { t: "act", base: table.seq, action: { t: "discard" } }), ctx(65_000));
+    const act = reduce(
+      table,
+      client(ANA, { t: "act", base: table.seq, action: { t: "discard" } }),
+      ctx(65_000),
+    );
     expect(to(act.out, ANA)).toEqual([{ t: "error", code: "paused" }]);
   });
 });
 
 describe("a returning player gets the seat back at once", () => {
   it("ends the pause when nobody is missing any more", () => {
-    const { table, out } = reduce(benGone().table, { t: "hello", who: BEN, name: "Ben" }, ctx(5000));
+    const { table, out } = reduce(
+      benGone().table,
+      { t: "hello", who: BEN, name: "Ben" },
+      ctx(5000),
+    );
     expect(table.status).toBe("playing");
     expect(table.pause).toBeNull();
     expect(table.deadlines.pauseChoice).toBeUndefined();
     expect(table.thinking).not.toBeNull();
     const welcome = to(out, BEN)[0] as WelcomeFrame;
-    expect(welcome).toMatchObject({ t: "welcome", you: { seat: "jaune" }, table: { status: "playing", pause: null } });
+    expect(welcome).toMatchObject({
+      t: "welcome",
+      you: { seat: "jaune" },
+      table: { status: "playing", pause: null },
+    });
     expect(welcome.view).not.toBeNull();
     expect(welcome.regained).toBeUndefined();
     expect(seen(out, ANA).status).toBe("playing");
@@ -273,7 +342,11 @@ describe("a returning player gets the seat back at once", () => {
     const view = (to(out, BEN)[0] as WelcomeFrame).view;
     const card = view?.hand[0];
     if (card === undefined) throw new Error("no card");
-    const gave = reduce(back, client(BEN, { t: "act", base: back.seq, action: { t: "give", card } }), ctx(64_002));
+    const gave = reduce(
+      back,
+      client(BEN, { t: "act", base: back.seq, action: { t: "give", card } }),
+      ctx(64_002),
+    );
     expect(gave.log).toHaveLength(1);
   });
 
@@ -313,7 +386,12 @@ describe("« Reprendre la partie » (resume)", () => {
   it("starts the pause flow at once with a fresh minute when someone is still missing", () => {
     const { table } = reduce(saved(), client(ANA, { t: "resume" }), ctx(80_000));
     expect(table.status).toBe("paused");
-    expect(table.pause).toEqual({ missing: ["jaune"], since: 80_000, choiceAt: 140_000, choosing: false });
+    expect(table.pause).toEqual({
+      missing: ["jaune"],
+      since: 80_000,
+      choiceAt: 140_000,
+      choosing: false,
+    });
   });
 });
 
@@ -357,7 +435,11 @@ describe("the silence sweep", () => {
     const table = started();
     expect(table.deadlines.sweep).toEqual({ at: 2000 + SWEEP_MS });
     // Under the zero pace the computer is due at once; the sweep alone moves on its own tick.
-    const quiet = { ...table, deadlines: { sweep: table.deadlines.sweep }, thinking: null } as Table;
+    const quiet = {
+      ...table,
+      deadlines: { sweep: table.deadlines.sweep },
+      thinking: null,
+    } as Table;
     const { table: next, out, log } = reduce(quiet, { t: "tick", retry: false }, ctx(32_000));
     expect(next.deadlines.sweep).toEqual({ at: 32_000 + SWEEP_MS });
     expect(log).toEqual([]);
@@ -366,7 +448,11 @@ describe("the silence sweep", () => {
   });
 
   it("is not armed in the waiting room nor once saved", () => {
-    const lobby = reduce(createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8] }), { t: "hello", who: ANA, name: "Ana" }, ctx(1000)).table;
+    const lobby = reduce(
+      createTable({ tableId: ID, now: 1000, seed: [5, 6, 7, 8] }),
+      { t: "hello", who: ANA, name: "Ana" },
+      ctx(1000),
+    ).table;
     expect(lobby.deadlines.sweep).toBeUndefined();
     const choosing = reduce(benGone().table, { t: "tick", retry: false }, ctx(63_000)).table;
     const saved = reduce(choosing, client(ANA, { t: "pause", choice: "save" }), ctx(64_000)).table;

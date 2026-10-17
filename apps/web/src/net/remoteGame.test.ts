@@ -16,16 +16,18 @@ const STATE = newGame({ firstDealer: "vert" }, [1, 2, 3, 4]);
 const TABLE: TablePublic = {
   status: "playing",
   seats: {
-    bleu: { kind: "human", name: "Ana", level: 3, online: true },
-    jaune: { kind: "human", name: "Ben", level: 3, online: true },
-    rouge: { kind: "bot", name: "Tornado", level: 3, online: true },
-    vert: { kind: "bot", name: "Ourasi", level: 3, online: true },
+    bleu: { kind: "human", name: "Ana", level: 3, online: true, handedOver: null },
+    jaune: { kind: "human", name: "Ben", level: 3, online: true, handedOver: null },
+    rouge: { kind: "bot", name: "Tornado", level: 3, online: true, handedOver: null },
+    vert: { kind: "bot", name: "Ourasi", level: 3, online: true, handedOver: null },
   },
   host: "bleu",
   creatorName: "Ana",
   gameNo: 1,
   thinking: null,
   unseated: [],
+  pause: null,
+  now: 0,
 };
 
 function fakeConnection(options: { seat?: Color; seq?: number; start?: StartBatch | null } = {}) {

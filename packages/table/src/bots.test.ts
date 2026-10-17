@@ -156,7 +156,9 @@ describe("which computer player is due", () => {
     );
     expect(table.thinking).toBeNull();
     expect(tablePublic(table).thinking).toBeNull();
-    expect(nextDeadline(table)).toBeNull();
+    // No computer deadline; only the silence sweep (plan 02-06) is armed while people play.
+    expect(table.deadlines.bot).toBeUndefined();
+    expect(nextDeadline(table)).toBe(table.deadlines.sweep?.at);
   });
 });
 

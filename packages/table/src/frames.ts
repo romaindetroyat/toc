@@ -4,17 +4,19 @@
 
 import { COLORS, type Color, eventsFor, type GameEvent, viewFor } from "@toc/engine";
 import type { EventsFrame, SeatPublic, TableFrame, TablePublic, WelcomeFrame } from "@toc/protocol";
-import type { Person, Table } from "./table.ts";
+import { hostOf } from "./presence.ts";
+import { personOf, type Table } from "./table.ts";
+
+export { personOf };
 
 /** The most « Sans place » names a public table lists (the protocol accepts up to 64). */
 const MAX_UNSEATED = 32;
 
-export function personOf(table: Table, who: string): Person | undefined {
-  return table.people.find((person) => person.who === who);
-}
-
-/** What anyone at the table may know of it. */
-export function tablePublic(table: Table): TablePublic {
+/**
+ * What anyone at the table may know of it, with the server's clock `now` (the countdown's reference;
+ * the table's last activity when left out).
+ */
+export function tablePublic(table: Table, now: number = table.lastActivity): TablePublic {
   const seats = {} as Record<Color, SeatPublic>;
   for (const color of COLORS) {
     const seat = table.seats[color];
@@ -26,11 +28,12 @@ export function tablePublic(table: Table): TablePublic {
         name: person?.name ?? null,
         level,
         online: person?.online ?? false,
+        handedOver: seat.handedOver ?? null,
       };
     } else if (seat.kind === "bot") {
-      seats[color] = { kind: "bot", name: seat.name, level, online: true };
+      seats[color] = { kind: "bot", name: seat.name, level, online: true, handedOver: null };
     } else {
-      seats[color] = { kind: "free", name: null, level, online: true };
+      seats[color] = { kind: "free", name: null, level, online: true, handedOver: null };
     }
   }
   const creator = table.creator === null ? undefined : personOf(table, table.creator);
@@ -38,31 +41,53 @@ export function tablePublic(table: Table): TablePublic {
     .filter((person) => person.seat === null && person.online)
     .map((person) => person.name)
     .slice(0, MAX_UNSEATED);
+  const host = hostOf(table);
+  const pause = table.status === "paused" ? table.pause : null;
   return {
     status: table.status,
     seats,
-    host: creator?.seat ?? null,
+    host: host === null ? null : (personOf(table, host)?.seat ?? null),
     creatorName: creator?.name ?? null,
     gameNo: table.gameNo,
     thinking: table.thinking?.seat ?? null,
     unseated,
+    pause:
+      pause === null
+        ? null
+        : {
+            missing: [...pause.missing],
+            since: pause.since,
+            choiceAt: pause.choiceAt,
+            choosing: pause.choosing,
+          },
+    now,
   };
 }
 
-export function tableFrame(table: Table): TableFrame {
-  return { t: "table", table: tablePublic(table) };
+export function tableFrame(table: Table, now?: number): TableFrame {
+  return { t: "table", table: tablePublic(table, now) };
 }
 
-/** The one snapshot of the table for one person: their seat, the public table, their own view. */
-export function welcomeFor(table: Table, who: string): WelcomeFrame {
+/**
+ * The one snapshot of the table for one person: their seat, the public table, their own view;
+ * `regained` when this hello gave them back a seat the computer played (plan 02-06).
+ */
+export function welcomeFor(
+  table: Table,
+  who: string,
+  now?: number,
+  regained = false,
+): WelcomeFrame {
   const seat = personOf(table, who)?.seat ?? null;
-  return {
+  const frame: WelcomeFrame = {
     t: "welcome",
-    you: { seat, host: table.creator === who },
-    table: tablePublic(table),
+    you: { seat, host: hostOf(table) === who },
+    table: tablePublic(table, now),
     view: table.game !== null && seat !== null ? viewFor(table.game, seat) : null,
     seq: table.seq,
   };
+  if (regained) frame.regained = true;
+  return frame;
 }
 
 /** One batch of play for the person on `seat`: the events projected for that seat and its view. */

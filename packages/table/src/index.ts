@@ -8,6 +8,20 @@ export {
 } from "./bots.ts";
 export { eventsFrameFor, personOf, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
 export {
+  applyChoice,
+  HANDOVER_LEVEL,
+  hostOf,
+  onGone,
+  onHello,
+  onPauseChoiceDue,
+  PAUSE_MS,
+  pauseMsOf,
+  resume,
+  SILENCE_MS,
+  SWEEP_MS,
+  wantsSweep,
+} from "./presence.ts";
+export {
   type BotInfo,
   type Command,
   type Ctx,
@@ -18,9 +32,11 @@ export {
 } from "./reduce.ts";
 export { summary } from "./summary.ts";
 export {
+  computerLevel,
   createTable,
   dueBot,
   nextDeadline,
+  type Pause,
   type PendingThink,
   type Person,
   type Seat,
