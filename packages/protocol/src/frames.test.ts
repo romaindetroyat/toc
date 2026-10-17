@@ -329,6 +329,7 @@ describe("the end of a game and the rematch (plan 02-09, D-08, PLAY-07)", () => 
       pause: null,
       winner: "bleu-rouge",
       rematch: { bleu: "yes", jaune: "offline", rouge: "bot", vert: "bot" },
+      fast: false,
       now: 5_000,
     };
     expect(parseServerFrame(JSON.stringify({ t: "table", table: finished }))).toEqual({
@@ -381,6 +382,59 @@ describe("the end of a game and the rematch (plan 02-09, D-08, PLAY-07)", () => 
   });
 });
 
+describe("the table's « Avance rapide » (plan 02-10b)", () => {
+  it("accepts speed { fast } from the client, a boolean only", () => {
+    expect(ok({ t: "speed", fast: true })).toEqual({ ok: true, frame: { t: "speed", fast: true } });
+    expect(ok({ t: "speed", fast: false })).toEqual({
+      ok: true,
+      frame: { t: "speed", fast: false },
+    });
+    for (const frame of [
+      { t: "speed" },
+      { t: "speed", fast: "true" },
+      { t: "speed", fast: 1 },
+      { t: "speed", fast: null },
+      { t: "speed", fast: true, seat: "bleu" },
+      { t: "speed", speed: "fast" },
+    ]) {
+      expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
+    }
+  });
+
+  it("reads the flag in every public table, and refuses a table without it", () => {
+    const seat = { kind: "free", name: null, level: 3, online: true, handedOver: null };
+    const table = {
+      status: "lobby",
+      seats: { bleu: seat, jaune: seat, rouge: seat, vert: seat },
+      host: "bleu",
+      creatorName: "Ana",
+      gameNo: 0,
+      thinking: null,
+      unseated: [],
+      pause: null,
+      winner: null,
+      rematch: null,
+      fast: true,
+      now: 1_000,
+    };
+    expect(parseServerFrame(JSON.stringify({ t: "table", table }))).toEqual({ t: "table", table });
+    const welcome = {
+      t: "welcome",
+      you: { seat: "bleu", host: true },
+      table,
+      view: null,
+      seq: 0,
+      chat: [],
+    };
+    expect(parseServerFrame(JSON.stringify(welcome))).toEqual(welcome);
+    const { fast: _fast, ...withoutFast } = table;
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: withoutFast }))).toBeNull();
+    expect(
+      parseServerFrame(JSON.stringify({ t: "table", table: { ...table, fast: "yes" } })),
+    ).toBeNull();
+  });
+});
+
 describe("normalizeName", () => {
   it("trims, collapses spaces and applies NFC", () => {
     expect(normalizeName("  Ana ")).toBe("Ana");
@@ -415,9 +469,9 @@ describe("ids", () => {
   it("keeps distinct close codes for the three endings, and 4000 for a silent socket", () => {
     expect([CLOSE_ELSEWHERE, CLOSE_VERSION, CLOSE_GONE]).toEqual([4001, 4002, 4004]);
     expect(CLOSE_SILENT).toBe(4000);
-    // Version 4 (plan 02-09): the finished table, its winner and the rematch votes; an older client,
-    // which cannot read status « finished », is closed with 4002.
-    expect(PROTOCOL_VERSION).toBe(4);
+    // Version 5 (plan 02-10b): the table's « Avance rapide »; an older page would animate at the
+    // normal speed while the table plays at the fast pace, so it is closed with 4002.
+    expect(PROTOCOL_VERSION).toBe(5);
   });
 });
 
@@ -434,6 +488,7 @@ describe("parseServerFrame", () => {
     pause: null,
     winner: null,
     rematch: null,
+    fast: false,
     now: 1_000,
   };
 
