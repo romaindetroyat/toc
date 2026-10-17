@@ -878,7 +878,7 @@
               />
             {/snippet}
           </Board>
-          <DealBanner {render} names={session.names} />
+          <DealBanner {render} names={session.names} human={session.human} />
         </div>
 
         {#if flow.kind === "sevenBuilding" && compact}

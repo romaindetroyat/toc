@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Color, PARTNER, type RenderState } from "@toc/engine";
+  import { type Color, firstPlayer, PARTNER, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
   import InfoBar from "./InfoBar.svelte";
@@ -46,6 +46,8 @@
   const playing = $derived(render.phase === "play");
   const ownTurn = $derived(playing && render.turn === human);
   const turnName = $derived(names[render.turn]);
+  /** Who plays first in this deal (G9: the seat after the dealer; Romain, 2026-10-17, plan 03-11). */
+  const starter = $derived(firstPlayer(render.dealer));
   /**
    * The thinking sign (D-12, 03-UI-SPEC « Thinking sign », 03-09): the turn row's glyph breathes in a
    * ring of its seat colour while the computer player whose turn it shows is thinking. Never on the
@@ -160,6 +162,10 @@
       <p class="deal" data-deal>
         {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
       </p>
+      {#if form === "column"}
+        <!-- Who plays first in this deal: the bottom bar and the sheet « Infos de la partie » (plan 03-11). -->
+        <p class="deal" data-starter={starter}>{game.info.starter(names[starter])}</p>
+      {/if}
     </div>
 
     <div class="teams">
