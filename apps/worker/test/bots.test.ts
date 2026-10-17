@@ -56,8 +56,12 @@ function logOf(id: string): Promise<LogRow[]> {
   );
 }
 
+/** How long a frame may take to arrive: generous, the whole suite runs CPU-heavy tests alongside. */
+const FRAME_WAIT_MS = 60_000;
+
 async function until(ready: () => boolean, what: string): Promise<void> {
-  for (let i = 0; i < 4000; i++) {
+  const deadline = Date.now() + FRAME_WAIT_MS;
+  while (Date.now() < deadline) {
     if (ready()) return;
     await new Promise((resolve) => setTimeout(resolve, 2));
   }
@@ -123,7 +127,14 @@ async function drive(
     let action: Action;
     [action, rng] = randomLegal(viewAt(ana, table.seq) as PlayerView, "bleu", rng);
     ana.send({ t: "act", base: table.seq, action });
-    await until(() => viewAt(ana, table.seq + 1) !== null, "Ana's events after her act");
+    await until(
+      () => viewAt(ana, table.seq + 1) !== null,
+      `Ana's events after her act at ${table.seq} (last frames: ${JSON.stringify(
+        ana.frames
+          .slice(-3)
+          .map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]),
+      )})`,
+    );
     acts += 1;
   }
   throw new Error("the table did not get there within the step cap");
