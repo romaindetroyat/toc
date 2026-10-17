@@ -1,4 +1,5 @@
 <script lang="ts">
+  import logo from "../assets/logo/logo-128.webp";
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
   import { browserApi, createTable } from "../net/api.ts";
@@ -13,6 +14,9 @@
   // « Accueil » at #/ (02-UI-SPEC « Home « Accueil » », D-09): the game against the computer (the solo
   // setup at #/ordinateur, unchanged and offline) or an online table, the first name this device
   // remembers, and « Mes parties en cours ». No amber here: the two choices are oak tiles.
+  // Romain's logo (2026-10-17, plan 02-04b) sits before « TOC »: as high as the title row in the
+  // compact layouts (34, no change to the fit), 64 beside the title and the tagline elsewhere. It
+  // is decorative (alt=""): the heading already says « TOC ».
 
   const storage = pageStorage();
   let device = $state(loadDevice(storage));
@@ -107,8 +111,11 @@
 
   {#if !compact}
     <header class="header">
-      <h1 class="t-display title">{accueil.home.title}</h1>
-      <p class="tagline">{accueil.home.tagline}</p>
+      <img class="logo" src={logo} alt="" width="64" height="64" data-home-logo />
+      <div class="heading-text">
+        <h1 class="t-display title">{accueil.home.title}</h1>
+        <p class="tagline">{accueil.home.tagline}</p>
+      </div>
     </header>
   {/if}
 
@@ -116,6 +123,7 @@
     <section class="choices">
       {#if compact}
         <header class="header">
+          <img class="logo" src={logo} alt="" width="34" height="34" data-home-logo />
           <h1 class="t-display title">{accueil.home.title}</h1>
         </header>
       {/if}
@@ -202,7 +210,17 @@
   }
 
   .header {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+  }
+
+  /* The logo's blue square, rounded like its board. */
+  .logo {
+    flex: none;
+    display: block;
+    border-radius: 22%;
   }
 
   .title {
@@ -314,11 +332,12 @@
     margin-bottom: var(--space-sm);
   }
 
-  /* Both compact layouts: TOC at the left over the tiles, 8 apart. */
+  /* Both compact layouts: the logo and TOC at the left over the tiles, 8 apart. */
   .home[data-layout="two"] .header,
   .home[data-layout="one"] .header {
+    justify-content: flex-start;
+    gap: var(--space-sm);
     margin-bottom: var(--space-sm);
-    text-align: start;
   }
 
   .home[data-layout="two"] .title,
