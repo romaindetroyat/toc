@@ -10,10 +10,16 @@ import { playSimpleMove, snapshot } from "../e2e/jouer.ts";
 // Shared helpers of the online specs: a table created through the Worker, a browser that opens its link
 // and types a first name, the seat tiles of the waiting room.
 
+/** The test options of a new table: the computers' pace, and their levels by colour (Champion 5). */
+export type TableTest = {
+  pace: "zero" | "normal";
+  levels?: Partial<Record<"bleu" | "jaune" | "rouge" | "vert", 1 | 2 | 3 | 4 | 5>>;
+};
+
 /** POST /api/tables; `test` is honoured because `wrangler dev` runs with TOC_TEST_MODE=1. */
 export async function createTable(
   request: APIRequestContext,
-  test: { pace: "zero" | "normal" } = { pace: "zero" },
+  test: TableTest = { pace: "zero" },
 ): Promise<string> {
   const response = await request.post("/api/tables", { data: { test } });
   expect(response.status()).toBe(201);

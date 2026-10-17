@@ -163,6 +163,21 @@ describe("createRemoteGame", () => {
     expect(game.stats()).toEqual({ dealsPlayed: 0, captured: { nous: 0, eux: 0 } });
   });
 
+  it("a table frame moves the thinking sign: onChange runs, so the session follows it", () => {
+    const connection = fakeConnection();
+    const game = createRemoteGame(connection, fakeDirector());
+    let changes = 0;
+    game.onChange(() => changes++);
+    game.start();
+    expect(game.thinking()).toBeNull();
+    connection.emit({ t: "table", table: { ...TABLE, thinking: "jaune" } });
+    expect(game.thinking()).toBe("jaune");
+    expect(changes).toBe(1);
+    connection.emit({ t: "table", table: { ...TABLE, thinking: null } });
+    expect(game.thinking()).toBeNull();
+    expect(changes).toBe(2);
+  });
+
   it("stops listening once disposed", () => {
     const connection = fakeConnection();
     const game = createRemoteGame(connection, fakeDirector());
