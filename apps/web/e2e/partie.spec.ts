@@ -84,7 +84,7 @@ async function untilOwnTurn(page: Page) {
   throw new Error("the player's turn never came");
 }
 
-test("l’échange : choisir, passer, attendre, recevoir une carte marquée « Reçue »", async ({
+test("l’échange : choisir, passer, attendre, recevoir une carte bordée de la couleur du partenaire", async ({
   page,
 }) => {
   await openGame(page, `graine=${SEED}&vitesse=test`);
@@ -110,11 +110,28 @@ test("l’échange : choisir, passer, attendre, recevoir une carte marquée « R
   await expect(pass).toBeEnabled();
   await pass.click();
 
-  // The partner's card arrives: « Échange fait », and the received card carries its tag.
+  // The partner's card arrives: « Échange fait », and the received card wears a thick border of the
+  // partner's colour, no text (Romain, 2026-10-17: « Juste un liseré coloré »); its name says
+  // whom it comes from, the partner named in the prompt.
   await expect(zone(page)).toContainText("Échange fait. Tu as reçu");
   await expect(page.locator("[data-hand] [data-card]")).toHaveCount(5);
   await expect(page.locator("[data-hand] [data-card]").first()).toBeVisible();
-  await expect(page.getByText("Reçue", { exact: true })).toBeVisible();
+  const got = page.locator("[data-hand] [data-card][data-received]");
+  await expect(got).toHaveCount(1);
+  await expect(got).toBeVisible();
+  await expect(page.getByText("Reçue", { exact: true })).toHaveCount(0);
+  const from = /, reçue (?:de |d’)(.+)$/.exec((await got.getAttribute("aria-label")) ?? "")?.[1];
+  expect(from, "the received card's name says whom it comes from").toBeTruthy();
+  await expect(zone(page)).toContainText(`${from}.`);
+  const seat = (await got.getAttribute("data-received")) ?? "";
+  const colours: Record<string, string> = {
+    bleu: "rgb(31, 79, 168)",
+    jaune: "rgb(227, 169, 12)",
+    rouge: "rgb(195, 39, 29)",
+    vert: "rgb(31, 138, 60)",
+  };
+  await expect(got.locator(".border")).toHaveCSS("border-top-color", colours[seat] ?? "none");
+  await expect(got.locator(".border")).toHaveCSS("border-top-width", "6px");
   await expect(page.locator(`[data-hand] [data-card="${given}"]`)).toHaveCount(0);
   await checkInfo(page, (info) => expect(info).toContainText("Donneur"));
 });

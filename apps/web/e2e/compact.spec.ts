@@ -89,9 +89,12 @@ async function settled(page: Page) {
     .toBe(0);
 }
 
-/** Everything the strips show: the info, the gear, « Avance rapide », the buttons, the cards, the chips. */
+/**
+ * Everything the strips show: the info, the gear, « Avance rapide », the buttons, the chips. The hand
+ * is checked on its own (expectHand): since plan 03-10 its cards may leave the strip.
+ */
 const STRIP_ITEMS =
-  "[data-info-bar], [data-settings-slot] button, [data-fast], [data-action-buttons] button, [data-hand] [data-card], [data-tray-option], [data-seven-chips] [data-step], [data-seven-buttons] button";
+  "[data-info-bar], [data-settings-slot] button, [data-fast], [data-action-buttons] button, [data-tray-option], [data-seven-chips] [data-step], [data-seven-buttons] button";
 
 type Item = Box & {
   name: string;
@@ -129,7 +132,7 @@ function stripItems(page: Page): Promise<Item[]> {
           break;
         }
         const left = node.matches(
-          "[data-info-bar], [data-hand] [data-card], [data-tray-option], [data-seven-chips] [data-step]",
+          "[data-info-bar], [data-tray-option], [data-seven-chips] [data-step]",
         );
         const right = node.matches(
           "[data-settings-slot] button, [data-fast], [data-action-buttons] button, [data-seven-buttons] button",
@@ -154,8 +157,66 @@ function stripItems(page: Page): Promise<Item[]> {
 }
 
 /**
+ * The hand in the galet's corner (plan 03-10, Romain's « Cartes plus grandes en coin »): every card
+ * under the info pill and above the screen's bottom edge; on the screen, each shows a slice of at
+ * least 44 x 44 px (to the next card's top, or whole for the last); and no card, wherever it stands
+ * (in the strip, over the galet's bare side or past the screen's left edge), covers a drawn cell or a
+ * knight.
+ */
+async function expectHand(page: Page, what: string) {
+  const size = page.viewportSize();
+  if (!size) throw new Error("no viewport");
+  const found = await page.evaluate(() => {
+    const rect = (node: Element) => {
+      const box = node.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    };
+    const info = document.querySelector("[data-info-bar]");
+    return {
+      cards: [...document.querySelectorAll("[data-hand] [data-card]")].map((node) => ({
+        name: node.getAttribute("aria-label") ?? "",
+        ...rect(node),
+      })),
+      keep: [...document.querySelectorAll("[data-board-art] [data-cell], [data-pawn]")]
+        .map((node) => ({
+          name: node.getAttribute("data-cell") ?? node.getAttribute("data-pawn") ?? "",
+          ...rect(node),
+        }))
+        .filter((box) => box.width > 0 && box.height > 0),
+      info: info === null ? null : rect(info),
+    };
+  });
+  for (const [i, card] of found.cards.entries()) {
+    const label = `${what}: « ${card.name} »`;
+    const next = found.cards[i + 1];
+    const left = Math.max(0, card.x);
+    const right = Math.min(size.width, card.x + card.width);
+    const bottom = next ? next.y : card.y + card.height;
+    expect(right - left, `${label} shows under 44 px across`).toBeGreaterThanOrEqual(43.8);
+    expect(bottom - card.y, `${label} shows under 44 px down`).toBeGreaterThanOrEqual(43.8);
+    if (found.info) {
+      expect(card.y, `${label} over the info`).toBeGreaterThanOrEqual(
+        found.info.y + found.info.height - 0.5,
+      );
+    }
+    expect(card.y + card.height, `${label} below the screen`).toBeLessThanOrEqual(
+      size.height + 0.5,
+    );
+    for (const thing of found.keep) {
+      const apart =
+        card.x + card.width <= thing.x + 0.5 ||
+        thing.x + thing.width <= card.x + 0.5 ||
+        card.y + card.height <= thing.y + 0.5 ||
+        thing.y + thing.height <= card.y + 0.5;
+      expect(apart, `${label} covers « ${thing.name} »`).toBe(true);
+    }
+  }
+}
+
+/**
  * The compact mode: the board centred under the prompt row, inside the screen; every item of the
- * strips inside the screen, in its own strip, never over the board's rectangle.
+ * strips inside the screen, in its own strip, never over the board's rectangle; the hand in the
+ * galet's corner (expectHand).
  */
 async function expectStrips(page: Page, what: string) {
   const size = page.viewportSize();
@@ -200,6 +261,7 @@ async function expectStrips(page: Page, what: string) {
     else if (item.side === "right") expect(rightOf, `${label} not in the right strip`).toBe(true);
     else expect(leftOf || rightOf, `${label} over the board`).toBe(true);
   }
+  await expectHand(page, what);
 }
 
 /** The measured board width against the formula at this window, and its target. */
@@ -235,7 +297,9 @@ test.describe("sur le téléphone tenu en largeur, le plateau sur toute la haute
     await expectStrips(page, "à toi de jouer");
     await expectNoScroll(page, "à toi de jouer");
 
-    // The hand in the left strip: a column of 52 x 73 cards, each showing at least its top 44 px.
+    // The hand in the corner (plan 03-10): 67 x 94 cards at 750 x 342 (52 x 73 before), from the
+    // bottom of the left strip up, 50 px apart (past the middle of each card), the last one on the
+    // screen's bottom edge; none further right than the board's edge but by the bare wood.
     const board = await boxOf(page, "[data-board]");
     const cards = await page.locator("[data-hand] [data-card]").evaluateAll((nodes) =>
       nodes.map((node) => {
@@ -245,11 +309,14 @@ test.describe("sur le téléphone tenu en largeur, le plateau sur toute la haute
     );
     expect(cards.length).toBeGreaterThan(0);
     for (const [i, card] of cards.entries()) {
-      expect(card.width, "a 52 px card").toBeCloseTo(52, 0);
-      expect(card.height, "a 73 px card").toBeCloseTo(73, 0);
-      expect(card.x + card.width, "the card in the left strip").toBeLessThanOrEqual(board.x + 0.5);
+      expect(card.width, "a 67 px card").toBeCloseTo(67, 0);
+      expect(card.height, "a 94 px card").toBeCloseTo(94, 0);
+      expect(card.x + card.width, "the card by the board's left side").toBeLessThanOrEqual(
+        board.x + 12,
+      );
       const next = cards[i + 1];
-      if (next) expect(next.y - card.y, "at least 44 px of the card").toBeGreaterThanOrEqual(43.5);
+      if (next) expect(next.y - card.y, "50 px of the card").toBeCloseTo(50, 0);
+      else expect(card.y + card.height, "the last card on the bottom edge").toBeCloseTo(342, 0);
     }
 
     // The Dame: her lone knight is chosen by itself and the preview shows at once (recette 3,
@@ -431,8 +498,10 @@ type Control = Box & {
 };
 
 /**
- * Every visible control of the page (buttons, the hand's cards, the chips) except the board's own
- * (its knights, its hit layer and its felt), each with the column it scrolls in, if any.
+ * Every visible control of the page (buttons, the chips) except the board's own (its knights, its
+ * hit layer and its felt) and the hand's cards, which expectHand checks (since plan 03-10 they may
+ * stand over the galet's bare corner and past the screen's left edge), each with the column it
+ * scrolls in, if any.
  */
 function controlsOf(page: Page): Promise<Control[]> {
   return page.evaluate(() => {
@@ -442,6 +511,7 @@ function controlsOf(page: Page): Promise<Control[]> {
     );
     for (const node of nodes) {
       if (node.closest("[data-board]") !== null) continue;
+      if (node.closest("[data-hand]") !== null) continue;
       const box = node.getBoundingClientRect();
       if (box.width === 0 || box.height === 0) continue;
       if (getComputedStyle(node).visibility === "hidden") continue;
@@ -498,7 +568,7 @@ const STATE_BUTTONS =
  * One state of the turn beside the full-height galet:
  * - the board and every strip item in place (`expectStrips`);
  * - every visible control inside the screen, never over the board's rectangle (the board's own
- *   knights, hit layer and felt excepted), and at least 44 x 44. A control of a column that scrolls
+ *   knights, hit layer and felt excepted, and the hand, checked by expectHand), and at least 44 x 44. A control of a column that scrolls
  *   (the 7's step chips at 480 x 320) may stand past the column's edge, but only the part inside
  *   the column shows, and the column scrolls;
  * - at most three state buttons, and exactly `primaries` amber ones: one at most, except the As and

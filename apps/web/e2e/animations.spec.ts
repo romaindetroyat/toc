@@ -731,7 +731,7 @@ test("l’échange : quatre cartes se croisent en 300 ms, sans bruit de glissade
   await expectOnlyHooves(page, false);
 
   // The received card slides into the hand when the crossing is over.
-  await expect(page.getByText("Reçue", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-hand] [data-card][data-received]")).toBeVisible();
   await expect.poll(async () => handCards(await records(page)).length).toBeGreaterThan(0);
   const arrival = handCards(await records(page)).at(-1) as Rec;
   near(arrival.delay, 360, 1);
