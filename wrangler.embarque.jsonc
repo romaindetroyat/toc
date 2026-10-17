@@ -10,8 +10,12 @@
   "main": "./worker-embedded/index.js",
   "compatibility_date": "2026-10-01",
   "find_additional_modules": false,
+  // Les globs sont testés sur le chemin importé par worker-embedded/manifest.js
+  // (« ../apps/web/dist/... ») et « * » y franchit les « / » : seuls les scripts du build web
+  // deviennent des modules texte ; zod et le serveur restent dans index.js
+  // (tools/check-bundle.mjs le vérifie sur la sortie de --dry-run).
   "rules": [
-    { "type": "Text", "globs": ["**/dist/**/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
+    { "type": "Text", "globs": ["**/apps/web/dist/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
     { "type": "Data", "globs": ["**/*.png", "**/*.webp", "**/*.woff2", "**/*.ico", "**/*.mp3", "**/*.m4a", "**/*.ogg", "**/*.wav"], "fallthrough": false }
   ],
   "durable_objects": {
