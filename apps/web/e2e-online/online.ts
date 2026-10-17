@@ -16,6 +16,21 @@ export type TableTest = {
   levels?: Partial<Record<"bleu" | "jaune" | "rouge" | "vert", 1 | 2 | 3 | 4 | 5>>;
   /** The pause's minute, shortened (plan 02-06). */
   pauseMs?: number;
+  /** The first game starts from this position instead of a deal (plan 02-09, a scenario's before). */
+  before?: unknown;
+};
+
+/**
+ * A near-end table (plan 02-09): bleu's 5 brings the eighth knight of bleu-rouge home (R-16.1 seen
+ * from bleu's side); the dealer is vert, so the rematch's dealer is bleu.
+ */
+export const NEAR_END = {
+  pawns: {
+    bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
+    rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+  },
+  hands: { bleu: ["5S"] },
+  turn: "bleu",
 };
 
 /** POST /api/tables; `test` is honoured because `wrangler dev` runs with TOC_TEST_MODE=1. */
