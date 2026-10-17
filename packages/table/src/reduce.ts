@@ -55,6 +55,7 @@ import {
   stopGame,
   wantsSweep,
 } from "./presence.ts";
+import { type GameRecord, keepRecord, onD1RetryDue, recorded } from "./record.ts";
 import { dropVote, maybeStartRematch, onGameWon, vote } from "./rematch.ts";
 import { copyTable, personOf, type Table } from "./table.ts";
 
@@ -65,6 +66,11 @@ export type Command =
   | { t: "gone"; who: string }
   /** The alarm fired; `retry` when the runtime retries it after a failed invocation (D-11). */
   | { t: "tick"; retry: boolean }
+  /**
+   * The Durable Object wrote the record of game `gameNo` to D1, or found no database (plan 02-09):
+   * it is no longer pending.
+   */
+  | { t: "recorded"; gameNo: number }
   /** A frame of a person who said hello. */
   | { t: "client"; who: string; frame: Exclude<ClientFrame, HelloFrame> };
 
@@ -93,8 +99,16 @@ export type LogEntry = {
 /**
  * `purge`: the table has been idle for EXPIRY_MS; the Durable Object deletes its whole storage and
  * closes every socket with CLOSE_GONE (plan 02-07, D-06). `table` is then the unchanged input.
+ * `records`: finished games for the Durable Object to write to D1 after the commit (plan 02-09): the
+ * winning step's, or every pending one when the d1Retry deadline is due. Never sent to anyone.
  */
-export type Reduced = { table: Table; out: Out[]; log: LogEntry[]; purge?: true };
+export type Reduced = {
+  table: Table;
+  out: Out[];
+  log: LogEntry[];
+  purge?: true;
+  records?: GameRecord[];
+};
 
 const unchanged = (table: Table): Reduced => ({ table, out: [], log: [] });
 
@@ -134,6 +148,8 @@ function commitPlay(
   next.game = played.state;
   next.seq += 1;
   onGameWon(next, now);
+  // The game's record, once per game number (plan 02-09): written by the object after the commit.
+  const record = next.status === "finished" ? keepRecord(next, now) : null;
   scheduleBot(next, played.events, now);
   const out: Out[] = [];
   if (publicFirst) out.push(...publicChanges(before, next, new Set(), now));
@@ -151,7 +167,9 @@ function commitPlay(
   };
   if (bot !== undefined) entry.bot = bot;
   const log: LogEntry[] = [entry];
-  return { table: next, out, log };
+  const result: Reduced = { table: next, out, log };
+  if (record !== null) result.records = [record];
+  return result;
 }
 
 function hello(table: Table, who: string, name: string, now: number): Reduced {
@@ -541,17 +559,29 @@ function tick(table: Table, now: number, retry: boolean): Reduced {
     if (base === table) base = copyTable(table);
     return base;
   };
-  const { sweep, pauseChoice, expire } = table.deadlines;
+  const { sweep, pauseChoice, expire, d1Retry } = table.deadlines;
   // EXPIRY_MS idle: the whole table goes (D-06); fired early, the deadline moves (Pattern 3).
   if (expire !== undefined && now >= expire.at && onExpireDue(edit(), now)) {
     return { table, out: [], log: [], purge: true };
   }
   if (sweep !== undefined && now >= sweep.at) edit().deadlines.sweep = { at: now + SWEEP_MS };
   if (pauseChoice !== undefined && now >= pauseChoice.at) onPauseChoiceDue(edit(), now);
+  // The game records D1 did not take yet go again (plan 02-09).
+  const retried = d1Retry !== undefined && now >= d1Retry.at ? onD1RetryDue(edit(), now) : [];
+  const withRecords = (result: Reduced): Reduced =>
+    retried.length === 0 ? result : { ...result, records: [...(result.records ?? []), ...retried] };
   const played = botTick(base, now, retry);
-  if (played.table !== base) return played;
+  if (played.table !== base) return withRecords(played);
   if (base === table) return unchanged(table);
-  return { table: base, out: publicChanges(table, base, new Set(), now), log: [] };
+  return withRecords({ table: base, out: publicChanges(table, base, new Set(), now), log: [] });
+}
+
+/** The Durable Object is done with game `gameNo`'s record (written, or no database). */
+function recordedGame(table: Table, gameNo: number): Reduced {
+  if (!table.records?.some((each) => each.gameNo === gameNo)) return unchanged(table);
+  const next = copyTable(table);
+  recorded(next, gameNo);
+  return { table: next, out: [], log: [] };
 }
 
 function botTick(table: Table, now: number, retry: boolean): Reduced {
@@ -630,6 +660,8 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
       return gone(table, command.who, ctx);
     case "tick":
       return tick(table, ctx.now, command.retry);
+    case "recorded":
+      return recordedGame(table, command.gameNo);
     case "client": {
       if (personOf(table, command.who) === undefined) return unchanged(table);
       const frame = command.frame;

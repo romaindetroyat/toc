@@ -32,6 +32,15 @@ export {
   wantsSweep,
 } from "./presence.ts";
 export {
+  D1_RETRY_MS,
+  type GameRecord,
+  gameRecordOf,
+  keepRecord,
+  onD1RetryDue,
+  type RecordSeat,
+  recorded,
+} from "./record.ts";
+export {
   type BotInfo,
   type Command,
   type Ctx,

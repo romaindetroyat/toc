@@ -19,6 +19,12 @@
 // answers `purge` (30 days without activity), the object closes every socket with CLOSE_GONE and
 // calls ctx.storage.deleteAll(), which also removes the alarm (compatibility date ≥ 2026-02-24); later
 // requests find no table (4004, 404).
+//
+// Game records (plan 02-09, D-14; 02-RESEARCH Pattern 12): a step that carries finished games' records
+// (the winning play, or a d1Retry tick) is committed and sent first; then each record is written to
+// D1 (src/record.ts, one row per game whatever happens) and, when written or when there is no DB
+// binding yet, the `recorded` command clears it. A failed write leaves it pending: the table already
+// armed its d1Retry deadline. Nothing on the game path reads D1.
 
 import { DurableObject } from "cloudflare:workers";
 import type { Rng } from "@toc/engine";
@@ -36,6 +42,7 @@ import {
 import {
   type Command,
   createTable,
+  type GameRecord,
   nextDeadline,
   reduce,
   SILENCE_MS,
@@ -43,6 +50,7 @@ import {
   type Table,
   type TestOptions,
 } from "@toc/table";
+import { writeGame } from "./record.ts";
 import { commit, createSchema, hasTable, load } from "./storage.ts";
 
 /** What a socket remembers through hibernation: its person, once it said hello. */
@@ -74,6 +82,8 @@ export class GameRoom extends DurableObject<Env> {
   private cached: Table | null | undefined;
   /** The alarm as last set by this instance; undefined until read. */
   private armed: number | null | undefined;
+  /** The missing DB binding was logged by this instance (once, plan 02-09). */
+  private toldNoDatabase = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -133,8 +143,9 @@ export class GameRoom extends DurableObject<Env> {
     const frame = parsed.frame;
     const attachment = attachmentOf(ws);
     if (frame.t !== "hello") {
-      // Frames before hello are ignored (T-02-05).
-      if (attachment.who !== null) this.run({ t: "client", who: attachment.who, frame });
+      // Frames before hello are ignored (T-02-05). A winning play's record is written before the
+      // handler ends.
+      if (attachment.who !== null) await this.run({ t: "client", who: attachment.who, frame });
       return;
     }
     if (frame.v !== PROTOCOL_VERSION) {
@@ -225,7 +236,8 @@ export class GameRoom extends DurableObject<Env> {
 
   /**
    * reduce → commit (synchronous SQL) → per-person sends → the alarm at the next deadline. A purge
-   * (only from a tick) returns the deletion's promise, which the alarm awaits.
+   * (only from a tick) returns the deletion's promise, which the alarm awaits; finished games'
+   * records return the D1 writes' promise, which the handler awaits.
    */
   private run(command: Command): Promise<void> | undefined {
     const table = this.table();
@@ -246,6 +258,28 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
     this.arm(nextDeadline(result.table));
+    if (result.records !== undefined && result.records.length > 0) {
+      return this.record(result.table.tableId, result.records);
+    }
+  }
+
+  /**
+   * Writes finished games to D1 after their step's commit. Written, or no DB binding (D1 not created
+   * yet, D-14): the record is no longer pending. Failed: it stays pending for the d1Retry deadline.
+   */
+  private async record(tableId: string, records: readonly GameRecord[]): Promise<void> {
+    for (const record of records) {
+      const outcome = await writeGame(this.env.DB, tableId, record);
+      if (outcome === "failed") {
+        console.warn(`table record: game ${record.gameNo} not written to D1, retried later`);
+        continue;
+      }
+      if (outcome === "skipped" && !this.toldNoDatabase) {
+        this.toldNoDatabase = true;
+        console.log("table record: no D1 binding (DB), finished games are not recorded");
+      }
+      this.run({ t: "recorded", gameNo: record.gameNo });
+    }
   }
 
   /**

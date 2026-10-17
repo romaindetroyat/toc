@@ -84,7 +84,7 @@ async function until(ready: () => Promise<boolean>, what: string): Promise<void>
   throw new Error(`timed out waiting for ${what}`);
 }
 
-/** Makes the table's d1Retry deadline due now and fires the alarm. */
+/** Makes the table's d1Retry deadline due and fires the alarm. */
 async function retryNow(id: string): Promise<void> {
   await evictDurableObject(stubOf(id));
   await runInDurableObject(stubOf(id), async (_room, state) => {
@@ -92,7 +92,8 @@ async function retryNow(id: string): Promise<void> {
     if (table === null) throw new Error("no table");
     table.deadlines.d1Retry = { at: 0, attempt: table.deadlines.d1Retry?.attempt ?? 1 };
     commit(state.storage.sql, table, [], Date.now());
-    await state.storage.setAlarm(Date.now());
+    // Far ahead, so the runtime does not fire it by itself first; runDurableObjectAlarm runs it now.
+    await state.storage.setAlarm(Date.now() + 3_600_000);
   });
   expect(await runDurableObjectAlarm(stubOf(id))).toBe(true);
 }
@@ -114,7 +115,11 @@ describe("the record of a finished game in D1", () => {
     expect(row?.winner).toBe("bleu-rouge");
     expect(row?.deals).toBe(0);
     expect(JSON.parse(String(row?.captures))).toEqual({ "bleu-rouge": 0, "jaune-vert": 0 });
-    const seats = JSON.parse(String(row?.seats)) as { colour: string; kind: string; name: string }[];
+    const seats = JSON.parse(String(row?.seats)) as {
+      colour: string;
+      kind: string;
+      name: string;
+    }[];
     expect(seats.map((seat) => [seat.colour, seat.kind])).toEqual([
       ["bleu", "human"],
       ["jaune", "human"],

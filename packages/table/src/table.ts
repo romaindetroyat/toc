@@ -7,6 +7,7 @@
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
 import { COLORS, type Color, type GameState, type Rng, type Scenario } from "@toc/engine";
 import type { ChatEntry } from "@toc/protocol";
+import type { GameRecord } from "./record.ts";
 
 export type Person = {
   who: string;
@@ -129,14 +130,21 @@ export type Table = {
    * The table's deadlines, one alarm for all (02-RESEARCH Pattern 3): when the computer player due
    * must next be ticked (decide, a slice, or play) for `seq`; when the pause's minute is over; when
    * the silent sockets are next swept (presence.ts); when the 30 idle days may be over (expire: not
-   * moved by each activity, re-armed when it fires early, plan 02-07).
+   * moved by each activity, re-armed when it fires early, plan 02-07); when the pending game records
+   * go to D1 again (d1Retry, `attempt` the tries so far, plan 02-09, record.ts).
    */
   deadlines: {
     bot?: { at: number; seq: number };
     pauseChoice?: { at: number };
     sweep?: { at: number };
     expire?: { at: number };
+    d1Retry?: { at: number; attempt: number };
   };
+  /**
+   * Server-only: the records of finished games not yet written to D1 (plan 02-09, record.ts), at
+   * most one per game number. Never put in a frame.
+   */
+  records: GameRecord[];
   /** The pending reclaims by seat (plan 02-07); server-only: `who` never leaves the table. */
   reclaims: Partial<Record<Color, Reclaim>>;
   /** The pause while the status is "paused"; else null. */
@@ -185,6 +193,7 @@ export function createTable(options: {
     startedAt: null,
     endedAt: null,
     rematch: {},
+    records: [],
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: { expire: { at: options.now + EXPIRY_MS } },
     reclaims: {},
@@ -209,6 +218,7 @@ export function copyTable(table: Table): Table {
   copy.deadlines.expire ??= { at: copy.lastActivity + EXPIRY_MS };
   // Before plan 02-09 a won game stayed « playing », without votes or times.
   copy.rematch ??= {};
+  copy.records ??= [];
   copy.firstDealer ??= null;
   copy.startedAt ??= null;
   copy.endedAt ??= null;
@@ -222,8 +232,8 @@ export function personOf(table: Table, who: string): Person | undefined {
 
 /** The earliest deadline of the table, or null: the Durable Object arms its one alarm at it. */
 export function nextDeadline(table: Table): number | null {
-  const { bot, pauseChoice, sweep, expire } = table.deadlines;
-  const times = [bot?.at, pauseChoice?.at, sweep?.at, expire?.at].filter(
+  const { bot, pauseChoice, sweep, expire, d1Retry } = table.deadlines;
+  const times = [bot?.at, pauseChoice?.at, sweep?.at, expire?.at, d1Retry?.at].filter(
     (at): at is number => at !== undefined,
   );
   return times.length === 0 ? null : Math.min(...times);

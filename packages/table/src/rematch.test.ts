@@ -18,6 +18,7 @@ import {
   gameRecordOf,
   nextDeadline,
   type Out,
+  type Reduced,
   reduce,
   summary,
   type Table,
@@ -84,7 +85,7 @@ function nearEnd(): Table {
 }
 
 /** Ana plays the winning 5 at 3000. */
-function won(): { table: Table; out: Out[] } {
+function won(): Reduced {
   const table = nearEnd();
   return reduce(
     table,
@@ -381,7 +382,9 @@ describe("the record of a finished game (plan 02-09 Task 2, HIST-01, D-14)", () 
   it("is pending until recorded, with the d1Retry deadline a minute later", () => {
     const { table } = won();
     expect(table.deadlines.d1Retry).toEqual({ at: 3000 + 60_000, attempt: 1 });
-    expect(nextDeadline(table)).toBe(3000 + 60_000);
+    // The one alarm takes it into account (the sweep and the expiry are the table's others).
+    const { d1Retry } = table.deadlines;
+    expect(nextDeadline({ ...table, deadlines: { d1Retry } })).toBe(3000 + 60_000);
     const done = reduce(table, { t: "recorded", gameNo: 1 }, ctx(3100));
     expect(done.table.records).toEqual([]);
     expect(done.table.deadlines.d1Retry).toBeUndefined();
