@@ -16,6 +16,7 @@ export {
   type Reduced,
   reduce,
 } from "./reduce.ts";
+export { summary } from "./summary.ts";
 export {
   createTable,
   dueBot,

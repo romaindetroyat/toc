@@ -235,3 +235,59 @@ export function parseCreateTestOptions(body: unknown): CreateTestOptions | null 
   const parsed = createTestSchema.safeParse((body as { test?: unknown }).test);
   return parsed.success ? (parsed.data as CreateTestOptions) : null;
 }
+
+// --- Public table summary (GET /api/tables/:id, plan 02-04) ---
+
+/**
+ * Where a table stands. The table core fills `lobby`, `playing` and `finished` today; `paused` (02-06)
+ * and `saved` (02-07) are named now so the home's list already has their words.
+ */
+export type TableStatus = "lobby" | "playing" | "paused" | "saved" | "finished";
+
+export const TABLE_STATUSES: readonly TableStatus[] = [
+  "lobby",
+  "playing",
+  "paused",
+  "saved",
+  "finished",
+];
+
+/** One seat in the summary: its kind and its first name or horse name (null for a free seat). */
+export type SummarySeat = { kind: "free" | "bot" | "human"; name: string | null };
+
+/**
+ * What anyone holding a table's link may read without joining (T-02-15): the status, the creator's
+ * first name, each seat's kind and name, the game number and the last activity. No person id, no token
+ * or token hash, no table id, no card.
+ */
+export type TableSummary = {
+  status: TableStatus;
+  creatorName: string | null;
+  seats: Record<Color, SummarySeat>;
+  gameNo: number;
+  /** The table's last activity, in ms since the epoch. */
+  updatedAt: number;
+};
+
+const summarySeat = z.strictObject({
+  kind: z.enum(["free", "bot", "human"]),
+  name: z.nullable(z.string().check(z.maxLength(64))),
+});
+const tableSummarySchema = z.strictObject({
+  status: z.enum(TABLE_STATUSES as [TableStatus, ...TableStatus[]]),
+  creatorName: z.nullable(z.string().check(z.maxLength(64))),
+  seats: z.strictObject({
+    bleu: summarySeat,
+    jaune: summarySeat,
+    rouge: summarySeat,
+    vert: summarySeat,
+  }),
+  gameNo: count,
+  updatedAt: count,
+});
+
+/** A table summary from untrusted JSON data (the response body), or null when it is not one. */
+export function parseTableSummary(data: unknown): TableSummary | null {
+  const parsed = tableSummarySchema.safeParse(data);
+  return parsed.success ? (parsed.data as TableSummary) : null;
+}
