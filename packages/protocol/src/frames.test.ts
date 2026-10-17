@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLOSE_ELSEWHERE,
   CLOSE_GONE,
+  CLOSE_SILENT,
   CLOSE_VERSION,
   MAX_FRAME_CHARS,
   PROTOCOL_VERSION,
@@ -18,7 +19,7 @@ describe("parseClientFrame", () => {
   it("accepts the four client frames", () => {
     expect(ok({ t: "hello", v: PROTOCOL_VERSION, token: TOKEN, name: "Ana" })).toEqual({
       ok: true,
-      frame: { t: "hello", v: 1, token: TOKEN, name: "Ana" },
+      frame: { t: "hello", v: PROTOCOL_VERSION, token: TOKEN, name: "Ana" },
     });
     expect(ok({ t: "sit", seat: "jaune" })).toEqual({
       ok: true,
@@ -141,6 +142,31 @@ describe("parseClientFrame", () => {
     for (const frame of refused) expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
   });
 
+  it("accepts the pause choices and resume (plan 02-06), a level with the hand-over only", () => {
+    expect(ok({ t: "pause", choice: "wait" })).toEqual({
+      ok: true,
+      frame: { t: "pause", choice: "wait" },
+    });
+    expect(ok({ t: "pause", choice: "save" }).ok).toBe(true);
+    expect(ok({ t: "pause", choice: "bot" })).toEqual({ ok: true, frame: { t: "pause", choice: "bot" } });
+    expect(ok({ t: "pause", choice: "bot", level: 4 })).toEqual({
+      ok: true,
+      frame: { t: "pause", choice: "bot", level: 4 },
+    });
+    expect(ok({ t: "resume" })).toEqual({ ok: true, frame: { t: "resume" } });
+    for (const frame of [
+      { t: "pause", choice: "wait", level: 3 },
+      { t: "pause", choice: "save", level: 1 },
+      { t: "pause", choice: "bot", level: 6 },
+      { t: "pause", choice: "bot", level: "4" },
+      { t: "pause", choice: "later" },
+      { t: "pause" },
+      { t: "resume", now: 1 },
+    ]) {
+      expect(ok(frame).ok, JSON.stringify(frame)).toBe(false);
+    }
+  });
+
   it("refuses any text longer than MAX_FRAME_CHARS before parsing it", () => {
     const padded = JSON.stringify({ t: "hello", v: 1, token: TOKEN, name: "Ana" }).padEnd(
       MAX_FRAME_CHARS + 1,
@@ -183,13 +209,16 @@ describe("ids", () => {
     expect(toBase64Url(bytes)).toBe("AAEC-vv8_f7_Pj8");
   });
 
-  it("keeps distinct close codes for the three endings", () => {
+  it("keeps distinct close codes for the three endings, and 4000 for a silent socket", () => {
     expect([CLOSE_ELSEWHERE, CLOSE_VERSION, CLOSE_GONE]).toEqual([4001, 4002, 4004]);
+    expect(CLOSE_SILENT).toBe(4000);
+    // Version 2: the pause and the ping (an older client is closed with 4002).
+    expect(PROTOCOL_VERSION).toBe(2);
   });
 });
 
 describe("parseServerFrame", () => {
-  const seat = { kind: "free", name: null, level: 3, online: true };
+  const seat = { kind: "free", name: null, level: 3, online: true, handedOver: null };
   const table = {
     status: "lobby",
     seats: { bleu: seat, jaune: seat, rouge: seat, vert: seat },
@@ -198,6 +227,8 @@ describe("parseServerFrame", () => {
     gameNo: 0,
     thinking: null,
     unseated: ["Céline"],
+    pause: null,
+    now: 1_000,
   };
 
   it("reads the four server frames", () => {
@@ -227,8 +258,45 @@ describe("parseServerFrame", () => {
     ).toEqual({ t: "events", seq: 3, events: [{ t: "turn" }], view });
   });
 
+  it("reads a paused table, a saved one, a handed-over seat and a welcome that regained a seat", () => {
+    const paused = {
+      ...table,
+      status: "paused",
+      seats: { ...table.seats, jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: null } },
+      pause: { missing: ["jaune"], since: 1_000, choiceAt: 61_000, choosing: false },
+    };
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: paused }))).toEqual({
+      t: "table",
+      table: paused,
+    });
+    const handed = {
+      ...table,
+      status: "playing",
+      seats: { ...table.seats, jaune: { kind: "human", name: "Ben", level: 3, online: false, handedOver: 4 } },
+    };
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: handed }))?.t).toBe("table");
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: { ...table, status: "saved" } }))?.t).toBe("table");
+    const welcome = { t: "welcome", you: { seat: "jaune", host: false }, table: handed, view: null, seq: 4, regained: true };
+    expect(parseServerFrame(JSON.stringify(welcome))).toEqual(welcome);
+    for (const code of ["paused", "refused"]) {
+      expect(parseServerFrame(JSON.stringify({ t: "error", code }))).toEqual({ t: "error", code });
+    }
+  });
+
   it("refuses a frame of another shape", () => {
     expect(parseServerFrame("nope")).toBeNull();
+    const { now: _now, ...withoutNow } = table;
+    expect(parseServerFrame(JSON.stringify({ t: "table", table: withoutNow }))).toBeNull();
+    expect(
+      parseServerFrame(
+        JSON.stringify({ t: "table", table: { ...table, pause: { missing: ["violet"], since: 0, choiceAt: 0, choosing: false } } }),
+      ),
+    ).toBeNull();
+    expect(
+      parseServerFrame(
+        JSON.stringify({ t: "table", table: { ...table, seats: { ...table.seats, bleu: { ...seat, handedOver: 9 } } } }),
+      ),
+    ).toBeNull();
     expect(parseServerFrame(JSON.stringify({ t: "error", code: "boom" }))).toBeNull();
     expect(
       parseServerFrame(
@@ -252,6 +320,10 @@ describe("the test options of a creation body", () => {
     expect(
       parseCreateTestOptions({ test: { pace: "normal", levels: { jaune: 5, rouge: 3, vert: 4 } } }),
     ).toEqual({ pace: "normal", levels: { jaune: 5, rouge: 3, vert: 4 } });
+    expect(parseCreateTestOptions({ test: { pace: "zero", pauseMs: 2000 } })).toEqual({
+      pace: "zero",
+      pauseMs: 2000,
+    });
     for (const test of [
       undefined,
       null,
@@ -260,6 +332,9 @@ describe("the test options of a creation body", () => {
       { pace: "zero", levels: { jaune: "5" } },
       { pace: "zero", levels: { violet: 3 } },
       { pace: "zero", extra: 1 },
+      { pace: "zero", pauseMs: 100 },
+      { pace: "zero", pauseMs: 61_000 },
+      { pace: "zero", pauseMs: "2000" },
     ]) {
       expect(parseCreateTestOptions({ test }), JSON.stringify(test)).toBeNull();
     }

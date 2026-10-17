@@ -35,8 +35,19 @@ export type Client = {
   closed: Promise<{ code: number }>;
 };
 
-/** Opens a socket on /ws/table/<id> and accepts it on the test side. */
-export async function connect(id: string, headers: Record<string, string> = {}): Promise<Client> {
+/** How often a test client pings, as the app does every 20 s (plan 02-06): well inside the 75 s. */
+const PING_EVERY_MS = 10_000;
+
+/**
+ * Opens a socket on /ws/table/<id> and accepts it on the test side. Like the app, the client sends
+ * "ping" every PING_EVERY_MS (the object's auto-response answers "pong" without waking it), so a long
+ * test is never swept as silent; `ping: false` leaves it silent.
+ */
+export async function connect(
+  id: string,
+  headers: Record<string, string> = {},
+  options: { ping?: boolean } = {},
+): Promise<Client> {
   const response = await SELF.fetch(`${ORIGIN}/ws/table/${id}`, {
     headers: { Upgrade: "websocket", ...headers },
   });
@@ -50,14 +61,27 @@ export async function connect(id: string, headers: Record<string, string> = {}):
   let lastSeq = 0;
   ws.addEventListener("message", (event) => {
     const text = typeof event.data === "string" ? event.data : "";
+    // The auto-response to a ping is not a frame.
+    if (text === "pong") return;
     raw.push(text);
     const frame = JSON.parse(text) as ServerFrame;
     if (frame.t === "welcome" || frame.t === "events") lastSeq = frame.seq;
     frames.push(frame);
     wake?.();
   });
+  const pinger =
+    options.ping === false
+      ? null
+      : setInterval(() => {
+          try {
+            ws.send("ping");
+          } catch {
+            // Closed meanwhile.
+          }
+        }, PING_EVERY_MS);
   const closed = new Promise<{ code: number }>((resolve) => {
     ws.addEventListener("close", (event) => {
+      if (pinger !== null) clearInterval(pinger);
       resolve({ code: event.code });
       wake?.();
     });

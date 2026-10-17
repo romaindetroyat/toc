@@ -82,7 +82,7 @@ function viewAt(client: Client, seq: number): PlayerView | null {
 async function seatAna(test: unknown, start = true): Promise<{ id: string; ana: Client }> {
   const id = await createTable(test);
   const ana = await connect(id);
-  ana.send({ t: "hello", v: 1, token: token("a"), name: "Ana" });
+  ana.send({ t: "hello", v: 2, token: token("a"), name: "Ana" });
   await ana.next("welcome");
   ana.send({ t: "sit", seat: "bleu" });
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");
