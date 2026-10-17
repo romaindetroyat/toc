@@ -79,3 +79,10 @@ The game is already published at https://toc.romaindetroyat.workers.dev (Worker 
 
 *Phase: 02-jouer-en-ligne-entre-proches*
 *Context gathered: 2026-10-17*
+
+## Addendum — Romain's answers after research (2026-10-17)
+
+- **D-11:** Cloudflare plan stays **Free**. Romain: « Je reste en gratuit ». The Champion's search inside the Durable Object must respect the Free-plan CPU limit per invocation: split the search across several alarm invocations (resumable thinker state in SQLite), as described in 02-RESEARCH.md. — **Reversibility:** reversible — a paid plan later only removes the slicing need.
+- **D-12:** Late arrivals cannot take a computer seat once the game has started. Romain: « Non ». Only the seat's own device (or the host-approved reclaim of one's own seat, see research pitfall on in-app browsers) gets back in.
+- **D-13:** Quick messages: « Bien joué ! », « Aïe ! », « Merci partenaire », « À toi ! », « Pardon… », « On y est presque », « Bravo ! », « 😂 », plus emoji reactions 👏 😮 🐴 ❤️. Romain: « Ajoute des émojis ».
+- **D-14:** HIST-01 uses a D1 database; Romain will give the deploy token the « D1 Edit » permission (« Je donne le droit au jeton »). Creating the database is a deploy step done from this environment once the permission exists; if it is missing at execution time, keep the D1 binding optional and report it.
