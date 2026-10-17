@@ -292,6 +292,20 @@ button {
   }
 }
 
+/* The board's glow around the thinking seat's rider (Board.svelte .thinking-glow). */
+@keyframes respire-lueur {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
 @keyframes respire-texte {
   0%,
   100% {

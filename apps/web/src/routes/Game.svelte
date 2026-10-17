@@ -810,6 +810,7 @@
             {discardTop}
             {burst}
             {flights}
+            thinking={session.thinking}
             ontapis={() => (tapisOpen = true)}
           >
             {#snippet under(px)}
