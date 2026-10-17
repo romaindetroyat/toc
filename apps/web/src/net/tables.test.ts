@@ -1,11 +1,13 @@
 import type { TableSummary } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
+import { table as copy } from "../i18n/fr/table.ts";
 import {
   forgetTable,
   loadTables,
   MAX_TABLES,
   rememberTable,
   restoreTable,
+  rowStatus,
   rowText,
   statusText,
   TABLES_KEY,
@@ -152,6 +154,17 @@ function summaryWith(
     missing: [],
   };
 }
+
+describe("rowStatus(summary, seat) (plan 02-07)", () => {
+  it("reads « En pause : on t’attend » when this device's seat is missing", () => {
+    const me = { kind: "human" as const, name: "Ana" };
+    const paused = { ...summaryWith({ bleu: me }, "paused"), missing: ["bleu" as const] };
+    expect(rowStatus(paused, "bleu")).toBe(copy.list.status.pausedForYou);
+    expect(rowStatus(paused, "jaune")).toBe(copy.list.status.paused);
+    expect(rowStatus(paused, null)).toBe(copy.list.status.paused);
+    expect(rowStatus(summaryWith({ bleu: me }, "saved"), "bleu")).toBe(copy.list.status.saved);
+  });
+});
 
 describe("rowText(summary, seat)", () => {
   it("nobody else, one, two, three", () => {

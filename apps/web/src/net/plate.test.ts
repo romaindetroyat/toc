@@ -2,7 +2,15 @@ import type { Color } from "@toc/engine";
 import type { SeatPublic, TablePublic } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import { typographyProblems } from "../i18n/typography.test.ts";
-import { formatCountdown, plateFor, remainingMs } from "./plate.ts";
+import {
+  BANNER_MS,
+  closeNotice,
+  connectionState,
+  formatCountdown,
+  PLATE_MS,
+  plateFor,
+  remainingMs,
+} from "./plate.ts";
 
 // The plate over the board (plan 02-06, 02-UI-SPEC « Plates », « Plate states »): what the pause, the
 // chef de table's choices and the saved game say, for the chef de table and for the others, with the
@@ -197,5 +205,70 @@ describe("plateFor", () => {
         if (typeof text === "string") expect(typographyProblems(text), text).toEqual([]);
       }
     }
+  });
+});
+
+// Plan 02-07 (02-UI-SPEC « Own connection: reconnect banner and plate », « Connecting, errors »).
+describe("connectionState: this device's own connection", () => {
+  it("shows nothing for 2 s, the banner until 10 s, then the plate", () => {
+    expect([BANNER_MS, PLATE_MS]).toEqual([2_000, 10_000]);
+    expect(connectionState(null, 50_000, false)).toBe("none");
+    expect(connectionState(1_000, 1_000, false)).toBe("none");
+    expect(connectionState(1_000, 2_999, false)).toBe("none");
+    expect(connectionState(1_000, 3_000, false)).toBe("banner");
+    expect(connectionState(1_000, 10_999, false)).toBe("banner");
+    expect(connectionState(1_000, 11_000, false)).toBe("plate");
+    expect(connectionState(1_000, 100_000, false)).toBe("plate");
+  });
+
+  it("shows nothing once the connection is back, whatever the clock says", () => {
+    expect(connectionState(1_000, 100_000, true)).toBe("none");
+  });
+});
+
+describe("the connection plate comes first: connection > saved > pause", () => {
+  it("replaces the saved plate and the pause plate, and stands alone during play", () => {
+    const connection = {
+      kind: "connection",
+      title: "Connexion perdue",
+      body: "Le jeu essaie de se reconnecter. Vérifie le Wi-Fi ou les données mobiles. La partie est gardée.",
+    };
+    expect(plateFor(table({ status: "saved" }), "bleu", 0, 0, "plate")).toEqual(connection);
+    expect(plateFor(paused(), "bleu", 0, 100_000, "plate")).toEqual(connection);
+    expect(plateFor(paused(true), "bleu", 0, 170_000, "plate")).toEqual(connection);
+    expect(plateFor(table(), "bleu", 0, 0, "plate")).toEqual(connection);
+    // The waiting room (no seat yet) has the same plate.
+    expect(plateFor(table({ status: "lobby" }), null, 0, 0, "plate")).toEqual(connection);
+  });
+
+  it("leaves the other plates as they are under the banner and when the connection is up", () => {
+    expect(plateFor(table({ status: "saved" }), "bleu", 0, 0, "banner")?.kind).toBe("saved");
+    expect(plateFor(paused(), "bleu", 0, 100_000, "none")?.kind).toBe("pause");
+    expect(plateFor(table(), "bleu", 0, 0, "banner")).toBeNull();
+    expect(plateFor(table({ status: "lobby" }), null, 0, 0, "none")).toBeNull();
+  });
+
+  it("writes the connection plate with the French typography", () => {
+    const plate = plateFor(table(), "bleu", 0, 0, "plate");
+    for (const text of Object.values(plate ?? {})) {
+      if (typeof text === "string") expect(typographyProblems(text), text).toEqual([]);
+    }
+  });
+});
+
+describe("closeNotice: the notice of a connection that ended", () => {
+  it("names one notice per close code, and the server's error", () => {
+    expect(closeNotice(4001, false)).toBe("ailleurs");
+    expect(closeNotice(4002, false)).toBe("version");
+    expect(closeNotice(4004, false)).toBe("introuvable");
+    expect(closeNotice(null, true)).toBe("serveur");
+    expect(closeNotice(4001, true)).toBe("ailleurs");
+  });
+
+  it("names none while the connection lives or retries", () => {
+    expect(closeNotice(null, false)).toBeNull();
+    expect(closeNotice(4000, false)).toBeNull();
+    expect(closeNotice(1006, false)).toBeNull();
+    expect(closeNotice(1000, false)).toBeNull();
   });
 });
