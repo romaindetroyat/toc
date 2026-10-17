@@ -202,9 +202,10 @@ Plans:
   4. Le créateur de la table peut arrêter une partie à tout moment. Les joueurs la reprennent plus tard, même plusieurs jours après, dans l'état exact où elle était : mains, donne en cours, position des pions, joueur dont c'est le tour.
   5. Les joueurs d'une table discutent par chat texte pendant la partie. À la fin, l'équipe gagnante est annoncée à tous, et la table peut enchaîner une revanche avec les mêmes joueurs.
 
-**Plans:** 6/11 plans executed (the plans run one after the other on the main tree; each runs only the Playwright specs it touches; 02-01 starts with Romain's approval of the five new packages; 02-10 runs everything, plays a game between four browsers, creates the D1 database if the token allows it, deploys to https://toc.romaindetroyat.workers.dev and writes 02-UAT.md)
+**Plans:** 7/12 plans executed (the plans run one after the other on the main tree; each runs only the Playwright specs it touches; 02-01 starts with Romain's approval of the five new packages; 02-10 runs everything, plays a game between four browsers, creates the D1 database if the token allows it, deploys to https://toc.romaindetroyat.workers.dev and writes 02-UAT.md)
 
 Plans:
+- [x] 02-06b-PLAN.md
 - [x] 02-04b-PLAN.md
 
 **Wave 1**
@@ -223,7 +224,7 @@ Plans:
 - [x] 02-05-PLAN.md — La salle d'attente et l'invitation (lien, code QR)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 02-06-PLAN.md — Un joueur s'absente : la pause pour tous, puis le choix du chef de table
+- [x] 02-06-PLAN.md — Un joueur s'absente : la pause pour tous, puis le choix du chef de table
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 02-07-PLAN.md — Recharger, perdre le réseau, arrêter et reprendre des jours après, « C'est moi »
@@ -326,7 +327,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
-| 2. Jouer en ligne entre proches | 6/11 | In Progress | - |
+| 2. Jouer en ligne entre proches | 7/12 | In Progress | - |
 | 3. L'ordinateur à la force choisie | 11/11 | In Progress | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
