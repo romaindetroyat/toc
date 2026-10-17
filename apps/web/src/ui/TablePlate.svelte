@@ -2,7 +2,7 @@
   import { type BotLevel, DEFAULT_BOT_LEVEL } from "@toc/bots";
   import type { Color } from "@toc/engine";
   import type { ClientFrame, TablePublic } from "@toc/protocol";
-  import { tick, untrack } from "svelte";
+  import { untrack } from "svelte";
   import { fade, fly } from "svelte/transition";
   import { unlock } from "../audio/engine.ts";
   import { table as copy } from "../i18n/fr/table.ts";
@@ -87,22 +87,20 @@
     });
   });
 
-  // --- Focus: to the first choice when the choices appear, to the level when it is asked ---
-  let plateEl = $state<HTMLElement | null>(null);
-  let firstChoice = $state<HTMLButtonElement | null>(null);
-  $effect(() => {
-    const current = kind;
-    untrack(() => {
-      void tick().then(() => {
-        if (current === "choices") firstChoice?.focus({ preventScroll: true });
-        else if (current === "level") {
-          plateEl
-            ?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"], input:checked')
-            ?.focus({ preventScroll: true });
-        }
-      });
-    });
-  });
+  // --- Focus: to the first choice when the choices appear (and on « Retour »), to the level's
+  // checked option when the level step appears. An action on the element itself, run once it is in
+  // the page (a bound reference may come a moment later). ---
+  function focusFirst(node: HTMLElement) {
+    requestAnimationFrame(() => node.focus({ preventScroll: true }));
+  }
+
+  function focusChecked(node: HTMLElement) {
+    requestAnimationFrame(() =>
+      node
+        .querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')
+        ?.focus({ preventScroll: true }),
+    );
+  }
 
   function act(frame: ClientFrame) {
     unlock();
@@ -197,7 +195,6 @@
     class="plate"
     aria-labelledby="plate-title"
     data-plate={kind}
-    bind:this={plateEl}
     bind:offsetHeight={plateHeight}
     style:left={place ? `${place.left}px` : undefined}
     style:top={place ? `${place.top}px` : undefined}
@@ -222,7 +219,7 @@
           type="button"
           class="btn btn-secondary"
           data-choice="wait"
-          bind:this={firstChoice}
+          use:focusFirst
           onclick={() => act({ t: "pause", choice: "wait" })}
         >
           {copy.game.pause.wait}
@@ -240,7 +237,7 @@
         </button>
       </div>
     {:else if plate.kind === "choices"}
-      <div class="level">
+      <div class="level" use:focusChecked>
         <StrengthPicker
           color={me}
           role="handover"

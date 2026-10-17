@@ -1,11 +1,15 @@
 <script lang="ts">
   import { type Color, firstPlayer, PARTNER, type RenderState } from "@toc/engine";
+  import type { TablePublic } from "@toc/protocol";
   import { game } from "../i18n/fr/game.ts";
+  import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings } from "../settings/store.svelte.ts";
   import InfoBar from "./InfoBar.svelte";
   import SeatChip from "./SeatChip.svelte";
   import SettingsButton from "./SettingsButton.svelte";
+  import Icon from "./Icon.svelte";
   import Sheet from "./Sheet.svelte";
+  import TablePlayers from "./TablePlayers.svelte";
 
   type Props = {
     render: RenderState;
@@ -27,6 +31,11 @@
     onabandon?: (to?: string) => void;
     /** The computer player thinking about its move (session.thinking), if any. */
     thinking?: Color | null;
+    /**
+     * An online table (plan 02-06): « À la table », the players list, as a section of the pill's
+     * sheet (phone) or behind a 44 px button on a fourth row of the column form (computer).
+     */
+    players?: { table: TablePublic; me: Color };
   };
 
   let {
@@ -37,9 +46,12 @@
     gear = true,
     onabandon,
     thinking = null,
+    players,
   }: Props = $props();
 
   let infoOpen = $state(false);
+  let playersOpen = $state(false);
+  let playersButton = $state<HTMLButtonElement | null>(null);
   let pill = $state<HTMLButtonElement | null>(null);
 
   const partner = $derived(PARTNER[human]);
@@ -118,6 +130,12 @@
       <div class="sheet-info" data-info-sheet>
         <InfoBar {render} {human} {names} {thinking} form="column" gear={false} />
       </div>
+      {#if players !== undefined}
+        <section class="players-section" aria-labelledby="players-heading" data-players-section>
+          <h3 id="players-heading" class="players-heading">{tableCopy.game.players.title}</h3>
+          <TablePlayers table={players.table} me={players.me} />
+        </section>
+      {/if}
     </Sheet>
   {/if}
 {:else}
@@ -147,8 +165,14 @@
           {#if ownTurn}
             <span class="name">{game.info.ownTurn}</span>
           {:else}
-            <span class="prefix" class:respire-texte={breathing}>{game.info.turnPrefix(turnName)}</span
-            ><span class="name other" class:respire-texte={breathing} title={turnName}>{turnName}</span>
+            <!-- Prefix and name in one box: the row's gap never splits « Tour d’Ana ». -->
+            <span class="who"
+              ><span class="prefix" class:respire-texte={breathing}
+                >{game.info.turnPrefix(turnName)}</span
+              ><span class="name other" class:respire-texte={breathing} title={turnName}
+                >{turnName}</span
+              ></span
+            >
             {#if breathing}
               <span class="respire-mark" aria-hidden="true">…</span>
             {/if}
@@ -182,7 +206,35 @@
         <SettingsButton {onabandon} />
       </div>
     {/if}
+
+    {#if form === "column" && gear && players !== undefined}
+      <!-- The computer's fourth row (plan 02-06): « À la table »; plan 02-08 adds « Messages ». -->
+      <div class="table-row" data-table-row-buttons>
+        <button
+          type="button"
+          class="round"
+          aria-label={tableCopy.game.players.title}
+          title={tableCopy.game.players.title}
+          aria-haspopup="dialog"
+          data-players-button
+          bind:this={playersButton}
+          onclick={() => (playersOpen = true)}
+        >
+          <Icon name="users" size={24} />
+        </button>
+      </div>
+    {/if}
   </header>
+
+  {#if playersOpen && players !== undefined}
+    <Sheet
+      title={tableCopy.game.players.title}
+      onclose={() => (playersOpen = false)}
+      opener={playersButton}
+    >
+      <TablePlayers table={players.table} me={players.me} />
+    </Sheet>
+  {/if}
 {/if}
 
 <style>
@@ -263,6 +315,12 @@
 
   .prefix {
     flex: none;
+    white-space: pre;
+  }
+
+  .who {
+    display: flex;
+    min-width: 0;
   }
 
   /* The turn's glyph chip, in its own box so that it can breathe (scale about its centre). */
@@ -389,6 +447,40 @@
 
   .sheet-info {
     padding: var(--space-xs) 0;
+  }
+
+  .players-section {
+    margin-top: var(--space-md);
+  }
+
+  .players-heading {
+    margin: 0 0 var(--space-xs);
+    font-size: var(--heading-size);
+    font-weight: 700;
+    line-height: var(--heading-line);
+  }
+
+  /* The fourth row of the column form: 44 px buttons, left-aligned, 4 px under the pills. */
+  .table-row {
+    flex: 1 1 100%;
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch);
+    height: var(--touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: transparent;
+    color: var(--creme);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Compact rule: « Tour de » is hidden visually and the middle zone narrows to 96. */

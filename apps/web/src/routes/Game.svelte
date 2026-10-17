@@ -65,6 +65,7 @@
   import SettingsButton from "../ui/SettingsButton.svelte";
   import SevenPanel from "../ui/SevenPanel.svelte";
   import TablePlate from "../ui/TablePlate.svelte";
+  import SeatBadges from "../board/SeatBadges.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
@@ -876,6 +877,9 @@
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
             onabandon={online === undefined ? abandon : undefined}
+            players={online !== undefined && onlineTable !== null
+              ? { table: onlineTable, me: online.seat }
+              : undefined}
           />
         </div>
 
@@ -901,6 +905,11 @@
             thinking={session.thinking}
             ontapis={() => (tapisOpen = true)}
           >
+            {#snippet badges()}
+              {#if onlineTable !== null}
+                <SeatBadges {k} table={onlineTable} />
+              {/if}
+            {/snippet}
             {#snippet under(px)}
               <Overlay
                 layer="under"

@@ -31,7 +31,8 @@
   // With a render state the felt is drawn as a card table under all of them (D-08).
   // `burst` puts the particles of the party above the knights; `flights` the cards that are moving.
   // `thinking`, the computer player thinking about its move, breathes a glow of its colour around its
-  // rider (plan 03-09).
+  // rider (plan 03-09). `badges`, an HTML layer over the glow and under the knights: the online
+  // table's rider badges (plan 02-06, SeatBadges).
   let {
     k = 0,
     render,
@@ -44,6 +45,7 @@
     under,
     over,
     hits,
+    badges,
   }: {
     k?: number;
     render?: RenderState | null;
@@ -60,6 +62,7 @@
     under?: Snippet<[number]>;
     over?: Snippet<[number]>;
     hits?: Snippet<[number]>;
+    badges?: Snippet;
   } = $props();
 
   const scene = SCENE;
@@ -134,6 +137,7 @@
       style:background={glow.background}
     ></div>
   {/if}
+  {@render badges?.()}
   <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
       <FeltTable {render} {discardTop} {k} {px} />

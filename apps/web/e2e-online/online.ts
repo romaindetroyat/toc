@@ -14,6 +14,8 @@ import { playSimpleMove, snapshot } from "../e2e/jouer.ts";
 export type TableTest = {
   pace: "zero" | "normal";
   levels?: Partial<Record<"bleu" | "jaune" | "rouge" | "vert", 1 | 2 | 3 | 4 | 5>>;
+  /** The pause's minute, shortened (plan 02-06). */
+  pauseMs?: number;
 };
 
 /** POST /api/tables; `test` is honoured because `wrangler dev` runs with TOC_TEST_MODE=1. */
