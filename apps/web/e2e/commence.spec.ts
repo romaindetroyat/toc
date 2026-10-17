@@ -46,6 +46,45 @@ const meet = (a: Box, b: Box): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /**
+ * The token reads « 1er » cleanly (Romain's iPhone, 2026-10-17, plan 02-06b): the « 1 » and the « er »
+ * side by side without touching, the « er » raised above the « 1 »'s middle, both inside the pill.
+ */
+async function expectCleanToken(page: Page, what: string) {
+  const parts = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const el = document.querySelector(selector);
+      if (el === null) return null;
+      const b = el.getBoundingClientRect();
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    };
+    return {
+      pill: box("[data-felt] [data-starter] rect"),
+      one: box('[data-felt] [data-starter] [data-starter-part="1"]'),
+      er: box('[data-felt] [data-starter] [data-starter-part="er"]'),
+      spans: document.querySelectorAll("[data-felt] [data-starter] tspan").length,
+    };
+  });
+  const { pill, one, er } = parts;
+  if (pill === null || one === null || er === null) throw new Error(`${what}: no « 1er » parts`);
+  expect(parts.spans, `${what}: a tspan in the token`).toBe(0);
+  expect(one.width, `${what}: no « 1 »`).toBeGreaterThan(2);
+  expect(er.width, `${what}: no « er »`).toBeGreaterThan(2);
+  expect(one.x + one.width, `${what}: the « er » over the « 1 »`).toBeLessThanOrEqual(er.x + 0.5);
+  expect(er.y + er.height / 2, `${what}: the « er » not raised`).toBeLessThan(
+    one.y + one.height / 2,
+  );
+  for (const [name, b] of [
+    ["1", one],
+    ["er", er],
+  ] as const) {
+    expect(b.x, `${what}: « ${name} » past the pill's left`).toBeGreaterThanOrEqual(pill.x);
+    expect(b.x + b.width, `${what}: « ${name} » past the pill's right`).toBeLessThanOrEqual(
+      pill.x + pill.width,
+    );
+  }
+}
+
+/**
  * Whether the token's box meets a shape of the ring or a dot of the drawing, a knight, the talon, the
  * défausse or the felt (an ellipse inscribed in the felt button's box). Returns what it meets.
  */
@@ -152,6 +191,7 @@ test("the « 1er » token covers no knight, pile or felt, on every side and size
       const board = (await page.locator("[data-board]").boundingBox()) as Box;
       expect(meet(box, board)).toBe(true);
       expect(await overlaps(page), `${seat} ${size.width}x${size.height}`).toEqual([]);
+      await expectCleanToken(page, `${seat} ${size.width}x${size.height}`);
     }
   }
 });
