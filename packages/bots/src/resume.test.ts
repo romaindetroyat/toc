@@ -3,12 +3,13 @@
 // in memory between two of them. The checkpoint goes through JSON at every boundary, as it does through
 // SQLite; the resumed think must end on exactly the decision of chooseAction in one go.
 
-import { type Color, newGame, type PlayerView, type Rng, viewFor } from "@toc/engine";
+import { type Action, type Color, newGame, type PlayerView, type Rng, viewFor } from "@toc/engine";
 import { describe, expect, it, vi } from "vitest";
 import { type BenchPosition, benchPositions } from "./bench.ts";
 import * as evaluate from "./evaluate.ts";
 import type { BotLevel } from "./levels.ts";
-import { chooseAction, createThinker, type Thought, type ThinkerCheckpoint } from "./thinker.ts";
+import { decodeAction, encodeAction } from "./search.ts";
+import { chooseAction, createThinker, type ThinkerCheckpoint, type Thought } from "./thinker.ts";
 
 // Every call of scoreCandidates is recorded with its view, so the test can tell the root scoring (the
 // search's own view object) from the rollouts' policy calls (views of imagined deals).
@@ -27,6 +28,8 @@ vi.mock("./evaluate.ts", async (importOriginal) => {
 const SLICES = [1, 7, 30, 64] as const;
 /** The checkpoint stored with the table stays small (the table row is written at every slice). */
 const CHECKPOINT_MAX_BYTES = 4096;
+/** 40 whole Champion decisions twice (one go, then sliced): a few seconds, more in slices of 1. */
+const SLICED_TIMEOUT_MS = 120_000;
 
 const positions: BenchPosition[] = benchPositions();
 
@@ -82,22 +85,26 @@ describe("the Champion's think resumed from a JSON checkpoint", () => {
   });
 
   for (const slice of SLICES) {
-    it(`gives the one-go decision on every bench position, in slices of ${slice} units`, () => {
-      for (const [i, { view, seat, label }] of positions.entries()) {
-        const rng = rngOf(i);
-        const before = JSON.stringify(view);
-        const whole = chooseAction(view, seat, 5, rng);
-        const { thought, checkpoints } = sliced(view, seat, rng, slice);
-        expect(thought, label).toEqual(whole);
-        expect(rng).toEqual(rngOf(i));
-        expect(JSON.stringify(view)).toBe(before);
-        for (const checkpoint of checkpoints) {
-          expect(checkpoint, label).not.toBeNull();
-          expect(jsonSafe(checkpoint), label).toBe(true);
-          expect(JSON.stringify(checkpoint).length, label).toBeLessThan(CHECKPOINT_MAX_BYTES);
+    it(
+      `gives the one-go decision on every bench position, in slices of ${slice} units`,
+      () => {
+        for (const [i, { view, seat, label }] of positions.entries()) {
+          const rng = rngOf(i);
+          const before = JSON.stringify(view);
+          const whole = chooseAction(view, seat, 5, rng);
+          const { thought, checkpoints } = sliced(view, seat, rng, slice);
+          expect(thought, label).toEqual(whole);
+          expect(rng).toEqual(rngOf(i));
+          expect(JSON.stringify(view)).toBe(before);
+          for (const checkpoint of checkpoints) {
+            expect(checkpoint, label).not.toBeNull();
+            expect(jsonSafe(checkpoint), label).toBe(true);
+            expect(JSON.stringify(checkpoint).length, label).toBeLessThan(CHECKPOINT_MAX_BYTES);
+          }
         }
-      }
-    });
+      },
+      SLICED_TIMEOUT_MS,
+    );
   }
 
   it("a resume does no root work: the search's own view is never scored again", () => {
@@ -139,6 +146,30 @@ describe("the Champion's think resumed from a JSON checkpoint", () => {
     expect(resumed.result()).toEqual(whole);
     expect(resumed.step(64)).toBe(true);
     expect(resumed.result()).toEqual(whole);
+  });
+});
+
+describe("the compact actions of a checkpoint", () => {
+  it("every action shape goes to a string and back unchanged", () => {
+    const actions: Action[] = [
+      { t: "give", card: "7H" },
+      { t: "exit", card: "1S", pawn: "bleu0" },
+      { t: "move", card: "4D", pawn: "vert3" },
+      { t: "swap", card: "11C", pawn: "jaune2", target: "rouge1" },
+      {
+        t: "seven",
+        card: "7C",
+        plan: [
+          { pawn: "bleu0", steps: 3 },
+          { pawn: "bleu1", steps: 4 },
+        ],
+      },
+      { t: "discard" },
+    ];
+    for (const action of actions) {
+      expect(JSON.stringify(decodeAction(encodeAction(action)))).toBe(JSON.stringify(action));
+    }
+    expect(() => decodeAction("z 7H")).toThrow();
   });
 });
 

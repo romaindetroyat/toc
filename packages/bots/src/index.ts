@@ -38,10 +38,28 @@ export {
   type TeamStats,
 } from "./match.ts";
 export { BOT_NAMES, type BotName } from "./names.ts";
+export {
+  CHOICE_BASE_MS,
+  CHOICE_CEILING_MS,
+  CHOICE_SPAN_MS,
+  FAST_CEILING_MS,
+  FAST_FACTOR,
+  FAST_HARD_CAP_MS,
+  HARD_CAP_MS,
+  hardCap,
+  JITTER,
+  type Paced,
+  paceFor,
+  SINGLE_BASE_MS,
+  SINGLE_SPAN_MS,
+  type Speed,
+} from "./pace.ts";
 export { randomLegal } from "./randomLegal.ts";
+export type { SearchCheckpoint } from "./search.ts";
 export {
   chooseAction,
   createThinker,
   type Thinker,
+  type ThinkerCheckpoint,
   type Thought,
 } from "./thinker.ts";

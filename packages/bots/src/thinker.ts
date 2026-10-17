@@ -22,7 +22,7 @@ import { scoreOf } from "./evaluate.ts";
 import { giveScores } from "./exchange.ts";
 import { type BotLevel, type Budget, CHAMPION_BUDGET, LEVEL_PARAMS } from "./levels.ts";
 import { randomLegal } from "./randomLegal.ts";
-import { createSearch } from "./search.ts";
+import { createSearch, type SearchCheckpoint } from "./search.ts";
 
 export type { Budget } from "./levels.ts";
 
@@ -39,11 +39,20 @@ export type Thought = {
   units: number;
 };
 
+/**
+ * Where a think stands, JSON-safe, to resume it in another invocation (the online table's Champion, plan
+ * 02-03): the search's checkpoint for level 5 in the play phase, null for every think that finishes in
+ * its first step (levels 1 to 4, every exchange).
+ */
+export type ThinkerCheckpoint = SearchCheckpoint | null;
+
 export type Thinker = {
   /** Runs about `units` more work (never past the budget); true when the decision is final. */
   step(units: number): boolean;
   /** Always valid, also before the search is finished (anytime). */
   result(): Thought;
+  /** The think so far as plain JSON (null when there is nothing to resume). */
+  checkpoint(): ThinkerCheckpoint;
 };
 
 /** The score gap (evaluation units) from which a choice no longer counts as close. */
@@ -158,8 +167,10 @@ function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thoug
 }
 
 /**
- * The anytime form of the bot, for hosts that slice the work (the browser runner of plan 03-05).
- * Takes a PlayerView only. Neither the view nor the rng is modified.
+ * The anytime form of the bot, for hosts that slice the work (the browser runner of plan 03-05, the
+ * online table's alarms of plan 02-03). Takes a PlayerView only. Neither the view nor the rng is
+ * modified. `from` resumes a level-5 play search from its checkpoint (same view, seat, rng and budget);
+ * it is ignored by every other think.
  */
 export function createThinker(
   view: PlayerView,
@@ -167,10 +178,18 @@ export function createThinker(
   level: BotLevel,
   rng: Rng,
   budget?: Budget,
+  from?: ThinkerCheckpoint,
 ): Thinker {
   const start: Rng = [rng[0], rng[1], rng[2], rng[3]];
   if (level === 5 && view.phase === "play") {
-    return createSearch(view, seat, start, budget ?? CHAMPION_BUDGET);
+    return createSearch(
+      view,
+      seat,
+      start,
+      budget ?? CHAMPION_BUDGET,
+      undefined,
+      from === null ? undefined : from,
+    );
   }
   let thought: Thought | null = null;
   const result = (): Thought => {
@@ -183,6 +202,7 @@ export function createThinker(
       return true;
     },
     result,
+    checkpoint: () => null,
   };
 }
 

@@ -13,7 +13,7 @@
 // is played only if the same bot is still due on the same state after every wait; otherwise it is
 // dropped and the bot thinks again (the human's give during the exchange, 03-RESEARCH Pitfall 4).
 
-import { type BotLevel, DEFAULT_BOT_LEVEL } from "@toc/bots";
+import { type BotLevel, DEFAULT_BOT_LEVEL, type Speed } from "@toc/bots";
 import {
   type Action,
   apply,
@@ -37,8 +37,8 @@ import { BOT_NAMES } from "./botNames.ts";
 import { type BotRunner, syncRunner, ThinkCancelled } from "./botRunner.ts";
 import { hardCap, paceFor } from "./pace.ts";
 
-/** `normal` and `fast` pace the bots (D-11, D-13); `test` has no think time (debug builds and tests). */
-export type Speed = "normal" | "fast" | "test";
+/** `normal` and `fast` pace the bots (D-11, D-13); `test` has no think time. Defined in @toc/bots. */
+export type { Speed };
 
 /** What the controller needs from the Director. */
 export type GameDirector = {

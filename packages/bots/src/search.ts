@@ -14,11 +14,18 @@
 // The work is counted in units (one apply plus one policy call; the candidate's own apply is one unit),
 // never in time: a deal is started only when its whole cost still fits, so the total never exceeds the
 // budget, and the same (view, rng, budget) gives the same move however the host slices the steps.
+// 4. checkpoint() (plan 02-03, D-11): the whole think as plain JSON, so the online table can stop after a
+//    slice, store it with the table in SQLite and resume in another alarm invocation, even after the
+//    Durable Object forgot everything. It carries the kept actions and their static scores (a resume
+//    never scores the root again), the rng before the imagined deal in progress, the work spent, the
+//    deals and sums so far and the scores of the deal in progress; that deal is drawn again from the
+//    view and that rng (determinize depends on nothing else), so a resumed think is the same think.
 // Pure, no I/O, erasable syntax only.
 
 import {
   type Action,
   apply,
+  type CardId,
   type Color,
   type PawnId,
   type PlayerView,
@@ -50,11 +57,38 @@ export type SearchThought = {
   units: number;
 };
 
+/**
+ * Where a search stands, JSON-safe (numbers, arrays and plain action objects only). It never holds a
+ * card the seat cannot see: actions of its own candidates, scores and an rng.
+ */
+export type SearchCheckpoint = {
+  /** The kept candidates' actions, in their static order, in the compact form of encodeAction. */
+  kept: string[];
+  /** Their static scores (the result before the first deal and the tie-breaks). */
+  statics: number[];
+  /** How many distinct candidates the seat had (Thought.candidates). */
+  candidates: number;
+  /** The static best (encodeAction), the decision when only one candidate is kept. */
+  firstAction: string;
+  /** The rng before the imagined deal in progress (or the next one to draw). */
+  r: Rng;
+  /** Units spent so far. */
+  spent: number;
+  /** Imagined deals finished. */
+  worlds: number;
+  /** Sum of each kept candidate's scores over the finished deals. */
+  sums: number[];
+  /** Scores of the kept candidates already rolled out in the deal in progress. */
+  partial: number[];
+};
+
 export type Search = {
   /** Runs at least `units` more work when the budget allows; true when the budget is spent. */
   step(units: number): boolean;
   /** Always valid: the best mean so far, the static best before the first deal. */
   result(): SearchThought;
+  /** The search so far as plain JSON, to resume with createSearch(…, from). */
+  checkpoint(): SearchCheckpoint;
 };
 
 /** True when `candidate` brings a knight of any colour into its home. */
@@ -132,7 +166,9 @@ function bestOf(values: readonly number[]): [index: number, gap: number] {
 
 /**
  * The search of `seat` (in the play phase, on its turn) from `view`, drawing its imagined deals with
- * `rng`, within `budget`. Neither the view nor the rng is modified.
+ * `rng`, within `budget`. Neither the view nor the rng is modified. With `from` (a checkpoint of the same
+ * view, seat, rng, budget and params), it resumes where that search stopped without scoring the root
+ * candidates again.
  */
 export function createSearch(
   view: PlayerView,
@@ -140,60 +176,151 @@ export function createSearch(
   rng: Rng,
   budget: Budget,
   params: SearchParams = { keep: CHAMPION_KEEP, plies: CHAMPION_PLIES },
+  from?: SearchCheckpoint,
 ): Search {
-  const scored = scoreCandidates(view, seat);
-  const first = scored[0];
-  if (first === undefined) throw new Error(`createSearch: ${seat} has no action to play`);
-  const kept = scored.length === 1 ? [first] : keptCandidates(view, seat, scored, params.keep);
-  const statics = kept.map((candidate) => candidate.score);
-  const worldCost = kept.length * (1 + params.plies);
-  const sums = kept.map(() => 0);
+  let keptActions: Action[];
+  let statics: number[];
+  let candidates: number;
+  let firstAction: Action;
+  if (from === undefined) {
+    const scored = scoreCandidates(view, seat);
+    const first = scored[0];
+    if (first === undefined) throw new Error(`createSearch: ${seat} has no action to play`);
+    const kept = scored.length === 1 ? [first] : keptCandidates(view, seat, scored, params.keep);
+    keptActions = kept.map((candidate) => candidate.action);
+    statics = kept.map((candidate) => candidate.score);
+    candidates = scored.length;
+    firstAction = first.action;
+  } else {
+    keptActions = from.kept.map(decodeAction);
+    statics = [...from.statics];
+    candidates = from.candidates;
+    firstAction = decodeAction(from.firstAction);
+  }
+  const worldCost = keptActions.length * (1 + params.plies);
+  const sums = from === undefined ? keptActions.map(() => 0) : [...from.sums];
 
-  let r: Rng = [rng[0], rng[1], rng[2], rng[3]];
-  let spent = 0;
-  let worlds = 0;
+  /** The rng before the deal in progress; `r` is the rng after drawing it. */
+  let before: Rng = from === undefined ? [rng[0], rng[1], rng[2], rng[3]] : copyRng(from.r);
+  let r: Rng = copyRng(before);
+  let spent = from === undefined ? 0 : from.spent;
+  let worlds = from === undefined ? 0 : from.worlds;
   let world: World | null = null;
-  let partial: number[] = [];
+  let partial: number[] = from === undefined ? [] : [...from.partial];
+  if (partial.length > 0) [world, r] = determinize(view, seat, before);
 
   const spentOut = (): boolean =>
-    kept.length === 1 || (world === null && spent + worldCost > budget.plies);
+    keptActions.length === 1 || (world === null && spent + worldCost > budget.plies);
 
   return {
     step(units) {
       let done = 0;
       while (done < units && !spentOut()) {
         if (world === null) {
+          before = r;
           [world, r] = determinize(view, seat, r);
           partial = [];
         }
-        const candidate = kept[partial.length] as ScoredCandidate;
-        const [score, used] = rollout(world, seat, candidate.action, params.plies);
+        const action = keptActions[partial.length] as Action;
+        const [score, used] = rollout(world, seat, action, params.plies);
         partial.push(score);
         spent += used;
         done += used;
-        if (partial.length === kept.length) {
-          for (let i = 0; i < kept.length; i++)
+        if (partial.length === keptActions.length) {
+          for (let i = 0; i < keptActions.length; i++)
             sums[i] = (sums[i] as number) + (partial[i] as number);
           worlds++;
           world = null;
+          partial = [];
+          before = r;
         }
       }
       return spentOut();
     },
     result() {
-      if (kept.length === 1) {
-        return { action: first.action, rng: [...rng], difficulty: 0, candidates: 1, units: 0 };
+      if (keptActions.length === 1) {
+        return { action: firstAction, rng: [...rng], difficulty: 0, candidates: 1, units: 0 };
       }
       const values = worlds === 0 ? statics : sums.map((sum) => sum / worlds);
       const [index, gap] = bestOf(values);
-      const chosen = kept[index] ?? first;
+      const chosen = keptActions[index] ?? firstAction;
       return {
-        action: chosen.action,
+        action: chosen,
         rng: [r[0], r[1], r[2], r[3]],
-        difficulty: difficultyOf(kept.length, gap),
-        candidates: scored.length,
+        difficulty: difficultyOf(keptActions.length, gap),
+        candidates,
         units: spent,
       };
     },
+    checkpoint() {
+      return {
+        kept: keptActions.map(encodeAction),
+        statics: [...statics],
+        candidates,
+        firstAction: encodeAction(firstAction),
+        r: copyRng(world === null ? r : before),
+        spent,
+        worlds,
+        sums: [...sums],
+        partial: [...partial],
+      };
+    },
   };
+}
+
+function copyRng(rng: Rng): Rng {
+  return [rng[0], rng[1], rng[2], rng[3]];
+}
+
+/**
+ * An action as one short string, so a checkpoint of many kept 7s stays small (the table row that holds
+ * it is written at every slice): "g 7H", "x 1S bleu0", "m 5H bleu0", "w 11S bleu0 jaune2",
+ * "s 7H bleu0:3 bleu1:4", "d". decodeAction gives back an equal action, keys in the engine's order.
+ */
+export function encodeAction(action: Action): string {
+  switch (action.t) {
+    case "give":
+      return `g ${action.card}`;
+    case "exit":
+      return `x ${action.card} ${action.pawn}`;
+    case "move":
+      return `m ${action.card} ${action.pawn}`;
+    case "swap":
+      return `w ${action.card} ${action.pawn} ${action.target}`;
+    case "seven":
+      return ["s", action.card, ...action.plan.map((step) => `${step.pawn}:${step.steps}`)].join(
+        " ",
+      );
+    case "discard":
+      return "d";
+  }
+}
+
+/** The action of encodeAction's string (the checkpoint is the table's own data, never a client's). */
+export function decodeAction(text: string): Action {
+  const [tag, card, ...rest] = text.split(" ");
+  const pawn = rest[0] as PawnId;
+  switch (tag) {
+    case "g":
+      return { t: "give", card: card as CardId };
+    case "x":
+      return { t: "exit", card: card as CardId, pawn };
+    case "m":
+      return { t: "move", card: card as CardId, pawn };
+    case "w":
+      return { t: "swap", card: card as CardId, pawn, target: rest[1] as PawnId };
+    case "s":
+      return {
+        t: "seven",
+        card: card as CardId,
+        plan: rest.map((step) => {
+          const [id, steps] = step.split(":");
+          return { pawn: id as PawnId, steps: Number(steps) };
+        }),
+      };
+    case "d":
+      return { t: "discard" };
+    default:
+      throw new Error(`decodeAction: unknown action ${text}`);
+  }
 }
