@@ -41,6 +41,7 @@ describe("summary(table)", () => {
       },
       gameNo: 0,
       updatedAt: 1000,
+      missing: [],
     });
   });
 
@@ -57,6 +58,7 @@ describe("summary(table)", () => {
       },
       gameNo: 0,
       updatedAt: 5000,
+      missing: [],
     });
   });
 

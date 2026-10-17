@@ -130,7 +130,14 @@ const FORBIDDEN_KEYS = new Set([
   "stack",
 ]);
 
-const FRAME_TYPES = new Set(["welcome", "events", "table", "error"]);
+const FRAME_TYPES = new Set([
+  "welcome",
+  "events",
+  "table",
+  "error",
+  "reclaimRequest",
+  "reclaimResult",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -194,6 +201,19 @@ export function structuralProblems(
     const keys = Object.keys(frame).sort();
     if (keys.join(",") !== "code,t" || typeof frame.code !== "string") {
       problems.push(`error frame is not exactly { t, code }: ${keys.join(",")}`);
+    }
+  }
+  // The reclaim's two frames (plan 02-07) carry a seat and a first name, or a yes or no: nothing else.
+  if (frame.t === "reclaimRequest") {
+    const keys = Object.keys(frame).sort();
+    if (keys.join(",") !== "name,seat,t" || typeof frame.name !== "string") {
+      problems.push(`reclaimRequest is not exactly { t, seat, name }: ${keys.join(",")}`);
+    }
+  }
+  if (frame.t === "reclaimResult") {
+    const keys = Object.keys(frame).sort();
+    if (keys.join(",") !== "accepted,t" || typeof frame.accepted !== "boolean") {
+      problems.push(`reclaimResult is not exactly { t, accepted }: ${keys.join(",")}`);
     }
   }
   if (frame.t === "events") {

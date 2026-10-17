@@ -181,6 +181,36 @@ describe("parseClientFrame", () => {
   });
 });
 
+describe("stop, leave and the reclaim of one's own seat (plan 02-07)", () => {
+  it("accepts stop, reclaim and reclaimAnswer", () => {
+    expect(ok({ t: "stop" })).toEqual({ ok: true, frame: { t: "stop" } });
+    expect(ok({ t: "reclaim", seat: "jaune" })).toEqual({
+      ok: true,
+      frame: { t: "reclaim", seat: "jaune" },
+    });
+    expect(ok({ t: "reclaimAnswer", seat: "jaune", accept: true })).toEqual({
+      ok: true,
+      frame: { t: "reclaimAnswer", seat: "jaune", accept: true },
+    });
+    expect(ok({ t: "reclaimAnswer", seat: "vert", accept: false }).ok).toBe(true);
+  });
+
+  it("refuses them with a bad seat, a missing answer or an extra key", () => {
+    for (const frame of [
+      { t: "stop", now: true },
+      { t: "reclaim" },
+      { t: "reclaim", seat: "violet" },
+      { t: "reclaim", seat: "jaune", name: "Bruno" },
+      { t: "reclaimAnswer", seat: "jaune" },
+      { t: "reclaimAnswer", seat: "jaune", accept: "yes" },
+      { t: "reclaimAnswer", seat: "jaune", accept: 1 },
+      { t: "reclaimAnswer", accept: true },
+    ]) {
+      expect(ok(frame), JSON.stringify(frame)).toEqual({ ok: false });
+    }
+  });
+});
+
 describe("normalizeName", () => {
   it("trims, collapses spaces and applies NFC", () => {
     expect(normalizeName("  Ana ")).toBe("Ana");
@@ -215,8 +245,8 @@ describe("ids", () => {
   it("keeps distinct close codes for the three endings, and 4000 for a silent socket", () => {
     expect([CLOSE_ELSEWHERE, CLOSE_VERSION, CLOSE_GONE]).toEqual([4001, 4002, 4004]);
     expect(CLOSE_SILENT).toBe(4000);
-    // Version 2: the pause and the ping (an older client is closed with 4002).
-    expect(PROTOCOL_VERSION).toBe(2);
+    // Version 3: stop, the online leave and the reclaim (an older client is closed with 4002).
+    expect(PROTOCOL_VERSION).toBe(3);
   });
 });
 
@@ -299,6 +329,24 @@ describe("parseServerFrame", () => {
     for (const code of ["paused", "refused"]) {
       expect(parseServerFrame(JSON.stringify({ t: "error", code }))).toEqual({ t: "error", code });
     }
+  });
+
+  it("reads the reclaim's request (host) and result (requester)", () => {
+    expect(
+      parseServerFrame(JSON.stringify({ t: "reclaimRequest", seat: "jaune", name: "Bruno" })),
+    ).toEqual({ t: "reclaimRequest", seat: "jaune", name: "Bruno" });
+    expect(parseServerFrame(JSON.stringify({ t: "reclaimResult", accepted: false }))).toEqual({
+      t: "reclaimResult",
+      accepted: false,
+    });
+    expect(parseServerFrame(JSON.stringify({ t: "reclaimResult", accepted: true }))?.t).toBe(
+      "reclaimResult",
+    );
+    expect(
+      parseServerFrame(JSON.stringify({ t: "reclaimRequest", seat: "violet", name: "Bruno" })),
+    ).toBeNull();
+    expect(parseServerFrame(JSON.stringify({ t: "reclaimRequest", seat: "jaune" }))).toBeNull();
+    expect(parseServerFrame(JSON.stringify({ t: "reclaimResult", accepted: "no" }))).toBeNull();
   });
 
   it("refuses a frame of another shape", () => {

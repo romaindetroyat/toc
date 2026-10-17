@@ -255,6 +255,14 @@ const seen = {
   handOvers: 0,
   saves: 0,
   resumes: 0,
+  /** Plan 02-07: stops by the chef de table, refused stops, leaves during a game. */
+  stops: 0,
+  refusedStops: 0,
+  leaves: 0,
+  /** Reclaims of an offline seat by someone without a seat, and the chef de table's answers. */
+  reclaims: 0,
+  reclaimAccepts: 0,
+  reclaimRefusals: 0,
 };
 
 /** A uniform integer in [0, n) from the walk's own stream. */
@@ -377,10 +385,55 @@ function playOne(config: {
     if (roll < config.noise) {
       // Noise: a disconnect, a reconnect, a stale act, an illegal act, a sit during the game, a tick.
       let kind: number;
-      [kind, rng] = pick(rng, 6);
+      [kind, rng] = pick(rng, 9);
       let who: number;
       [who, rng] = pick(rng, people.length);
       const person = people[who] as Person;
+      if (kind === 6 && person.seat !== null && online(person)) {
+        // « Quitter la table » during the game (plan 02-07): the others' pause.
+        run({ t: "client", who: person.who, frame: { t: "leave" } });
+        absent.add(person.who);
+        seen.leaves += 1;
+        continue;
+      }
+      if (kind === 7 && (table.status === "playing" || table.status === "paused")) {
+        // « Arrêter la partie »: by the chef de table, or refused for anyone else.
+        const host = hostOf(table);
+        run({ t: "client", who: person.who, frame: { t: "stop" } });
+        if (person.who === host) seen.stops += 1;
+        else seen.refusedStops += 1;
+        continue;
+      }
+      if (kind === 8) {
+        // Someone without a seat asks for an offline seat; the chef de table answers.
+        const asker = people.find((each) => each.seat === null && online(each));
+        const seat = COLORS.find((color) => {
+          const held = table.seats[color];
+          return held.kind === "human" && !online(people.find((p) => p.who === held.who) as Person);
+        });
+        if (asker !== undefined && seat !== undefined) {
+          run({ t: "client", who: asker.who, frame: { t: "reclaim", seat } });
+          seen.reclaims += 1;
+          const host = people.find((each) => each.who === hostOf(table));
+          if (host !== undefined && table.reclaims[seat]?.who === asker.who) {
+            let yes: number;
+            [yes, rng] = pick(rng, 2);
+            const holder = table.seats[seat];
+            run({
+              t: "client",
+              who: host.who,
+              frame: { t: "reclaimAnswer", seat, accept: yes === 1 },
+            });
+            if (yes === 1 && holder.kind === "human") {
+              const old = people.find((each) => each.who === holder.who) as Person;
+              old.seat = null;
+              asker.seat = seat;
+              seen.reclaimAccepts += 1;
+            } else seen.reclaimRefusals += 1;
+          }
+        }
+        continue;
+      }
       if (kind === 0 && online(person)) {
         const wasPlaying = table.status === "playing";
         run({ t: "gone", who: person.who });
