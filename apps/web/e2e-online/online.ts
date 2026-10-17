@@ -5,7 +5,7 @@ import {
   type Page,
   type TestInfo,
 } from "@playwright/test";
-import { playSimpleMove, snapshot } from "../e2e/jouer.ts";
+import { type GameStats, newStats, playSimpleMove, playStep, snapshot } from "../e2e/jouer.ts";
 
 // Shared helpers of the online specs: a table created through the Worker, a browser that opens its link
 // and types a first name, the seat tiles of the waiting room.
@@ -140,4 +140,57 @@ export async function playOneMove(page: Page): Promise<void> {
     else await page.waitForTimeout(20);
   }
   throw new Error("the move never finished");
+}
+
+export type Seat = "bleu" | "jaune" | "rouge" | "vert";
+export type Frame = { [key: string]: unknown; t: string };
+/** A frame a page received, with the seat that page held when it came. */
+export type Received = { seat: Seat | null; text: string; frame: Frame };
+
+/** Every frame the page receives on its table socket, with the seat the page holds at that time. */
+export function listenFrames(page: Page, seat: () => Seat | null): Received[] {
+  const received: Received[] = [];
+  page.on("websocket", (ws) => {
+    if (!ws.url().includes("/ws/table/")) return;
+    ws.on("framereceived", ({ payload }) => {
+      const text = typeof payload === "string" ? payload : payload.toString("utf8");
+      // The heartbeat answer of the runtime (setWebSocketAutoResponse) is not a frame.
+      if (text === "pong") return;
+      received.push({ seat: seat(), text, frame: JSON.parse(text) as Frame });
+    });
+  });
+  return received;
+}
+
+/**
+ * Four people at one table (plan 02-10): every page passes its card at each deal, and whichever page
+ * has something to tap taps it (jouer.ts's plainest player: the first card, the first knight, the
+ * most steps of a 7, a dead hand posed), until every page shows the end plank. The server deals and
+ * judges every move. Throws after `capMs`.
+ */
+export async function playTogether(
+  pages: Page[],
+  capMs = 15 * 60_000,
+): Promise<{ stats: GameStats[]; taps: number; ms: number }> {
+  const stats = pages.map(() => newStats());
+  const started = Date.now();
+  let taps = 0;
+  for (;;) {
+    if (Date.now() - started > capMs) throw new Error(`the game did not end within ${capMs} ms`);
+    let ended = 0;
+    let acted = false;
+    for (const [i, page] of pages.entries()) {
+      const s = await snapshot(page);
+      if (s.end) {
+        ended += 1;
+        continue;
+      }
+      if (await playStep(page, s, stats[i] as GameStats)) {
+        taps += 1;
+        acted = true;
+      }
+    }
+    if (ended === pages.length) return { stats, taps, ms: Date.now() - started };
+    if (!acted) await (pages[0] as Page).waitForTimeout(20);
+  }
 }

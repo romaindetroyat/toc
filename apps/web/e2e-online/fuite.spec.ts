@@ -1,7 +1,16 @@
 import { expect, type Page, test } from "@playwright/test";
 import { cardIdsIn, structuralProblems } from "../../../packages/table/src/oracle.ts";
 import { exchange, zone } from "../e2e/jouer.ts";
-import { createTable, deviceOptions, join, playOneMove, seatTile } from "./online.ts";
+import {
+  createTable,
+  deviceOptions,
+  type Frame,
+  join,
+  listenFrames as listen,
+  playOneMove,
+  type Received,
+  seatTile,
+} from "./online.ts";
 
 // « En examinant les messages reçus par son appareil » (SC2, RULE-19): two browsers at one table play
 // the exchange and three human turns, and every WebSocket frame each page receives (Playwright's
@@ -10,24 +19,6 @@ import { createTable, deviceOptions, join, playOneMove, seatTile } from "./onlin
 // cardsExchanged only that page's card, no GameState key, codes-only errors. Then the two devices are
 // compared: at the same seq, no card of one page's hand appears in the other page's frame unless a
 // public event of that frame announces it (a card played, a dead hand laid down).
-
-type Frame = { [key: string]: unknown; t: string };
-type Received = { seat: "bleu" | "jaune" | null; text: string; frame: Frame };
-
-/** Every frame the page receives on its table socket, with the seat the page holds at that time. */
-function listen(page: Page, seat: () => "bleu" | "jaune" | null): Received[] {
-  const received: Received[] = [];
-  page.on("websocket", (ws) => {
-    if (!ws.url().includes("/ws/table/")) return;
-    ws.on("framereceived", ({ payload }) => {
-      const text = typeof payload === "string" ? payload : payload.toString("utf8");
-      // The heartbeat answer of the runtime (setWebSocketAutoResponse) is not a frame.
-      if (text === "pong") return;
-      received.push({ seat: seat(), text, frame: JSON.parse(text) as Frame });
-    });
-  });
-  return received;
-}
 
 /** The highest seq a page has received (events or welcome), 0 before the game. */
 function lastSeq(frames: Received[]): number {
