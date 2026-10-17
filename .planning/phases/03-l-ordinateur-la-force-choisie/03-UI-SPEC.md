@@ -16,7 +16,7 @@ created: "2026-10-15"
 
 **Scope (small, three surfaces only):**
 1. The per-seat strength picker on the launch screen (D-01, D-02, D-03).
-2. The discreet « thinking » sign on a computer player (D-12).
+2. The discreet « thinking » sign on a computer player (D-12); made more visible on 2026-10-17 (plan 03-09, « Pas assez visible »), including a glow around the seat's rider on the board.
 3. The bench page that times the computer on a real phone (03-RESEARCH Pitfall 1, « Real mid-range phone » fallback). It stays out of normal navigation.
 
 Nothing else in the game screen, the board, the sheets or the end plank changes in this phase.
@@ -119,7 +119,7 @@ Never amber in this phase: the checked strength option (it is cream fill with wa
 
 The checked strength option: background `--creme` `#FFF8E1`, text `--noyer` `#2B1D12` in 700 (≈ 15:1). Unchecked: transparent with `--creme` text in 400 on noyer (≈ 15:1), 2 px cream separators. Colour is never the only cue: weight and fill change together.
 
-The thinking sign uses `--creme` at a minimum opacity of 0.7 on `--bois-sombre`: ≈ 6.4:1, so the name stays readable at the trough of the breath. The static marker « … » is `--creme-attenuee` `#CDB89E` (≈ 6:1 on bois sombre).
+The thinking sign's text uses `--creme` at a minimum opacity of 0.7 on `--bois-sombre`: ≈ 6.4:1, so the name stays readable at the trough of the breath (since 03-09 the glyph no longer fades and its ring takes the seat's light tint, see « Thinking sign »). The static marker « … » is `--creme-attenuee` `#CDB89E` (≈ 6:1 on bois sombre).
 
 ---
 
@@ -263,31 +263,35 @@ Right-column heights used above: inline = 24 + 8 + (3 × 48 + 2 × 8) + 16 + 48 
 
 ## Thinking sign (D-12)
 
+> **Note, 2026-10-17 (plan 03-09).** Romain, UAT tests 6 and 12, on the first version below (glyph × 1.12 fading to 0.7, text to 70 %, over 1.6 s; reduced motion: a fixed « … »): « Pas assez visible ». The sign was made clearly noticeable while staying calm: the glyph swells to × 1.22 without fading and wears a pulsing ring of its seat colour; « {Nom} réfléchit… » starts with that glyph on the computer and on the phone; on the board a glow of the seat's colour breathes around its rider. Reduced motion keeps an obvious static marker: the ring and the glow steady, plus « … ». The tables below are the current contract; the values they replace are named in each row.
+
 Shown exactly while `session.thinking === seat` for a computer seat (from the start of its think until its action is applied). Never on the human. It complements the existing prompt « {Nom} réfléchit… ».
 
 ### Where
 
 | Surface | Element that breathes | Static marker (reduced motion) |
 |---------|-----------------------|--------------------------------|
-| Desktop bottom bar (`InfoBar` form `column`) and `row` form | The turn row: the glyph `SeatChip` (scale + opacity) and the text « Tour de {Nom} » (opacity only) | « … » after the name, 4 px gap |
-| Phone pill (`InfoBar` form `pill`, 52 × 44) | `.pill-turn` (turn dot + glyph chip), scale + opacity | « … » after the glyph chip (8 + 3 + 16 + 3 + 10 = 40 ≤ 48 inner width) |
+| Desktop bottom bar (`InfoBar` form `column`) and `row` form | The turn row: the glyph `SeatChip` (scale, in its ring) and the text « Tour de {Nom} » (opacity only). The glyph keeps 6 px on each side for the ring (03-09) | Ring steady + « … » after the name, 4 px gap |
+| Phone pill (`InfoBar` form `pill`, 52 × 44) | The glyph chip `.pill-glyph` (scale, in its ring 2 px out); the turn dot stays still (03-09; was `.pill-turn`, dot and chip) | Ring steady + « … » after the glyph chip (8 + 3 + 16 + 3 + 10 = 40 ≤ 48 inner width) |
 | Sheet « Infos de la partie » (the column form inside the sheet) | Same as the column form | Same |
-| Exchange waiting list (`ActionZone` givers, desktop action zone and the compact prompt row) | The thinking bot's hourglass icon (scale + opacity) and its name (opacity only) | « … » after its name |
+| Exchange waiting list (`ActionZone` givers, desktop action zone and the compact prompt row) | The thinking bot's hourglass icon (scale, in its ring) and its name (opacity only), now in full `--creme` instead of `--creme-attenuee` (03-09). The bar's list is indented 12 px and the icon keeps 4 px on each side, so the ring stays inside the action column, which clips | Ring steady + « … » after its name |
+| The prompt « {Nom} réfléchit… » (desktop action zone, phone prompt row over the board) — new in 03-09 | The thinking seat's glyph (`SeatChip`, `label={false}`, `aria-hidden`, `data-thinking-line`) before the text, outside the text box (the bar's text scrolls and the phone's line clips), scale in its ring | Ring steady (the text already ends with « … ») |
+| The board — new in 03-09 (was: « The board does not change ») | `div[data-thinking-glow]`: a radial glow of the seat's `PALETTE.hex` (55 % at the centre, 30 % half-way, 0 at the edge), 1.7 × the rider's height across, centred on the seat's ink rider (`riderBox`), an HTML layer between the drawing's svg and the knights' svg; never a target. Shown during the exchange too | Glow steady at 0.85 |
 
-The board does not change (no breathing on the felt slot or the knights).
+The felt slot and the knights still never breathe.
 
 ### Motion
 
 | Property | Value |
 |----------|-------|
-| Keyframes | `@keyframes respire`: 0 % and 100 % `transform: scale(1); opacity: 1`; 50 % `transform: scale(1.12); opacity: 0.7`. Text parts animate opacity only (1 → 0.7 → 1), never scale |
+| Keyframes | `@keyframes respire`: 0 % and 100 % `transform: scale(1)`; 50 % `transform: scale(1.22)`, full opacity (03-09; was × 1.12 fading to 0.7). The ring (`.respire::before`, `--respire-inset` 4 px out, 2 px line of `--respire-seat` with an 8 px glow): `@keyframes respire-halo`, opacity 0.55 → 1 → 0.55 and scale 1 → 1.15 → 1. The board glow: `@keyframes respire-lueur`, opacity 0.5 → 1 and scale 0.9 → 1.06. Text parts animate opacity only (1 → 0.7 → 1), never scale |
 | Timing | 1600 ms, `ease-in-out`, infinite, `transform-origin: center` |
-| Start / stop | Starts at rest (scale 1, opacity 1), so a short think in « Avance rapide » (≤ 300 ms) shows a barely visible swell and no jump; stops instantly when thinking ends (the element returns to rest without transition) |
-| Layout | `transform` and `opacity` only, no layout shift, no filter; the scaled chip (16 → 18 px) stays inside its 20 px slot |
-| Colour | cream as today; never amber (amber is the own-turn dot) |
-| Implementation | one shared utility in `app.css`: `.respire` (the animation) and `.respire-mark` (the static « … », Label 14 / 700, `--creme-attenuee`, `aria-hidden`). Components add `.respire` and render `.respire-mark` while thinking; test hook `data-thinking` on the element that breathes |
+| Start / stop | The glyph starts at rest (scale 1), so a short think in « Avance rapide » (≤ 300 ms) shows no jump; the ring and the board glow appear at once at a visible strength (0.55 and 0.5), so even a short think is seen (03-09); all stop instantly when thinking ends, without transition |
+| Layout | `transform` and `opacity` only, no layout shift, no filter; the room the ring needs is reserved statically (margins above), so nothing moves when the sign starts. The board glow is a composited HTML layer (`will-change: transform, opacity`): its breath never repaints the drawing or the knights. No `.animate(` outside `frameClock.ts` |
+| Colour | The ring takes the light tint of the seat (`--seat-{couleur}-clair`, the board's `PALETTE.light`: bleu `#5C86D4`, jaune `#F7D35A`, rouge `#EE6B5E`, vert `#5CC27A`, readable on bois sombre); the board glow takes `PALETTE.hex`. Never amber (amber is the own-turn dot) |
+| Implementation | one shared utility in `app.css`: `.respire` (the animation and its ring, coloured by `--respire-seat` set on the element) and `.respire-mark` (the static « … », Label 14 / 700, `--creme-attenuee`, `aria-hidden`). Components add `.respire` and render `.respire-mark` while thinking; test hooks `data-thinking` on the element that breathes, `data-thinking-line` on the prompt's glyph, `data-thinking-glow` on the board glow |
 
-Reduced motion (the phase-1 dual switch): when `settings.reduceMotion` is on (`class:still` on the component root) or `@media (prefers-reduced-motion: reduce)` matches, `.respire` has `animation: none` and `.respire-mark` is shown; otherwise `.respire-mark` is `display: none`. The marker appears and disappears without transition.
+Reduced motion (the phase-1 dual switch): when `settings.reduceMotion` is on (`class:still` on the component root) or `@media (prefers-reduced-motion: reduce)` matches, `.respire` and its ring have `animation: none`, the ring stays at opacity 0.9, the board glow stays at 0.85, and `.respire-mark` is shown; otherwise `.respire-mark` is `display: none`. The marker, the ring and the glow appear and disappear without transition.
 
 ### Bot pacing (replaces phase-1 « Bot pacing (D-18) »; D-11, D-13; constants are 03-RESEARCH Pattern 8, tuned with Romain at UAT)
 
@@ -370,7 +374,7 @@ Applicable state considerations resolved: 15 covered, 3 backstop, 0 unresolved
 | error | interactive-control: bench run | ✅ covered | Error heading, body and « Recharger la page » (Copywriting) |
 | partial | list-collection: bench results after stop or interruption | ✅ covered | Results of the measured decisions with « Mesure arrêtée après i coups. »; interrupted runs get no verdict |
 | error | interactive-control: « Copier les résultats » | ✅ covered | Failure toast + read-only « Mes résultats » text box |
-| populated | interactive-control: thinking sign | 🧪 backstop | Romain watches a game (normal and « Avance rapide », phone and computer): the sign is noticeable but discreet; reduced motion shows « … » without animation |
+| populated | interactive-control: thinking sign | 🧪 backstop | Romain watches a game (normal and « Avance rapide », phone and computer): the sign is noticeable but discreet; reduced motion shows « … » without animation. 2026-10-17: « Pas assez visible » → 03-09 (ring, prompt glyph, board glow); to watch again |
 | populated | launch screen on the real iPhone (Safari and installed) | 🧪 backstop | Romain sets three different levels held sideways, plays, comes back: the choices are remembered and the whole screen fits |
 | populated | bench on the real iPhone | 🧪 backstop | Romain runs Champion on `#/banc` and sends « Copier les résultats »; p95 < 1 s is the target (BOT-05) |
 
