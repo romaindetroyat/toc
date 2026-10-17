@@ -5,3 +5,5 @@ dist/
 test-results/
 playwright-report/
 *.tsbuildinfo
+worker-embedded/manifest.js
+.wrangler/

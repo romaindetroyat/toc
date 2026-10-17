@@ -3,32 +3,33 @@ import { expect, type Page, test } from "@playwright/test";
 type Rendered = Record<string, { duration: number; peak: number }>;
 type TocWindow = Window & { __tocDebug?: { audio: { sounds?: Rendered } } };
 
-// Every synthesized Phase 1 sound renders to a non-silent buffer in a real browser (no listening
-// here: whether it sounds like a horse is Romain's call on the sound test page).
-test("audio: tous les sons synthétisés sont rendus, audibles et de la bonne durée", async ({
+// Only the hooves are heard since 2026-10-15 (Romain: « laisse les sons de côté sauf les sabots des
+// chevaux », then « Oui, que les sabots »; plan 03-08): the first tap renders the three takes of the
+// chosen hoof version, non-silent and short, and nothing else (no ambience since 2026-10-14). The
+// neigh and card recipes stay in synth.ts; this test used to check their durations too (sortie
+// about 1.15 s, surpris under 0.5 s, ruade under 0.4 s, fête longer than joyeux, donne longer than
+// pose): those checks come back with their ids in ENABLED_SOUNDS (see 03-08-SUMMARY.md).
+test("audio: seuls les sabots sont rendus, audibles et courts ; aucun hennissement ni son de carte", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Jouer la partie" }).click();
   await expect(page.locator("body")).toHaveAttribute("data-audio", "running");
-  await expect
-    .poll(() =>
-      page.evaluate(() => Object.keys((window as TocWindow).__tocDebug?.audio.sounds ?? {}).length),
-    )
-    .toBe(12); // 3 hoof variants + 6 neighs + 3 card sounds; no ambience since 2026-10-14
+  const rendered = () =>
+    page.evaluate(() => Object.keys((window as TocWindow).__tocDebug?.audio.sounds ?? {}).sort());
+  await expect.poll(rendered).toEqual(["hoof#0", "hoof#1", "hoof#2"]);
+  // Nothing else is rendered later either.
+  await page.waitForTimeout(500);
+  expect(await rendered()).toEqual(["hoof#0", "hoof#1", "hoof#2"]);
   const sounds = await page.evaluate(() => (window as TocWindow).__tocDebug?.audio.sounds ?? {});
-
-  for (const [key, { peak }] of Object.entries(sounds)) {
+  for (const [key, { peak, duration }] of Object.entries(sounds)) {
     expect(peak, key).toBeGreaterThan(0.05);
     expect(peak, key).toBeLessThanOrEqual(1);
+    expect(duration, key).toBeLessThan(0.3);
   }
-  const seconds = (key: string) => sounds[key]?.duration ?? 0;
-  expect(seconds("neigh-sortie#0")).toBeCloseTo(1.15, 1);
-  expect(seconds("neigh-surpris#0")).toBeLessThan(0.5);
-  expect(seconds("neigh-ruade#0")).toBeLessThan(0.4);
-  expect(seconds("neigh-fete#0")).toBeGreaterThan(seconds("neigh-joyeux#0"));
-  expect(seconds("card-donne#0")).toBeGreaterThan(seconds("card-pose#0"));
-  expect(Object.keys(sounds).filter((key) => key.startsWith("ambience"))).toEqual([]);
+  const keys = Object.keys(sounds);
+  expect(keys.filter((key) => key.startsWith("neigh") || key.startsWith("card"))).toEqual([]);
+  expect(keys.filter((key) => key.startsWith("ambience"))).toEqual([]);
 });
 
 // A reload or a PWA relaunch lands on #/partie without the launch screen's « Jouer la partie » tap:

@@ -12,6 +12,9 @@
 //   knights a split of this 7 can leave in their home (sevenMustEnter) end the plan either where they
 //   started or in their home. It is a check on the finished plan, so a knight may stop on its carré 16 and
 //   enter with a later step; previewPlan never applies it. If no plan respects it, the 7 plays as before.
+// - sevenOutcomes (phase 3, for the computer players) lists one plan per distinct end board: the same
+//   search as sevenPlans, which expands each equivalent partial state once, so a 7 with thousands of
+//   plans costs a handful of boards. Its boards are exactly those of sevenPlans then applyPlan.
 // Pure, no I/O, erasable syntax only.
 
 import type { GameEvent } from "./events.ts";
@@ -446,6 +449,55 @@ export function sevenPlans(
   };
 
   walkPlans(board.pawns, SEVEN, null, 0);
+  return out;
+}
+
+/** One end board of a 7: the first plan (in sevenPlans' order) that reaches it, as applyPlan plays it. */
+export type SevenOutcome = {
+  plan: SevenPlan;
+  pawns: Record<PawnId, Pawn>;
+  captured: PawnId[];
+};
+
+/**
+ * The distinct end boards of `card` for `seat`, one outcome each, in the order of their first plan in
+ * sevenPlans, with that plan. The search is sevenPlans' own (eachChild, completable, G16 through
+ * keepsDuty), with a visited set on the key of completable's memo: a partial state already expanded
+ * cannot reach a board not yet seen, so each is expanded once and no first plan is lost.
+ * [] for a card that is not a 7 or a 7 that cannot be played.
+ */
+export function sevenOutcomes(board: Board, seat: Color, card: CardId): SevenOutcome[] {
+  if (rankOf(card) !== SEVEN) return [];
+  const search = newSearch(board, seat);
+  const sameTwice = search.ctx.rules.SEVEN_SAME_PAWN_TWICE;
+  const out: SevenOutcome[] = [];
+  const ends = new Set<string>();
+  const expanded = new Set<string>();
+  const prefix: SevenPlan = [];
+
+  const explore = (pawns: Pawns, remaining: number, last: PawnId | null, used: number): void => {
+    if (remaining === 0) {
+      const end = boardKey(pawns);
+      if (ends.has(end)) return;
+      ends.add(end);
+      const result = applyPlan(board, seat, card, prefix);
+      if (!result.ok) throw new Error(`sevenOutcomes: a found plan was refused (${result.reason})`);
+      out.push({ plan: result.plan, pawns: result.pawns, captured: result.captured });
+      return;
+    }
+    const state = `${boardKey(pawns)}|${remaining}|${last ?? ""}|${sameTwice ? 0 : used}`;
+    if (expanded.has(state)) return;
+    expanded.add(state);
+    eachChild(search, pawns, remaining, last, used, false, (pawn, steps, next) => {
+      if (!completable(search, next, remaining - steps, pawn, used | bit(pawn))) return false;
+      prefix.push({ pawn, steps });
+      explore(next, remaining - steps, pawn, used | bit(pawn));
+      prefix.pop();
+      return false;
+    });
+  };
+
+  explore(board.pawns, SEVEN, null, 0);
   return out;
 }
 

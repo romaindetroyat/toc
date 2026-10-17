@@ -58,11 +58,11 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Joueurs gérés par l'ordinateur (BOT)
 
-- [ ] **BOT-01** : Chaque place gérée par l'ordinateur a une force réglable de 1 à 5.
-- [ ] **BOT-02** : Le niveau 1 joue un coup légal au hasard ; chaque niveau supérieur gagne nettement plus souvent que le précédent dans des parties simulées.
-- [ ] **BOT-03** : Le niveau 5 joue pour son équipe (protéger, aider le partenaire, choisir la carte d'échange).
-- [ ] **BOT-04** : L'ordinateur ne joue qu'avec les informations qu'un humain aurait à sa place (pas de triche sur les mains cachées).
-- [ ] **BOT-05** : L'ordinateur marque un temps de réflexion naturel avant de jouer et ne dépasse jamais quelques secondes.
+- [x] **BOT-01** : Chaque place gérée par l'ordinateur a une force réglable de 1 à 5.
+- [x] **BOT-02** : Le niveau 1 joue un coup légal au hasard ; chaque niveau supérieur gagne nettement plus souvent que le précédent dans des parties simulées.
+- [x] **BOT-03** : Le niveau 5 joue pour son équipe (protéger, aider le partenaire, choisir la carte d'échange).
+- [x] **BOT-04** : L'ordinateur ne joue qu'avec les informations qu'un humain aurait à sa place (pas de triche sur les mains cachées).
+- [x] **BOT-05** : L'ordinateur marque un temps de réflexion naturel avant de jouer et ne dépasse jamais quelques secondes.
 
 ### Suivi (HIST)
 
@@ -152,11 +152,11 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | ACCT-03 | Phase 4 | Pending |
 | ACCT-04 | Phase 4 | Pending |
 | ACCT-05 | Phase 4 | Pending |
-| BOT-01 | Phase 3 | Pending |
-| BOT-02 | Phase 3 | Pending |
-| BOT-03 | Phase 3 | Pending |
-| BOT-04 | Phase 3 | Pending |
-| BOT-05 | Phase 3 | Pending |
+| BOT-01 | Phase 3 | Complete |
+| BOT-02 | Phase 3 | Complete |
+| BOT-03 | Phase 3 | Complete |
+| BOT-04 | Phase 3 | Complete |
+| BOT-05 | Phase 3 | Complete |
 | HIST-01 | Phase 2 | Pending |
 | HIST-02 | Phase 5 | Pending |
 | HIST-03 | Phase 5 | Pending |

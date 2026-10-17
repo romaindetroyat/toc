@@ -1,6 +1,6 @@
 <script lang="ts">
   import { MOTION, REDUCED, scaleFor } from "@toc/board";
-  import type { Color, RenderState } from "@toc/engine";
+  import { type Color, firstPlayer, type RenderState } from "@toc/engine";
   import { fade, scale } from "svelte/transition";
   import { game } from "../i18n/fr/game.ts";
   import { settings } from "../settings/store.svelte.ts";
@@ -9,9 +9,11 @@
     render: RenderState;
     /** « toi » for the human, a horse name for each bot. */
     names: Record<Color, string>;
+    /** The player's seat: « Tu commences. » when the player plays first. */
+    human: Color;
   };
 
-  let { render, names }: Props = $props();
+  let { render, names, human }: Props = $props();
 
   // The plate stays 1.2 s over the board, 0.4 times that in fast mode; it fades in and out in 150 ms
   // when motion is reduced (UI-SPEC « Deal banner »).
@@ -33,9 +35,14 @@
     last = current;
     if (current === null) return;
     const deal = game.banner.deal(render.dealIndex + 1, CARDS[render.dealIndex]);
+    // Every deal ends with who plays first (Romain, 2026-10-17, plan 03-11: the seat after the dealer).
+    const starter = firstPlayer(render.dealer);
+    const starts = game.banner.starts(names[starter], starter === human);
     // The first deal of a shuffle also tells that the cards were shuffled and who deals.
     lines =
-      render.dealIndex === 0 ? [game.banner.reshuffle(names[render.dealer]), deal] : [deal];
+      render.dealIndex === 0
+        ? [game.banner.reshuffle(names[render.dealer]), deal, starts]
+        : [deal, starts];
     clearTimeout(timer);
     timer = setTimeout(() => {
       lines = null;
@@ -58,7 +65,11 @@
   {#if lines !== null}
     <div class="plate" data-deal-banner in:intro out:outro>
       {#each lines as line, i (i)}
-        <p class:display={i === 0} class:sub={i > 0}>{line}</p>
+        <p
+          class:display={i === 0}
+          class:sub={i > 0}
+          data-banner-starts={i === lines.length - 1 ? "" : undefined}
+        >{line}</p>
       {/each}
     </div>
   {/if}

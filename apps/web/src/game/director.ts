@@ -22,7 +22,7 @@ import {
   renderReduce,
   teamOf,
 } from "@toc/engine";
-import type { SoundId } from "../audio/sounds.ts";
+import { isSoundEnabled, type SoundId } from "../audio/sounds.ts";
 import { anchorOf, type Facing, facingFor, screenDelta } from "../board/geometry.ts";
 import { type Cue, cuesFor } from "./cues.ts";
 
@@ -240,7 +240,10 @@ export function createDirector(deps: DirectorDeps): Director {
     const clops = cues.filter((cue) => cue.id === "sabot").map((cue) => cue.atMs);
     if (clops.length > 0) deps.audio.scheduleClops(clops, t0);
     for (const cue of cues) {
-      if (cue.id !== "sabot") deps.audio.cue?.(cue.id, t0 + cue.atMs / 1000);
+      // Only the sounds that are heard (ENABLED_SOUNDS: the hooves alone since 2026-10-15).
+      if (cue.id !== "sabot" && isSoundEnabled(cue.id)) {
+        deps.audio.cue?.(cue.id, t0 + cue.atMs / 1000);
+      }
     }
   }
 

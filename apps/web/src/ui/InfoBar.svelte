@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { type Color, PARTNER, type RenderState } from "@toc/engine";
+  import { type Color, firstPlayer, PARTNER, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import InfoBar from "./InfoBar.svelte";
   import SeatChip from "./SeatChip.svelte";
   import SettingsButton from "./SettingsButton.svelte";
@@ -24,9 +25,19 @@
     gear?: boolean;
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
+    /** The computer player thinking about its move (session.thinking), if any. */
+    thinking?: Color | null;
   };
 
-  let { render, human, names, form = "row", gear = true, onabandon }: Props = $props();
+  let {
+    render,
+    human,
+    names,
+    form = "row",
+    gear = true,
+    onabandon,
+    thinking = null,
+  }: Props = $props();
 
   let infoOpen = $state(false);
   let pill = $state<HTMLButtonElement | null>(null);
@@ -35,6 +46,16 @@
   const playing = $derived(render.phase === "play");
   const ownTurn = $derived(playing && render.turn === human);
   const turnName = $derived(names[render.turn]);
+  /** Who plays first in this deal (G9: the seat after the dealer; Romain, 2026-10-17, plan 03-11). */
+  const starter = $derived(firstPlayer(render.dealer));
+  /**
+   * The thinking sign (D-12, 03-UI-SPEC « Thinking sign », 03-09): the turn row's glyph breathes in a
+   * ring of its seat colour while the computer player whose turn it shows is thinking. Never on the
+   * human.
+   */
+  const breathing = $derived(
+    playing && thinking !== null && thinking !== human && thinking === render.turn,
+  );
 
   // Knights home per team, ours first (UI-SPEC: « Nous {n}/8 » and « Eux {n}/8 »).
   const us = $derived(render.homeCounts[human] + render.homeCounts[partner]);
@@ -63,6 +84,7 @@
   <button
     type="button"
     class="info-pill"
+    class:still={settings.reduceMotion}
     data-info-bar
     data-form="pill"
     data-turn={playing ? render.turn : ""}
@@ -74,7 +96,18 @@
     <span class="pill-turn" aria-hidden="true">
       <span class="dot" class:own={ownTurn}></span>
       {#if playing}
-        <SeatChip color={render.turn} showName={false} small />
+        <!-- The glyph chip breathes in its ring (the dot stays still, so the swell fits the pill). -->
+        <span
+          class="pill-glyph"
+          class:respire={breathing}
+          data-thinking={breathing ? render.turn : undefined}
+          style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
+        >
+          <SeatChip color={render.turn} showName={false} small />
+        </span>
+      {/if}
+      {#if breathing}
+        <span class="respire-mark">…</span>
       {/if}
     </span>
     <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
@@ -83,7 +116,7 @@
   {#if infoOpen}
     <Sheet title={game.info.sheetTitle} onclose={() => (infoOpen = false)} opener={pill}>
       <div class="sheet-info" data-info-sheet>
-        <InfoBar {render} {human} {names} form="column" gear={false} />
+        <InfoBar {render} {human} {names} {thinking} form="column" gear={false} />
       </div>
     </Sheet>
   {/if}
@@ -95,6 +128,7 @@
   <header
     class="bar"
     class:column={form === "column"}
+    class:still={settings.reduceMotion}
     data-info-bar
     data-form={form}
   >
@@ -102,11 +136,22 @@
       <p class="turn" data-turn={playing ? render.turn : ""}>
         {#if playing}
           <span class="dot" class:own={ownTurn} aria-hidden="true"></span>
-          <SeatChip color={render.turn} showName={false} small />
+          <span
+            class="glyph"
+            class:respire={breathing}
+            data-thinking={breathing ? render.turn : undefined}
+            style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
+          >
+            <SeatChip color={render.turn} showName={false} small />
+          </span>
           {#if ownTurn}
             <span class="name">{game.info.ownTurn}</span>
           {:else}
-            <span class="prefix">{game.info.turnPrefix(turnName)}</span><span class="name">{turnName}</span>
+            <span class="prefix" class:respire-texte={breathing}>{game.info.turnPrefix(turnName)}</span
+            ><span class="name" class:respire-texte={breathing}>{turnName}</span>
+            {#if breathing}
+              <span class="respire-mark" aria-hidden="true">…</span>
+            {/if}
           {/if}
         {:else}
           <span class="name">
@@ -117,6 +162,10 @@
       <p class="deal" data-deal>
         {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
       </p>
+      {#if form === "column"}
+        <!-- Who plays first in this deal: the bottom bar and the sheet « Infos de la partie » (plan 03-11). -->
+        <p class="deal" data-starter={starter}>{game.info.starter(names[starter])}</p>
+      {/if}
     </div>
 
     <div class="teams">
@@ -205,6 +254,14 @@
 
   .prefix {
     flex: none;
+  }
+
+  /* The turn's glyph chip, in its own box so that it can breathe (scale about its centre). */
+  .glyph {
+    flex: none;
+    display: inline-flex;
+    /* Room for the thinking ring (4 px out, swelling with the breath) clear of the dot and the text. */
+    margin: 0 6px;
   }
 
   .dot {
@@ -297,9 +354,21 @@
     height: 12px;
   }
 
+  /* The pill's glyph chip in its own box, its ring 2 px out (the pill is only 44 px high). */
+  .pill-glyph {
+    flex: none;
+    display: inline-flex;
+    --respire-inset: 2px;
+  }
+
   .pill-turn .dot {
     width: 8px;
     height: 8px;
+  }
+
+  /* The static « … » after the glyph chip: 8 + 3 + 16 + 3 + 10 = 40 px of the pill's 48. */
+  .pill-turn .respire-mark {
+    line-height: 16px;
   }
 
   .pill-score {

@@ -4,6 +4,7 @@
     type CardId,
     COLORS,
     type Color,
+    PARTNER,
     type PawnId,
     type Place,
     type Playability,
@@ -649,6 +650,8 @@
   let rotateHeading = $state<HTMLHeadingElement | null>(null);
   /** The game's wrapper, hidden behind the invitation. */
   let playEl = $state<HTMLElement | null>(null);
+  /** The board's box (the stage is exactly the galet): the phone's hand measures its corner on it. */
+  let stageEl = $state<HTMLElement | null>(null);
   /** The element of the game that had the focus when the invitation appeared. */
   let focusBefore: HTMLElement | null = null;
   let wasPrompting = false;
@@ -754,9 +757,11 @@
       playability={verdicts}
       selected={selectedCard}
       {received}
+      partner={{ color: PARTNER[session.human], name: session.names[PARTNER[session.human]] }}
       {concealed}
       pace={session.pace}
       {compact}
+      board={stageEl}
       onpick={pickCard}
     />
   {/if}
@@ -787,6 +792,7 @@
             {render}
             human={session.human}
             names={session.names}
+            thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
             onabandon={abandon}
           />
@@ -802,13 +808,14 @@
           </div>
         {/if}
 
-        <div class="stage">
+        <div class="stage" bind:this={stageEl}>
           <Board
             {k}
             {render}
             {discardTop}
             {burst}
             {flights}
+            thinking={session.thinking}
             ontapis={() => (tapisOpen = true)}
           >
             {#snippet under(px)}
@@ -871,7 +878,7 @@
               />
             {/snippet}
           </Board>
-          <DealBanner {render} names={session.names} />
+          <DealBanner {render} names={session.names} human={session.human} />
         </div>
 
         {#if flow.kind === "sevenBuilding" && compact}
@@ -970,14 +977,16 @@
    * media queries being the very strings of ui/screen.svelte.ts (the store gives `data-chrome`):
    * - « bar », landscape from 960 x 600 (computers): the board across the width,
    *   min(100vw − 32 px − insets, (100dvh − 160 px − insets) / (ratio + head room), 1600 px), and
-   *   under it one 160 px bar (--bar, the regular fan's box: an 88 x 124 card + 36 px) holding the
+   *   under it one 160 px bar (--bar, the regular fan's box: 106 x 148 cards since plan 03-10, their
+   *   top 10 px under the bar's top and their lower edge under the screen's) holding the
    *   info at the left (240 px), the hand in the middle and the action zone at the right (at least
    *   320 px); the 7 assistant takes the place of the hand and the action zone. About 1227 px wide
    *   at 1280 x 800, 920 at 1024 x 640, 1408 at 1440 x 900.
    * - « compact », every other landscape screen (a phone held sideways, a small window): the board
    *   on the full height under a 24 px prompt row, max(0, min(100vw − 2 × 60 px − insets,
    *   (100dvh − 24 px − insets) / ratio)), with a strip of at least 60 px at each side: the info and
-   *   the hand at the left, « Avance rapide » and the state's buttons at the right. About 630 px wide
+   *   the hand at the left (its larger cards over the galet's bare corner and past the screen's left
+   *   edge, plan 03-10), « Avance rapide » and the state's buttons at the right. About 630 px wide
    *   at 750 x 342, 724 at 844 x 390, 360 at 480 x 320 (plan 01-47).
    * - « rotate », every screen taller than wide: only the invitation, « Tourne ton téléphone » (or
    *   « Élargis la fenêtre » on a computer). The game is kept behind it, mounted but not displayed
@@ -999,8 +1008,10 @@
   .game {
     --inset-x: calc(env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
     --inset-y: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-    /* Its own formatting context: the outer margin of a layout stays inside the page. */
+    /* Its own formatting context: the outer margin of a layout stays inside the page. The screen's
+       edges clip what runs past them (the hand's cards, plan 03-10): the page never scrolls. */
     display: flow-root;
+    overflow: clip;
     min-height: 100%;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
       env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
@@ -1071,7 +1082,6 @@
       height: calc(100dvh - var(--inset-y));
       margin: 0;
       padding: 0;
-      overflow: clip;
       gap: 0;
       grid-template-columns: minmax(var(--strip), 1fr) var(--board-size) minmax(var(--strip), 1fr);
       grid-template-rows: minmax(0, 1fr) var(--prompt-row) auto minmax(0, 1fr);
@@ -1123,8 +1133,21 @@
       max-height: calc(100% - 2 * var(--touch) - 3 * var(--space-xs));
     }
 
+    /* The hand over the whole left strip, in front of the board: its cards stand from the strip's
+       bottom up to under the info (44 px), over the galet's bare corner and past the screen's left
+       edge (plan 03-10); the box lets every other tap through. */
+    .hand {
+      grid-area: left;
+      align-self: stretch;
+      justify-self: stretch;
+      position: relative;
+      z-index: 2;
+      min-width: 0;
+      min-height: 0;
+      pointer-events: none;
+    }
+
     /* The bottom of the left strip, under the info (44 px). */
-    .hand,
     .chips {
       grid-area: left;
       align-self: end;

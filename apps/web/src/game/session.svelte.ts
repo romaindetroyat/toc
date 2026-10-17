@@ -6,10 +6,20 @@
 // brought up to date only once the Director is idle, so the board stays locked until the last
 // animation has finished (UI-SPEC, Turn flow step 4).
 
-import { quarterTurnsFor } from "@toc/board";
-import type { Color, GameEvent, PlayerView, Reason, RenderState } from "@toc/engine";
+import { quarterTurnsFor, screenSideOf } from "@toc/board";
+import type { BotLevel } from "@toc/bots";
+import {
+  COLORS,
+  type Color,
+  type GameEvent,
+  type PlayerView,
+  type Reason,
+  type RenderState,
+} from "@toc/engine";
 import * as audio from "../audio/engine.ts";
+import type { BotLevels } from "../settings/settings.ts";
 import { settings } from "../settings/store.svelte.ts";
+import { createInlineRunner } from "./botRunner.ts";
 import type { DebugParams } from "./debugParams.ts";
 import { createDirector, type DirectorDeps, type DirectorMode } from "./director.ts";
 import {
@@ -88,6 +98,22 @@ export async function loadDebugParams(hash: string): Promise<DebugParams> {
 }
 
 /**
+ * The level of each computer seat, by colour, from the levels remembered per role: the seat in front
+ * of the human is the partner, the next seat clockwise is on his left, the previous one on his right
+ * (screenSideOf, the same sides as the board).
+ */
+export function levelsByColour(levels: BotLevels, human: Color): Partial<Record<Color, BotLevel>> {
+  const out: Partial<Record<Color, BotLevel>> = {};
+  for (const color of COLORS) {
+    const side = screenSideOf(color, human);
+    if (side === "top") out[color] = levels.partner;
+    else if (side === "left") out[color] = levels.left;
+    else if (side === "right") out[color] = levels.right;
+  }
+  return out;
+}
+
+/**
  * `colour` is the seat the human plays; without it, the colour chosen on the launch screen. A debug
  * scenario overrides it with the seat whose turn it is.
  */
@@ -134,8 +160,16 @@ export function createSession(
     seed: debug.graine,
     botSeed: debug.graine === undefined ? undefined : botSeedFrom(debug.graine),
     speed: (): Speed => (testSpeed ? "test" : settings.fast ? "fast" : "normal"),
+    // A debug scenario's human is its turn seat: the roles are read from that seat.
+    levels: levelsByColour(settings.botLevels, human),
     scenario,
     director: watched,
+    // The Champion searches in slices that let the page breathe, within the cap of the speed; the
+    // controller's clock and the runner's are the same (performance.now, the controller's default).
+    runner: createInlineRunner({
+      now: () => performance.now(),
+      isHidden: () => document.hidden,
+    }),
   });
 
   let view = $state.raw<PlayerView>(controller.view());

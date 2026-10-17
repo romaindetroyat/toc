@@ -7,7 +7,10 @@ import { etatParam } from "./position.ts";
 // left, the hand in the middle and the action zone at the right. Explicit viewports in Playwright's
 // Chromium emulation (safe-area insets 0), so the desktop project only.
 
-/** The bar's height (the regular fan's box: an 88 x 124 card + 36 px). */
+/**
+ * The bar's height (the regular fan's box; since plan 03-10 its 106 x 148 cards stand 10 px under
+ * its top and their lower edge runs under the screen's).
+ */
 const BAR = 160;
 /** The landscape galet: 1600 / 3200 tall, and the head room of a lifted top-row knight above it. */
 const RATIO = 0.5;

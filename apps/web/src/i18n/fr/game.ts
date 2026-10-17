@@ -26,6 +26,8 @@ export const game = {
     over: "Partie terminée",
     teamAriaThem: (n: number) => `Équipe adverse : ${n} chevaux rentrés sur 8`,
     dealer: (name: string) => `Donneur : ${name}`,
+    /** Who plays first in this deal (G9, plan 03-11): « Commence : toi », « Commence : Marengo ». */
+    starter: (name: string) => `Commence : ${name}`,
     deal: (k: number) => `Donne ${k} sur 3`,
     teamUs: (n: number) => `Nous ${n}/8`,
     teamThem: (n: number) => `Eux ${n}/8`,
@@ -42,6 +44,8 @@ export const game = {
   banner: {
     deal: (k: number, cards: number) => `Donne ${k} sur 3 · ${cards} cartes`,
     reshuffle: (dealer: string) => `On rebat les cartes. Donneur : ${dealer}`,
+    /** The last line of every deal's banner: who plays first (plan 03-11). */
+    starts: (name: string, own: boolean) => (own ? "Tu commences." : `${name} commence.`),
   },
 
   exchange: {
@@ -49,7 +53,11 @@ export const game = {
     pass: "Passer cette carte",
     waiting: (names: readonly string[]) => `En attente de ${names.join(", ")}…`,
     done: (card: string, partner: string) => `Échange fait. Tu as reçu ${card} ${de(partner)}.`,
-    receivedTag: "Reçue",
+    /**
+     * The card received from the partner wears only a thick border of the partner's colour (Romain,
+     * 2026-10-17: « Juste un liseré coloré »); its name says where it comes from.
+     */
+    received: (label: string, partner: string) => `${label}, reçue ${de(partner)}`,
   },
 
   turn: {

@@ -10,11 +10,14 @@ import {
   endDeal,
   eventsFor,
   FULL_DECK,
+  firstPlayer,
   type GameEvent,
   type GameState,
   giveCard,
   nextColor,
   PARTNER,
+  renderInit,
+  renderReduce,
   sortHand,
   startGame,
   teamOf,
@@ -406,8 +409,11 @@ describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
     stages.push(state);
     for (const stage of stages) {
       for (const seat of COLORS) {
-        const json = JSON.stringify(viewFor(stage, seat));
+        const view = viewFor(stage, seat);
+        const json = JSON.stringify(view);
+        // The seat knows its own cards and the card it passed to its partner (givenToPartner).
         const mine = new Set<string>(stage.hands[seat]);
+        if (view.givenToPartner !== null) mine.add(view.givenToPartner);
         for (const other of COLORS) {
           if (other === seat) continue;
           for (const card of stage.hands[other]) {
@@ -464,6 +470,58 @@ describe("viewFor: the hidden-hand boundary (T-01-10)", () => {
   });
 });
 
+describe("viewFor: givenToPartner, the card the seat passed (D-10, BOT-04)", () => {
+  it("is null before the seat chooses, its own choice during the exchange, hidden from the others", () => {
+    let { state } = startGame({ firstDealer: "bleu" }, SEED);
+    for (const seat of COLORS) expect(viewFor(state, seat).givenToPartner).toBeNull();
+    const card = state.hands.rouge[2] as CardId;
+    state = giveCard(state, "rouge", card).state;
+    expect(viewFor(state, "rouge").givenToPartner).toBe(card);
+    for (const seat of ["bleu", "jaune", "vert"] as const) {
+      expect(viewFor(state, seat).givenToPartner).toBeNull();
+    }
+  });
+
+  it("is the card the seat passed once the gives have crossed, and null again at the next deal", () => {
+    const { state } = startGame({ firstDealer: "bleu" }, SEED);
+    const gift = Object.fromEntries(COLORS.map((c) => [c, state.hands[c][0]])) as Record<
+      Color,
+      CardId
+    >;
+    const played = exchangeAll(state).state;
+    for (const seat of COLORS) {
+      const view = viewFor(played, seat);
+      expect(view.givenToPartner).toBe(gift[seat]);
+      expect(view.givenToPartner).toBe(played.received[PARTNER[seat]]);
+      expect(played.hands[PARTNER[seat]]).toContain(view.givenToPartner);
+    }
+    const next = endDeal(emptyHands(played)).state;
+    expect(next.phase).toBe("exchange");
+    for (const seat of COLORS) expect(viewFor(next, seat).givenToPartner).toBeNull();
+  });
+
+  it("never equals another seat's give, through the deals of a game", () => {
+    let { state } = startGame({ firstDealer: "jaune" }, [9, 8, 7, 6]);
+    for (let deal = 0; deal < 4; deal++) {
+      const gift: Partial<Record<Color, CardId>> = {};
+      // The seats give one after the other; after each give every view is checked.
+      for (const giver of COLORS) {
+        const card = state.hands[giver][deal % state.hands[giver].length] as CardId;
+        gift[giver] = card;
+        state = giveCard(state, giver, card).state;
+        for (const seat of COLORS) {
+          const own = viewFor(state, seat).givenToPartner;
+          expect(own).toBe(gift[seat] ?? null);
+          for (const other of COLORS) {
+            if (other !== seat && gift[other] !== undefined) expect(own).not.toBe(gift[other]);
+          }
+        }
+      }
+      state = endDeal(emptyHands(state)).state;
+    }
+  });
+});
+
 describe("eventsFor: the hidden-hand boundary of the event stream", () => {
   it("keeps the seat's own dealt cards and the public hand sizes, hides the other hands", () => {
     const { state, events } = startGame({ firstDealer: "rouge" }, SEED);
@@ -510,6 +568,54 @@ describe("eventsFor: the hidden-hand boundary of the event stream", () => {
     const source = frozen.find((e) => e.t === "handDealt" && e.seat === "jaune");
     if (own?.t === "handDealt" && source?.t === "handDealt") {
       expect(own.cards).not.toBe(source.cards);
+    }
+  });
+});
+
+describe("who starts the deal (R-03, G9; Romain 2026-10-17, plan 03-11)", () => {
+  it("is the seat after the dealer, clockwise", () => {
+    expect(COLORS.map((dealer) => firstPlayer(dealer))).toEqual(["jaune", "rouge", "vert", "bleu"]);
+    for (const dealer of COLORS) {
+      expect(firstPlayer(dealer)).toBe(nextColor(dealer));
+      expect(firstPlayer(dealer, DEFAULT_RULES)).toBe(nextColor(dealer));
+    }
+  });
+
+  it("is the seat whose turn it is at every deal of three packs, from every first dealer", () => {
+    for (const firstDealer of COLORS) {
+      let { state } = startGame({ firstDealer }, SEED);
+      const starters: Color[] = [];
+      for (let deal = 0; deal < 9; deal++) {
+        expect(state.phase).toBe("exchange");
+        expect(state.turn).toBe(firstPlayer(state.dealer));
+        const exchanged = exchangeAll(state).state;
+        expect(exchanged.phase).toBe("play");
+        expect(exchanged.turn).toBe(firstPlayer(state.dealer));
+        starters.push(exchanged.turn);
+        state = endDeal(emptyHands(exchanged)).state;
+      }
+      // Three deals per pack with the same starter, then the next seat (the dealer moved on).
+      const a = nextColor(firstDealer);
+      const b = nextColor(a);
+      const c = nextColor(b);
+      expect(starters).toEqual([a, a, a, b, b, b, c, c, c]);
+    }
+  });
+
+  it("is the turn the screen's reducer opens each deal with", () => {
+    let { state } = startGame({ firstDealer: "rouge" }, SEED);
+    let render = renderInit(viewFor(state, "bleu"));
+    expect(render.turn).toBe(firstPlayer(render.dealer));
+    for (let deal = 0; deal < 6; deal++) {
+      const played = emptyHands(exchangeAll(state).state);
+      const result = endDeal(played);
+      for (const event of eventsFor(result.events, "bleu")) {
+        render = renderReduce(render, event);
+        if (event.t === "dealt") expect(render.turn).toBe(firstPlayer(event.dealer));
+      }
+      state = result.state;
+      expect(render.dealer).toBe(state.dealer);
+      expect(render.turn).toBe(state.turn);
     }
   });
 });

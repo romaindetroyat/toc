@@ -7,7 +7,8 @@
 </script>
 
 <script lang="ts">
-  import type { CardId } from "@toc/engine";
+  import { PALETTE } from "@toc/board";
+  import type { CardId, Color } from "@toc/engine";
   import { COURT_FIGURES, cardFace } from "../cards/faces.ts";
   import { cardName } from "../i18n/fr/cards.ts";
   import { game } from "../i18n/fr/game.ts";
@@ -15,8 +16,11 @@
   type Props = {
     card: CardId;
     state: CardState;
-    /** The card received from the partner (D-21): amber outline and « Reçue » tag. */
-    received?: boolean;
+    /**
+     * The card received from the partner (D-21): a thick border of the partner's colour, no text
+     * (Romain, 2026-10-17: « Juste un liseré coloré »), and « reçue de {Partenaire} » in its name.
+     */
+    received?: { color: Color; name: string } | null;
     /** A button when true, a picture when false (cards are not interactive while he waits). */
     interactive?: boolean;
     onclick?: () => void;
@@ -27,7 +31,7 @@
   let {
     card,
     state,
-    received = false,
+    received = null,
     interactive = true,
     onclick,
     tabindex = 0,
@@ -38,16 +42,22 @@
   const figure = $derived(COURT_FIGURES[card]);
   const name = $derived(cardName(card));
   // « Dame de cœur, jouable » / « …, pas jouable »; a neutral card is only named.
-  const label = $derived(
+  const named = $derived(
     state === "playable" || state === "selected"
       ? game.hand.playable(name)
       : state === "unplayable"
         ? game.hand.unplayable(name)
         : game.hand.neutral(name),
   );
+  const label = $derived(received ? game.exchange.received(named, received.name) : named);
+  const border = $derived(received ? PALETTE.hex[received.color] : undefined);
 </script>
 
 {#snippet content()}
+  {#if received}
+    <!-- Under the corners and the middle: the glyphs stay whole over the border. -->
+    <span class="border" aria-hidden="true"></span>
+  {/if}
   <span class="corner top" style:color={face.colour} aria-hidden="true">
     <span class="rank">{face.rankLabel}</span>
     <span class="pip">{face.suitGlyph}</span>
@@ -66,9 +76,6 @@
     <span class="rank">{face.rankLabel}</span>
     <span class="pip">{face.suitGlyph}</span>
   </span>
-  {#if received}
-    <span class="tag" aria-hidden="true">{game.exchange.receivedTag}</span>
-  {/if}
 {/snippet}
 
 {#if interactive}
@@ -76,18 +83,30 @@
     bind:this={el}
     type="button"
     class="card {state}"
-    class:received
+    class:received={received !== null}
+    style:--received={border}
     aria-label={label}
     aria-pressed={state === "selected"}
     {tabindex}
     {onclick}
     data-card={card}
     data-state={state}
+    data-received={received?.color}
   >
     {@render content()}
   </button>
 {:else}
-  <div bind:this={el} class="card {state}" class:received role="img" aria-label={label} data-card={card} data-state={state}>
+  <div
+    bind:this={el}
+    class="card {state}"
+    class:received={received !== null}
+    style:--received={border}
+    role="img"
+    aria-label={label}
+    data-card={card}
+    data-state={state}
+    data-received={received?.color}
+  >
     {@render content()}
   </div>
 {/if}
@@ -117,24 +136,20 @@
     cursor: default;
   }
 
+  /* The corner index: rank over suit. Its size comes from the hand (--index-rank, --index-suit:
+     larger since Romain's « valeurs en gros », 2026-10-17); elsewhere it keeps the body size. */
   .corner {
     position: absolute;
     display: flex;
     flex-direction: column;
     align-items: center;
     line-height: 1;
-    font-size: var(--label-size);
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .corner.top {
     top: 4px;
     left: 5px;
-  }
-
-  /* The « Reçue » tag takes the top 20 px of the visible slice: the rank moves under it. */
-  .received .corner.top {
-    top: 24px;
   }
 
   .corner.bottom {
@@ -143,17 +158,32 @@
     transform: rotate(180deg);
   }
 
+  /* Inside the received card's border. */
+  .received .corner.top {
+    top: 8px;
+    left: 9px;
+  }
+
+  .received .corner.bottom {
+    right: 9px;
+    bottom: 8px;
+  }
+
   .rank {
-    font-size: var(--body-size);
+    font-size: var(--index-rank, var(--body-size));
+    letter-spacing: -0.02em;
   }
 
   .pip {
-    font-size: var(--body-size);
+    font-size: var(--index-suit, var(--body-size));
   }
 
+  /* Centred on the part of the card that is on the screen (--cut: what runs past its left edge) and,
+     in the phone's corner hand, under the slice of a card the next one covers (--middle-top), so a
+     slice shows its index alone. */
   .middle {
     position: absolute;
-    inset: 0;
+    inset: var(--middle-top, 0px) 0 0 var(--cut, 0px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -161,13 +191,13 @@
   }
 
   .big {
-    font-size: 44px;
+    font-size: var(--pip-size, 44px);
     line-height: 1;
   }
 
   .letter {
     font-family: var(--font-display);
-    font-size: 44px;
+    font-size: var(--pip-size, 44px);
     font-weight: 700;
     line-height: 1;
   }
@@ -187,8 +217,7 @@
 
   /* Playable: 3 px amber outline and 4 px amber top bar. */
   .playable,
-  .selected,
-  .received {
+  .selected {
     box-shadow:
       0 0 0 3px var(--ambre),
       0 2px 4px rgb(0 0 0 / 0.35);
@@ -209,20 +238,14 @@
     opacity: 0.5;
   }
 
-  /* « Reçue »: walnut on amber, 20 px high, top-left of the visible slice. */
-  .tag {
+  /* The card received from the partner: a 6 px border of the partner's colour inside the card, a
+     fine walnut line on its inner side so that the yellow seat never melts into the amber outline. */
+  .border {
     position: absolute;
-    top: 0;
-    left: 0;
-    min-width: 44px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 0 0 var(--radius-card) 0;
-    background: var(--ambre);
-    color: var(--noyer);
-    font-size: var(--label-size);
-    font-weight: 700;
-    line-height: 20px;
-    text-align: center;
+    inset: 0;
+    border: 6px solid var(--received);
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgb(43 29 18 / 0.5);
+    pointer-events: none;
   }
 </style>

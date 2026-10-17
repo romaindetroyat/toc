@@ -58,7 +58,7 @@ Exceptions (each is a multiple of 4 and has a reason):
 | 48px | primary button height, As/Roi mode buttons | thumb ergonomics |
 | 56px | info bar height; pawn-tray chip height | two 28px rows; 44px target + padding |
 | 72px / 100px | hand card size (w × h) on compact screens | five cards fit a 320px viewport (see Hand fan) |
-| 88px / 124px | hand card size (w × h) on regular screens | same ratio 1 : 1.41 |
+| 88px / 124px | hand card size (w × h) on regular screens | same ratio 1 : 1.41 (*révisé le 2026-10-17, plan 03-10 : 106 × 148 dans la barre de l’ordinateur, et les cartes du téléphone tenu en largeur dans le coin du galet ; voir 03-UI-SPEC.md, « Des cartes qu’on lit »*) |
 | 72px | action zone minimum height (compact) | one prompt line + one 48px button |
 | 200px | 7 splitter panel height (compact) | counter + chips + 2 buttons |
 | `env(safe-area-inset-*)` | top bar, hand zone | notch and home indicator (PITFALLS 14) |
@@ -75,7 +75,7 @@ Exactly four sizes and two weights (400 regular, 700 bold) across the whole phas
 | Role | Size | Weight | Line Height | Font | Usage |
 |------|------|--------|-------------|------|-------|
 | Body | 16px | 400 (700 for buttons) | 1.5 | Nunito | Action-zone prompts, dialog text, helper text, button labels (700) |
-| Label | 14px | 400 muted / 700 emphasis | 1.4 | Nunito | Info bar, seat chips, card tags (« Reçue »), toasts, badges on the board, aria-visible captions |
+| Label | 14px | 400 muted / 700 emphasis | 1.4 | Nunito | Info bar, seat chips, toasts, badges on the board, aria-visible captions (the « Reçue » card tag is gone since 2026-10-17, plan 03-10) |
 | Heading | 20px | 700 | 1.2 | Nunito | Sheet/dialog titles, « À toi de jouer », 7 panel title, section titles on launch/end screens |
 | Display | 28px | 700 | 1.2 | Caveat | « TOC » title, « Victoire ! » / « Défaite », « Reste 7 » counter, deal banner « Donne 2 sur 3 » |
 
@@ -98,7 +98,7 @@ Accent reserved for (and nothing else):
 1. Primary action button fill: « Jouer la partie », « Jouer » (move confirmation), « Poser mes cartes », « Passer cette carte », « Rejouer » (text `#2B1D12`, ≈9:1)
 2. Halo on pawns that can be played with the selected card (double ring: 4 units walnut inside, 8 units amber outside) and on the selected pawn
 3. Outline (3px) and top bar of playable cards in the hand; outline of the selected card
-4. « Reçue » tag and outline on the card received from the partner (D-21)
+4. ~~« Reçue » tag and outline on the card received from the partner (D-21)~~ *Révisé le 2026-10-17 (plan 03-10) : la carte reçue porte un bord épais de la couleur du partenaire, plus l’ambre (voir « Hand fan »).*
 5. Current-turn marker: the turn dot in the info bar and the ring around the active seat's felt slot
 6. Keyboard focus ring (3px amber with 2px walnut offset)
 
@@ -162,7 +162,7 @@ Register: tutoiement, warm, short sentences, first person for the player's own o
 | Deal banner | « Donne {k} sur 3 · {c} cartes » ; at reshuffle: « On rebat les cartes. Donneur : {Nom} » |
 | Exchange, choose | « Choisis la carte à passer à {Partenaire}. » + button « Passer cette carte » |
 | Exchange, waiting | « En attente de {Nom, Nom}… » (names of those who still have to choose; each shown with an hourglass, done ones with a check) |
-| Exchange, done | « Échange fait. Tu as reçu {Carte} de {Partenaire}. » ; tag on the card: « Reçue » |
+| Exchange, done | « Échange fait. Tu as reçu {Carte} de {Partenaire}. » ; on the card no text since 2026-10-17 (plan 03-10): a thick border of the partner’s colour, and its read name ends with « , reçue de {Partenaire} » (« d’ » before a vowel) |
 | Own turn, no selection | « À toi de jouer. Choisis une carte. » |
 | Card selected | « Choisis un cheval. » |
 | Only one pawn can play | (aucune consigne : le cheval est choisi et l’aperçu s’affiche, recette 3) |
@@ -328,14 +328,14 @@ Flow: touch a pawn → chips 1..reste appear (chips whose plan could no longer b
 
 | Property | Value |
 |----------|-------|
-| Card size | 72 × 100 compact, 88 × 124 regular (min(viewport w, h) ≥ 600) |
+| Card size | 72 × 100 compact, 88 × 124 regular (min(viewport w, h) ≥ 600). *Révisé le 2026-10-17 (plan 03-10), Romain : « sur ordinateur on y arrive (mais ça pourrait être mieux) », puis « Un peu plus grandes » — « Cartes environ 20 % plus grandes et valeurs plus contrastées, dans la barre du bas. » : 106 × 148 in the computer’s 160px bar, their top 10px under the bar’s top and their lower edge running under the screen’s (the board keeps its 1227px at 1280 × 800); corner index rank 26px / suit 22px, weight 800 (was 16px / 700); red suits #A8140E (was #C0201A)* |
 | Count | 1 to 5 |
 | Fan geometry | container width `W = viewport − 32`; offset = `min(56, floor((W − cardW) / (n − 1)))` (≥ 54 at n = 5 on a 320px phone, so each visible slice ≥ 44px); rotation = `(i − (n−1)/2) × 4°`; vertical drop = `((i − (n−1)/2)²) × 4px`; transform-origin 50% 160%. n = 1: centred, no rotation. Hit area = the visible slice, extended to 44px minimum width |
 | Order | ascending value (As = 1 … Roi = 13), ties by ♠ ♥ ♦ ♣; stable within a deal; played card removed, others re-settle in 200ms |
 | Playable (own turn) | raised 8px, 3px amber outline, 4px amber top bar |
 | Not playable | opacity 0.5, not raised, no outline; tap shows the reason line (see Copywriting) |
 | Selected | raised 16px, scale 1.06, rotation 0, z-index top, 3px amber outline |
-| Received from partner | 3px amber outline + tag « Reçue » (Label 700, walnut on amber, 20px high, top-left of the visible slice, ≥ 44px wide) until that card is played (D-21) |
+| Received from partner | *Révisé le 2026-10-17 (plan 03-10), Romain : « surtout pour la carte indiquée comme ayant été donnée par le partenaire », puis « Juste un liseré coloré » — « Un bord épais de la couleur du partenaire, sans texte. »* A 6px border of the partner’s seat colour (`PALETTE.hex`) inside the card, with a 1px walnut line on its inner side, until that card is played (D-21); no tag, no amber; the card’s read name ends with « , reçue de {Partenaire} ». Was: 3px amber outline + tag « Reçue » |
 | Waiting (not my turn) | all cards neutral, not interactive, no dimming (they are not "unplayable") |
 | Dead hand | all dimmed, button « Poser mes cartes » in the action zone |
 | Exchange phase | all cards raised 8px and selectable; selection = same lift as above |
@@ -430,7 +430,7 @@ Board → pointer behaviour: tapping a non-candidate pawn or empty board while a
 
 ### Exchange (D-21, PLAY-05)
 
-At the start of each deal: all cards selectable, prompt « Choisis la carte à passer à {Partenaire}. », button « Passer cette carte ». After confirm the card slides face-down toward the partner's side of the felt; the prompt becomes « En attente de {noms}… » with a hourglass/check per player; bots choose one by one with the bot think delay. When all have chosen, cards cross (300ms), the received card joins the hand with the « Reçue » marker, prompt « Échange fait. … ».
+At the start of each deal: all cards selectable, prompt « Choisis la carte à passer à {Partenaire}. », button « Passer cette carte ». After confirm the card slides face-down toward the partner's side of the felt; the prompt becomes « En attente de {noms}… » with a hourglass/check per player; bots choose one by one with the bot think delay. When all have chosen, cards cross (300ms), the received card joins the hand with the « Reçue » marker, prompt « Échange fait. … ». *Révisé le 2026-10-17 (plan 03-10) : le marqueur est un bord épais de la couleur du partenaire, sans texte.*
 
 ### Dead hand (D-20, RULE-16)
 
@@ -959,7 +959,7 @@ Conséquence de mise en œuvre (planificateur), à confirmer par Romain. Chaque 
 
 1. **La ligne de consigne.** Une seule ligne de 24 px au-dessus du plateau, centrée sur lui : la consigne, le dernier coup des ordinateurs, ou, pendant le 7, « Reste n » en ambre suivi de la consigne et du partage, joints par « · ». En Label 14 crème. Un texte trop long finit par « … » ; le texte entier reste dans la région lue par les lecteurs d’écran et dans le titre (au survol). Une prise d’un cheval de son équipe passe en tête de ligne, pour que « … » ne la coupe jamais. Pendant « Lequel ? », la ligne dit « Lequel de ces chevaux ? » (texte nouveau). Pendant l’attente de l’échange, les trois donneurs (sablier ou coche) prennent la place de la ligne.
 2. **Les deux bandes.** Une bande d’au moins 60 px de chaque côté du galet, sur toute la hauteur : les coins arrondis du galet ne laissent pas de place aux cartes sans couvrir des cases de l’anneau. Le plateau est centré et les bandes prennent ce qui reste ; aux cinq tailles visées le plateau est limité par la largeur et chaque bande fait exactement 60 px.
-3. **La main en colonne.** En bas de la bande de gauche : des cartes de 52 × 73, chacune montrant au moins ses 44 px du haut (son indice), la dernière entière ; cinq cartes font 4 × 44 + 73 = 249 px, et la boîte garde cette hauteur pour ne jamais sauter quand une carte part. La carte choisie avance de 6 px vers le plateau et garde sa place dans la pile. Les cartes injouables sont couvertes d’un voile noyer opaque (des cartes à 40 % laissaient voir celle du dessous). Une main vide montre « Plus de cartes » ; la phrase qui suit est lue, pas affichée. Les flèches haut et bas parcourent la colonne.
+3. **La main en colonne.** *Remplacé le 2026-10-17 (plan 03-10) : Romain, « sur iphone c'est beaucoup plus difficile », puis « Cartes plus grandes en coin » ; voir 03-UI-SPEC.md, « Des cartes qu’on lit ». Le texte ci-dessous est l’ancienne colonne.* En bas de la bande de gauche : des cartes de 52 × 73, chacune montrant au moins ses 44 px du haut (son indice), la dernière entière ; cinq cartes font 4 × 44 + 73 = 249 px, et la boîte garde cette hauteur pour ne jamais sauter quand une carte part. La carte choisie avance de 6 px vers le plateau et garde sa place dans la pile. Les cartes injouables sont couvertes d’un voile noyer opaque (des cartes à 40 % laissaient voir celle du dessous). Une main vide montre « Plus de cartes » ; la phrase qui suit est lue, pas affichée. Les flèches haut et bas parcourent la colonne.
 4. **La pastille et sa feuille.** En haut de la bande de gauche, un bouton de 52 × 44 : le point du tour (ambre quand c’est à toi), la pastille de la place dont c’est le tour, et dessous « n–m », les chevaux rentrés de « nous » et d’« eux », en chiffres tabulaires. Son nom lu : « Infos de la partie : {la ligne du tour}, nous n sur 8, eux m sur 8 ». Un toucher ouvre la feuille « Infos de la partie » : la ligne du tour, le donneur, « Donne n sur 3 », les deux pastilles d’équipe, et « Fermer » ; Échap la ferme.
 5. **« Réglages » et « Avance rapide » en haut à droite.** La roue (44 × 44) en haut de la bande de droite, puis, pendant que l’ordinateur joue, « Avance rapide » en icône seule (44 × 44, bouton à bascule, son nom et son titre « Avance rapide »).
 6. **Les boutons de l’état.** En bas de la bande de droite, empilés à 4 px : 58 px de large (« Annuler » mesure 52,4 px en Label 14 gras et ne tenait pas dans 52), au moins 48 px de haut, deux lignes au plus. Un seul bouton principal au plus, le plus bas. Exception gardée de 01-36 : la question de l’As et du Roi garde ses deux boutons ambre, « Sortir » et « +n ».

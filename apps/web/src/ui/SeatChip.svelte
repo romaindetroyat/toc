@@ -8,9 +8,14 @@
     showName?: boolean;
     /** A 20 px chip for the info bar, where two rows share 56 px. */
     small?: boolean;
+    /**
+     * Whether a hidden name is still read out. False for a purely decorative glyph standing beside a
+     * text that already names the seat (the thinking prompt, plan 03-09).
+     */
+    label?: boolean;
   };
 
-  let { color, showName = true, small = false }: Props = $props();
+  let { color, showName = true, small = false, label = true }: Props = $props();
 
   const seat = $derived(seats[color]);
 </script>
@@ -31,7 +36,7 @@
   </svg>
   {#if showName}
     <span class="name">{seat.name}</span>
-  {:else}
+  {:else if label}
     <span class="sr-only">{seat.name}</span>
   {/if}
 </span>

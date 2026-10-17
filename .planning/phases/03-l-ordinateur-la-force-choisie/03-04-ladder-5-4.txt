@@ -1,0 +1,9 @@
+ladder: A=5 (Champion) vs B=4 (Pur-sang), 400 games (200 pairs), seed 1
+games: 400 (400 finished, 0 failed)
+A wins: 327 / 400, p̂ = 81.8 %
+Wilson 95 %: [77.7 %, 85.2 %]
+pairs: 2–0 133, 1–1 61, 0–2 6
+A decisions: 55635, mean 33.27 ms, p95 129.85 ms, max 2017.7 ms, units 9957597
+B decisions: 53374, mean 0.30 ms, p95 1.16 ms, max 42.7 ms, units 195848
+wall time: 486.9 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 60 % and Wilson lower bound > 55 %)

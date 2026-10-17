@@ -10,10 +10,11 @@
 </script>
 
 <script lang="ts">
-  import { bottomOf, SCENE } from "@toc/board";
-  import type { CardId, RenderState } from "@toc/engine";
+  import { bottomOf, PALETTE, riderBox, SCENE } from "@toc/board";
+  import type { CardId, Color, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { game } from "../i18n/fr/game.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import BoardArt from "./BoardArt.svelte";
   import CardFlights, { type Flight } from "./CardFlights.svelte";
   import FeltTable from "./FeltTable.svelte";
@@ -29,12 +30,15 @@
   // all; each receives the number of scene units per screen pixel.
   // With a render state the felt is drawn as a card table under all of them (D-08).
   // `burst` puts the particles of the party above the knights; `flights` the cards that are moving.
+  // `thinking`, the computer player thinking about its move, breathes a glow of its colour around its
+  // rider (plan 03-09).
   let {
     k = 0,
     render,
     discardTop = null,
     burst = null,
     flights = [],
+    thinking = null,
     ontapis,
     children,
     under,
@@ -48,6 +52,8 @@
     burst?: Burst | null;
     /** The cards in flight: dealt, played, exchanged or laid down. */
     flights?: Flight[];
+    /** The computer player thinking about its move (session.thinking), if any. */
+    thinking?: Color | null;
     /** A tap (or Entrée) on the felt: the game opens « Sur le tapis ». */
     ontapis?: () => void;
     children?: Snippet;
@@ -70,6 +76,30 @@
     height: pct(scene.felt.h, scene.height),
     radius: "50%",
   };
+
+  /**
+   * The thinking glow (plan 03-09, Romain's « Pas assez visible » of 2026-10-17): a soft disc of the
+   * seat's colour around its ink rider, its diameter 1.7 times the rider's height, placed by
+   * percentages of the scene like the felt button. It is an HTML layer of its own between the drawing
+   * and the knights, so its breath (CSS, transform and opacity) never repaints either svg.
+   */
+  const GLOW_SPAN = 1.7;
+  const glow = $derived.by(() => {
+    if (thinking === null) return null;
+    const box = riderBox(thinking, k);
+    const r = (box.h * GLOW_SPAN) / 2;
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const hex = PALETTE.hex[thinking];
+    return {
+      seat: thinking,
+      left: pct(cx - r, scene.width),
+      top: pct(cy - r, scene.height),
+      width: pct(2 * r, scene.width),
+      height: pct(2 * r, scene.height),
+      background: `radial-gradient(closest-side, ${hex}8c 0%, ${hex}4d 50%, ${hex}00 100%)`,
+    };
+  });
 </script>
 
 <!-- The drawing is synchronous: `loaded` is the readiness signal the specs wait for, set at once. -->
@@ -91,6 +121,19 @@
   >
     <BoardArt {k} />
   </svg>
+  {#if glow !== null}
+    <div
+      class="thinking-glow"
+      class:still={settings.reduceMotion}
+      data-thinking-glow={glow.seat}
+      aria-hidden="true"
+      style:left={glow.left}
+      style:top={glow.top}
+      style:width={glow.width}
+      style:height={glow.height}
+      style:background={glow.background}
+    ></div>
+  {/if}
   <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
       <FeltTable {render} {discardTop} {k} {px} />
@@ -143,6 +186,27 @@
     margin-top: calc(var(--side) * var(--head-room, 0.0217));
     container-type: inline-size;
     flex: none;
+  }
+
+  /* The thinking glow: under the knights' svg, never a target; it breathes (app.css respire-lueur). */
+  .thinking-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: respire-lueur 1600ms ease-in-out infinite;
+  }
+
+  .thinking-glow.still {
+    animation: none;
+    opacity: 0.85;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thinking-glow {
+      animation: none;
+      opacity: 0.85;
+    }
   }
 
   /* Invisible button over the felt (its bounding box and shape, placed by its inline percentages). */

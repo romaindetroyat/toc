@@ -200,6 +200,48 @@ async function expectFits(page: Page, what: string, selectors: string[]) {
 }
 
 /**
+ * The hand's cards may run past the screen's edges since plan 03-10 (Romain's larger cards: past the
+ * left edge in the phone's corner, past the bottom edge in the computer's bar), but each shows on the
+ * screen at least 44 x 44 px and its whole top corner index, and none starts above the screen or ends
+ * past its right edge.
+ */
+async function expectCardsShown(page: Page, what: string) {
+  const size = page.viewportSize();
+  if (!size) throw new Error("no viewport");
+  const cards = await page.locator("[data-hand] [data-card]").evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      const index = node.querySelector(".corner.top")?.getBoundingClientRect();
+      return {
+        name: node.getAttribute("aria-label") ?? "",
+        x: box.x,
+        y: box.y,
+        right: box.right,
+        bottom: box.bottom,
+        index: index ? { x: index.x, y: index.y, right: index.right, bottom: index.bottom } : null,
+      };
+    }),
+  );
+  expect(cards.length, `${what}: no card`).toBeGreaterThan(0);
+  for (const card of cards) {
+    const label = `${what}: « ${card.name} »`;
+    expect(card.y, `${label} starts above the screen`).toBeGreaterThanOrEqual(-0.5);
+    expect(card.right, `${label} ends right of the screen`).toBeLessThanOrEqual(size.width + 0.5);
+    const shownX = Math.min(size.width, card.right) - Math.max(0, card.x);
+    const shownY = Math.min(size.height, card.bottom) - Math.max(0, card.y);
+    expect(shownX, `${label} shows under 44 px across`).toBeGreaterThanOrEqual(43.8);
+    expect(shownY, `${label} shows under 44 px down`).toBeGreaterThanOrEqual(43.8);
+    expect(card.index, `${label} has no index`).not.toBeNull();
+    if (card.index) {
+      expect(card.index.x, `${label}: its index past the left edge`).toBeGreaterThanOrEqual(-0.5);
+      expect(card.index.bottom, `${label}: its index past the bottom`).toBeLessThanOrEqual(
+        size.height + 0.5,
+      );
+    }
+  }
+}
+
+/**
  * The landscape galet, the game's only board (Romain's « paysage obligatoire », D-07): twice as wide
  * as it is tall.
  */
@@ -231,32 +273,35 @@ for (const size of SIZES) {
       await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
 
       const chrome = ["[data-board]", "[data-info-bar]", "[data-action-zone]", "[data-hand]"];
-      const hand = [...chrome, "[data-hand] [data-card]"];
+      const fits = async (what: string) => {
+        await expectFits(page, what, chrome);
+        await expectCardsShown(page, what);
+      };
 
       // The exchange: five cards in the hand, the choice asked in the action zone.
       await expect(zone(page)).toHaveAttribute("data-state", "exchange");
       await expectLandscapeGalet(page, "échange");
       await expectBarBoard(page, "échange");
-      await expectFits(page, "échange", hand);
+      await fits("échange");
       await page.locator("[data-hand] [data-card]").first().click();
-      await expectFits(page, "échange, carte choisie", hand);
+      await fits("échange, carte choisie");
       await page.getByRole("button", { name: "Passer cette carte" }).click();
 
       // His turn: card selected, knight tapped (the preview; at once for a lone knight, recette 3,
       // test 27), then the move.
       await untilOwnTurn(page);
-      await expectFits(page, "à toi de jouer", hand);
+      await fits("à toi de jouer");
       const card = page
         .locator('[data-hand] [data-state="playable"]:not([data-card^="7"]):not([data-card^="11"])')
         .first();
       await card.click();
-      await chooseKnight(page, () => expectFits(page, "carte choisie", hand));
+      await chooseKnight(page, () => fits("carte choisie"));
       await expect(page.locator("[data-ghost]")).toBeVisible();
-      await expectFits(page, "aperçu du coup", hand);
+      await fits("aperçu du coup");
       await expectLandscapeGalet(page, "aperçu");
       await page.getByRole("button", { name: /^Jouer/ }).click();
       await expect(page.locator('[data-felt-last="bleu"]')).toBeVisible();
-      await expectFits(page, "après le coup", hand);
+      await fits("après le coup");
     });
 
     test(`l’assistant du 7 tient sous le plateau ou autour de lui (${size.name})`, async ({

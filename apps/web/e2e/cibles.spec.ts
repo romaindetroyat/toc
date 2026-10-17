@@ -64,7 +64,8 @@ for (const viewport of VIEWPORTS) {
       await expectAllButtons(page);
 
       // Each visible slice of the hand is at least 44 px: the next card starts 44 px or more on, along
-      // the hand (across in a fan, down in the column of the left strip, plan 01-47).
+      // the hand (across in a fan, down in the corner of the phone held sideways, plan 03-10); and a
+      // card running past the screen's left edge (the corner's larger cards) keeps 44 px on it.
       const boxes = await Promise.all((await cards.all()).map((card) => card.boundingBox()));
       for (let i = 1; i < boxes.length; i++) {
         const gap = Math.max(
@@ -72,6 +73,11 @@ for (const viewport of VIEWPORTS) {
           Math.abs((boxes[i]?.y ?? 0) - (boxes[i - 1]?.y ?? 0)),
         );
         expect(gap, `slice ${i - 1}`).toBeGreaterThanOrEqual(MIN - TOLERANCE);
+      }
+      for (const [i, box] of boxes.entries()) {
+        if (box === null) continue;
+        const shown = Math.min(viewport.width, box.x + box.width) - Math.max(0, box.x);
+        expect(shown, `card ${i} on the screen`).toBeGreaterThanOrEqual(MIN - TOLERANCE);
       }
       await cards.first().click();
       await expectAllButtons(page);

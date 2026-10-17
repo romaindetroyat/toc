@@ -25,8 +25,15 @@ function initialPawns(): Record<PawnId, Pawn> {
   return pawns as Record<PawnId, Pawn>;
 }
 
-/** The seat that plays first in every deal (G9, 'afterDealer'). */
-function firstPlayer(dealer: Color, rules: RuleSet): Color {
+/**
+ * The seat that plays first in every deal of a pack (RULES.md R-03, G9 'afterDealer': the seat after
+ * the dealer, clockwise). The one place that says who starts: the deal machine, the render reducer and
+ * the screen (the deal banner, the « 1er » token, « Commence : … ») all read it.
+ */
+export function firstPlayer(
+  dealer: Color,
+  rules: Pick<RuleSet, "FIRST_PLAYER"> = DEFAULT_RULES,
+): Color {
   switch (rules.FIRST_PLAYER) {
     case "afterDealer":
       return nextColor(dealer);

@@ -1,23 +1,35 @@
-import { randomLegal } from "@toc/bots";
+import { chooseAction, randomLegal, type Thought } from "@toc/bots";
 import {
   type Action,
   type CardId,
   COLORS,
   type Color,
   type GameEvent,
+  next,
   type PlayerView,
+  type Rng,
   type Scenario,
 } from "@toc/engine";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOT_NAMES } from "./botNames.ts";
-import { createGame, type GameDirector, type Speed } from "./GameController.ts";
+import { type BotRunner, ThinkCancelled, type ThinkRequest } from "./botRunner.ts";
+import {
+  type CreateGameOptions,
+  createGame,
+  type GameDirector,
+  type Speed,
+} from "./GameController.ts";
 import source from "./GameController.ts?raw";
+import { paceFor } from "./pace.ts";
 
-// The real bot, wrapped so the tests can see what it was called with.
+// The real bot entry point, wrapped so the tests can see what it was called with.
 vi.mock("@toc/bots", async (importOriginal) => {
   const original = await importOriginal<typeof import("@toc/bots")>();
-  return { ...original, randomLegal: vi.fn(original.randomLegal) };
+  return { ...original, chooseAction: vi.fn(original.chooseAction) };
 });
+
+const { chooseAction: realChooseAction } =
+  await vi.importActual<typeof import("@toc/bots")>("@toc/bots");
 
 const SEED: [number, number, number, number] = [11, 22, 33, 44];
 const BOT_SEED: [number, number, number, number] = [55, 66, 77, 88];
@@ -60,9 +72,14 @@ function play(hands: Partial<Record<Color, CardId[]>>, turn: Color = "bleu"): Sc
   return { pawns: PAWNS, hands, turn, phase: "play" };
 }
 
-function scenarioGame(before: Scenario["before"], speed: Speed | (() => Speed)) {
+function scenarioGame(
+  before: Scenario["before"],
+  speed: Speed | (() => Speed),
+  extra: Partial<CreateGameOptions> = {},
+) {
   const director = fakeDirector();
   const game = createGame({
+    ...extra,
     human: "rouge", // overridden by the scenario's turn seat
     seed: SEED,
     botSeed: BOT_SEED,
@@ -77,7 +94,7 @@ const sizes = (view: PlayerView) => view.handSizes;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.mocked(randomLegal).mockClear();
+  vi.mocked(chooseAction).mockClear();
 });
 
 afterEach(() => {
@@ -143,22 +160,85 @@ describe("createGame: set-up", () => {
   });
 });
 
-describe("bots: think delay and view-only play (D-18)", () => {
-  it("gives the three bots' cards one at a time, each after a 700 to 1300 ms think", async () => {
-    const { game } = newGameFor("normal");
-    game.start();
-    const given = () => COLORS.filter((c) => game.view().hasGiven[c]).length;
+describe("bots: think time by the move, the decision counted inside it (D-11, D-13)", () => {
+  /** A clock the tests move by hand on top of the fake timers: the time a decision « takes ». */
+  function fakeClock() {
+    const clock = { offset: 0, now: () => Date.now() + clock.offset };
+    return clock;
+  }
 
-    await vi.advanceTimersByTimeAsync(699);
-    expect(given()).toBe(0);
-    await vi.advanceTimersByTimeAsync(601); // 1300 ms in all
-    expect(given()).toBe(1);
-    await vi.advanceTimersByTimeAsync(699);
-    expect(given()).toBe(1);
-    await vi.advanceTimersByTimeAsync(601);
-    expect(given()).toBe(2);
-    await vi.advanceTimersByTimeAsync(1300);
-    expect(given()).toBe(3);
+  /** The pace the controller drew for the decision `index` (its u comes right after the bot's rng). */
+  function paceOf(index: number, speed: Speed): number {
+    const thought = vi.mocked(chooseAction).mock.results[index]?.value as Thought;
+    return paceFor(thought, speed, next(thought.rng)[0]);
+  }
+
+  const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] };
+
+  for (const decision of [100, 1200]) {
+    it(`plays at max(decision, pace) after the think starts: a decision of ${decision} ms`, async () => {
+      const clock = fakeClock();
+      const { game } = scenarioGame(play(hands as never), "normal", { now: clock.now });
+      let startedAt: number | null = null;
+      let playedAt: number | null = null;
+      game.onChange(() => {
+        if (startedAt === null && game.thinking() === "jaune") startedAt = clock.now();
+        if (playedAt === null && sizes(game.view()).jaune === 0) playedAt = clock.now();
+      });
+      let thinkingWhileDeciding: Color | null = null;
+      vi.mocked(chooseAction).mockImplementationOnce((...args) => {
+        thinkingWhileDeciding = game.thinking();
+        clock.offset += decision;
+        return realChooseAction(...args);
+      });
+      game.start();
+      game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+      await vi.advanceTimersByTimeAsync(0);
+      // The bot shows as thinking while it decides.
+      expect(thinkingWhileDeciding).toBe("jaune");
+      const pace = paceOf(0, "normal");
+      expect(pace).toBeGreaterThanOrEqual(300);
+      expect(pace).toBeLessThan(500);
+      if (decision < pace) {
+        // A quick decision: still thinking, unplayed, until a moment before its pace.
+        expect(game.thinking()).toBe("jaune");
+        await vi.advanceTimersByTimeAsync(pace - decision - 5);
+        expect(sizes(game.view()).jaune).toBe(1);
+        expect(game.thinking()).toBe("jaune");
+      }
+      await vi.advanceTimersByTimeAsync(10);
+      expect(playedAt).not.toBeNull();
+      const took = (playedAt as unknown as number) - (startedAt as unknown as number);
+      // The pace is the whole think: a fast decision waits the rest, a slow one is played at once.
+      expect(Math.abs(took - Math.max(decision, pace))).toBeLessThanOrEqual(1);
+      game.dispose();
+    });
+  }
+
+  it("gives the three bots' cards one at a time, each after its own pace, then waits for the human", async () => {
+    const { game } = newGameFor("normal");
+    const started: number[] = [];
+    const gaveAt: number[] = [];
+    let thinking: Color | null = null;
+    const given = () => COLORS.filter((c) => game.view().hasGiven[c]).length;
+    game.onChange(() => {
+      if (game.thinking() !== null && game.thinking() !== thinking) started.push(Date.now());
+      thinking = game.thinking();
+      if (given() > gaveAt.length) gaveAt.push(Date.now());
+    });
+    game.start();
+    await vi.advanceTimersByTimeAsync(3 * 2000 + 10);
+    expect(gaveAt).toHaveLength(3);
+    for (let i = 0; i < 3; i++) {
+      const pace = paceOf(i, "normal");
+      expect(pace).toBeGreaterThanOrEqual(450 * 0.9);
+      expect(pace).toBeLessThanOrEqual(2000);
+      // One at a time: each think starts once the previous card is given.
+      if (i > 0) expect(started[i]).toBeGreaterThanOrEqual(gaveAt[i - 1] as number);
+      expect(Math.abs((gaveAt[i] as number) - (started[i] as number) - pace)).toBeLessThanOrEqual(
+        1,
+      );
+    }
     // Then it waits for the human, however long.
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(given()).toBe(3);
@@ -167,16 +247,19 @@ describe("bots: think delay and view-only play (D-18)", () => {
     game.dispose();
   });
 
-  it("thinks 200 to 300 ms in fast mode and not at all at test speed", async () => {
-    const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] } as const;
+  it("thinks about a quarter as long in « Avance rapide », at most 300 ms, and not at all at test speed", async () => {
     const before = play({ ...hands, bleu: [...hands.bleu] } as never);
 
     const fast = scenarioGame(before, "fast");
     fast.game.start();
     expect(fast.game.submit({ t: "move", card: "5H", pawn: "bleu0" })).toEqual({ ok: true });
-    await vi.advanceTimersByTimeAsync(199);
+    await vi.advanceTimersByTimeAsync(0);
+    const pace = paceOf(0, "fast");
+    expect(pace).toBeLessThanOrEqual(300);
+    expect(pace).toBeCloseTo(paceOf(0, "normal") / 4, 6);
+    await vi.advanceTimersByTimeAsync(Math.max(0, pace - 2));
     expect(sizes(fast.game.view()).jaune).toBe(1);
-    await vi.advanceTimersByTimeAsync(101);
+    await vi.advanceTimersByTimeAsync(3);
     expect(sizes(fast.game.view()).jaune).toBe(0);
     expect(sizes(fast.game.view()).rouge).toBe(1);
     fast.game.dispose();
@@ -189,6 +272,55 @@ describe("bots: think delay and view-only play (D-18)", () => {
     expect(sizes(view)).toEqual({ bleu: 1, jaune: 0, rouge: 0, vert: 0 });
     expect(view.turn).toBe("bleu");
     quick.game.dispose();
+  });
+
+  it("applies « Avance rapide » turned on between two bot steps to the next step", async () => {
+    let speed: Speed = "normal";
+    const { game } = scenarioGame(play(hands as never), () => speed);
+    // « Avance rapide » is turned on as soon as jaune has played, before rouge's step.
+    let jauneAt: number | null = null;
+    let rougeAt: number | null = null;
+    game.onChange(() => {
+      if (jauneAt === null && sizes(game.view()).jaune === 0) {
+        jauneAt = Date.now();
+        speed = "fast";
+      }
+      if (rougeAt === null && sizes(game.view()).rouge === 0) rougeAt = Date.now();
+    });
+    const t0 = Date.now();
+    game.start();
+    game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+    await vi.advanceTimersByTimeAsync(2000);
+    // Jaune's single move at normal speed: 300 to 450 ms. Rouge's, now fast: a quarter, 75 to 113 ms.
+    const jaune = (jauneAt as unknown as number) - t0;
+    expect(jaune).toBeGreaterThanOrEqual(300);
+    expect(jaune).toBeLessThan(500);
+    const rouge = (rougeAt as unknown as number) - (jauneAt as unknown as number);
+    expect(rouge).toBeGreaterThanOrEqual(74);
+    expect(rouge).toBeLessThan(120);
+    game.dispose();
+  });
+
+  it("drops a decision made before the human's give and thinks again (the exchange race)", async () => {
+    const { game } = newGameFor("normal");
+    game.start();
+    for (let i = 0; i < 200 && game.thinking() !== "vert"; i++) {
+      await vi.advanceTimersByTimeAsync(50);
+    }
+    expect(game.thinking()).toBe("vert");
+    const calls = () => vi.mocked(chooseAction).mock.calls.filter((c) => c[1] === "vert");
+    // Vert has decided and waits out its pace.
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]?.[0].hasGiven.bleu).toBe(false);
+    expect(game.submit({ t: "give", card: game.view().hand[0] as CardId })).toEqual({ ok: true });
+
+    await vi.advanceTimersByTimeAsync(2100);
+    // The first decision was not played: vert decided again, from the state with the human's give.
+    expect(calls().length).toBeGreaterThanOrEqual(2);
+    expect(calls()[1]?.[0].hasGiven.bleu).toBe(true);
+    await vi.advanceTimersByTimeAsync(2100);
+    expect(game.view().phase).toBe("play");
+    game.dispose();
   });
 
   it("reads the speed again for every bot step", async () => {
@@ -210,7 +342,7 @@ describe("bots: think delay and view-only play (D-18)", () => {
     game.submit({ t: "move", card: "5H", pawn: "bleu0" });
     await vi.runAllTimersAsync();
 
-    const calls = vi.mocked(randomLegal).mock.calls;
+    const calls = vi.mocked(chooseAction).mock.calls;
     expect(calls.map((c) => c[1])).toEqual(["jaune", "rouge", "vert"]);
     for (const [view, seat] of calls) {
       expect(view.kind).toBe("view");
@@ -317,7 +449,7 @@ describe("bots: think delay and view-only play (D-18)", () => {
       game.dispose();
     });
 
-    it("reads the bot due after the second wait: a give made meanwhile counts", async () => {
+    it("reads the bot due after the second wait: a give made meanwhile is seen", async () => {
       const { game, director } = newGameFor("normal");
       game.start();
       for (let i = 0; i < 200 && game.thinking() !== "vert"; i++) {
@@ -334,7 +466,10 @@ describe("bots: think delay and view-only play (D-18)", () => {
       expect(game.view().phase).toBe("exchange");
 
       release();
+      // The state moved under vert's decision: it is dropped, and vert thinks again before it gives.
       await vi.advanceTimersByTimeAsync(0);
+      expect(director.events.map((e) => e.t)).not.toContain("cardsExchanged");
+      await vi.advanceTimersByTimeAsync(2100);
       expect(director.events.map((e) => e.t)).toContain("cardsExchanged");
       expect(game.view().phase).toBe("play");
       game.dispose();
@@ -367,10 +502,174 @@ describe("bots: think delay and view-only play (D-18)", () => {
   });
 });
 
+describe("bots: the runner of the decision, its cap and its cancel (BOT-05)", () => {
+  const hands = { bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] };
+
+  /** A runner whose thinks the test settles by hand. */
+  function scriptedRunner() {
+    const requests: ThinkRequest[] = [];
+    const pending: { resolve: (t: Thought) => void; reject: (e: unknown) => void }[] = [];
+    let cancels = 0;
+    const runner: BotRunner = {
+      think(request) {
+        requests.push(request);
+        return new Promise<Thought>((resolve, reject) => pending.push({ resolve, reject }));
+      },
+      cancel() {
+        cancels++;
+        for (const think of pending.splice(0)) think.reject(new ThinkCancelled());
+      },
+    };
+    return { runner, requests, pending, cancels: () => cancels };
+  }
+
+  const playedBy = (director: FakeDirector, seat: Color) =>
+    director.events.filter((e) => e.t === "cardPlayed" && e.seat === seat).length;
+
+  for (const [speed, cap] of [
+    ["normal", 2500],
+    ["fast", 500],
+    ["test", null],
+  ] as const) {
+    it(`gives the runner the bot's own view and a deadline of ${cap ?? "none"} at ${speed} speed`, async () => {
+      const scripted = scriptedRunner();
+      const { game } = scenarioGame(play(hands as never), speed, {
+        now: () => Date.now(),
+        runner: scripted.runner,
+      });
+      const t0 = Date.now();
+      game.start();
+      game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(scripted.requests).toHaveLength(1);
+      const request = scripted.requests[0] as ThinkRequest;
+      expect(request.seat).toBe("jaune");
+      expect(request.level).toBe(3);
+      expect(request.view.kind).toBe("view");
+      expect(request.view.seat).toBe("jaune");
+      expect(request.view).not.toHaveProperty("hands");
+      expect(request.deadline).toBe(cap === null ? null : t0 + cap);
+      expect(game.thinking()).toBe("jaune");
+      game.dispose();
+    });
+  }
+
+  it("plays the runner's decision at once when the search took longer than the pace", async () => {
+    const scripted = scriptedRunner();
+    const { game, director } = scenarioGame(play(hands as never), "normal", {
+      now: () => Date.now(),
+      runner: scripted.runner,
+    });
+    game.start();
+    game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+    await vi.advanceTimersByTimeAsync(2400);
+    expect(playedBy(director, "jaune")).toBe(0);
+    expect(game.thinking()).toBe("jaune");
+    const request = scripted.requests[0] as ThinkRequest;
+    scripted.pending[0]?.resolve(realChooseAction(request.view, request.seat, 3, request.rng));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(playedBy(director, "jaune")).toBe(1);
+    game.dispose();
+  });
+
+  it("cancels a think in progress when the game is left: nothing is played, no error", async () => {
+    const scripted = scriptedRunner();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { game, director } = scenarioGame(play(hands as never), "normal", {
+      runner: scripted.runner,
+    });
+    const seen: unknown[] = [];
+    game.onError((error) => seen.push(error));
+    game.start();
+    game.submit({ t: "move", card: "5H", pawn: "bleu0" });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(scripted.requests).toHaveLength(1);
+    const calls = director.calls;
+
+    game.dispose();
+    expect(scripted.cancels()).toBe(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(director.calls).toBe(calls);
+    expect(playedBy(director, "jaune")).toBe(0);
+    expect(scripted.requests).toHaveLength(1);
+    expect(seen).toEqual([]);
+    expect(errors).not.toHaveBeenCalled();
+  });
+});
+
+describe("bots: each seat plays at its level (BOT-01)", () => {
+  it("calls the bot of every seat with that seat's level and its own view", async () => {
+    const director = fakeDirector();
+    const levels = { jaune: 1, rouge: 5, vert: 2 } as const;
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      levels,
+      director,
+    });
+    game.start();
+    await vi.runAllTimersAsync();
+    expect(game.submit({ t: "give", card: game.view().hand[0] as CardId })).toEqual({ ok: true });
+    await vi.runAllTimersAsync();
+
+    const calls = vi.mocked(chooseAction).mock.calls;
+    // The three gives, then the play of the first deal up to the human's turn.
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    for (const [view, seat, level] of calls) {
+      expect(seat).not.toBe("bleu");
+      expect(level).toBe(levels[seat as keyof typeof levels]);
+      expect(view.kind).toBe("view");
+      expect(view.seat).toBe(seat);
+      expect(view).not.toHaveProperty("hands");
+    }
+    expect(new Set(calls.map((c) => c[1]))).toEqual(new Set(["jaune", "rouge", "vert"]));
+    game.dispose();
+  });
+
+  it("plays every seat at Galopeur (3) when no level is given", async () => {
+    const { game } = newGameFor("test");
+    game.start();
+    await vi.runAllTimersAsync();
+    const calls = vi.mocked(chooseAction).mock.calls;
+    expect(calls).toHaveLength(3);
+    expect(calls.map((c) => c[2])).toEqual([3, 3, 3]);
+    game.dispose();
+  });
+
+  it("gives Galopeur to a seat the levels leave out, and keeps the bot rng it returns", async () => {
+    const director = fakeDirector();
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      levels: { jaune: 4 },
+      director,
+    });
+    game.start();
+    await vi.runAllTimersAsync();
+    const calls = vi.mocked(chooseAction).mock.calls;
+    expect(calls.map((c) => [c[1], c[2]])).toEqual([
+      ["jaune", 4],
+      ["rouge", 3],
+      ["vert", 3],
+    ]);
+    // Each call starts from the rng the previous one returned, after the one draw of the think delay.
+    const results = vi.mocked(chooseAction).mock.results;
+    for (let i = 1; i < calls.length; i++) {
+      const previous = results[i - 1]?.value as { rng: Rng };
+      expect(calls[i]?.[3]).toEqual(next(previous.rng)[1]);
+    }
+    game.dispose();
+  });
+});
+
 describe("bots: a failing bot step is reported, never swallowed", () => {
   it("stops the loop and calls the error listeners once with the error", async () => {
     const boom = new Error("bot step failed");
-    vi.mocked(randomLegal).mockImplementationOnce(() => {
+    vi.mocked(chooseAction).mockImplementationOnce(() => {
       throw boom;
     });
     vi.spyOn(console, "error").mockImplementation(() => {});

@@ -18,7 +18,6 @@ import { createDirector, type DirectorMode, LEAD_S, type VisibilitySource } from
 
 const SEED: Rng = [3, 1, 4, 1];
 const NOW = 10;
-const T0 = NOW + LEAD_S;
 const LEAD = LEAD_S * 1000;
 
 type Call = { name: string; lead: number; mode: Mode; args: unknown[] };
@@ -127,7 +126,7 @@ const dealt = (dealIndex: 0 | 1 | 2, size: number, dealer: Color = "bleu"): Game
 const named = (calls: Call[], name: string) => calls.filter((c) => c.name === name);
 
 describe("a deal", () => {
-  it("flies the cards of the four hands in dealing order, with the riffle at t0", async () => {
+  it("flies the cards of the four hands in dealing order; the riffle is silenced", async () => {
     const h = rig();
     h.director.enqueue(dealt(0, 5));
     await h.director.idle();
@@ -146,7 +145,8 @@ describe("a deal", () => {
         ],
       },
     ]);
-    expect(h.cues).toEqual([{ id: "carte-donne", at: T0 }]);
+    // The riffle at t0 (cuesFor) is silenced: Romain, 2026-10-15, « que les sabots ».
+    expect(h.cues).toEqual([]);
   });
 
   it("opens the exchange first (the banner), then counts the hands once the cards have landed", async () => {
@@ -197,7 +197,7 @@ describe("a deal", () => {
 describe("a played card", () => {
   const played: GameEvent = { t: "cardPlayed", seat: "jaune", card: "2S" };
 
-  it("flies to the felt slot with the card-down sound, then the felt shows it", async () => {
+  it("flies to the felt slot, then the felt shows it; the card-down sound is silenced", async () => {
     const h = rig();
     h.hold();
     h.director.enqueue([played]);
@@ -206,7 +206,7 @@ describe("a played card", () => {
     expect(named(h.calls, "playCard")).toEqual([
       { name: "playCard", lead: LEAD, mode: "normal", args: ["jaune", "2S"] },
     ]);
-    expect(h.cues).toEqual([{ id: "carte-pose", at: T0 }]);
+    expect(h.cues).toEqual([]); // the card-down sound is silenced since 2026-10-15
     // Still flying: the felt does not show it yet.
     expect(h.director.renderState?.lastPlayed.jaune).toBeNull();
     await h.director.snapToEnd();
@@ -223,7 +223,7 @@ describe("a played card", () => {
     ]);
     await h.director.idle();
     expect(named(h.calls, "playCard").map((c) => c.args[0])).toEqual(["jaune", "bleu", "rouge"]);
-    expect(h.cues.map((c) => c.id)).toEqual(["carte-pose", "carte-pose", "carte-pose"]);
+    expect(h.cues).toEqual([]); // silenced since 2026-10-15
   });
 });
 
@@ -233,7 +233,7 @@ describe("the exchange", () => {
     received: { bleu: "2S", jaune: "3S", rouge: "4S", vert: "5S" },
   };
 
-  it("crosses the cards with the slide sound, then opens the play", async () => {
+  it("crosses the cards, then opens the play; the slide sound is silenced", async () => {
     const h = rig();
     h.hold();
     h.director.enqueue([exchanged]);
@@ -242,20 +242,20 @@ describe("the exchange", () => {
     expect(named(h.calls, "exchange")).toEqual([
       { name: "exchange", lead: LEAD, mode: "normal", args: [] },
     ]);
-    expect(h.cues).toEqual([{ id: "carte-echange", at: T0 }]);
+    expect(h.cues).toEqual([]); // the slide sound is silenced since 2026-10-15
     expect(h.director.renderState?.phase).toBe("play");
   });
 });
 
 describe("a dead hand", () => {
-  it("lays its cards in front of the seat with one card-down sound", async () => {
+  it("lays its cards in front of the seat; the card-down sound is silenced", async () => {
     const h = rig();
     h.director.enqueue([{ t: "handDiscarded", seat: "bleu", cards: ["5H", "9S"] }]);
     await h.director.idle();
     expect(named(h.calls, "lay")).toEqual([
       { name: "lay", lead: LEAD, mode: "normal", args: ["bleu", ["5H", "9S"]] },
     ]);
-    expect(h.cues).toEqual([{ id: "carte-pose", at: T0 }]);
+    expect(h.cues).toEqual([]); // silenced since 2026-10-15
     expect(h.director.renderState?.posed.bleu).toEqual(["5H", "9S"]);
   });
 });
@@ -268,7 +268,9 @@ describe("a hidden tab and the fast-forward", () => {
     h.director.enqueue([{ t: "cardPlayed", seat: "jaune", card: "2S" }]);
     await Promise.resolve();
     await Promise.resolve();
-    expect(h.cues).toHaveLength(1);
+    // The card sounds are silenced since 2026-10-15: no cue at all, hidden or not (the hidden-tab
+    // silence of the hooves is covered in director.test.ts).
+    expect(h.cues).toHaveLength(0);
     // The tab is hidden mid-flight, and more events arrive: all applied at once, no new sound.
     view.set(true);
     h.director.enqueue([
@@ -278,18 +280,19 @@ describe("a hidden tab and the fast-forward", () => {
     ]);
     await h.director.idle();
     expect(h.finishedCount()).toBeGreaterThan(0);
-    expect(h.cues).toHaveLength(1);
+    expect(h.cues).toHaveLength(0);
     expect(named(h.calls, "playCard")).toHaveLength(1);
     expect(named(h.calls, "deal")).toHaveLength(0);
     expect(named(h.calls, "lay")).toHaveLength(0);
     expect(h.director.renderState?.lastPlayed.bleu).toBe("5H");
     expect(h.director.renderState?.handSizes.bleu).toBe(4);
-    // Back on screen, the next event moves and sounds again.
+    // Back on screen, the next event moves again (its sound is silenced).
     view.set(false);
     h.release();
     h.director.enqueue([{ t: "cardPlayed", seat: "vert", card: "4S" }]);
     await h.director.idle();
-    expect(h.cues.map((c) => c.id)).toEqual(["carte-pose", "carte-pose"]);
+    expect(named(h.calls, "playCard")).toHaveLength(2);
+    expect(h.cues).toEqual([]); // silenced since 2026-10-15
   });
 
   it("an animator without card motions still applies every card event", async () => {

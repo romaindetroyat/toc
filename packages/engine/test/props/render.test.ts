@@ -15,6 +15,7 @@ import {
   legalActions,
   newGame,
   next,
+  PARTNER,
   type RenderState,
   type Rng,
   renderInit,
@@ -77,6 +78,8 @@ function publicCards(state: GameState, seat: Color): Set<string> {
     ...COLORS.flatMap((c) => (state.lastPlayed[c] === null ? [] : [state.lastPlayed[c] as string])),
     ...(state.given[seat] === null ? [] : [state.given[seat] as string]),
     ...(state.received[seat] === null ? [] : [state.received[seat] as string]),
+    // The card the seat passed to its partner, which it remembers (PlayerView.givenToPartner).
+    ...(state.received[PARTNER[seat]] === null ? [] : [state.received[PARTNER[seat]] as string]),
   ]);
 }
 

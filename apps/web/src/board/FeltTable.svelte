@@ -1,10 +1,11 @@
 <script lang="ts">
   import { type Point, SCENE, seatCard } from "@toc/board";
-  import { type CardId, COLORS, type RenderState } from "@toc/engine";
+  import { type CardId, COLORS, firstPlayer, type RenderState } from "@toc/engine";
   import { game } from "../i18n/fr/game.ts";
   import CardBack from "../ui/CardBack.svelte";
   import { posedSlots, tiltOf } from "./cardFx.ts";
   import FaceUpCard from "./FaceUpCard.svelte";
+  import { starterToken } from "./starterToken.ts";
 
   type Props = {
     render: RenderState;
@@ -64,6 +65,12 @@
     const [bw, bh] = angle % 180 === 0 ? [CW, CH] : [CH, CW];
     return [at[0] + bw / 2, at[1] - bh / 2];
   });
+
+  /** Who plays first in this deal (G9: the seat after the dealer; Romain, 2026-10-17, plan 03-11). */
+  const starter = $derived(firstPlayer(render.dealer));
+
+  /** The « 1er » token: on the wood just outside the felt, on the first player's side (starterToken). */
+  const token = $derived(starterToken(starter, k, px));
 </script>
 
 <!-- The galet's felt as a card table (UI-SPEC « Plateau galet », item 4): each seat's cards lie on
@@ -162,6 +169,33 @@
       {/each}
     </g>
   {/each}
+
+  <!-- The « 1er » token of the first player (plan 03-11): a walnut pill with a cream outline, unlike the
+       cream « D » disc, on the wood just outside the felt on that player's side, for the whole deal.
+       The deal banner says it aloud (« … commence. »), so the token itself stays silent. -->
+  <g data-starter={starter} aria-hidden="true">
+    <rect
+      x={token.at[0] - token.w / 2}
+      y={token.at[1] - token.h / 2}
+      width={token.w}
+      height={token.h}
+      rx={token.h / 2}
+      fill={WALNUT}
+      stroke={CREAM}
+      stroke-width={2 * px}
+    />
+    <text
+      class="disc"
+      x={token.at[0]}
+      y={token.at[1]}
+      font-size={15 * px}
+      text-anchor="middle"
+      dominant-baseline="central"
+      fill={CREAM}
+    >
+      1<tspan font-size={10 * px} baseline-shift="super">er</tspan>
+    </text>
+  </g>
 
   <!-- The dealer disc « D », at the top-right corner (on the screen) of the dealer's card place. -->
   <g data-dealer={render.dealer}>
