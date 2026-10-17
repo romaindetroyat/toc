@@ -3,7 +3,7 @@ status: testing
 phase: 02-jouer-en-ligne-entre-proches
 source: [02-CONTEXT.md, 02-UI-SPEC.md, 02-10-SUMMARY.md]
 started: 2026-10-17T16:45:00Z
-updated: 2026-10-17T16:45:00Z
+updated: 2026-10-17T19:00:00Z
 ---
 
 ## Current Test
@@ -11,7 +11,7 @@ updated: 2026-10-17T16:45:00Z
 number: 1
 name: "L’accueil (iPhone tenu en largeur puis en hauteur, Android, ordinateur)"
 expected: |
-  Ouvre https://toc.romaindetroyat.workers.dev. L’accueil montre le logo, « TOC » et deux grandes tuiles en chêne : « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »). À côté ou dessous, « Mes parties en cours » (« Aucune partie en cours » la première fois). Tout tient sans défiler, téléphone tenu en largeur comme en hauteur. Touche « Jouer contre l’ordinateur » : l’écran de choix de couleur s’ouvre (adresse #/ordinateur), avec un bouton « Accueil ». Puis mets l’iPhone en mode avion, rouvre l’app depuis l’écran d’accueil et lance une partie contre l’ordinateur : elle marche sans réseau.
+  Ouvre https://toc.romaindetroyat.workers.dev. L’accueil montre le logo, « TOC » et deux grandes tuiles en chêne : « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »). À côté ou dessous, « Mes parties en cours » (« Aucune partie en cours » la première fois). Tout tient sans défiler, téléphone tenu en largeur comme en hauteur. Touche « Jouer contre l’ordinateur » : l’écran de choix de couleur s’ouvre (adresse #/ordinateur), avec un bouton « Accueil ». Puis, la page déjà ouverte, mets l’iPhone en mode avion et lance une partie contre l’ordinateur : elle se joue sans réseau. Ne rouvre pas l’app à froid depuis l’écran d’accueil en mode avion : il n’y a pas encore de service worker, donc l’app ne se charge pas sans réseau. Le lancement hors ligne vient avec l’application installable, en phase 4.
 awaiting: user response
 
 ## Tests
@@ -19,7 +19,7 @@ awaiting: user response
 Tous les tests se font sur https://toc.romaindetroyat.workers.dev, sur l’iPhone tenu en largeur, sur un téléphone Android si quelqu’un de la famille en a un, et sur l’ordinateur. Pour les tests à plusieurs, il faut deux à quatre appareils (ou un appareil et des fenêtres privées sur l’ordinateur).
 
 ### 1. L’accueil (iPhone tenu en largeur puis en hauteur, Android, ordinateur)
-expected: Ouvre https://toc.romaindetroyat.workers.dev. L’accueil montre le logo, « TOC » et deux grandes tuiles en chêne : « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »). À côté ou dessous, « Mes parties en cours » (« Aucune partie en cours » la première fois). Tout tient sans défiler, téléphone tenu en largeur comme en hauteur. Touche « Jouer contre l’ordinateur » : l’écran de choix de couleur s’ouvre (adresse #/ordinateur), avec un bouton « Accueil ». Puis mets l’iPhone en mode avion, rouvre l’app depuis l’écran d’accueil et lance une partie contre l’ordinateur : elle marche sans réseau.
+expected: Ouvre https://toc.romaindetroyat.workers.dev. L’accueil montre le logo, « TOC » et deux grandes tuiles en chêne : « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »). À côté ou dessous, « Mes parties en cours » (« Aucune partie en cours » la première fois). Tout tient sans défiler, téléphone tenu en largeur comme en hauteur. Touche « Jouer contre l’ordinateur » : l’écran de choix de couleur s’ouvre (adresse #/ordinateur), avec un bouton « Accueil ». Puis, la page déjà ouverte, mets l’iPhone en mode avion et lance une partie contre l’ordinateur : elle se joue sans réseau. Ne rouvre pas l’app à froid depuis l’écran d’accueil en mode avion : il n’y a pas encore de service worker, donc l’app ne se charge pas sans réseau. Le lancement hors ligne vient avec l’application installable, en phase 4.
 result: pending
 
 ### 2. Ton prénom et la création d’une table
@@ -39,7 +39,7 @@ expected: Quatre personnes, chacune sur son appareil, prennent les quatre couleu
 result: pending
 
 ### 6. Une partie avec des places tenues par l’ordinateur
-expected: Lance une table avec une ou deux personnes et des ordinateurs, dont au moins un Champion. Pendant qu’un ordinateur réfléchit, son signe « réfléchit » respire, comme contre l’ordinateur. Il joue à un rythme naturel : vite quand il n’a qu’un coup, jusqu’à 2 secondes environ pour un coup délicat. Le jeu est sur l’offre gratuite de Cloudflare, qui limite le calcul à chaque réveil du serveur : le Champion découpe donc sa réflexion en petits morceaux. Il ne doit jamais rester bloqué : si un ordinateur « réfléchit » plus de 10 secondes, ou si la table s’arrête sans raison, note l’heure et dis-le. Attention : le 17 octobre, sur la version alors en ligne, chaque coup d’un ordinateur (Galopeur comme Champion) attendait une minute entière ; en local, c’est 3 secondes au plus. La correction est faite et sera en ligne avec cette version : vérifie que les ordinateurs ont retrouvé ce rythme naturel. Budget : une partie avec trois Champions écrit environ 15 500 lignes, soit environ 6 parties par jour dans l’offre gratuite (100 000 lignes par jour) ; avec trois Galopeurs, environ 1 375 lignes, soit environ 70 parties par jour.
+expected: Lance une table avec une ou deux personnes et des ordinateurs, dont au moins un Champion. Pendant qu’un ordinateur réfléchit, son signe « réfléchit » respire, comme contre l’ordinateur. Il joue à un rythme naturel : vite quand il n’a qu’un coup, jusqu’à 2 secondes environ pour un coup délicat. Le jeu est sur l’offre gratuite de Cloudflare, qui limite le calcul à chaque réveil du serveur : le Champion découpe donc sa réflexion en petits morceaux. Il ne doit jamais rester bloqué : si un ordinateur « réfléchit » plus de 10 secondes, ou si la table s’arrête sans raison, note l’heure et dis-le. Le 17 octobre, sur l’ancienne version en ligne, chaque coup d’un ordinateur (Galopeur comme Champion) attendait une minute entière. La correction est maintenant en ligne : après la mise en ligne, les essais de fumée sur le site ont mesuré une attente la plus longue de 2,4 à 2,8 secondes, et une sonde a mesuré des tours d’ordinateur de 0,6 à 1,3 seconde. Vérifie sur tes téléphones que ce rythme te paraît naturel. Budget : une partie avec trois Champions écrit environ 15 500 lignes, soit environ 6 parties par jour dans l’offre gratuite (100 000 lignes par jour) ; avec trois Galopeurs, environ 1 375 lignes, soit environ 70 parties par jour.
 result: pending
 
 ### 7. Personne ne voit la main d’un autre
@@ -87,7 +87,7 @@ expected: Sur l’iPhone, en pleine partie en ligne, verrouille l’écran une m
 result: pending
 
 ### 18. L’historique des parties (D1)
-expected: Chaque partie finie doit laisser une ligne anonyme dans la base D1 (prénoms, forces, équipe gagnante, durée), pour l’historique de la phase 5. La base est créée au moment de la mise en ligne si le jeton de déploiement a le droit « D1 Edit » : le compte rendu de la mise en ligne dit si c’est fait. Si elle n’existe pas encore, le jeu marche quand même, mais les parties finies d’ici là ne seront jamais enregistrées. Dans ce cas, donne le droit « D1 Edit » au jeton et demande que l’étape de création de la base soit relancée. Termine une partie, puis dis-le : on vérifie qu’une ligne a bien été écrite.
+expected: Chaque partie finie doit laisser une ligne anonyme dans la base D1 (prénoms, forces, équipe gagnante, durée), pour l’historique de la phase 5. La base « toc » existe, elle est liée au jeu en ligne et sa migration est appliquée. Aucune partie n’a encore été finie sur le site depuis : termine une partie en ligne jusqu’à la planche de fin, puis dis-le, et on vérifie qu’une ligne a bien été écrite.
 result: pending
 
 ### 19. Un 7 partagé en cinq morceaux ou plus
@@ -95,7 +95,7 @@ expected: À une table en ligne, joue un 7 en revenant sur un cavalier, par exem
 result: pending
 
 ### 20. À confirmer : l’accueil
-expected: Deux grandes tuiles en chêne, « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »), sans bouton ambre ; dessous ou à côté, « Mes parties en cours ». L’écran de choix de couleur contre l’ordinateur est à l’adresse #/ordinateur, avec un bouton « Accueil ». Ça te va ?
+expected: Deux grandes tuiles en chêne, « Jouer contre l’ordinateur » (« Sur cet appareil, même sans réseau ») et « Créer une table en ligne » (« Invite tes proches avec un lien »), sans bouton ambre ; dessous ou à côté, « Mes parties en cours ». L’écran de choix de couleur contre l’ordinateur est à l’adresse #/ordinateur, avec un bouton « Accueil ». « Même sans réseau » n’est vrai qu’une fois la page chargée, jusqu’à la phase 4 (test 1). Ça te va ?
 result: pending
 
 ### 21. À confirmer : « chef de table »
@@ -134,8 +134,8 @@ result: pending
 expected: Quand l’ordinateur joue pour Marie : « Tour de Marie (ordinateur) », « Marie (ordinateur) réfléchit… ». Ça te va ?
 result: pending
 
-### 30. À confirmer : « Avance rapide » caché en ligne
-expected: En ligne, « Avance rapide » n’apparaît pas, et le réglage choisi contre l’ordinateur ne s’applique pas : c’est le serveur qui règle le rythme des ordinateurs pour tout le monde. Sur le téléphone, sa place est prise par « Messages ». Ça te va ?
+### 30. À confirmer : « Avance rapide » pour toute la table
+expected: Depuis 02-10b, en ligne, « Avance rapide » vaut pour toute la table et c’est le serveur qui la tient. Seul le chef de table l’active ou l’enlève, dans « Réglages » (première ligne), dans la salle d’attente comme en partie. Les autres voient l’interrupteur grisé avec « Seul le chef de table, Romain, peut la changer. », une pastille sur la roue « Réglages », et un message « Romain a mis l’avance rapide. ». Le réglage choisi contre l’ordinateur sur cet appareil ne compte pas en ligne. Ça te va ?
 result: pending
 
 ### 31. À confirmer : les messages rapides
@@ -203,7 +203,7 @@ expected: Un joueur qui quitte la planche de fin, ou dont le téléphone se tait
 result: pending
 
 ### 47. À confirmer : une partie finie avant la création de la base
-expected: Une partie terminée avant que la base D1 existe n’est jamais enregistrée plus tard (test 18). Ça te va ?
+expected: La base D1 « toc » existe maintenant, liée et migrée : chaque partie finie depuis est enregistrée (test 18). Une partie terminée avant sa création n’a pas été enregistrée et ne le sera jamais. Ça te va ?
 result: pending
 
 ### 48. À confirmer : quatre bulles sur un très petit téléphone
@@ -214,12 +214,28 @@ result: pending
 expected: Dans la salle d’attente, une personne qui n’a pas encore pris de place ne voit pas le bouton « Messages » : le serveur n’accepte de messages que des joueurs assis. Ça te va ?
 result: pending
 
+### 50. « Avance rapide » pour toute la table (02-10b)
+expected: À une table avec au moins un ordinateur, le chef de table ouvre « Réglages » dans la salle d’attente et active « Avance rapide ». La salle d’attente affiche « Avance rapide pour toute la table. ». Chez les autres, un message « Romain a mis l’avance rapide. » s’affiche, une pastille apparaît sur la roue « Réglages », et dans « Réglages » l’interrupteur est grisé avec « Seul le chef de table, Romain, peut la changer. ». Lance la partie : les ordinateurs jouent presque aussitôt (au plus 0,3 seconde de réflexion après l’animation du coup précédent) et les coups vont plus vite chez tout le monde. En partie, le chef de table l’enlève : « Romain a enlevé l’avance rapide. » et la pastille disparaît. Une revanche garde le réglage. Dis si le rythme rapide te plaît.
+result: pending
+
+### 51. La main sur l’iPhone tenu en largeur (02-06b, 02-06c)
+expected: Sur l’iPhone tenu en largeur, joue quelques tours, en tenant l’encoche (ou la Dynamic Island) une fois à gauche, une fois à droite. Ta main forme une seule colonne droite : toutes les cartes ont la même taille et le même bord gauche, la carte du bas n’est plus décalée, et aucune carte ne passe sous l’encoche. La carte choisie se décale un peu vers la droite, et la carte reçue du partenaire garde sa bordure. Sur un iPhone à encoche, les cartes font environ 74 × 103 points, presque aussi grandes qu’avant. Pour leur laisser la place, le plateau est environ 3 % plus petit. Dis si les cartes et le plateau te paraissent à la bonne taille.
+result: pending
+
+### 52. Le jeton « 1er » net (02-06b)
+expected: Pendant une donne, le jeton « 1er » posé sur le bois à côté du tapis, du côté du joueur qui commence, est net : le « er » est en exposant, au-dessus et à droite du « 1 », sans le toucher ni être coupé. Regarde-le sur l’iPhone et sur l’ordinateur.
+result: pending
+
+### 53. Le logo comme icône de l’écran d’accueil (02-04b)
+expected: Sur l’iPhone, dans Safari, touche « Partager » puis « Sur l’écran d’accueil » ; sur Android, « Ajouter à l’écran d’accueil ». L’icône est ton logo et le nom est « TOC ». Sur l’ordinateur, l’onglet du navigateur montre aussi le logo, et l’accueil l’affiche à côté de « TOC ». L’app ouverte depuis l’écran d’accueil a encore besoin du réseau pour se charger (phase 4, test 1).
+result: pending
+
 ## Summary
 
-total: 49
+total: 53
 passed: 0
 issues: 0
-pending: 49
+pending: 53
 skipped: 0
 blocked: 0
 

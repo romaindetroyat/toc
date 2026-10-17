@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "« Les ordinateurs sont beaucoup trop lents quand on joue à deux joueurs humains » — 2 humans + 2 computers (Galopeur or below), production, a computer turn takes more than 15 s"
 created: 2026-10-17
 updated: 2026-10-17
@@ -11,7 +11,7 @@ hypothesis: confirmed (see reasoning_checkpoint and Resolution)
 bug_class: Bohrbug (deterministic given production's exact-time alarm delivery)
 test: production check after a deploy (this session may not deploy): `NODE_USE_ENV_PROXY=1 node probe.mjs https://toc.romaindetroyat.workers.dev bleu jaune 20 300` (scratchpad/slowbots), every computer turn should take 0.3–2 s plus the animation
 expecting: no turn on a 60 s grid any more
-next_action: Romain or the orchestrator deploys, plays 2 people + 2 Galopeurs on phones (or runs the probe) and confirms
+next_action: none (resolved, verified in production on 2026-10-17; Romain's check on real phones is UAT test 6 of 02-UAT.md)
 
 reasoning_checkpoint:
   hypothesis: "A computer's play deadline playAt is fractional; the runtime arms the alarm at floor(playAt) and production runs it with Date.now() == floor(playAt), so the tick finds playAt still ahead, does nothing, and GameRoom re-sets the same truncated time; an unchanged alarm time is no write and no request to the alarm service, so the alarm is dropped until the platform's ~60 s rescan. A computer made due « at once » inside an alarm handler (the next computer, every Champion slice) is armed at that same time too."
@@ -116,7 +116,8 @@ verification:
   gate: "pnpm typecheck OK; pnpm lint OK (282 files); vitest --project worker 11 files 33 tests passed; vitest node packages/table + packages/bots 20 files 234 tests passed"
   local_probe: "wrangler dev :8799, 2 people + 2 Galopeurs, real pace: before 1.19–3.19 s, after 0.99–2.59 s (workerd delivery never showed the bug)"
   production_probe_before: "table 0WZxsLTToEg61gGQJGFM9g: 20.3, 60.0, 60.0, 60.0, 59.2, 60.0, 59.6, 2.64, 2.21, 54.8, 59.6 s"
-  production_probe_after: "not run: needs a deploy"
-  guardrail_verdict: accepted (pending the production check)
+  production_probe_after: "run on the live site after the deploy (2026-10-17): the probe measured computer turns of 0.6–1.3 s, no turn on the 60 s grid any more"
+  production_smoke: "tools/smoke-online.mjs on https://toc.romaindetroyat.workers.dev after the deploy: longest computer wait 2.4–2.8 s across the runs"
+  guardrail_verdict: accepted (verified in production)
 files_changed: [apps/worker/src/GameRoom.ts, apps/worker/test/pace.test.ts]
 commits: [d2d0912 RED, 25f3753 GREEN]

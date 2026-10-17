@@ -27,7 +27,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **RULE-16** : Si aucune carte de la main n'est jouable, le joueur pose toute sa main face visible et attend la donne suivante.
 - [x] **RULE-17** : Un joueur dont les 4 pions sont rentrés joue ensuite avec les pions de son partenaire, qui comptent alors comme les siens pour toutes les cartes.
 - [x] **RULE-18** : L'équipe qui rentre ses 8 pions gagne la partie.
-- [ ] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
+- [x] **RULE-19** : Chaque joueur ne connaît que sa propre main ; les cartes jouées sont publiques ; le serveur n'envoie jamais à un client la main d'un autre joueur.
 - [x] **RULE-20** : Les règles sont rédigées et numérotées dans un document RULES.md validé par Romain, chaque règle illustrée par un scénario de test.
 
 ### Jouer un tour (PLAY)
@@ -38,15 +38,15 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
 - [x] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
 - [ ] **PLAY-06** : Une aide en français rappelle les règles et l'effet de chaque carte à tout moment.
-- [ ] **PLAY-07** : À la fin de la partie, l'équipe gagnante est annoncée et les joueurs peuvent relancer une revanche à la même table.
+- [x] **PLAY-07** : À la fin de la partie, l'équipe gagnante est annoncée et les joueurs peuvent relancer une revanche à la même table.
 
 ### Multijoueur en ligne (NET)
 
-- [ ] **NET-01** : Quatre joueurs sur des téléphones ou ordinateurs différents jouent la même partie en temps réel ; le serveur valide chaque coup.
-- [ ] **NET-02** : Un joueur qui recharge la page ou perd le réseau retrouve la partie dans son état exact en se reconnectant.
-- [ ] **NET-03** : Quand un humain se déconnecte, la partie se met en pause et tous les joueurs le voient.
-- [ ] **NET-04** : Après un délai, le créateur de la table choisit : attendre encore, confier la place à l'ordinateur (le joueur la récupère à son retour), ou sauvegarder la partie pour plus tard.
-- [ ] **NET-05** : Les joueurs d'une table échangent des messages rapides pendant la partie : des phrases et des émojis prêts à l'emploi, sans clavier (choix de Romain du 2026-10-17, D-07).
+- [x] **NET-01** : Quatre joueurs sur des téléphones ou ordinateurs différents jouent la même partie en temps réel ; le serveur valide chaque coup.
+- [x] **NET-02** : Un joueur qui recharge la page ou perd le réseau retrouve la partie dans son état exact en se reconnectant.
+- [x] **NET-03** : Quand un humain se déconnecte, la partie se met en pause et tous les joueurs le voient.
+- [x] **NET-04** : Après un délai, le créateur de la table choisit : attendre encore, confier la place à l'ordinateur (le joueur la récupère à son retour), ou sauvegarder la partie pour plus tard.
+- [x] **NET-05** : Les joueurs d'une table échangent des messages rapides pendant la partie : des phrases et des émojis prêts à l'emploi, sans clavier (choix de Romain du 2026-10-17, D-07).
 
 ### Comptes et amis (ACCT)
 
@@ -66,7 +66,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 
 ### Suivi (HIST)
 
-- [ ] **HIST-01** : Une partie peut être interrompue puis reprise plus tard dans l'état exact où elle était.
+- [x] **HIST-01** : Une partie peut être interrompue puis reprise plus tard dans l'état exact où elle était.
 - [ ] **HIST-02** : Un joueur consulte l'historique de ses parties (date, équipes, résultat).
 - [ ] **HIST-03** : Un joueur consulte ses statistiques et celles de ses équipes (parties, victoires, pions mangés…).
 - [ ] **HIST-04** : Un classement entre amis est affiché.
@@ -133,7 +133,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | RULE-16 | Phase 1 | Complete |
 | RULE-17 | Phase 1 | Complete |
 | RULE-18 | Phase 1 | Complete |
-| RULE-19 | Phase 2 | Pending |
+| RULE-19 | Phase 2 | Complete |
 | RULE-20 | Phase 1 | Complete |
 | PLAY-01 | Phase 1 | Complete |
 | PLAY-02 | Phase 1 | Complete |
@@ -141,12 +141,12 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | PLAY-04 | Phase 1 | Complete |
 | PLAY-05 | Phase 1 | Complete |
 | PLAY-06 | Phase 5 | Pending |
-| PLAY-07 | Phase 2 | Pending |
-| NET-01 | Phase 2 | Pending |
-| NET-02 | Phase 2 | Pending |
-| NET-03 | Phase 2 | Pending |
-| NET-04 | Phase 2 | Pending |
-| NET-05 | Phase 2 | Pending |
+| PLAY-07 | Phase 2 | Complete |
+| NET-01 | Phase 2 | Complete |
+| NET-02 | Phase 2 | Complete |
+| NET-03 | Phase 2 | Complete |
+| NET-04 | Phase 2 | Complete |
+| NET-05 | Phase 2 | Complete |
 | ACCT-01 | Phase 4 | Pending |
 | ACCT-02 | Phase 4 | Pending |
 | ACCT-03 | Phase 4 | Pending |
@@ -157,7 +157,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | BOT-03 | Phase 3 | Complete |
 | BOT-04 | Phase 3 | Complete |
 | BOT-05 | Phase 3 | Complete |
-| HIST-01 | Phase 2 | Pending |
+| HIST-01 | Phase 2 | Complete |
 | HIST-02 | Phase 5 | Pending |
 | HIST-03 | Phase 5 | Pending |
 | HIST-04 | Phase 5 | Pending |
