@@ -202,9 +202,10 @@ Plans:
   4. Le créateur de la table peut arrêter une partie à tout moment. Les joueurs la reprennent plus tard, même plusieurs jours après, dans l'état exact où elle était : mains, donne en cours, position des pions, joueur dont c'est le tour.
   5. Les joueurs d'une table discutent par chat texte pendant la partie. À la fin, l'équipe gagnante est annoncée à tous, et la table peut enchaîner une revanche avec les mêmes joueurs.
 
-**Plans:** 8/12 plans executed (the plans run one after the other on the main tree; each runs only the Playwright specs it touches; 02-01 starts with Romain's approval of the five new packages; 02-10 runs everything, plays a game between four browsers, creates the D1 database if the token allows it, deploys to https://toc.romaindetroyat.workers.dev and writes 02-UAT.md)
+**Plans:** 9/13 plans executed (the plans run one after the other on the main tree; each runs only the Playwright specs it touches; 02-01 starts with Romain's approval of the five new packages; 02-10 runs everything, plays a game between four browsers, creates the D1 database if the token allows it, deploys to https://toc.romaindetroyat.workers.dev and writes 02-UAT.md)
 
 Plans:
+- [x] 02-06c-PLAN.md
 - [x] 02-06b-PLAN.md
 - [x] 02-04b-PLAN.md
 
@@ -327,7 +328,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
-| 2. Jouer en ligne entre proches | 8/12 | In Progress | - |
+| 2. Jouer en ligne entre proches | 9/13 | In Progress | - |
 | 3. L'ordinateur à la force choisie | 11/11 | In Progress | - |
 | 4. Comptes, amis et application installable | 0/TBD | Not started | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
