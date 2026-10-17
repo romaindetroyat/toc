@@ -1,6 +1,6 @@
 // Scène 3D : relief, fonds marins, champ de vent animé, marques, parcours et routes.
 
-import * as THREE from 'three';
+import * as THREE from '../vendor/three.module.min.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { toXY, toLL } from './geo.js';
 import { speedColor } from './wind.js';

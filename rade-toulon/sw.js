@@ -5,7 +5,7 @@ const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/geo.js', 'js/wind.js', 'js/scene3d.js', 'js/courses.js', 'js/weather.js', 'js/tactics.js', 'js/polar.js', 'js/router.js', 'js/j80.js', 'js/tuning.js', 'js/polar-orc.js',
   'vendor/three.module.min.js', 'vendor/OrbitControls.js',
-  'data/meta.json', 'data/terrain.bin', 'data/cover.bin', 'data/coast.json', 'data/j80.pol',
+  'data/meta.json', 'data/terrain.bin', 'data/cover.bin', 'data/coast.json', 'data/j80.pol', 'data/wx-snapshot.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });

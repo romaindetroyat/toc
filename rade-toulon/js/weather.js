@@ -47,6 +47,11 @@ export async function fetchAll() {
 
 export const cached = () => load(KEY);
 
+// Instantané livré avec l’app (data/wx-snapshot.json) : secours sans réseau
+export async function snapshot() {
+  try { const r = await fetch('data/wx-snapshot.json'); return r.ok ? r.json() : null; } catch { return null; }
+}
+
 // Moyenne circulaire pondérée
 export function circMean(dirs, weights) {
   let s = 0, c = 0, w = 0;

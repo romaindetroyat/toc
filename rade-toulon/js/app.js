@@ -4,13 +4,18 @@ import { Terrain, toXY, toLL, NM, bearingXY, distXY, norm360, norm180, fmtBrg, f
 import { WindField, speedColor } from './wind.js';
 import { Scene3D } from './scene3d.js';
 import { MARKS, COURSES, LINE_PRESETS, FORBIDDEN_ZONE, DANGERS, IC } from './courses.js';
-import { fetchAll, cached, consensus, gridPoints, marineAt, fetchLive, MODELS, WMO, CENTER } from './weather.js';
+import { fetchAll, cached, snapshot, consensus, gridPoints, marineAt, fetchLive, MODELS, WMO, CENTER } from './weather.js';
 import { buildLegs, analyzeLeg, markAdvice, analyzeStart, trendOf, rankCourses, regimeOf, sideName, summarizeTime } from './tactics.js';
 import { optimalAngles, boatSpeed, trimAdvice, spiMinTwa, getPolar, setPolar, resetPolar, parsePolar } from './polar.js';
 import { renderJ80 } from './j80.js';
 import { shroudsFor } from './tuning.js';
 
 const $ = (s, r = document) => r.querySelector(s);
+function toast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(toast.tm); toast.tm = setTimeout(() => { t.hidden = true; }, 4500);
+}
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -45,6 +50,8 @@ async function init() {
   scene.onCamera = () => { $('#compass .needle').style.transform = `rotate(${-scene.azimuth()}deg)`; };
   bindUI();
   data = cached();
+  const snap = await snapshot();
+  if (snap && (!data || snap.fetched > data.fetched)) data = snap;
   if (data) series = consensus(data);
   updateAll();
   $('#splash').classList.add('gone');
@@ -61,6 +68,7 @@ async function refreshWeather() {
     status();
     updateAll();
   } catch (e) {
+    if (!data) { data = await snapshot(); if (data) { series = consensus(data); updateAll(); } }
     status(data ? `Hors ligne — prévisions du ${new Date(data.fetched).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}` : 'Prévisions indisponibles (réseau)');
   } finally { b.classList.remove('spin'); }
 }
@@ -72,7 +80,8 @@ function status(msg) {
   if (msg) { el.textContent = msg; return; }
   if (!data) { el.textContent = 'Pas de prévision'; return; }
   const ago = Math.round((Date.now() - data.fetched) / 60000);
-  el.textContent = `${S.src === 'manual' ? 'Vent manuel' : 'AROME HD + 5 modèles'} · màj ${ago < 1 ? 'à l’instant' : `il y a ${ago} min`}`;
+  const when = ago < 1 ? 'à l’instant' : ago < 120 ? `il y a ${ago} min` : `le ${new Date(data.fetched).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
+  el.textContent = `${S.src === 'manual' ? 'Vent manuel' : 'AROME HD + 5 modèles'} · ${data.snapshot ? 'instantané ' : 'màj '}${when}`;
 }
 
 // ───────────────────────── vent de base
@@ -413,8 +422,8 @@ function renderStart() {
   if (timer.iv) tickTimer();
 }
 function pingLine(which) {
-  if (!navigator.geolocation) return alert('GPS indisponible');
-  navigator.geolocation.getCurrentPosition((p) => setLineEnd(which, { lat: p.coords.latitude, lon: p.coords.longitude }), (e) => alert('GPS : ' + e.message), { enableHighAccuracy: true, timeout: 15000 });
+  if (!navigator.geolocation) return toast('GPS indisponible');
+  navigator.geolocation.getCurrentPosition((p) => setLineEnd(which, { lat: p.coords.latitude, lon: p.coords.longitude }), (e) => toast('GPS : ' + e.message), { enableHighAccuracy: true, timeout: 15000 });
 }
 let actx = null;
 function audioInit() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch { /* audio indisponible */ } }
@@ -445,7 +454,7 @@ function tickTimer() {
 // ───────────────────────── EN COURSE
 function startGps() {
   if (gps?.watch) return;
-  if (!navigator.geolocation) { alert('GPS indisponible sur cet appareil'); return; }
+  if (!navigator.geolocation) { toast('GPS indisponible sur cet appareil'); return; }
   gps = { watch: null, pos: null, hist: [] };
   gps.watch = navigator.geolocation.watchPosition((p) => {
     const q = { ...toXY(p.coords.latitude, p.coords.longitude), t: p.timestamp, acc: p.coords.accuracy, lat: p.coords.latitude, lon: p.coords.longitude };
@@ -542,7 +551,7 @@ function renderWind() {
   $('#fx').onchange = () => { persist(); updateDisplayField(); scheduleAnalysis(); };
   $('#obsGo').onclick = () => {
     const d = +$('#obsDir').value, s = +$('#obsSpd').value, lat = parseFloat($('#obsLat').value), lon = parseFloat($('#obsLon').value);
-    if (!(d >= 0 && d < 360) || !(s > 0) || isNaN(lat) || isNaN(lon)) return alert('Saisir direction (0–359) et force du vent observé');
+    if (!(d >= 0 && d < 360) || !(s > 0) || isNaN(lat) || isNaN(lon)) return toast('Saisir direction (0–359) et force du vent observé');
     S.calib = null; computeField(S.day, S.hour);
     const p = toXY(lat, lon), w = F.sample(p.x, p.y);
     S.calib = { ddir: norm180(d - w.dir), ratio: Math.max(0.2, Math.min(4, s / Math.max(0.5, w.spd))) };
