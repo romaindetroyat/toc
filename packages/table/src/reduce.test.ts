@@ -1,10 +1,12 @@
-import { BOT_NAMES } from "@toc/bots";
 import { eventsDuration } from "@toc/board";
+import { BOT_NAMES } from "@toc/bots";
 import {
   type Action,
+  type CardId,
   COLORS,
   type Color,
   type GameEvent,
+  type GameState,
   legalActions,
   type Rng,
   viewFor,
@@ -38,6 +40,12 @@ function run(table: Table, commands: Parameters<typeof reduce>[1][], now = 2000)
 const to = (out: Out[], who: string): ServerFrame[] =>
   out.filter((each) => each.to === who).map((each) => each.frame);
 
+/** The game of a started table. */
+function gameOf(table: Table): GameState {
+  if (table.game === null) throw new Error("no game");
+  return table.game;
+}
+
 /** Ana (creator) on bleu and Ben on jaune, in the waiting room. */
 function lobby(pace: "zero" | "normal" = "zero"): Table {
   return run(fresh(pace), [
@@ -61,10 +69,9 @@ describe("hello and seats", () => {
     ]);
     const second = reduce(first.table, { t: "hello", who: BEN, name: "Ben" }, ctx());
     expect(second.table.creator).toBe(ANA);
-    expect(to(second.out, BEN)).toMatchObject([
-      { t: "welcome", you: { seat: null, host: false } },
-    ]);
-    expect(to(second.out, ANA).map((frame) => frame.t)).toEqual(["table"]);
+    expect(to(second.out, BEN)).toMatchObject([{ t: "welcome", you: { seat: null, host: false } }]);
+    // Nothing public changed: an unseated person is not part of the public table yet.
+    expect(to(second.out, ANA)).toEqual([]);
     expect(second.table.people.map((p) => [p.who, p.seat])).toEqual([
       [ANA, null],
       [BEN, null],
@@ -78,10 +85,18 @@ describe("hello and seats", () => {
       { t: "client", who: ANA, frame: { t: "sit", seat: "bleu" } },
     ]);
     expect(table.seats.bleu).toEqual({ kind: "human", who: ANA });
-    const taken = reduce(table, { t: "client", who: BEN, frame: { t: "sit", seat: "bleu" } }, ctx());
+    const taken = reduce(
+      table,
+      { t: "client", who: BEN, frame: { t: "sit", seat: "bleu" } },
+      ctx(),
+    );
     expect(to(taken.out, BEN)).toEqual([{ t: "error", code: "seat-taken" }]);
     expect(taken.table).toEqual(table);
-    const moved = reduce(table, { t: "client", who: ANA, frame: { t: "sit", seat: "rouge" } }, ctx());
+    const moved = reduce(
+      table,
+      { t: "client", who: ANA, frame: { t: "sit", seat: "rouge" } },
+      ctx(),
+    );
     expect(moved.table.seats.bleu).toEqual({ kind: "free" });
     expect(moved.table.seats.rouge).toEqual({ kind: "human", who: ANA });
     expect(to(moved.out, ANA)).toMatchObject([{ t: "welcome", you: { seat: "rouge" } }]);
@@ -123,7 +138,11 @@ describe("start", () => {
 
   it("seats Galopeur horses on the free seats and deals each person only their own hand", () => {
     const withClo = run(lobby(), [{ t: "hello", who: CLO, name: "Clo" }]).table;
-    const { table, out, log } = reduce(withClo, { t: "client", who: ANA, frame: { t: "start" } }, ctx());
+    const { table, out, log } = reduce(
+      withClo,
+      { t: "client", who: ANA, frame: { t: "start" } },
+      ctx(),
+    );
     expect(table.status).toBe("playing");
     expect(table.gameNo).toBe(1);
     expect(table.game?.phase).toBe("exchange");
@@ -154,7 +173,7 @@ describe("start", () => {
         if (each.seat === seat) expect(each.cards).toEqual(table.game?.hands[seat]);
         else expect(each.cards).toBeNull();
       }
-      expect(frame.view).toEqual(viewFor(table.game!, seat));
+      expect(frame.view).toEqual(viewFor(gameOf(table), seat));
       expect(frames.map((f) => f.t)).toContain("table");
     }
     expect(to(out, CLO).map((frame) => frame.t)).toEqual(["table"]);
@@ -164,10 +183,14 @@ describe("start", () => {
 describe("act", () => {
   it("answers a stale base with an error and a welcome to that person only", () => {
     const { table } = started();
-    const card = table.game!.hands.bleu[0]!;
+    const card = gameOf(table).hands.bleu[0] as CardId;
     const result = reduce(
       table,
-      { t: "client", who: ANA, frame: { t: "act", base: table.seq + 5, action: { t: "give", card } } },
+      {
+        t: "client",
+        who: ANA,
+        frame: { t: "act", base: table.seq + 5, action: { t: "give", card } },
+      },
       ctx(),
     );
     expect(to(result.out, ANA)).toMatchObject([
@@ -180,11 +203,15 @@ describe("act", () => {
 
   it("refuses an illegal action and leaves the table as it was", () => {
     const { table } = started();
-    const before = structuredClone(table);
-    const notHeld = table.game!.hands.jaune[0]!;
+    const before = JSON.parse(JSON.stringify(table)) as Table;
+    const notHeld = gameOf(table).hands.jaune[0] as CardId;
     const result = reduce(
       table,
-      { t: "client", who: ANA, frame: { t: "act", base: table.seq, action: { t: "give", card: notHeld } } },
+      {
+        t: "client",
+        who: ANA,
+        frame: { t: "act", base: table.seq, action: { t: "give", card: notHeld } },
+      },
       ctx(),
     );
     expect(to(result.out, ANA)).toEqual([{ t: "error", code: "illegal" }]);
@@ -194,7 +221,7 @@ describe("act", () => {
 
   it("applies a legal action, logs it and sends each seated person their own projection", () => {
     const { table } = started();
-    const action: Action = { t: "give", card: table.game!.hands.bleu[0]! };
+    const action: Action = { t: "give", card: gameOf(table).hands.bleu[0] as CardId };
     const result = reduce(
       table,
       { t: "client", who: ANA, frame: { t: "act", base: table.seq, action } },
@@ -213,10 +240,10 @@ describe("act", () => {
         t: "events",
         seq: table.seq + 1,
         events: expect.any(Array),
-        view: viewFor(result.table.game!, seat),
+        view: viewFor(gameOf(result.table), seat),
       });
     }
-    expect(result.table.game!.given.bleu).toBe(action.card);
+    expect(gameOf(result.table).given.bleu).toBe(action.card);
   });
 
   it("refuses an act from a person without a seat", () => {
@@ -242,7 +269,7 @@ describe("computer players", () => {
     expect(ticked.table.seq).toBe(table.seq + 1);
     // The first bot in COLORS order whose give is missing: rouge.
     expect(ticked.log).toMatchObject([{ seat: "rouge", action: { t: "give" } }]);
-    expect(ticked.table.game!.given.rouge).not.toBeNull();
+    expect(gameOf(ticked.table).given.rouge).not.toBeNull();
     expect(to(ticked.out, ANA).filter((f) => f.t === "events")).toHaveLength(1);
   });
 
@@ -267,13 +294,13 @@ describe("computer players", () => {
     let { table } = started();
     const humans: Record<string, Color> = { [ANA]: "bleu", [BEN]: "jaune" };
     let now = 2000;
-    for (let step = 0; step < 5000 && table.game!.phase !== "won"; step++) {
+    for (let step = 0; step < 5000 && gameOf(table).phase !== "won"; step++) {
       now += 1;
       if (table.deadlines.bot !== undefined) {
         table = reduce(table, { t: "tick" }, ctx(now)).table;
         continue;
       }
-      const game = table.game!;
+      const game = gameOf(table);
       const who = Object.keys(humans).find((w) => {
         const seat = humans[w] as Color;
         return game.phase === "exchange" ? game.given[seat] === null : game.turn === seat;
@@ -289,7 +316,7 @@ describe("computer players", () => {
       expect(result.table.seq).toBe(table.seq + 1);
       table = result.table;
     }
-    expect(table.game!.phase).toBe("won");
+    expect(gameOf(table).phase).toBe("won");
     expect(table.deadlines.bot).toBeUndefined();
     expect(COLORS.every((c) => table.seats[c].kind !== "free")).toBe(true);
   });

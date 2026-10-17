@@ -73,7 +73,8 @@ export async function connect(id: string, headers: Record<string, string> = {}):
       for (let attempt = 0; attempt < 2000; attempt++) {
         while (cursor < frames.length) {
           const frame = frames[cursor++] as ServerFrame;
-          if (frame.t === t && (where === undefined || where(frame as never))) return frame as never;
+          if (frame.t === t && (where === undefined || where(frame as never)))
+            return frame as never;
         }
         await new Promise<void>((resolve) => {
           wake = resolve;

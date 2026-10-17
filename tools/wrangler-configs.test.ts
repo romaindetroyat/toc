@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /** JSONC to a value: comments outside strings are dropped, trailing commas are not used here. */
-export function parseJsonc(text: string): unknown {
+function parseJsonc(text: string): unknown {
   let out = "";
   let inString = false;
   for (let i = 0; i < text.length; i++) {

@@ -42,6 +42,7 @@
   import type { DebugParams } from "../game/debugParams.ts";
   import { game as copy } from "../i18n/fr/game.ts";
   import {
+    type ControllerFactory,
     createSession,
     loadDebugParams,
     type Session,
@@ -63,6 +64,17 @@
   import ShortcutsSheet from "../ui/ShortcutsSheet.svelte";
   import TapisSheet from "../ui/TapisSheet.svelte";
   import { showToast } from "../ui/toast.svelte.ts";
+
+  type Props = {
+    /**
+     * An online table (#/table/<id>): the server's controller and the seat it gave this device, which
+     * turns the board to that seat. Online there is no « Abandonner la partie » (plan 02-07 adds the
+     * online stop and leave) and the end plank's buttons lead to the home (plan 02-09: « Revanche »).
+     */
+    online?: { makeController: ControllerFactory; seat: Color };
+  };
+
+  let { online }: Props = $props();
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -319,7 +331,7 @@
     missed = false;
     await tick();
     if (!alive || mine !== epoch) return;
-    const created = createSession(env, debug, colour);
+    const created = createSession(env, debug, colour, online?.makeController);
     session = created;
     // The pawns must be mounted before the first bot can move.
     await tick();
@@ -330,7 +342,9 @@
     guarded(
       (async () => {
         opened = await loadDebugParams(location.hash);
-        if (alive) await begin(opened);
+        // Online the server holds the game: only the test speed of the debug parameters applies.
+        if (online !== undefined) opened = { vitesse: opened.vitesse };
+        if (alive) await begin(opened, online?.seat);
       })(),
     );
     return () => {
@@ -342,11 +356,27 @@
 
   /** « Rejouer »: a new game with the same colour (and the same speed under test). */
   function replay() {
+    if (online !== undefined) {
+      leave();
+      return;
+    }
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
   }
 
   /** « Changer de couleur »: back to the launch screen. */
   function changeColour() {
+    if (online !== undefined) {
+      leave();
+      return;
+    }
+    location.hash = "#/";
+  }
+
+  /** Online, both buttons of the end plank lead home for now (plan 02-09 gives them their own words). */
+  function leave() {
+    epoch++;
+    session?.dispose();
+    session = undefined;
     location.hash = "#/";
   }
 
@@ -794,7 +824,7 @@
             names={session.names}
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
-            onabandon={abandon}
+            onabandon={online === undefined ? abandon : undefined}
           />
         </div>
 
@@ -802,7 +832,7 @@
           <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
-              <SettingsButton onabandon={abandon} />
+              <SettingsButton onabandon={online === undefined ? abandon : undefined} />
             </div>
             {@render zone("fast")}
           </div>

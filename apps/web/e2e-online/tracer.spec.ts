@@ -1,6 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { exchange, playSimpleMove, snapshot, zone } from "../e2e/jouer.ts";
-import { createTable, join, knightPlaces, newDevice, seatTile } from "./online.ts";
+import {
+  createTable,
+  deviceOptions,
+  join,
+  knightPlaces,
+  seatTile,
+  tablePicture,
+} from "./online.ts";
 
 // The phase-2 tracer (02-01): two browsers open the same table link, each types a first name, takes a
 // colour (Bleu, Jaune), the creator starts, the server deals, and a move played in one browser shows
@@ -57,8 +64,9 @@ test("two browsers join one table by its link and each sees the other's move", a
 }, testInfo) => {
   test.setTimeout(120_000);
   const id = await createTable(request, { pace: "zero" });
-  const anaDevice = await newDevice(browser, testInfo);
-  const benDevice = await newDevice(browser, testInfo);
+  // Two browsers, each with its own storage: two devices.
+  const anaDevice = await browser.newContext(deviceOptions(testInfo));
+  const benDevice = await browser.newContext(deviceOptions(testInfo));
   const ana = await anaDevice.newPage();
   const ben = await benDevice.newPage();
 
@@ -99,28 +107,27 @@ test("two browsers join one table by its link and each sees the other's move", a
     if (mover === null) await ana.waitForTimeout(50);
   }
   if (mover === null) throw new Error("no human turn came");
-  const before = await knightPlaces(mover);
+  const before = await tablePicture(mover);
   await playOneMove(mover);
 
-  // Both screens settle on the same knights, and the move is on them.
-  let settled: Record<string, string> = {};
+  // Both screens settle on the same table (knights and felt), and the move is on it: a knight moved,
+  // or a card was played or a dead hand posed on the felt.
   await expect
     .poll(
       async () => {
-        const [a, b] = [await knightPlaces(ana), await knightPlaces(ben)];
-        settled = a;
-        return JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(before);
+        const [a, b] = [await tablePicture(ana), await tablePicture(ben)];
+        return a === b && a !== before;
       },
       { timeout: 20_000 },
     )
     .toBe(true);
-  expect(Object.keys(settled)).toHaveLength(16);
+  expect(Object.keys(await knightPlaces(ana))).toHaveLength(16);
 
   // Neither page shows a card of the other's hand: each hand comes from its own view.
   const handOf = (page: Page) =>
-    page.locator("[data-hand] [data-card]").evaluateAll((cards) =>
-      cards.map((card) => card.getAttribute("data-card")),
-    );
+    page
+      .locator("[data-hand] [data-card]")
+      .evaluateAll((cards) => cards.map((card) => card.getAttribute("data-card")));
   const [anaHand, benHand] = [await handOf(ana), await handOf(ben)];
   expect(anaHand.filter((card) => benHand.includes(card))).toEqual([]);
 

@@ -1,7 +1,6 @@
 import {
   type APIRequestContext,
-  type Browser,
-  type BrowserContext,
+  type BrowserContextOptions,
   expect,
   type Page,
   type TestInfo,
@@ -22,18 +21,11 @@ export async function createTable(
   return id;
 }
 
-/** A new browser (its own storage, so its own device) with the project's device settings. */
-export function newDevice(browser: Browser, testInfo: TestInfo): Promise<BrowserContext> {
+/** The project's device settings, for a new browser context (its own storage, so its own device). */
+export function deviceOptions(testInfo: TestInfo): BrowserContextOptions {
   const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, baseURL } =
     testInfo.project.use;
-  return browser.newContext({
-    viewport,
-    userAgent,
-    deviceScaleFactor,
-    isMobile,
-    hasTouch,
-    baseURL,
-  });
+  return { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, baseURL };
 }
 
 export const seatTile = (page: Page, couleur: string) =>
@@ -50,14 +42,34 @@ export async function join(page: Page, id: string, name: string): Promise<void> 
   await expect(seatTile(page, "bleu")).toBeVisible();
 }
 
-/** Where every knight stands, by its logical place (the same on every screen, whatever its turn). */
+/**
+ * Where every knight stands, by its logical place (the same on every screen, whatever its turn), in
+ * knight order: each board draws its knights in its own front-to-back order.
+ */
 export function knightPlaces(page: Page): Promise<Record<string, string>> {
   return page.evaluate(() =>
     Object.fromEntries(
-      [...document.querySelectorAll("[data-pawn]")].map((knight) => [
-        knight.getAttribute("data-pawn") ?? "",
-        knight.getAttribute("data-place") ?? "",
-      ]),
+      [...document.querySelectorAll("[data-pawn]")]
+        .map((knight) => [
+          knight.getAttribute("data-pawn") ?? "",
+          knight.getAttribute("data-place") ?? "",
+        ])
+        .sort(([a], [b]) => (a as string).localeCompare(b as string)),
     ),
   );
+}
+
+/** What the felt shows: the face-up cards (played, posed) and the size of the discard pile. */
+export function feltCards(page: Page): Promise<{ cards: string[]; discard: string | null }> {
+  return page.evaluate(() => ({
+    cards: [...document.querySelectorAll("[data-felt-card]")]
+      .map((card) => card.getAttribute("data-felt-card") ?? "")
+      .sort(),
+    discard: document.querySelector("[data-discard]")?.getAttribute("data-discard") ?? null,
+  }));
+}
+
+/** The whole table as one comparable text: the knights and the felt. */
+export async function tablePicture(page: Page): Promise<string> {
+  return JSON.stringify({ knights: await knightPlaces(page), felt: await feltCards(page) });
 }

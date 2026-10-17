@@ -25,6 +25,8 @@ import { createDirector, type DirectorDeps, type DirectorMode } from "./director
 import {
   botSeedFrom,
   createGame,
+  type GameController,
+  type GameDirector,
   type GameStats,
   humanSeat,
   type Speed,
@@ -52,6 +54,14 @@ export type SessionEnv = Pick<DirectorDeps, "animator" | "facingOf" | "commit" |
    */
   hold?: () => Promise<void>;
 };
+
+/**
+ * Builds the controller of an online game (net/remoteGame.ts) from the session's Director. The online
+ * table passes it; the local game (D-09) leaves it out and createGame runs as before.
+ */
+export type ControllerFactory = (
+  director: GameDirector & { reset(view: PlayerView): void },
+) => GameController & { onRefused?(listener: () => void): () => void };
 
 /** What a bot just played: its seat and the events of its play (the action zone words them). */
 export type BotPlay = { seat: Color; events: GameEvent[] };
@@ -121,6 +131,7 @@ export function createSession(
   env: SessionEnv,
   debug: DebugParams = {},
   colour: Color = settings.lastColor,
+  makeController?: ControllerFactory,
 ): Session {
   const scenario = debug.etat ?? debug.scenario?.before;
   const human = humanSeat(colour, scenario);
@@ -155,22 +166,28 @@ export function createSession(
       await env.hold?.();
     },
   };
-  const controller = createGame({
-    human,
-    seed: debug.graine,
-    botSeed: debug.graine === undefined ? undefined : botSeedFrom(debug.graine),
-    speed: (): Speed => (testSpeed ? "test" : settings.fast ? "fast" : "normal"),
-    // A debug scenario's human is its turn seat: the roles are read from that seat.
-    levels: levelsByColour(settings.botLevels, human),
-    scenario,
-    director: watched,
-    // The Champion searches in slices that let the page breathe, within the cap of the speed; the
-    // controller's clock and the runner's are the same (performance.now, the controller's default).
-    runner: createInlineRunner({
-      now: () => performance.now(),
-      isHidden: () => document.hidden,
-    }),
-  });
+  const controller: ReturnType<ControllerFactory> = makeController
+    ? makeController({ ...watched, reset: (view) => director.reset(view) })
+    : createLocal();
+
+  function createLocal(): GameController {
+    return createGame({
+      human,
+      seed: debug.graine,
+      botSeed: debug.graine === undefined ? undefined : botSeedFrom(debug.graine),
+      speed: (): Speed => (testSpeed ? "test" : settings.fast ? "fast" : "normal"),
+      // A debug scenario's human is its turn seat: the roles are read from that seat.
+      levels: levelsByColour(settings.botLevels, human),
+      scenario,
+      director: watched,
+      // The Champion searches in slices that let the page breathe, within the cap of the speed; the
+      // controller's clock and the runner's are the same (performance.now, the controller's default).
+      runner: createInlineRunner({
+        now: () => performance.now(),
+        isHidden: () => document.hidden,
+      }),
+    });
+  }
 
   let view = $state.raw<PlayerView>(controller.view());
   let render = $state.raw<RenderState | null>(null);
@@ -205,6 +222,14 @@ export function createSession(
 
   controller.onError((error) => {
     if (!disposed) failure = { error };
+  });
+
+  // Online, the server refuses an illegal act after submit() has answered: worded exactly like a
+  // refused local move (nothing changed, the interaction starts again from the view).
+  controller.onRefused?.(() => {
+    if (disposed) return;
+    hint = "illegal";
+    ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
   });
 
   controller.onChange(() => {

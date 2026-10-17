@@ -19,7 +19,10 @@ describe("parseClientFrame", () => {
       ok: true,
       frame: { t: "hello", v: 1, token: TOKEN, name: "Ana" },
     });
-    expect(ok({ t: "sit", seat: "jaune" })).toEqual({ ok: true, frame: { t: "sit", seat: "jaune" } });
+    expect(ok({ t: "sit", seat: "jaune" })).toEqual({
+      ok: true,
+      frame: { t: "sit", seat: "jaune" },
+    });
     expect(ok({ t: "start" })).toEqual({ ok: true, frame: { t: "start" } });
     expect(ok({ t: "act", base: 0, action: { t: "discard" } }).ok).toBe(true);
   });
@@ -84,8 +87,16 @@ describe("parseClientFrame", () => {
           plan: [1, 1, 1, 1, 3].map((steps, i) => ({ pawn: `bleu${i % 4}`, steps })),
         },
       },
-      { t: "act", base: 0, action: { t: "seven", card: "7H", plan: [{ pawn: "bleu0", steps: 8 }] } },
-      { t: "act", base: 0, action: { t: "seven", card: "7H", plan: [{ pawn: "bleu0", steps: 0 }] } },
+      {
+        t: "act",
+        base: 0,
+        action: { t: "seven", card: "7H", plan: [{ pawn: "bleu0", steps: 8 }] },
+      },
+      {
+        t: "act",
+        base: 0,
+        action: { t: "seven", card: "7H", plan: [{ pawn: "bleu0", steps: 0 }] },
+      },
       { t: "act", base: 0, action: { t: "seven", card: "7H", plan: [] } },
       null,
       [],
@@ -110,9 +121,9 @@ describe("parseClientFrame", () => {
 describe("normalizeName", () => {
   it("trims, collapses spaces and applies NFC", () => {
     expect(normalizeName("  Ana ")).toBe("Ana");
-    expect(normalizeName("Zoé")).toBe("Zoé");
+    expect(normalizeName("Zoe\u0301")).toBe("Zoé");
     expect(normalizeName("Ana\u0000\u0007 Lou")).toBe("Ana Lou");
-    expect(normalizeName("Ana‮iram")).toBe("Anairam");
+    expect(normalizeName("Ana\u202Eiram")).toBe("Anairam");
   });
 
   it("refuses empty names and names longer than 20 code points", () => {
@@ -133,6 +144,9 @@ describe("ids", () => {
     expect(isTableId(`${id}x`)).toBe(false);
     expect(isTableId("../../etc/passwd/xxxxx")).toBe(false);
     expect(toBase64Url(new Uint8Array(32))).toHaveLength(43);
+    // Same as the standard encoding with the URL alphabet and no padding.
+    const bytes = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255, 62, 63]);
+    expect(toBase64Url(bytes)).toBe("AAEC-vv8_f7_Pj8");
   });
 
   it("keeps distinct close codes for the three endings", () => {
@@ -154,7 +168,13 @@ describe("parseServerFrame", () => {
   it("reads the four server frames", () => {
     expect(
       parseServerFrame(
-        JSON.stringify({ t: "welcome", you: { seat: null, host: true }, table, view: null, seq: 0 }),
+        JSON.stringify({
+          t: "welcome",
+          you: { seat: null, host: true },
+          table,
+          view: null,
+          seq: 0,
+        }),
       )?.t,
     ).toBe("welcome");
     expect(parseServerFrame(JSON.stringify({ t: "table", table }))?.t).toBe("table");
@@ -172,8 +192,12 @@ describe("parseServerFrame", () => {
     expect(parseServerFrame("nope")).toBeNull();
     expect(parseServerFrame(JSON.stringify({ t: "error", code: "boom" }))).toBeNull();
     expect(
-      parseServerFrame(JSON.stringify({ t: "events", seq: 1, events: [], view: { kind: "state" } })),
+      parseServerFrame(
+        JSON.stringify({ t: "events", seq: 1, events: [], view: { kind: "state" } }),
+      ),
     ).toBeNull();
-    expect(parseServerFrame(JSON.stringify({ t: "table", table: { ...table, host: "violet" } }))).toBeNull();
+    expect(
+      parseServerFrame(JSON.stringify({ t: "table", table: { ...table, host: "violet" } })),
+    ).toBeNull();
   });
 });

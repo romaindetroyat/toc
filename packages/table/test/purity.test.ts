@@ -54,7 +54,9 @@ function stripComments(text: string): string {
 
 function violations(file: string, text: string): string[] {
   const code = stripComments(text);
-  return FORBIDDEN.filter(({ pattern }) => pattern.test(code)).map(({ label }) => `${file}: ${label}`);
+  return FORBIDDEN.filter(({ pattern }) => pattern.test(code)).map(
+    ({ label }) => `${file}: ${label}`,
+  );
 }
 
 describe("table core purity (it runs inside the Durable Object, which owns the clock and I/O)", () => {
@@ -84,8 +86,8 @@ describe("table core purity (it runs inside the Durable Object, which owns the c
     ]) {
       expect(violations("bad.ts", line), line).toHaveLength(1);
     }
-    expect(violations("ok.ts", "// Date.now() in a comment\nconst a = Math.floor(ctx.now);")).toEqual(
-      [],
-    );
+    expect(
+      violations("ok.ts", "// Date.now() in a comment\nconst a = Math.floor(ctx.now);"),
+    ).toEqual([]);
   });
 });

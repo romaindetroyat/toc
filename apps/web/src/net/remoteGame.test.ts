@@ -1,18 +1,13 @@
 import {
   type Action,
+  type CardId,
   type Color,
   type GameEvent,
   newGame,
   type PlayerView,
   viewFor,
 } from "@toc/engine";
-import type {
-  ClientFrame,
-  EventsFrame,
-  ServerFrame,
-  TablePublic,
-  You,
-} from "@toc/protocol";
+import type { ClientFrame, EventsFrame, ServerFrame, TablePublic, You } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import { createRemoteGame, type RemoteConnection, type StartBatch } from "./remoteGame.ts";
 
@@ -88,7 +83,7 @@ describe("createRemoteGame", () => {
   it("sends act with the current seq as base and answers ok at once", () => {
     const connection = fakeConnection({ seq: 7 });
     const game = createRemoteGame(connection, fakeDirector());
-    const action: Action = { t: "give", card: STATE.hands.jaune[0]! };
+    const action: Action = { t: "give", card: STATE.hands.jaune[0] as CardId };
     expect(game.submit(action)).toEqual({ ok: true });
     expect(connection.sent).toEqual([{ t: "act", base: 7, action }]);
   });

@@ -37,6 +37,7 @@ export {
   seatStreams,
   type TeamStats,
 } from "./match.ts";
+export { BOT_NAMES, type BotName } from "./names.ts";
 export { randomLegal } from "./randomLegal.ts";
 export {
   chooseAction,

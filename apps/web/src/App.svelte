@@ -4,6 +4,7 @@
   import Game from "./routes/Game.svelte";
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
+  import Table from "./routes/Table.svelte";
   import Toast from "./ui/Toast.svelte";
 
   /** Debug builds only (route #/panne): an error thrown while the screen is drawn, to see the error screen. */
@@ -24,7 +25,10 @@
 
   let hash = $state(location.hash);
   // The hash may carry a query (#/partie?debug=geometry): the route is what precedes the "?".
-  const route = $derived(hash.split("?")[0]);
+  const route = $derived(hash.split("?")[0] ?? "");
+  /** An online table's link: #/table/<id> (the id is checked by the route). */
+  const TABLE_PREFIX = "#/table/";
+  const tableId = $derived(route.startsWith(TABLE_PREFIX) ? route.slice(TABLE_PREFIX.length) : null);
 
   $effect(() => {
     const onHashChange = () => {
@@ -42,6 +46,10 @@
 <svelte:boundary onerror={(error) => console.error(error)}>
   {#if route === "#/partie"}
     <Game />
+  {:else if tableId !== null}
+    {#key tableId}
+      <Table id={tableId} />
+    {/key}
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}

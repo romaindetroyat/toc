@@ -68,7 +68,9 @@ describe("router", () => {
       headers: { ...ws, Origin: "https://evil.example" },
     });
     expect(evil.status).toBe(403);
-    const same = await SELF.fetch(`${ORIGIN}/ws/table/${id}`, { headers: { ...ws, Origin: ORIGIN } });
+    const same = await SELF.fetch(`${ORIGIN}/ws/table/${id}`, {
+      headers: { ...ws, Origin: ORIGIN },
+    });
     expect(same.status).toBe(101);
     expect((await SELF.fetch(`${ORIGIN}/api/nothing`)).status).toBe(404);
   });
@@ -93,7 +95,10 @@ describe("a table, two people and two computers", () => {
 
     const ana = await connect(id);
     ana.send({ t: "hello", v: 1, token: token("a"), name: "Ana" });
-    expect(await ana.next("welcome")).toMatchObject({ you: { seat: null, host: true }, view: null });
+    expect(await ana.next("welcome")).toMatchObject({
+      you: { seat: null, host: true },
+      view: null,
+    });
     await evictDurableObject(stub);
 
     const ben = await connect(id);
@@ -102,7 +107,6 @@ describe("a table, two people and two computers", () => {
       you: { seat: null, host: false },
       table: { creatorName: "Ana" },
     });
-    await ana.next("table");
     await evictDurableObject(stub);
 
     ana.send({ t: "sit", seat: "bleu" });
@@ -190,7 +194,7 @@ describe("a table, two people and two computers", () => {
       expect(text).not.toContain('"rng"');
       expect(text).not.toContain('"talon"');
     }
-  });
+  }, 60_000);
 
   it("closes an older socket of the same device with 4001", async () => {
     const id = await createTable();

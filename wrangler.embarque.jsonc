@@ -1,7 +1,8 @@
 {
   // Variante de wrangler.jsonc pour les environnements où l'envoi des ressources statiques
   // est bloqué (conteneur cloud derrière un proxy qui remplace le jeton d'envoi).
-  // Même Worker « toc », mais les fichiers du build sont embarqués dans le script.
+  // Même Worker « toc », mais les fichiers du build sont embarqués dans le script ; le point
+  // d'entrée essaie d'abord le serveur de apps/worker (/api/*, /ws/*, la table de jeu).
   //   pnpm --filter @toc/web build && node tools/build-embedded-worker.mjs
   //   wrangler deploy -c wrangler.embarque.jsonc
   "$schema": "./node_modules/wrangler/config-schema.json",
@@ -12,5 +13,9 @@
   "rules": [
     { "type": "Text", "globs": ["**/dist/**/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
     { "type": "Data", "globs": ["**/*.png", "**/*.webp", "**/*.woff2", "**/*.ico", "**/*.mp3", "**/*.m4a", "**/*.ogg", "**/*.wav"], "fallthrough": false }
-  ]
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
 }

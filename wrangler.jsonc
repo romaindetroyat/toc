@@ -1,11 +1,21 @@
 {
   // TOC en ligne : Worker avec ressources statiques (pas Pages).
   // Construire d'abord : pnpm --filter @toc/web build
+  // Le Worker (apps/worker) répond à /api/* et /ws/* ; le reste est l'application construite.
+  // Les blocs durable_objects et migrations sont identiques dans wrangler.embarque.jsonc
+  // (tools/wrangler-configs.test.ts le vérifie).
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "toc",
+  "main": "./apps/worker/src/index.ts",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./apps/web/dist",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
 }
