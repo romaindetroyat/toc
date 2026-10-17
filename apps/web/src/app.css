@@ -69,6 +69,11 @@
   --seat-jaune: #ffff00;
   --seat-rouge: #d40100;
   --seat-vert: #019c01;
+  /* Light tints of the seats (the board's PALETTE.light), readable on bois sombre: the thinking ring. */
+  --seat-bleu-clair: #5c86d4;
+  --seat-jaune-clair: #f7d35a;
+  --seat-rouge-clair: #ee6b5e;
+  --seat-vert-clair: #5cc27a;
   --pawn-bleu: #1a22e0;
   --pawn-jaune: #f5d000;
   --pawn-rouge: #d40100;
@@ -254,22 +259,36 @@ button {
 }
 
 /*
- * The thinking sign (03-UI-SPEC « Thinking sign », D-12): while a computer player thinks, its sign
- * breathes. A glyph swells to 1.12 and fades to 0.7 and back over 1.6 s; a text only fades. It starts
- * at rest and stops at once (no transition): transform and opacity only, no layout shift, never amber.
- * With reduced motion (the in-app switch, class « still » on the component root, or the system's
- * prefers-reduced-motion) nothing moves and a fixed « … » (.respire-mark) follows the name instead.
+ * The thinking sign (03-UI-SPEC « Thinking sign », D-12; made more visible by 03-09 after Romain's
+ * « Pas assez visible », 2026-10-17): while a computer player thinks, its sign breathes. A glyph
+ * swells to 1.22 and back over 1.6 s, wearing a ring in its seat colour (--respire-seat, a light tint
+ * readable on bois sombre) that glows from 55 % to full and grows a little with the breath; a text
+ * only fades to 0.7. It starts at rest and stops at once (no transition): transform and opacity only,
+ * no layout shift, never amber. With reduced motion (the in-app switch, class « still » on the
+ * component root, or the system's prefers-reduced-motion) nothing moves: the ring stays steady and a
+ * fixed « … » (.respire-mark) follows the name.
  */
 @keyframes respire {
   0%,
   100% {
     transform: scale(1);
-    opacity: 1;
   }
 
   50% {
-    transform: scale(1.12);
-    opacity: 0.7;
+    transform: scale(1.22);
+  }
+}
+
+@keyframes respire-halo {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
   }
 }
 
@@ -285,8 +304,21 @@ button {
 }
 
 .respire {
+  position: relative;
   animation: respire 1600ms ease-in-out infinite;
   transform-origin: center;
+}
+
+/* The ring: --respire-inset outside the glyph, a 2 px line and a soft glow of the seat colour. */
+.respire::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--respire-inset, 4px));
+  border: 2px solid var(--respire-seat, var(--creme));
+  border-radius: 999px;
+  box-shadow: 0 0 8px 2px var(--respire-seat, var(--creme));
+  pointer-events: none;
+  animation: respire-halo 1600ms ease-in-out infinite;
 }
 
 .respire-texte {
@@ -302,8 +334,13 @@ button {
 }
 
 .still .respire,
-.still .respire-texte {
+.still .respire-texte,
+.still .respire::before {
   animation: none;
+}
+
+.still .respire::before {
+  opacity: 0.9;
 }
 
 .still .respire-mark {
@@ -312,8 +349,13 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .respire,
-  .respire-texte {
+  .respire-texte,
+  .respire::before {
     animation: none;
+  }
+
+  .respire::before {
+    opacity: 0.9;
   }
 
   .respire-mark {

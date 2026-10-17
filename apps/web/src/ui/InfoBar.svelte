@@ -47,8 +47,9 @@
   const ownTurn = $derived(playing && render.turn === human);
   const turnName = $derived(names[render.turn]);
   /**
-   * The thinking sign (D-12, 03-UI-SPEC « Thinking sign »): the turn row breathes while the computer
-   * player whose turn it shows is thinking. Never on the human.
+   * The thinking sign (D-12, 03-UI-SPEC « Thinking sign », 03-09): the turn row's glyph breathes in a
+   * ring of its seat colour while the computer player whose turn it shows is thinking. Never on the
+   * human.
    */
   const breathing = $derived(
     playing && thinking !== null && thinking !== human && thinking === render.turn,
@@ -90,15 +91,18 @@
     bind:this={pill}
     onclick={() => (infoOpen = true)}
   >
-    <span
-      class="pill-turn"
-      class:respire={breathing}
-      data-thinking={breathing ? render.turn : undefined}
-      aria-hidden="true"
-    >
+    <span class="pill-turn" aria-hidden="true">
       <span class="dot" class:own={ownTurn}></span>
       {#if playing}
-        <SeatChip color={render.turn} showName={false} small />
+        <!-- The glyph chip breathes in its ring (the dot stays still, so the swell fits the pill). -->
+        <span
+          class="pill-glyph"
+          class:respire={breathing}
+          data-thinking={breathing ? render.turn : undefined}
+          style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
+        >
+          <SeatChip color={render.turn} showName={false} small />
+        </span>
       {/if}
       {#if breathing}
         <span class="respire-mark">…</span>
@@ -134,6 +138,7 @@
             class="glyph"
             class:respire={breathing}
             data-thinking={breathing ? render.turn : undefined}
+            style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
           >
             <SeatChip color={render.turn} showName={false} small />
           </span>
@@ -249,6 +254,8 @@
   .glyph {
     flex: none;
     display: inline-flex;
+    /* Room for the thinking ring (4 px out, swelling with the breath) clear of the dot and the text. */
+    margin: 0 6px;
   }
 
   .dot {
@@ -339,6 +346,13 @@
   .pill-turn :global(.chip.small svg) {
     width: 12px;
     height: 12px;
+  }
+
+  /* The pill's glyph chip in its own box, its ring 2 px out (the pill is only 44 px high). */
+  .pill-glyph {
+    flex: none;
+    display: inline-flex;
+    --respire-inset: 2px;
   }
 
   .pill-turn .dot {

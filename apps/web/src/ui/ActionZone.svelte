@@ -19,6 +19,7 @@
   import Icon from "./Icon.svelte";
   import KeyHint from "./KeyHint.svelte";
   import PawnTray from "./PawnTray.svelte";
+  import SeatChip from "./SeatChip.svelte";
 
   type Props = {
     ui: TurnUiState;
@@ -195,6 +196,15 @@
   });
   const rowText = $derived(rowLines.join(" "));
 
+  /**
+   * The line « {Nom} réfléchit… » while a computer player thinks, if shown: it starts with that
+   * seat's glyph breathing in its ring (plan 03-09, « Pas assez visible »), on the computer's action
+   * zone and in the phone's prompt row. The glyph is decorative: the line already names the seat.
+   */
+  const thinkingLine = $derived(
+    thinking !== null && thinking !== human ? game.bot.thinking(names[thinking]) : null,
+  );
+
   // One key per displayed state, so the zone cross-fades (150 ms, none under reduced motion).
   const key = $derived(`${ui.kind}|${hint ?? ""}|${missed}|${thinking ?? ""}|${lines.join("/")}`);
   const fadeMs = $derived(settings.reduceMotion ? 0 : 150);
@@ -312,17 +322,32 @@
   {/if}
 {/snippet}
 
+{#snippet thinkingGlyph()}
+  {#if thinking !== null}
+    <span
+      class="thinking-glyph respire"
+      data-thinking-line={thinking}
+      style:--respire-seat={`var(--seat-${thinking}-clair)`}
+      aria-hidden="true"
+    >
+      <SeatChip color={thinking} showName={false} label={false} small />
+    </span>
+  {/if}
+{/snippet}
+
 {#snippet givingList()}
   <ul class="givers" data-givers>
     {#each givers as giver (giver.color)}
       {@const breathing = !giver.done && giver.color === thinking}
-      <!-- The thinking sign (D-12): the computer player choosing its card breathes, its hourglass
-           swelling and its name fading; with reduced motion a fixed « … » follows the name. -->
-      <li data-giver={giver.color} data-done={giver.done}>
+      <!-- The thinking sign (D-12, 03-09): the computer player choosing its card breathes, its
+           hourglass swelling in a ring of its seat colour and its name fading; with reduced motion the
+           ring stays still and a fixed « … » follows the name. -->
+      <li data-giver={giver.color} data-done={giver.done} class:thinking={breathing}>
         <span
           class="giver-icon"
           class:respire={breathing}
           data-thinking={breathing ? giver.color : undefined}
+          style:--respire-seat={breathing ? `var(--seat-${giver.color}-clair)` : undefined}
         >
           <Icon name={giver.done ? "check" : "hourglass"} size={16} />
         </span>
@@ -380,6 +405,10 @@
             <p class="spoken">{rowText}</p>
             {@render givingList()}
           {:else if rowLines.length > 0}
+            <!-- The glyph stands before the line, outside it: the line clips its overflow. -->
+            {#if thinkingLine !== null && rowLines.includes(thinkingLine)}
+              {@render thinkingGlyph()}
+            {/if}
             <p class="line" title={rowText} data-prompt-line>
               {#each rowLines as line, i (i)}{#if i > 0}{" "}{/if}<span class:prompt={i === 0}
                   >{line}</span
@@ -388,10 +417,17 @@
           {/if}
         {:else}
           {#if lines.length > 0}
-            <div class="text">
-              {#each lines as line, i (i)}
-                <p class:prompt={i === 0}>{line}</p>
-              {/each}
+            <!-- While a bot thinks, its glyph stands at the left of the text, outside it: the text
+                 scrolls past three lines and would clip the glyph's ring. -->
+            <div class="said">
+              {#if thinkingLine !== null && lines.includes(thinkingLine)}
+                {@render thinkingGlyph()}
+              {/if}
+              <div class="text">
+                {#each lines as line, i (i)}
+                  <p class:prompt={i === 0}>{line}</p>
+                {/each}
+              </div>
             </div>
           {/if}
 
@@ -482,14 +518,37 @@
     line-height: var(--label-line);
   }
 
-  .givers li[data-done="true"] {
+  .givers li[data-done="true"],
+  .givers li.thinking {
     color: var(--creme);
+  }
+
+  /* The text, with the thinking glyph at its left while a bot thinks. */
+  .said {
+    flex: 1 1 140px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .said .text {
+    flex: 1 1 auto;
+  }
+
+  /* The glyph before « {Nom} réfléchit… », breathing in its ring, 6 px clear of its neighbours. */
+  .thinking-glyph {
+    flex: none;
+    display: inline-flex;
+    margin-left: 6px;
   }
 
   /* The giver's icon in its own box, so that it can breathe about its centre. */
   .giver-icon {
     flex: none;
     display: inline-flex;
+    /* Room for the thinking ring (4 px out, swelling with the breath) clear of the name. */
+    margin: 0 4px;
   }
 
   .buttons {
@@ -574,6 +633,16 @@
   }
 
   /* Three lines of Body 16 (24 px each), then the text scrolls inside. */
+  .bar .said {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  /* The bar's column clips at its edge: the ring and its glow need 16 px there. */
+  .bar .thinking-glyph {
+    margin-left: 16px;
+  }
+
   .bar .text {
     flex: 0 1 auto;
     min-height: 0;
@@ -582,8 +651,10 @@
     overscroll-behavior: contain;
   }
 
+  /* Indented so that the thinking ring and its glow stay inside the action column, which clips. */
   .bar .givers {
     flex: none;
+    padding-left: 12px;
   }
 
   .bar .buttons {
@@ -631,6 +702,11 @@
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .row .thinking-glyph {
+    margin: 0 4px 0 0;
+    --respire-inset: 2px;
   }
 
   .row .line .prompt {
