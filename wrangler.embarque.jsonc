@@ -21,5 +21,8 @@
   "durable_objects": {
     "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "toc", "database_id": "a5700309-470a-469c-a76a-d3e0c5774335", "migrations_dir": "apps/worker/migrations" }
+  ]
 }
