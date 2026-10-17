@@ -723,12 +723,20 @@
     white-space: nowrap;
   }
 
+  /* The list clips what does not fit; its 8 px padding, cancelled by as much negative margin, keeps
+     the thinking ring and its glow inside the clip without moving the list. */
   .row .givers {
     flex: 0 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
+    margin: -8px;
+    padding: 8px;
     overflow: hidden;
     gap: 0 var(--space-md);
+  }
+
+  .row .giver-icon {
+    --respire-inset: 2px;
   }
 
   .row .givers li {
