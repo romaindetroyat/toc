@@ -90,3 +90,7 @@ The game is already published at https://toc.romaindetroyat.workers.dev (Worker 
 ## Package approval (2026-10-17)
 
 Romain approved the packages of 02-01 Task 1 (AskUserQuestion « Pour le jeu en ligne, j'ai besoin d'ajouter 5 outils libres… Tu valides leur installation ? » → « Oui, les 5 (Recommandé) »): wrangler 4.151.1, @cloudflare/vitest-plugin 1.4.4, zod 4.6.7, partysocket 1.3.0, uqr 0.1.3 — exact pinned versions.
+
+## Free-plan budget (2026-10-17, after 02-03)
+
+02-03 measured the sliced Champion at about 15 500 rows written per game with three Champions (≈ 6 games a day on the Free plan's 100 000 rows/day) and about 1 375 rows per game with three Galopeurs (≈ 70 a day). Asked whether to pay 5 $/month, stay free, or keep the Champion local only, Romain chose « Rester en gratuit, ça suffit ». Keep the slicing (SLICE_UNITS = 5); no further change.
