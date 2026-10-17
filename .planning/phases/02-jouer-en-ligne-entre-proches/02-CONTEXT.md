@@ -86,3 +86,7 @@ The game is already published at https://toc.romaindetroyat.workers.dev (Worker 
 - **D-12:** Late arrivals cannot take a computer seat once the game has started. Romain: « Non ». Only the seat's own device (or the host-approved reclaim of one's own seat, see research pitfall on in-app browsers) gets back in.
 - **D-13:** Quick messages: « Bien joué ! », « Aïe ! », « Merci partenaire », « À toi ! », « Pardon… », « On y est presque », « Bravo ! », « 😂 », plus emoji reactions 👏 😮 🐴 ❤️. Romain: « Ajoute des émojis ».
 - **D-14:** HIST-01 uses a D1 database; Romain will give the deploy token the « D1 Edit » permission (« Je donne le droit au jeton »). Creating the database is a deploy step done from this environment once the permission exists; if it is missing at execution time, keep the D1 binding optional and report it.
+
+## Package approval (2026-10-17)
+
+Romain approved the packages of 02-01 Task 1 (AskUserQuestion « Pour le jeu en ligne, j'ai besoin d'ajouter 5 outils libres… Tu valides leur installation ? » → « Oui, les 5 (Recommandé) »): wrangler 4.151.1, @cloudflare/vitest-plugin 1.4.4, zod 4.6.7, partysocket 1.3.0, uqr 0.1.3 — exact pinned versions.
