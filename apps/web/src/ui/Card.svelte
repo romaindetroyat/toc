@@ -178,12 +178,11 @@
     font-size: var(--index-suit, var(--body-size));
   }
 
-  /* Centred on the part of the card that is on the screen (--cut: what runs past its left edge) and,
-     in the phone's corner hand, under the slice of a card the next one covers (--middle-top), so a
-     slice shows its index alone. */
+  /* Centred on the card and, in the phone's corner hand, under the slice of a card the next one covers
+     (--middle-top), so a slice shows its index alone. */
   .middle {
     position: absolute;
-    inset: var(--middle-top, 0px) 0 0 var(--cut, 0px);
+    inset: var(--middle-top, 0px) 0 0;
     display: flex;
     flex-direction: column;
     align-items: center;
