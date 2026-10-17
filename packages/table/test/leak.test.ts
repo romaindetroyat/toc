@@ -374,13 +374,13 @@ function playOne(config: {
       } else if (kind === 4) {
         run({ t: "client", who: person.who, frame: { t: "sit", seat: "vert" } });
       } else {
-        run({ t: "tick" });
+        run({ t: "tick", retry: false });
       }
       continue;
     }
     // Progress: the computer due plays, else the human due acts (after coming back if away).
     if (dueBot(table) !== null) {
-      run({ t: "tick" });
+      run({ t: "tick", retry: false });
       seen.botTicks += 1;
       continue;
     }

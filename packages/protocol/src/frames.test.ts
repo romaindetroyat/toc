@@ -6,6 +6,7 @@ import {
   MAX_FRAME_CHARS,
   PROTOCOL_VERSION,
   parseClientFrame,
+  parseCreateTestOptions,
   parseServerFrame,
 } from "./frames.ts";
 import { isTableId, normalizeName, toBase64Url } from "./names.ts";
@@ -199,5 +200,27 @@ describe("parseServerFrame", () => {
     expect(
       parseServerFrame(JSON.stringify({ t: "table", table: { ...table, host: "violet" } })),
     ).toBeNull();
+  });
+});
+
+describe("the test options of a creation body", () => {
+  it("accepts a pace and per-colour levels 1 to 5, nothing else", () => {
+    expect(parseCreateTestOptions({ test: { pace: "zero" } })).toEqual({ pace: "zero" });
+    expect(
+      parseCreateTestOptions({ test: { pace: "normal", levels: { jaune: 5, rouge: 3, vert: 4 } } }),
+    ).toEqual({ pace: "normal", levels: { jaune: 5, rouge: 3, vert: 4 } });
+    for (const test of [
+      undefined,
+      null,
+      { pace: "fast" },
+      { pace: "zero", levels: { jaune: 6 } },
+      { pace: "zero", levels: { jaune: "5" } },
+      { pace: "zero", levels: { violet: 3 } },
+      { pace: "zero", extra: 1 },
+    ]) {
+      expect(parseCreateTestOptions({ test }), JSON.stringify(test)).toBeNull();
+    }
+    expect(parseCreateTestOptions(null)).toBeNull();
+    expect(parseCreateTestOptions("x")).toBeNull();
   });
 });

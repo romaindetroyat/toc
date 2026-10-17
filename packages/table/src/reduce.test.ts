@@ -263,9 +263,9 @@ describe("computer players", () => {
     const { table } = started();
     expect(table.deadlines.bot).toEqual({ at: 2000, seq: table.seq });
     expect(nextDeadline(table)).toBe(2000);
-    const early = reduce(table, { t: "tick" }, ctx(1999));
+    const early = reduce(table, { t: "tick", retry: false }, ctx(1999));
     expect(early.table).toBe(table);
-    const ticked = reduce(table, { t: "tick" }, ctx(2000));
+    const ticked = reduce(table, { t: "tick", retry: false }, ctx(2000));
     expect(ticked.table.seq).toBe(table.seq + 1);
     // The first bot in COLORS order whose give is missing: rouge.
     expect(ticked.log).toMatchObject([{ seat: "rouge", action: { t: "give" } }]);
@@ -273,17 +273,21 @@ describe("computer players", () => {
     expect(to(ticked.out, ANA).filter((f) => f.t === "events")).toHaveLength(1);
   });
 
-  it("waits for the animation of the last batch under the normal pace", () => {
+  it("decides at once and plays after the animation of the last batch under the normal pace", () => {
     const { table, log } = started("normal");
     const deal = log[0]?.events as GameEvent[];
     expect(eventsDuration(deal, "normal")).toBeGreaterThan(0);
-    expect(table.deadlines.bot?.at).toBe(2000 + eventsDuration(deal, "normal"));
+    // Decide first (plan 02-03): the decision is due at once, the play once the deal is animated.
+    expect(table.deadlines.bot?.at).toBe(2000);
+    const decided = reduce(table, { t: "tick", retry: false }, ctx(2000)).table;
+    expect(decided.seq).toBe(table.seq);
+    expect(decided.deadlines.bot?.at).toBeGreaterThanOrEqual(2000 + eventsDuration(deal, "normal"));
   });
 
   it("does nothing on a tick for a stale seq", () => {
     const { table } = started();
     const stale: Table = { ...table, deadlines: { bot: { at: 0, seq: table.seq - 1 } } };
-    const result = reduce(stale, { t: "tick" }, ctx());
+    const result = reduce(stale, { t: "tick", retry: false }, ctx());
     expect(result.table.game).toEqual(stale.game);
     expect(result.table.seq).toBe(stale.seq);
     expect(result.out).toEqual([]);
@@ -297,7 +301,7 @@ describe("computer players", () => {
     for (let step = 0; step < 5000 && gameOf(table).phase !== "won"; step++) {
       now += 1;
       if (table.deadlines.bot !== undefined) {
-        table = reduce(table, { t: "tick" }, ctx(now)).table;
+        table = reduce(table, { t: "tick", retry: false }, ctx(now)).table;
         continue;
       }
       const game = gameOf(table);
