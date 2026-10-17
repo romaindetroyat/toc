@@ -24,6 +24,18 @@ export type Seat =
   | { kind: "human"; who: string; handedOver?: BotLevel | null }
   | { kind: "bot"; name: string };
 
+/**
+ * A table with no activity for this long is deleted by its own alarm (D-06): 30 days. Activity is a
+ * person's hello or any of their frames the table accepted; never an alarm or a socket closing.
+ */
+export const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * A pending reclaim of a seat (plan 02-07, D-12): the person without a seat who asked, the first
+ * name they typed, when. One per seat; dropped when the seat's person comes back or the host answers.
+ */
+export type Reclaim = { who: string; name: string; since: number };
+
 /** Test-only options, honoured only when the Worker runs with TOC_TEST_MODE=1 (T-02-07). */
 export type TestOptions = {
   /** `zero`: the computer players act at once instead of waiting for the animations. */
@@ -99,13 +111,17 @@ export type Table = {
   /**
    * The table's deadlines, one alarm for all (02-RESEARCH Pattern 3): when the computer player due
    * must next be ticked (decide, a slice, or play) for `seq`; when the pause's minute is over; when
-   * the silent sockets are next swept (presence.ts).
+   * the silent sockets are next swept (presence.ts); when the 30 idle days may be over (expire: not
+   * moved by each activity, re-armed when it fires early, plan 02-07).
    */
   deadlines: {
     bot?: { at: number; seq: number };
     pauseChoice?: { at: number };
     sweep?: { at: number };
+    expire?: { at: number };
   };
+  /** The pending reclaims by seat (plan 02-07); server-only: `who` never leaves the table. */
+  reclaims: Partial<Record<Color, Reclaim>>;
   /** The pause while the status is "paused"; else null. */
   pause: Pause | null;
   /** The computer player due and its decision, or null (its seat is TablePublic.thinking). */
@@ -142,7 +158,8 @@ export function createTable(options: {
     seq: 0,
     gameNo: 0,
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
-    deadlines: {},
+    deadlines: { expire: { at: options.now + EXPIRY_MS } },
+    reclaims: {},
     pause: null,
     thinking: null,
     test: options.test ?? null,
@@ -152,9 +169,12 @@ export function createTable(options: {
 /** A deep copy: the table is plain JSON (it is stored as such), so the reducer never edits its input. */
 export function copyTable(table: Table): Table {
   const copy = JSON.parse(JSON.stringify(table)) as Table;
-  // A snapshot written before plan 02-03 has no pending think, before plan 02-06 no pause.
+  // A snapshot written before plan 02-03 has no pending think, before plan 02-06 no pause, before
+  // plan 02-07 no reclaims and no expiry.
   copy.thinking ??= null;
   copy.pause ??= null;
+  copy.reclaims ??= {};
+  copy.deadlines.expire ??= { at: copy.lastActivity + EXPIRY_MS };
   return copy;
 }
 
@@ -164,8 +184,8 @@ export function personOf(table: Table, who: string): Person | undefined {
 
 /** The earliest deadline of the table, or null: the Durable Object arms its one alarm at it. */
 export function nextDeadline(table: Table): number | null {
-  const { bot, pauseChoice, sweep } = table.deadlines;
-  const times = [bot?.at, pauseChoice?.at, sweep?.at].filter(
+  const { bot, pauseChoice, sweep, expire } = table.deadlines;
+  const times = [bot?.at, pauseChoice?.at, sweep?.at, expire?.at].filter(
     (at): at is number => at !== undefined,
   );
   return times.length === 0 ? null : Math.min(...times);

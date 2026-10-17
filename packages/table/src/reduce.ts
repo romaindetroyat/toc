@@ -6,6 +6,10 @@
 //
 // The engine's apply() is the only judge of a move (NET-01): the seat comes from the person, never from
 // the frame, and a base that is not the table's seq is refused as stale (Pitfall 3).
+//
+// Plan 02-07: activity (lastActivity, the 30-day clock of EXPIRY_MS) is a hello or a client frame
+// that changed the table, set here once for all; a tick (a computer's move included) or a socket gone
+// is not. A tick past the idle days answers `purge`: the Durable Object then deletes everything.
 
 import { BOT_NAMES, type BotLevel, parseBotLevel } from "@toc/bots";
 import {
@@ -29,6 +33,8 @@ import type {
   LevelFrame,
   MoveFrame,
   PauseFrame,
+  ReclaimAnswerFrame,
+  ReclaimFrame,
   ServerFrame,
 } from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
@@ -36,11 +42,13 @@ import { eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts
 import {
   applyChoice,
   hostOf,
+  onExpireDue,
   onGone,
   onHello,
   onPauseChoiceDue,
   resume as resumeGame,
   SWEEP_MS,
+  stopGame,
   wantsSweep,
 } from "./presence.ts";
 import { copyTable, personOf, type Table } from "./table.ts";
@@ -77,7 +85,11 @@ export type LogEntry = {
   bot?: BotInfo;
 };
 
-export type Reduced = { table: Table; out: Out[]; log: LogEntry[] };
+/**
+ * `purge`: the table has been idle for EXPIRY_MS; the Durable Object deletes its whole storage and
+ * closes every socket with CLOSE_GONE (plan 02-07, D-06). `table` is then the unchanged input.
+ */
+export type Reduced = { table: Table; out: Out[]; log: LogEntry[]; purge?: true };
 
 const unchanged = (table: Table): Reduced => ({ table, out: [], log: [] });
 
@@ -110,7 +122,6 @@ function commitPlay(
 ): Reduced {
   next.game = played.state;
   next.seq += 1;
-  next.lastActivity = now;
   scheduleBot(next, played.events, now);
   const out: Out[] = [];
   for (const person of next.people) {
@@ -139,17 +150,20 @@ function hello(table: Table, who: string, name: string, now: number): Reduced {
     person.name = name;
     person.online = true;
   }
-  next.lastActivity = now;
   // Back at the table: the pause may end, a handed-over seat is theirs again (plan 02-06).
   const { regained } = onHello(next, who, now);
-  return {
-    table: next,
-    out: [
-      { to: who, frame: welcomeFor(next, who, now, regained) },
-      ...publicChanges(table, next, new Set([who]), now),
-    ],
-    log: [],
-  };
+  const out: Out[] = [
+    { to: who, frame: welcomeFor(next, who, now, regained) },
+    ...publicChanges(table, next, new Set([who]), now),
+  ];
+  // The seat's own person is back: a reclaim of it is void (plan 02-07).
+  const seat = personOf(next, who)?.seat ?? null;
+  const asked = seat === null ? undefined : next.reclaims[seat];
+  if (seat !== null && asked !== undefined) {
+    delete next.reclaims[seat];
+    out.push({ to: asked.who, frame: { t: "reclaimResult", accepted: false } });
+  }
+  return { table: next, out, log: [] };
 }
 
 function gone(table: Table, who: string, now: number): Reduced {
@@ -167,7 +181,6 @@ function gone(table: Table, who: string, now: number): Reduced {
  * changed), a table frame to every other person online when the public table changed.
  */
 function lobbyChange(before: Table, next: Table, now: number): Reduced {
-  next.lastActivity = now;
   const moved = new Set<string>();
   for (const person of next.people) {
     const was = personOf(before, person.who)?.seat ?? null;
@@ -249,19 +262,26 @@ function level(table: Table, who: string, frame: LevelFrame, now: number): Reduc
   if (table.levels[frame.seat] === value) return unchanged(table);
   const next = copyTable(table);
   next.levels[frame.seat] = value;
-  next.lastActivity = now;
   return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
 }
 
 /**
- * « Quitter la table » in the waiting room: the seat is freed and the person goes. The creator's record
- * stays (unseated, offline) so the role and the name come back with them (plan 02-06 adds the
- * hand-over). Once the game runs only someone without a seat may go this way (02-07 adds the rest).
+ * « Quitter la table ». In the waiting room the seat is freed and the person goes; the creator's record
+ * stays (unseated, offline) so the role and the name come back with them. Once the game has started a
+ * seated person keeps the seat and goes offline: the game pauses for the others as when a socket
+ * closes, and the same link brings them back (plan 02-07; the client then closes its socket).
  */
 function leave(table: Table, who: string, now: number): Reduced {
   const person = personOf(table, who);
   if (person === undefined) return unchanged(table);
-  if (table.status !== "lobby" && person.seat !== null) return refuse(table, who, "started");
+  if (table.status !== "lobby" && person.seat !== null) {
+    if (!person.online) return unchanged(table);
+    const away = copyTable(table);
+    const self = personOf(away, who);
+    if (self !== undefined) self.online = false;
+    onGone(away, who, now);
+    return { table: away, out: publicChanges(table, away, new Set([who]), now), log: [] };
+  }
   const next = copyTable(table);
   if (person.seat !== null) next.seats[person.seat] = { kind: "free" };
   if (who === next.creator) {
@@ -273,7 +293,6 @@ function leave(table: Table, who: string, now: number): Reduced {
   } else {
     next.people = next.people.filter((each) => each.who !== who);
   }
-  next.lastActivity = now;
   return { table: next, out: publicChanges(table, next, new Set([who]), now), log: [] };
 }
 
@@ -335,7 +354,6 @@ function pause(table: Table, who: string, frame: PauseFrame, now: number): Reduc
   if (level === null) return refuse(table, who, "bad-frame");
   const next = copyTable(table);
   applyChoice(next, frame.choice, level, now);
-  next.lastActivity = now;
   return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
 }
 
@@ -345,8 +363,100 @@ function resume(table: Table, who: string, now: number): Reduced {
   if (hostOf(table) !== who) return refuse(table, who, "not-host");
   const next = copyTable(table);
   resumeGame(next, now);
-  next.lastActivity = now;
   return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
+}
+
+/**
+ * « Arrêter la partie » (SC4): the host saves a running or paused game at any moment, in any phase
+ * (not a won one, whose next step is the rematch).
+ */
+function stop(table: Table, who: string, now: number): Reduced {
+  const running = table.status === "playing" || table.status === "paused";
+  if (!running || table.game === null || table.game.phase === "won") {
+    return refuse(table, who, "refused");
+  }
+  if (hostOf(table) !== who) return refuse(table, who, "not-host");
+  const next = copyTable(table);
+  stopGame(next, now);
+  return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
+}
+
+const noReclaim = (table: Table, who: string): Reduced => ({
+  table,
+  out: [{ to: who, frame: { t: "reclaimResult", accepted: false } }],
+  log: [],
+});
+
+/**
+ * « C’est moi, {Nom} » (D-12, T-02-28): someone without a seat asks for a started table's seat whose
+ * person is offline. Only one pending request per seat and per asker, and only when there is a host
+ * to ask; the host alone receives it, with the first name the asker typed. Anything else is answered
+ * at once with reclaimResult { accepted: false }.
+ */
+function reclaim(table: Table, who: string, frame: ReclaimFrame, now: number): Reduced {
+  const person = personOf(table, who);
+  const seat = table.seats[frame.seat];
+  const host = hostOf(table);
+  if (
+    person === undefined ||
+    table.status === "lobby" ||
+    person.seat !== null ||
+    seat.kind !== "human" ||
+    personOf(table, seat.who)?.online === true ||
+    table.reclaims[frame.seat] !== undefined ||
+    Object.values(table.reclaims).some((each) => each?.who === who) ||
+    host === null
+  ) {
+    return noReclaim(table, who);
+  }
+  const next = copyTable(table);
+  next.reclaims[frame.seat] = { who, name: person.name, since: now };
+  return {
+    table: next,
+    out: [{ to: host, frame: { t: "reclaimRequest", seat: frame.seat, name: person.name } }],
+    log: [],
+  };
+}
+
+/**
+ * The host's answer to a pending reclaim. Accepted (and the seat's person still offline): the asker
+ * holds the seat, the old person is forgotten (their token no longer opens it), the creator's role
+ * follows the creator's seat, and the asker gets the welcome on it (regained when the computer was
+ * playing it). Refused: the asker alone reads reclaimResult { accepted: false }.
+ */
+function reclaimAnswer(table: Table, who: string, frame: ReclaimAnswerFrame, now: number): Reduced {
+  if (hostOf(table) !== who) return refuse(table, who, "not-host");
+  const asked = table.reclaims[frame.seat];
+  if (asked === undefined) return refuse(table, who, "refused");
+  const next = copyTable(table);
+  delete next.reclaims[frame.seat];
+  const asker = personOf(next, asked.who);
+  const seat = next.seats[frame.seat];
+  if (
+    !frame.accept ||
+    asker === undefined ||
+    asker.seat !== null ||
+    seat.kind !== "human" ||
+    personOf(next, seat.who)?.online === true
+  ) {
+    return noReclaim(next, asked.who);
+  }
+  const old = seat.who;
+  next.seats[frame.seat] = { kind: "human", who: asked.who, handedOver: seat.handedOver ?? null };
+  asker.seat = frame.seat;
+  next.people = next.people.filter((each) => each.who !== old);
+  if (next.creator === old) next.creator = asked.who;
+  // The asker is at the table now: the pause may end, a handed-over seat is theirs (onHello).
+  const { regained } = asker.online ? onHello(next, asked.who, now) : { regained: false };
+  return {
+    table: next,
+    out: [
+      { to: asked.who, frame: { t: "reclaimResult", accepted: true } },
+      { to: asked.who, frame: welcomeFor(next, asked.who, now, regained) },
+      ...publicChanges(table, next, new Set([asked.who]), now),
+    ],
+    log: [],
+  };
 }
 
 /**
@@ -356,15 +466,17 @@ function resume(table: Table, who: string, now: number): Reduced {
  */
 function tick(table: Table, now: number, retry: boolean): Reduced {
   let base = table;
-  const { sweep, pauseChoice } = table.deadlines;
-  if (
-    (sweep !== undefined && now >= sweep.at) ||
-    (pauseChoice !== undefined && now >= pauseChoice.at)
-  ) {
-    base = copyTable(table);
-    if (sweep !== undefined && now >= sweep.at) base.deadlines.sweep = { at: now + SWEEP_MS };
-    if (pauseChoice !== undefined && now >= pauseChoice.at) onPauseChoiceDue(base, now);
+  const edit = (): Table => {
+    if (base === table) base = copyTable(table);
+    return base;
+  };
+  const { sweep, pauseChoice, expire } = table.deadlines;
+  // EXPIRY_MS idle: the whole table goes (D-06); fired early, the deadline moves (Pattern 3).
+  if (expire !== undefined && now >= expire.at && onExpireDue(edit(), now)) {
+    return { table, out: [], log: [], purge: true };
   }
+  if (sweep !== undefined && now >= sweep.at) edit().deadlines.sweep = { at: now + SWEEP_MS };
+  if (pauseChoice !== undefined && now >= pauseChoice.at) onPauseChoiceDue(edit(), now);
   const played = botTick(base, now, retry);
   if (played.table !== base) return played;
   if (base === table) return unchanged(table);
@@ -400,11 +512,36 @@ function botTick(table: Table, now: number, retry: boolean): Reduced {
 }
 
 /**
+ * The pending reclaims, sent again to the host when the host changed (D-05) or when the host said
+ * hello (a reload, another tab): the dialog « Rendre sa place à … ? » follows the chef de table.
+ */
+function reclaimsForHost(before: Table, result: Reduced, command: Command): Out[] {
+  const host = hostOf(result.table);
+  if (host === null) return [];
+  const hello = command.t === "hello" && command.who === host;
+  if (!hello && hostOf(before) === host) return [];
+  const out: Out[] = [];
+  for (const [seat, asked] of Object.entries(result.table.reclaims)) {
+    if (asked === undefined) continue;
+    const frame: ServerFrame = { t: "reclaimRequest", seat: seat as Color, name: asked.name };
+    out.push({ to: host, frame });
+  }
+  return out;
+}
+
+/**
  * One command of the Durable Object. After it, the sweep deadline is armed while a game runs or waits
- * with a seated person online, and removed otherwise (presence.ts).
+ * with a seated person online, and removed otherwise (presence.ts); a hello or a client frame that
+ * changed the table is activity (EXPIRY_MS counts from it).
  */
 export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
-  const result = route(table, command, ctx);
+  let result = route(table, command, ctx);
+  if (result.purge === true) return result;
+  if (result.table !== table && (command.t === "hello" || command.t === "client")) {
+    result.table.lastActivity = ctx.now;
+  }
+  const again = reclaimsForHost(table, result, command);
+  if (again.length > 0) result = { ...result, out: [...result.out, ...again] };
   const wanted = wantsSweep(result.table);
   const armed = result.table.deadlines.sweep !== undefined;
   if (wanted === armed) return result;
@@ -444,6 +581,12 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
           return pause(table, command.who, frame, ctx.now);
         case "resume":
           return resume(table, command.who, ctx.now);
+        case "stop":
+          return stop(table, command.who, ctx.now);
+        case "reclaim":
+          return reclaim(table, command.who, frame, ctx.now);
+        case "reclaimAnswer":
+          return reclaimAnswer(table, command.who, frame, ctx.now);
       }
     }
   }

@@ -32,5 +32,7 @@ export function summary(table: Table): TableSummary {
     seats,
     gameNo: table.gameNo,
     updatedAt: table.lastActivity,
+    // The seats a paused game waits for (« En pause : on t’attend », plan 02-07).
+    missing: table.status === "paused" && table.pause !== null ? [...table.pause.missing] : [],
   };
 }

@@ -21,12 +21,16 @@
 // - The sweep deadline wakes the Durable Object every SWEEP_MS while a game runs or waits with a
 //   seated person online, so silent sockets are found (the object closes them; its tick here only
 //   re-arms itself).
+// - Stop (plan 02-07, SC4): the host saves a running or paused game at any moment, in any phase.
+// - Expiry (plan 02-07, D-06; 02-RESEARCH Pattern 3): the expire deadline is not moved by each
+//   activity. When it fires before lastActivity + EXPIRY_MS it is re-armed at that time; at or after
+//   it the table is purged (the Durable Object deletes its whole storage and closes every socket).
 
 import type { BotLevel } from "@toc/bots";
 import { COLORS, type Color, nextColor } from "@toc/engine";
 import type { PauseChoice } from "@toc/protocol";
 import { scheduleBot } from "./bots.ts";
-import { personOf, type Table } from "./table.ts";
+import { EXPIRY_MS, personOf, type Table } from "./table.ts";
 
 /** The pause's minute before the host may choose (D-04). */
 export const PAUSE_MS = 60_000;
@@ -188,6 +192,22 @@ export function resume(table: Table, now: number): void {
   const missing = COLORS.filter((color) => missingSeat(table, color));
   if (missing.length === 0) play(table, now);
   else startPause(table, missing, now);
+}
+
+/** « Arrêter la partie » (the reducer checked the host and that a game runs or is paused). */
+export function stopGame(table: Table, now: number): void {
+  save(table, now);
+}
+
+/**
+ * The expire deadline is due: true when the table has been idle for EXPIRY_MS (it must be purged);
+ * else the deadline moves to lastActivity + EXPIRY_MS and false.
+ */
+export function onExpireDue(table: Table, now: number): boolean {
+  const end = table.lastActivity + EXPIRY_MS;
+  if (now >= end) return true;
+  table.deadlines.expire = { at: end };
+  return false;
 }
 
 /** Whether the sweep deadline should be armed: a game runs or waits with a seated person online. */

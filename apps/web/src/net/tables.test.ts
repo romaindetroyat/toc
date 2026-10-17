@@ -149,6 +149,7 @@ function summaryWith(
     seats: { bleu: free, jaune: free, rouge: free, vert: free, ...seats },
     gameNo: 0,
     updatedAt: 0,
+    missing: [],
   };
 }
 

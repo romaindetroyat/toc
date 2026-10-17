@@ -14,6 +14,11 @@
 // whose last sign of life (that timestamp, else its hello) is older than SILENCE_MS, and runs `gone`
 // for its person when no other socket of theirs is open; the table keeps a sweep deadline every
 // SWEEP_MS while a game runs or waits, so such an alarm comes.
+//
+// Expiry (plan 02-07, D-06): the table is created with an expire deadline 30 days on. When a tick
+// answers `purge` (30 days without activity), the object closes every socket with CLOSE_GONE and
+// calls ctx.storage.deleteAll(), which also removes the alarm (compatibility date ≥ 2026-02-24); later
+// requests find no table (4004, 404).
 
 import { DurableObject } from "cloudflare:workers";
 import type { Rng } from "@toc/engine";
@@ -89,6 +94,8 @@ export class GameRoom extends DurableObject<Env> {
     });
     commit(sql, table, [], Date.now());
     this.cached = table;
+    // The 30-day expiry is the first deadline of every table.
+    this.arm(nextDeadline(table));
     return true;
   }
 
@@ -167,7 +174,7 @@ export class GameRoom extends DurableObject<Env> {
     this.sweepSilent(Date.now());
     // A retry follows a failed invocation (over the Free plan's CPU limit, for instance): a computer
     // decision still pending is then made at level 1, so the table never freezes (D-11).
-    this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
+    await this.run({ t: "tick", retry: alarmInfo?.isRetry === true });
   }
 
   /**
@@ -216,12 +223,16 @@ export class GameRoom extends DurableObject<Env> {
     return this.cached;
   }
 
-  /** reduce → commit (synchronous SQL) → per-person sends → the alarm at the next deadline. */
-  private run(command: Command): void {
+  /**
+   * reduce → commit (synchronous SQL) → per-person sends → the alarm at the next deadline. A purge
+   * (only from a tick) returns the deletion's promise, which the alarm awaits.
+   */
+  private run(command: Command): Promise<void> | undefined {
     const table = this.table();
     if (table === null) return;
     const now = Date.now();
     const result = reduce(table, command, { now, seed: randomSeed });
+    if (result.purge === true) return this.purge();
     if (result.table !== table) {
       commit(this.ctx.storage.sql, result.table, result.log, now);
       this.cached = result.table;
@@ -235,6 +246,24 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
     this.arm(nextDeadline(result.table));
+  }
+
+  /**
+   * 30 days without activity: every socket is closed with CLOSE_GONE (its close handler finds no
+   * person), then the whole storage goes, the alarm with it. Nothing is cached any more.
+   */
+  private async purge(): Promise<void> {
+    this.cached = null;
+    this.armed = null;
+    for (const ws of this.ctx.getWebSockets()) {
+      ws.serializeAttachment({ who: null, helloAt: 0 } satisfies Attachment);
+      try {
+        ws.close(CLOSE_GONE, "table effacée");
+      } catch {
+        // Already closing.
+      }
+    }
+    await this.ctx.storage.deleteAll();
   }
 
   private send(ws: WebSocket, frame: ServerFrame): void {

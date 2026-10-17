@@ -300,9 +300,7 @@ describe("the 30-day expiry (D-06)", () => {
     expect(late.purge).toBe(true);
     expect(late.out).toEqual([]);
     // Exactly 30 days is the end.
-    expect(reduce(early.table, { t: "tick", retry: false }, ctx(DAY + EXPIRY_MS)).purge).toBe(
-      true,
-    );
+    expect(reduce(early.table, { t: "tick", retry: false }, ctx(DAY + EXPIRY_MS)).purge).toBe(true);
   });
 
   it("pushes the date back with any activity before it", () => {

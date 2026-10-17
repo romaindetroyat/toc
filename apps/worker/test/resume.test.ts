@@ -182,9 +182,7 @@ describe("the 30-day expiry (D-06)", () => {
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     expect(await ana.closed).toEqual({ code: CLOSE_GONE });
     const left = await runInDurableObject(stub, (_room, state) => ({
-      tables: state.storage.sql
-        .exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_cf_%'")
-        .toArray(),
+      tables: state.storage.sql.exec("SELECT name FROM sqlite_master").toArray(),
       alarm: state.storage.getAlarm(),
     }));
     expect(left.tables).toEqual([]);

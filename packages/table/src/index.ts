@@ -11,6 +11,7 @@ export {
   applyChoice,
   HANDOVER_LEVEL,
   hostOf,
+  onExpireDue,
   onGone,
   onHello,
   onPauseChoiceDue,
@@ -19,6 +20,7 @@ export {
   resume,
   SILENCE_MS,
   SWEEP_MS,
+  stopGame,
   wantsSweep,
 } from "./presence.ts";
 export {
@@ -35,10 +37,12 @@ export {
   computerLevel,
   createTable,
   dueBot,
+  EXPIRY_MS,
   nextDeadline,
   type Pause,
   type PendingThink,
   type Person,
+  type Reclaim,
   type Seat,
   type Table,
   type TestOptions,

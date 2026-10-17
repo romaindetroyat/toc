@@ -15,6 +15,7 @@ const SUMMARY: TableSummary = {
   },
   gameNo: 0,
   updatedAt: 1_792_000_000_000,
+  missing: [],
 };
 
 type Call = { url: string; init: RequestInit | undefined };

@@ -1,9 +1,10 @@
 // The table protocol: every frame a browser and the table's Durable Object exchange, validated with
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
-// Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume. Server → client: welcome (the one snapshot),
-// events (one batch of play, already projected for its reader), table (public data only), error (a
-// code, never a message). No frame type carries a GameState, the deck rng, another seat's cards or a
+// Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume,
+// stop, reclaim, reclaimAnswer. Server → client: welcome (the one snapshot), events (one batch of play,
+// already projected for its reader), table (public data only), error (a code, never a message), and
+// the reclaim's reclaimRequest (to the chef de table) and reclaimResult (to the one who asked). No frame type carries a GameState, the deck rng, another seat's cards or a
 // token (RULE-19): `view` is a PlayerView built by viewFor, `events` went through eventsFor.
 // Later plans add frames to these unions: each is a strict object in a discriminated union on "t".
 
@@ -15,8 +16,10 @@ import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
  * Bumped when a frame changes shape: an older client is closed with CLOSE_VERSION (Pitfall 10).
  * 2 (plan 02-06): the table may be paused or saved, and a client must ping every PING_MS (a client
  * of version 1 never pings, so the silence sweep would close it).
+ * 3 (plan 02-07): stop, the leave during a game and the reclaim; a chef de table of version 2 would
+ * drop the reclaim's request and leave the one who asked waiting.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** The longest client frame, in characters, checked before JSON.parse (T-02-05). */
 export const MAX_FRAME_CHARS = 4096;
@@ -76,6 +79,9 @@ const clientFrameSchema = z.discriminatedUnion("t", [
     level: z.optional(levelValue),
   }),
   z.strictObject({ t: z.literal("resume") }),
+  z.strictObject({ t: z.literal("stop") }),
+  z.strictObject({ t: z.literal("reclaim"), seat: colour }),
+  z.strictObject({ t: z.literal("reclaimAnswer"), seat: colour, accept: z.boolean() }),
 ]);
 
 /** The first frame of every socket: the protocol version, the device token and the first name. */
@@ -106,6 +112,15 @@ export type PauseChoice = "wait" | "bot" | "save";
 export type PauseFrame = { t: "pause"; choice: PauseChoice; level?: Level };
 /** The host resumes a saved game (« Reprendre la partie »). */
 export type ResumeFrame = { t: "resume" };
+/** The host stops the game at any moment: it is saved for everyone (« Arrêter la partie », SC4). */
+export type StopFrame = { t: "stop" };
+/**
+ * Someone without a seat asks for a started table's seat whose person is offline: their own, begun
+ * on another device or in another app (« C’est moi, {Nom} », D-12). The host must accept.
+ */
+export type ReclaimFrame = { t: "reclaim"; seat: Color };
+/** The host's answer to a reclaim of `seat` (« Rendre sa place » or « Refuser »). */
+export type ReclaimAnswerFrame = { t: "reclaimAnswer"; seat: Color; accept: boolean };
 export type ClientFrame =
   | HelloFrame
   | SitFrame
@@ -116,7 +131,10 @@ export type ClientFrame =
   | StartFrame
   | ActFrame
   | PauseFrame
-  | ResumeFrame;
+  | ResumeFrame
+  | StopFrame
+  | ReclaimFrame
+  | ReclaimAnswerFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
@@ -237,7 +255,20 @@ export type WelcomeFrame = {
 export type EventsFrame = { t: "events"; seq: number; events: GameEvent[]; view: PlayerView };
 export type TableFrame = { t: "table"; table: TablePublic };
 export type ErrorFrame = { t: "error"; code: ErrorCode };
-export type ServerFrame = WelcomeFrame | EventsFrame | TableFrame | ErrorFrame;
+/** To the host only: `name` (the first name they typed) asks for `seat` (« Rendre sa place à … ? »). */
+export type ReclaimRequestFrame = { t: "reclaimRequest"; seat: Color; name: string };
+/**
+ * To the one who asked only: the host refused, or the request could not be made (the seat is online,
+ * already asked for, or there is no host); accepted comes with a welcome on the seat.
+ */
+export type ReclaimResultFrame = { t: "reclaimResult"; accepted: boolean };
+export type ServerFrame =
+  | WelcomeFrame
+  | EventsFrame
+  | TableFrame
+  | ErrorFrame
+  | ReclaimRequestFrame
+  | ReclaimResultFrame;
 
 const level = z.int().check(z.minimum(1), z.maximum(5));
 const seatPublic = z.object({
@@ -290,6 +321,12 @@ const serverFrameSchema = z.discriminatedUnion("t", [
   z.object({ t: z.literal("events"), seq: count, events, view }),
   z.object({ t: z.literal("table"), table: tablePublic }),
   z.object({ t: z.literal("error"), code: z.enum(ERROR_CODES as [ErrorCode, ...ErrorCode[]]) }),
+  z.object({
+    t: z.literal("reclaimRequest"),
+    seat: colour,
+    name: z.string().check(z.maxLength(64)),
+  }),
+  z.object({ t: z.literal("reclaimResult"), accepted: z.boolean() }),
 ]);
 
 /** A server frame from the socket, or null when it does not have the expected shape. */
@@ -342,10 +379,7 @@ export function parseCreateTestOptions(body: unknown): CreateTestOptions | null 
 
 // --- Public table summary (GET /api/tables/:id, plan 02-04) ---
 
-/**
- * Where a table stands. The table core fills `lobby`, `playing` and `finished` today; `paused` (02-06)
- * and `saved` (02-07) are named now so the home's list already has their words.
- */
+/** Where a table stands (« Salle d’attente », « En cours », « En pause », « Sauvegardée », « Terminée »). */
 export type TableStatus = "lobby" | "playing" | "paused" | "saved" | "finished";
 
 export const TABLE_STATUSES: readonly TableStatus[] = [
@@ -371,6 +405,8 @@ export type TableSummary = {
   gameNo: number;
   /** The table's last activity, in ms since the epoch. */
   updatedAt: number;
+  /** The seats the paused game waits for (« En pause : on t’attend » when one is this device's). */
+  missing: Color[];
 };
 
 const summarySeat = z.strictObject({
@@ -388,6 +424,7 @@ const tableSummarySchema = z.strictObject({
   }),
   gameNo: count,
   updatedAt: count,
+  missing: z.array(colour).check(z.maxLength(4)),
 });
 
 /** A table summary from untrusted JSON data (the response body), or null when it is not one. */
