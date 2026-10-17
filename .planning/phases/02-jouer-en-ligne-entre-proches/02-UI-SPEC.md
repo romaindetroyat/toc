@@ -493,10 +493,24 @@ Everything of the phase-1/3 game screen stays. Online only:
 
 | Mode | Change |
 |------|--------|
-| Compact (phone sideways) | Right strip top: « Réglages » (gear), then « Messages » (44 × 44, `message-circle`) in the slot « Avance rapide » used; the budget of the strip's bottom buttons is unchanged (`calc(100% − 2 × 44 − 3 × 4)`). « Avance rapide » is hidden online: the server paces the computer players; the local animation speed setting stays in « Réglages » for reduced motion only **(à confirmer par Romain)** |
+| Compact (phone sideways) | Right strip top: « Réglages » (gear), then « Messages » (44 × 44, `message-circle`) in the slot « Avance rapide » used; the budget of the strip's bottom buttons is unchanged (`calc(100% − 2 × 44 − 3 × 4)`). « Avance rapide » is hidden online: the server paces the computer players; the local animation speed setting stays in « Réglages » for reduced motion only **(à confirmer par Romain)**. Since plan 02-10b the chef de table sets a table-wide « Avance rapide » in « Réglages » (section below) |
 | Compact, info pill sheet « Infos de la partie » | After the column-form info, a section « À la table » (Heading) with the players list; the sheet body scrolls |
 | Bar (computer) | The info column (≈ 240 wide) keeps its three lines and its `[Nous][Eux][gear]` row, then a fourth row `[À la table 44][Messages 44]` left-aligned, 4 px above. Height: 3 × 20 + 4 + 24 + 4 + 44 = 136 ≤ 160 (the planner measures in the bar; the bar stays 160 px and the board 1227 px at 1280 × 800) |
 | Prompt row / action zone | Shows « Partie en pause » while paused, the reconnect banner while the own socket is down |
+
+### « Avance rapide » for the whole table (plan 02-10b, 2026-10-17)
+
+> Romain, 2026-10-17. Online the computers felt slow (a dropped-alarm bug, since fixed: `.planning/debug/slow-online-bots.md`), and locally he plays with « Avance rapide », which is hidden online. Offered « On peut ajouter une avance rapide valable pour toute la table, que le créateur activerait. », he answered: « Oui, ajoute l’avance rapide ». This replaces the « hidden online » rule of « Chrome changes » for the table's pace; the local action-zone toggle stays hidden online (its slot is « Messages »).
+
+| Element | Contract |
+|---------|----------|
+| Who | The chef de table only (the derived host: the creator, or the role's holder while the creator is away); the server refuses anyone else (`not-host`) |
+| Where | « Réglages » at an online table, waiting room and game: the first row of the sheet, the existing `Switch` « Avance rapide » with the helper « Pour toute la table : les ordinateurs jouent presque aussitôt et les coups vont plus vite. ». For everyone else the same switch, disabled (dimmed), showing the table's state, with the helper « Seul le chef de table, {Nom}, peut la changer. » |
+| Default | Off. A table this device just created starts with the creator's last choice on this device (`tableFast` in the settings) |
+| Effect | The server's computers think at the fast pace (at most 300 ms) and wait for the fast animations; every page plays the moves in fast mode (its own « Animations réduites » still wins). It applies from the next computer decision. The rematch keeps it |
+| Badge | While on, a 20 px disc (`--bois-sombre`, 2 px `--creme` border, 12 px cream `fast-forward`) on the top-right corner of the « Réglages » gear, wherever the gear stands (right strip on the phone, info column on the computer, the waiting room's action row); `data-fast-badge`, `aria-hidden`, never a target; the gear's accessible name becomes « Réglages (avance rapide pour toute la table) ». No motion (state, not event) |
+| Waiting room line | While on, a muted Body line « Avance rapide pour toute la table. » at the end of the right column (`data-fast-line`), for everyone |
+| Toasts | To everyone but the chef de table who switched it: « {Nom} a mis l’avance rapide. » / « {Nom} a enlevé l’avance rapide. » ({Nom}: the chef de table's first name) |
 
 ### Players list « À la table » (`TablePlayers.svelte`, new)
 
@@ -674,7 +688,8 @@ Only `transform` and `opacity`, no filter, no blur, no `.animate(` outside `fram
 | `ui/MessagesSheet.svelte` | new | Palette + history | empty history, populated, rate-limited toast |
 | `board/ChatBubbles.svelte` (+ waiting-room variant) | new | Received messages | text, emoji, own (no name), replace, several seats at once, reduced motion |
 | `ui/EndScreen.svelte` | changed (additive) | Plank | + online mode: « Revanche » toggle, « Quitter la table », vote row and line; local mode unchanged |
-| `ui/SettingsSheet.svelte` | changed | « Réglages » | + online links « Arrêter la partie » (creator) and « Quitter la table »; « Tester les sons » hidden online |
+| `ui/SettingsSheet.svelte` | changed | « Réglages » | + online links « Arrêter la partie » (creator) and « Quitter la table »; « Tester les sons » hidden online; + the table's « Avance rapide » switch (plan 02-10b: chef de table, others disabled) |
+| `ui/SettingsButton.svelte` | changed | The gear | + the « Avance rapide » badge while the table is fast (plan 02-10b) |
 | `ui/ConfirmDialog.svelte` | changed (generalised) | Confirmations | the four online confirmations + the existing abandon |
 | `ui/icons.ts` | changed | Icons | + `users`, `share-2`, `message-circle`, `wifi-off`, `bot`, `crown` (Lucide, ISC) |
 | `App.svelte` | changed | Router | `#/` → Home, `#/ordinateur` → Launch, `#/table/<id>` → Table |
@@ -764,7 +779,7 @@ Choix du chercheur à l’intérieur des décisions D-01 à D-14 ; ils seront re
 8. **La pause** : une plaque au milieu du plateau, « En attente de Marie… », un compte à rebours « Dans 0:42, Paul pourra choisir la suite. » ; après la minute, le chef de table choisit entre « Attendre encore une minute », « Confier sa place à l’ordinateur » (puis la force, Galopeur au départ) et « Sauvegarder et arrêter ». Le plateau reste visible sous un léger voile ; « Messages », « Réglages » et la pastille restent utilisables.
 9. **Ma connexion perdue** : rien pendant 2 s, puis « Connexion perdue. Reconnexion… » à la place de la consigne, puis après 10 s une plaque avec « Réessayer maintenant » et « Retour à l’accueil ».
 10. **Le nom d’une place confiée à l’ordinateur** : « Tour de Marie (ordinateur) », « Marie (ordinateur) réfléchit… ».
-11. **« Avance rapide » en ligne** : caché, parce que le serveur règle le rythme des ordinateurs pour tout le monde ; sa place sur le téléphone est prise par « Messages ».
+11. **« Avance rapide » en ligne** : caché, parce que le serveur règle le rythme des ordinateurs pour tout le monde ; sa place sur le téléphone est prise par « Messages ». *Décidé le 2026-10-17 (« Oui, ajoute l’avance rapide ») : le chef de table règle une avance rapide pour toute la table dans « Réglages » (plan 02-10b).*
 12. **Les messages rapides** : une fenêtre avec les sept phrases puis la rangée 😂 👏 😮 🐴 ❤️ (😂 rangé avec les émojis), et les cinq derniers messages ; touche « M » sur l’ordinateur. Un message reçu apparaît 4 s dans une bulle crème bordée de la couleur de l’expéditeur, à côté de son cavalier dessiné, avec son prénom ; on peut toucher le plateau à travers. Pas de son, pas de messages sur la planche de fin.
 13. **La revanche** : « Revanche » remplace « Rejouer » et « Quitter la table » remplace « Changer de couleur » ; quatre pastilles montrent qui est d’accord (les ordinateurs le sont toujours) ; un joueur hors ligne au moment de la revanche est remplacé par l’ordinateur (Galopeur) jusqu’à son retour.
 14. **Rendre sa place** : quelqu’un qui ouvre le lien sur un autre appareil (ou hors de WhatsApp) touche « C’est moi, Marie » ; le chef de table confirme par « Rendre sa place » ou « Refuser ».
