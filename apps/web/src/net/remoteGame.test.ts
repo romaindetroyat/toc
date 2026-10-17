@@ -9,7 +9,12 @@ import {
 } from "@toc/engine";
 import type { ClientFrame, EventsFrame, ServerFrame, TablePublic, You } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
-import { createRemoteGame, type RemoteConnection, type StartBatch } from "./remoteGame.ts";
+import {
+  createActWatch,
+  createRemoteGame,
+  type RemoteConnection,
+  type StartBatch,
+} from "./remoteGame.ts";
 
 const STATE = newGame({ firstDealer: "vert" }, [1, 2, 3, 4]);
 
@@ -118,6 +123,52 @@ describe("createRemoteGame", () => {
     expect(refused).toEqual([]);
     connection.emit({ t: "error", code: "illegal" });
     expect(refused).toEqual(["illegal"]);
+  });
+
+  // .planning/debug/lost-move-reply.md: a legal 7 of five parts used to come back as bad-frame, and
+  // the page then showed « La table ne répond pas » and kept the turn waiting.
+  it("reopens the turn when the server refuses its own act as bad-frame, not another frame's", () => {
+    const connection = fakeConnection();
+    const game = createRemoteGame(connection, fakeDirector());
+    const refused: string[] = [];
+    game.onRefused?.(() => refused.push("refused"));
+    game.start();
+    // A bad-frame that answers no act of this page is not a refused move.
+    connection.emit({ t: "error", code: "bad-frame" });
+    expect(refused).toEqual([]);
+    // The act, then the server's bad-frame: refused like an illegal move.
+    game.submit({ t: "discard" });
+    connection.emit({ t: "error", code: "bad-frame" });
+    expect(refused).toEqual(["refused"]);
+    // Answered once: the next bad-frame is not this act's.
+    connection.emit({ t: "error", code: "bad-frame" });
+    expect(refused).toEqual(["refused"]);
+    // An act answered by its events no longer waits.
+    game.submit({ t: "discard" });
+    connection.emit(eventsFrame(8, [{ t: "turn", seat: "rouge" }]));
+    connection.emit({ t: "error", code: "bad-frame" });
+    expect(refused).toEqual(["refused"]);
+  });
+
+  it("createActWatch: what an error means for the page, once an act is sent or not", () => {
+    const watch = createActWatch();
+    // No act waiting: a bad-frame is the server's error, an illegal move is still refused.
+    expect(watch.answer({ t: "error", code: "bad-frame" })).toBe("server");
+    expect(watch.answer({ t: "error", code: "illegal" })).toBe("refused");
+    expect(watch.answer({ t: "error", code: "stale" })).toBeNull();
+    // The act's own bad-frame is a refused move, once.
+    watch.sent();
+    expect(watch.answer({ t: "error", code: "bad-frame" })).toBe("refused");
+    expect(watch.answer({ t: "error", code: "bad-frame" })).toBe("server");
+    // A stale act is answered (the welcome follows): a later bad-frame is not its.
+    watch.sent();
+    expect(watch.answer({ t: "error", code: "stale" })).toBeNull();
+    expect(watch.answer({ t: "error", code: "bad-frame" })).toBe("server");
+    // An events frame or a welcome answers the act; a chat's refusal does not.
+    watch.sent();
+    expect(watch.answer({ t: "error", code: "rate" })).toBeNull();
+    expect(watch.answer(eventsFrame(9, []))).toBeNull();
+    expect(watch.answer({ t: "error", code: "bad-frame" })).toBe("server");
   });
 
   it("stops at another game number (the rematch): nothing more reaches its Director (plan 02-09)", () => {
