@@ -5,7 +5,9 @@
 // submit() sends act { base: seq, action } and answers ok at once: the move shows when the server's
 // events frame comes back, built for this seat only. A stale act is silent (the server sends a fresh
 // welcome, which resets the Director); an illegal one reaches onRefused, which words it like a refused
-// local move. Pure TypeScript: the connection is passed in, so Node tests use a fake one.
+// local move, and so does a bad-frame that answers the act (.planning/debug/lost-move-reply.md: the
+// server refusing a move's shape must not leave the turn waiting). Pure TypeScript: the connection is
+// passed in, so Node tests use a fake one.
 //
 // One remote game is one game number (plan 02-09): once a table frame or a welcome names another
 // game (the rematch started), this controller stops feeding its Director, so the end plank stays over
@@ -42,6 +44,47 @@ export type RemoteGame = GameController & {
   readonly gameNo: number;
 };
 
+/** What an error frame means for the page: a refused move, the server's error, or nothing to show. */
+export type ErrorAnswer = "refused" | "server" | null;
+
+/**
+ * Whether this device's act still waits for its answer, and what a frame then means. The server
+ * answers each frame of a socket in order, so the first events, welcome or act error after an act is
+ * its answer. « illegal » is always a refused move; a bad-frame is one when it answers the act (the
+ * turn opens again, the table keeps its seq), else it is the server's error (« La table ne répond
+ * pas »). The connection and the remote game each keep one.
+ */
+export function createActWatch(): { sent(): void; answer(frame: ServerFrame): ErrorAnswer } {
+  let pending = false;
+  return {
+    sent() {
+      pending = true;
+    },
+    answer(frame) {
+      if (frame.t === "events" || frame.t === "welcome") {
+        pending = false;
+        return null;
+      }
+      if (frame.t !== "error") return null;
+      switch (frame.code) {
+        case "illegal":
+          pending = false;
+          return "refused";
+        case "stale":
+          pending = false;
+          return null;
+        case "bad-frame": {
+          const answered = pending;
+          pending = false;
+          return answered ? "refused" : "server";
+        }
+        default:
+          return null;
+      }
+    },
+  };
+}
+
 const SELF = "toi";
 
 export function createRemoteGame(
@@ -62,6 +105,7 @@ export function createRemoteGame(
 
   const listeners = new Set<() => void>();
   const refusedListeners = new Set<() => void>();
+  const acts = createActWatch();
   let started = false;
   let disposed = false;
   /** Frames that came before the screen started: played after the opening deal. */
@@ -72,6 +116,7 @@ export function createRemoteGame(
   }
 
   function handle(frame: ServerFrame): void {
+    const answer = acts.answer(frame);
     if ((frame.t === "table" || frame.t === "welcome") && frame.table.gameNo !== gameNo) {
       over = true;
     }
@@ -98,7 +143,7 @@ export function createRemoteGame(
         notify();
         return;
       case "error":
-        if (frame.code === "illegal") for (const listener of [...refusedListeners]) listener();
+        if (answer === "refused") for (const listener of [...refusedListeners]) listener();
         return;
     }
   }
@@ -136,6 +181,7 @@ export function createRemoteGame(
     submit(action) {
       if (disposed) return { ok: false, error: "illegal" };
       const sent = connection.send({ t: "act", base: seq, action });
+      if (sent) acts.sent();
       return sent ? { ok: true } : { ok: false, error: "illegal" };
     },
     onChange(listener) {

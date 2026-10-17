@@ -37,7 +37,7 @@ import {
 import ReconnectingWebSocket from "partysocket/ws";
 import type { Device } from "./device.ts";
 import { BANNER_MS, type ConnectionState, connectionState, PLATE_MS } from "./plate.ts";
-import type { RemoteConnection, StartBatch } from "./remoteGame.ts";
+import { createActWatch, type RemoteConnection, type StartBatch } from "./remoteGame.ts";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
@@ -51,7 +51,10 @@ export type TableConnection = RemoteConnection & {
   readonly link: ConnectionState;
   /** How long the drop that the latest welcome ended lasted, in ms (null: the welcome ended none). */
   readonly lastDownMs: number | null;
-  /** The server answered bad-frame: « La table ne répond pas ». */
+  /**
+   * The server answered bad-frame to something else than this device's act: « La table ne répond
+   * pas ». A bad-frame that answers an act is a refused move (the remote game reopens the turn).
+   */
   readonly serverError: boolean;
   /**
    * The quick messages the table kept (plan 02-08), oldest first: the welcome's, then each chat frame
@@ -91,6 +94,8 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
   let linkNow = $state(Date.now());
   let lastDownMs = $state<number | null>(null);
   let serverError = $state(false);
+  /** This device's act waiting for its answer (a bad-frame then refuses the move, nothing more). */
+  const acts = createActWatch();
   let chat = $state.raw<ChatEntry[]>([]);
   let linkTimers: ReturnType<typeof setTimeout>[] = [];
 
@@ -141,6 +146,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
   }
 
   function apply(frame: ServerFrame): void {
+    const answer = acts.answer(frame);
     if (frame.t === "welcome" || frame.t === "table") serverOffset = frame.table.now - Date.now();
     switch (frame.t) {
       case "welcome":
@@ -175,7 +181,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
         keep(frame);
         return;
       case "error":
-        if (frame.code === "bad-frame") serverError = true;
+        if (answer === "server") serverError = true;
         return;
       case "chat":
         chat = [...chat, { from: frame.from, msg: frame.msg, at: frame.at }].slice(-CHAT_KEEP);
@@ -324,6 +330,7 @@ export function connectTable(id: string, device: Device & { name: string }): Tab
     send(frame) {
       if (status !== "open") return false;
       sendRaw(frame);
+      if (frame.t === "act") acts.sent();
       return true;
     },
     onFrame(listener) {
