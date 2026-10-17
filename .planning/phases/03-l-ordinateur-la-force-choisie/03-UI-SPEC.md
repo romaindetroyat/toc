@@ -380,6 +380,60 @@ Applicable state considerations resolved: 15 covered, 3 backstop, 0 unresolved
 
 ---
 
+## Des cartes qu’on lit (plan 03-10)
+
+> **Note, 2026-10-17 (plan 03-10).** Romain, after playing: « Je trouve tout de même que la visibilité des cartes est un peu en dessous des prérequis : sur ordinateur on y arrive (mais ça pourrait être mieux), sur iphone c'est beaucoup plus difficile, surtout pour la carte indiquée comme ayant été donnée par le partenaire ». His three choices: for the iPhone « Cartes plus grandes en coin (Recommandé) » — « La main s'étale en éventail dans le coin vide en bas à gauche du plateau, cartes environ 1,5 fois plus grandes (≈ 80 × 112 px), valeurs en gros. Le plateau ne rétrécit pas. »; for the received card « Juste un liseré coloré » — « Un bord épais de la couleur du partenaire, sans texte. »; for the computer « Un peu plus grandes (Recommandé) » — « Cartes environ 20 % plus grandes et valeurs plus contrastées, dans la barre du bas. ». This section replaces 01-UI-SPEC « Hand fan » (card size, received marker) and the addendum « Recette 3 de Romain », « Le plateau sur toute la hauteur du téléphone », point 3 (« La main en colonne »).
+
+### The phone held sideways (compact mode): the hand in the corner
+
+Measured before building, from `packages/board` (insets 0): the galet’s bare bottom-left corner is a quarter disc of about 110 px from the screen corner, and along the left strip the ring’s cells stand 2 to 7 px right of the board’s edge. Whole 80 px cards cannot stand there without covering cells. So the hand is a cascade of large cards from the bottom of the left strip up, each pushed as far right as the scene geometry allows (the lower ones lean into the corner), and running past the screen’s left edge when the strip is narrower than the card. On an iPhone the safe-area inset (about 47 px each side in landscape) gives the cards that room first, so they show (nearly) whole there.
+
+| Property | Value |
+|----------|-------|
+| Card | `cornerCard(height)` (`apps/web/src/cards/fan.ts`): the largest 5:7 card, at most 80 × 112, such that five fit under the info pill (48 px) with each slice at least 3 px past the middle of its card (the middle of every card is seen and tapped) |
+| Board | Unchanged (formula of 01-47): no shrinking |
+| Order and slices | Ascending value from top to bottom; the last card on the strip’s bottom edge, each card a slice above the next (a box of five: nothing jumps when a card leaves); slice = min(h/2 + 12, (height − 48 − h) / 4), at least 44 |
+| Horizontal place | `cornerLayout` over `leftClearance(y0, y1)` (`packages/board/src/scene.ts`): the right edge of each card at the leftmost thing of the game in its band (a ring cell with the knight, halo and ghost ring it may carry, a home or stable dot with its knight, a rider with its thinking glow, the felt), less 2 px and the 6 px of the selection; never right of the card under it |
+| Index | Rank over suit, stacked in the card’s **top-right** corner (the part always on the screen, as on a four-index deck): rank 25 % of the card’s height (27.5 px at 110), suit 20 %, weight 800 |
+| Middle | The big pip, letter or figure centred on the part on the screen (`--cut`), and, on every card but the last, under its slice (`--middle-top`), so a slice shows its index alone |
+| Selected | Moves 6 px toward the board, keeps its place in the stack (amber outline) |
+| Unplayable | Opaque card under a walnut veil at 50 % (was 60 %) |
+| Taps | The cards only: the hand’s box covers the left strip but lets every other tap through (the info pill stays reachable); the 7’s step chips and « Lequel ? »’s chips still take the hand’s place, unchanged |
+| Keyboard | Digits 1–5, arrows up and down, unchanged; the digit (computer only) astride the card’s top edge at the left of its part on the screen |
+
+Sizes at the target windows (Chromium emulation, insets 0; « shown » = the part of the card on the screen):
+
+| Window | Board width | Card | Slice | Shown of each card (the last one) |
+|--------|-------------|------|-------|----------------------------------|
+| 844 × 390 | 724 px | 79 × 110 | 58 px | 57 px (65) |
+| 750 × 342 | 630 px | 67 × 94 | 50 px | 56 px (63) |
+| 667 × 375 | 547 px | 75 × 105 | 55 px | 55 px (70) |
+| 568 × 320 | 448 px | 61 × 86 | 46 px | 55 px (whole) |
+| 480 × 320 | 360 px | 61 × 86 | 46 px | 54 px (whole) |
+
+The smallest phones (320 px high) degrade gracefully: cards 1.17 times the old column’s instead of 1.5, slices of 46 px. A window lower than 306 px keeps 44 px slices with smaller cards.
+
+### The card received from the partner
+
+A 6 px border of the partner’s seat colour (`PALETTE.hex`: bleu `#1F4FA8`, jaune `#E3A90C`, rouge `#C3271D`, vert `#1F8A3C`) inside the card, a 1 px walnut line on its inner side (so the yellow seat never melts into the amber outline of a playable card), the corner indices moved 4 px in. No text, no amber. The card’s read name ends with « , reçue de {Partenaire} » (« d’ » before a vowel), e.g. « As de carreau, jouable, reçue de Marengo ». `data-received="{couleur}"` is the test hook. On the computer and the phone alike.
+
+### The computer: larger cards in the same bar
+
+| Property | Value |
+|----------|-------|
+| Card | 106 × 148 (was 88 × 124, + 20 %) |
+| Bar | Unchanged, 160 px: the cards’ top stays 10 px under the bar’s top, their lower edge (more for the dropped outer cards) runs under the screen’s bottom edge, which clips it; the page never scrolls (`.game { overflow: clip }`) |
+| Board | Unchanged: 1227 px at 1280 × 800 |
+| Index | Rank 26 px, suit 22 px, weight 800 (was 16 px / 700); the middle pip 56 px (was 44) |
+| Colour | Red suits `#A8140E` (was `#C0201A`: 7.4:1 on the card instead of 6.0:1); black `#1A1A1A` unchanged |
+| Digit | Astride the card’s top edge, 38 px from its left (right of the larger rank) |
+
+### Proofs
+
+`packages/board/src/scene.test.ts` (« the galet’s bare left side »), `apps/web/src/cards/cards.test.ts` (« the compact mode’s hand in the corner »), `e2e/compact.spec.ts` (`expectHand` in every state: each card under the info, shown at least 44 × 44, covering no drawn cell nor knight), `e2e/cibles.spec.ts` (44 px of each card on the screen), `e2e/finition.spec.ts` (`expectCardsShown`: each card’s top index on the screen at every size), `e2e/partie.spec.ts` (the border’s colour and width, the read name).
+
+---
+
 ## Registry Safety
 
 | Registry | Blocks Used | Safety Gate |
@@ -410,6 +464,10 @@ Choix du chercheur à l’intérieur des décisions D-01 à D-13 ; ils seront re
 6. **Le résumé des équipes** (« Ton équipe : … », « Adversaires : … ») remplacé à l’écran par les lignes de force ; « Réglages » à gauche de « Jouer la partie ».
 7. **Le banc d’essai** à l’adresse `#/banc`, dans toutes les versions, sans aucun lien vers lui.
 8. **Les seuils du verdict** du banc : 95 % des coups en moins d’une seconde, aucun coup au-delà de 2 s, aucune image figée plus de 100 ms.
+9. **La main dans le coin** (plan 03-10) : le coin nu du galet est trop petit pour des cartes entières sans couvrir de cases ; les cartes montent donc en cascade depuis le bas de la bande de gauche, chacune aussi à droite que le galet le permet, et dépassent du bord gauche de l’écran quand la bande est trop étroite (sur l’iPhone, la marge de l’encoche leur laisse la place). La valeur est en haut à droite de la carte, la partie toujours visible.
+10. **La taille** : 79 × 110 à 844 × 390 (au lieu de ≈ 80 × 112, pour que le milieu de chaque carte reste visible et touchable), 67 × 94 sur l’iPhone 13 de Playwright (750 × 342), 61 × 86 sur les plus petits téléphones.
+11. **Le liseré** : 6 px de la couleur du partenaire, avec un filet noyer à l’intérieur ; la carte n’est plus entourée d’ambre.
+12. **L’ordinateur** : des cartes de 106 × 148 dont le bas passe sous le bord de l’écran, pour garder la barre de 160 px et le plateau de 1227 px ; le rouge des cœurs et des carreaux un peu plus foncé.
 
 ---
 
