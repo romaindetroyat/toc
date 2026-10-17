@@ -60,6 +60,7 @@ export {
 export { summary } from "./summary.ts";
 export {
   computerLevel,
+  copyTable,
   createTable,
   dueBot,
   EXPIRY_MS,

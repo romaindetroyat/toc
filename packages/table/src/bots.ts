@@ -9,9 +9,13 @@
 //   The Champion's search runs SLICE_UNITS units per tick, one alarm invocation each, its checkpoint
 //   stored in table.thinking (so in the SQLite snapshot), the next slice due at once; when its budget
 //   is spent, or HARD_CAP_MS after dueAt, its best move so far is the decision.
-// - Play: playAt = dueAt + eventsDuration(last batch, "normal") + paceFor(thought, "normal", u), u drawn
+// - Play: playAt = dueAt + eventsDuration(last batch, speed) + paceFor(thought, speed, u), u drawn
 //   from the table's bot rng after the decision (like the local game), never before the decision
 //   tick. Under the zero test pace there is no wait, no think time and no cap (hardCap("test")).
+// - The speed (plan 02-10b): "fast" while the chef de table has the table's « Avance rapide » on, else
+//   "normal" (the zero test pace is "test" either way). A switch applies from the next decision: the
+//   wait is fixed when a computer becomes due, the think time when it has decided; a Champion reads
+//   its cap at each slice.
 // - A retried alarm (the previous invocation failed, for instance over the Free plan's CPU limit) that
 //   finds the decision still pending decides at FALLBACK_LEVEL (randomLegal) and marks it: the table
 //   never freezes.
@@ -45,9 +49,13 @@ export const SLICE_UNITS = 5;
 /** The level of a decision made by a retried alarm: randomLegal, which cannot run out of CPU. */
 export const FALLBACK_LEVEL: BotLevel = 1;
 
-/** The pace the table's computer players follow: the local game's normal pace, none under the test pace. */
+/**
+ * The pace the table's computer players follow: the local game's fast pace under the table's
+ * « Avance rapide » (plan 02-10b), else its normal pace; none under the zero test pace.
+ */
 export function speedOf(table: Table): Speed {
-  return table.test?.pace === "zero" ? "test" : "normal";
+  if (table.test?.pace === "zero") return "test";
+  return table.fast === true ? "fast" : "normal";
 }
 
 /** Whether `pending` is still the decision of the computer player due on this table. */
@@ -74,6 +82,7 @@ export function scheduleBot(table: Table, events: readonly GameEvent[], now: num
   } else {
     const seat = dueBot(table);
     const game = table.game;
+    const speed = speedOf(table);
     table.thinking =
       seat === null || game === null
         ? null
@@ -82,7 +91,7 @@ export function scheduleBot(table: Table, events: readonly GameEvent[], now: num
             base: game.phase === "exchange" ? "exchange" : table.seq,
             level: computerLevel(table, seat) ?? table.levels[seat],
             dueAt: now,
-            waitMs: speedOf(table) === "test" ? 0 : eventsDuration(events, "normal"),
+            waitMs: speed === "test" ? 0 : eventsDuration(events, speed),
             checkpoint: null,
             slices: 0,
             thought: null,

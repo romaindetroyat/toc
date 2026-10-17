@@ -158,6 +158,11 @@ export type Table = {
    * (chat.ts). Never put in a frame.
    */
   chatTimes: Record<string, number[]>;
+  /**
+   * The table's « Avance rapide » (plan 02-10b): set by the chef de table, off by default, kept by the
+   * rematch. The computers think at the fast pace and wait for the fast animations (bots.ts speedOf).
+   */
+  fast: boolean;
   test: TestOptions | null;
 };
 
@@ -201,6 +206,7 @@ export function createTable(options: {
     thinking: null,
     chat: [],
     chatTimes: {},
+    fast: false,
     test: options.test ?? null,
   };
 }
@@ -222,6 +228,8 @@ export function copyTable(table: Table): Table {
   copy.firstDealer ??= null;
   copy.startedAt ??= null;
   copy.endedAt ??= null;
+  // Before plan 02-10b a table had no « Avance rapide ».
+  copy.fast ??= false;
   if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }

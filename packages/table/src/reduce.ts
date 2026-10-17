@@ -39,6 +39,7 @@ import type {
   ReclaimFrame,
   RematchFrame,
   ServerFrame,
+  SpeedFrame,
 } from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
 import { canChat, keepMessage, overRate } from "./chat.ts";
@@ -549,6 +550,19 @@ function chat(table: Table, who: string, frame: ChatSendFrame, now: number): Red
 }
 
 /**
+ * The table's « Avance rapide » (plan 02-10b): the derived chef de table only (anyone else:
+ * not-host), in every status; everyone online gets the public table. The same value again sends
+ * nothing.
+ */
+function setSpeed(table: Table, who: string, frame: SpeedFrame, now: number): Reduced {
+  if (hostOf(table) !== who) return refuse(table, who, "not-host");
+  if ((table.fast === true) === frame.fast) return unchanged(table);
+  const next = copyTable(table);
+  next.fast = frame.fast;
+  return { table: next, out: publicChanges(table, next, new Set(), now), log: [] };
+}
+
+/**
  * The alarm: every due deadline of the table. The sweep only re-arms itself (the Durable Object
  * closed the silent sockets before this tick); the pause's minute lets the host choose; then the
  * computer player due.
@@ -694,6 +708,8 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
           return chat(table, command.who, frame, ctx.now);
         case "rematch":
           return rematch(table, command.who, frame, ctx);
+        case "speed":
+          return setSpeed(table, command.who, frame, ctx.now);
       }
     }
   }

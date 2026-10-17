@@ -71,6 +71,8 @@ export function tablePublic(table: Table, now: number = table.lastActivity): Tab
           },
     winner: table.status === "finished" ? (table.game?.winner ?? null) : null,
     rematch: rematchVotes(table),
+    // An older snapshot has no flag (copyTable fills it in on the next change).
+    fast: table.fast === true,
     now,
   };
 }

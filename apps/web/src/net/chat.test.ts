@@ -31,6 +31,7 @@ const TABLE: TablePublic = {
   pause: null,
   winner: null,
   rematch: null,
+  fast: false,
   now: 0,
 };
 
