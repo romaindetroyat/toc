@@ -34,6 +34,7 @@ describe("parseSettings", () => {
       sfx: true,
       reduceMotion: true,
       fast: true,
+      tableFast: true,
       lastColor: "vert",
       botLevels: { partner: 5, left: 1, right: 4 },
     };
@@ -229,5 +230,19 @@ describe("saveSettings", () => {
     saveSettings(storage, loaded);
     const stored = JSON.parse(storage.data.get(STORAGE_KEY) ?? "null") as Record<string, unknown>;
     expect(Object.keys(stored).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
+  });
+});
+
+describe("parseSettings: the creator's last table-wide « Avance rapide » (plan 02-10b)", () => {
+  it("is off by default and on a stored object without it", () => {
+    expect(DEFAULT_SETTINGS.tableFast).toBe(false);
+    expect(parseSettings({ fast: true }, false).tableFast).toBe(false);
+  });
+
+  it("keeps a boolean and refuses anything else", () => {
+    expect(parseSettings({ tableFast: true }, false).tableFast).toBe(true);
+    for (const tableFast of ["true", 1, null, {}]) {
+      expect(parseSettings({ tableFast }, false).tableFast).toBe(false);
+    }
   });
 });
