@@ -210,7 +210,14 @@ describe("leak oracle on the real frames of a whole game", () => {
       let action: Action;
       [action, rng] = randomLegal(viewAt(client, table.seq) as PlayerView, seat, rng);
       client.send({ t: "act", base: table.seq, action });
-      await until(() => viewAt(client, table.seq + 1) !== null, `${seat}'s events after its act`);
+      try {
+        await until(() => viewAt(client, table.seq + 1) !== null, `${seat}'s events after its act`);
+      } catch (error) {
+        const now = await readTable(id);
+        throw new Error(
+          `${String(error)} (socket close ${client.closeCode()}, table ${now.status} seq ${now.seq}, last frames ${JSON.stringify(client.frames.slice(-3).map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]))})`,
+        );
+      }
       humanActs += 1;
     }
 

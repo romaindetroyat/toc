@@ -129,7 +129,7 @@ async function drive(
     ana.send({ t: "act", base: table.seq, action });
     await until(
       () => viewAt(ana, table.seq + 1) !== null,
-      `Ana's events after her act at ${table.seq} (last frames: ${JSON.stringify(
+      `Ana's events after her act at ${table.seq} (socket close ${ana.closeCode()}, last frames: ${JSON.stringify(
         ana.frames
           .slice(-3)
           .map((f) => [f.t, "seq" in f ? f.seq : null, f.t === "error" ? f.code : null]),

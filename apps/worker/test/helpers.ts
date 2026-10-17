@@ -33,6 +33,8 @@ export type Client = {
   /** The latest seq seen in a welcome or events frame. */
   seq(): number;
   closed: Promise<{ code: number }>;
+  /** The close code once the socket closed, else null (for a test's failure message). */
+  closeCode(): number | null;
 };
 
 /** How often a test client pings, as the app does every 20 s (plan 02-06): well inside the 75 s. */
@@ -79,8 +81,10 @@ export async function connect(
             // Closed meanwhile.
           }
         }, PING_EVERY_MS);
+  let closeCode: number | null = null;
   const closed = new Promise<{ code: number }>((resolve) => {
     ws.addEventListener("close", (event) => {
+      closeCode = event.code;
       if (pinger !== null) clearInterval(pinger);
       resolve({ code: event.code });
       wake?.();
@@ -112,6 +116,7 @@ export async function connect(
     },
     seq: () => lastSeq,
     closed,
+    closeCode: () => closeCode,
   };
 }
 
