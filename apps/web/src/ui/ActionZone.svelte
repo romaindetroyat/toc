@@ -723,20 +723,24 @@
     white-space: nowrap;
   }
 
-  /* The list clips what does not fit; its 8 px padding, cancelled by as much negative margin, keeps
-     the thinking ring and its glow inside the clip without moving the list. */
+  /* The list cuts what does not fit sideways only (overflow-x: clip), so the thinking ring and its
+     glow may stand above and below the 24 px row; the first icon keeps 8 px clear of the cut. */
   .row .givers {
     flex: 0 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
-    margin: -8px;
-    padding: 8px;
     overflow: hidden;
+    overflow-x: clip;
+    overflow-y: visible;
     gap: 0 var(--space-md);
   }
 
   .row .giver-icon {
     --respire-inset: 2px;
+  }
+
+  .row .givers li:first-child .giver-icon {
+    margin-left: 8px;
   }
 
   .row .givers li {
