@@ -2,14 +2,22 @@
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
 // Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume,
-// stop, reclaim, reclaimAnswer, chat. Server → client: welcome (the one snapshot), events (one batch of
+// stop, reclaim, reclaimAnswer, chat, rematch. Server → client: welcome (the one snapshot), events (one batch of
 // play, already projected for its reader), table (public data only), error (a code, never a message),
 // the reclaim's reclaimRequest (to the chef de table) and reclaimResult (to the one who asked), and chat
 // (a quick message: a seat and one of twelve ids). No frame type carries a GameState, the deck rng, another seat's cards or a
 // token (RULE-19): `view` is a PlayerView built by viewFor, `events` went through eventsFor.
 // Later plans add frames to these unions: each is a strict object in a discriminated union on "t".
 
-import { type Action, COLORS, type Color, type GameEvent, type PlayerView } from "@toc/engine";
+import {
+  type Action,
+  COLORS,
+  type Color,
+  type GameEvent,
+  type PlayerView,
+  type Scenario,
+  type Team,
+} from "@toc/engine";
 import * as z from "zod/mini";
 import { CHAT_KEEP, QUICK_MESSAGES, type QuickMessageId } from "./messages.ts";
 import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
@@ -22,8 +30,10 @@ import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
  * drop the reclaim's request and leave the one who asked waiting.
  * Plan 02-08 adds chat without a bump: an older page never sends it and drops the frames it does not
  * know (the chat frame, the welcome's chat key), and deploys are atomic.
+ * 4 (plan 02-09): a won game makes the table « finished », with its winner and the rematch votes; a
+ * page of version 3 cannot read that status (it would drop every table frame from the end on).
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** The longest client frame, in characters, checked before JSON.parse (T-02-05). */
 export const MAX_FRAME_CHARS = 4096;
@@ -87,6 +97,7 @@ const clientFrameSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("reclaim"), seat: colour }),
   z.strictObject({ t: z.literal("reclaimAnswer"), seat: colour, accept: z.boolean() }),
   z.strictObject({ t: z.literal("chat"), msg: z.enum(QUICK_MESSAGES) }),
+  z.strictObject({ t: z.literal("rematch"), agree: z.boolean() }),
 ]);
 
 /** The first frame of every socket: the protocol version, the device token and the first name. */
@@ -128,6 +139,11 @@ export type ReclaimFrame = { t: "reclaim"; seat: Color };
 export type ReclaimAnswerFrame = { t: "reclaimAnswer"; seat: Color; accept: boolean };
 /** A quick message (D-07): one of the twelve ids, never text; the server adds the sender's seat. */
 export type ChatSendFrame = { t: "chat"; msg: QuickMessageId };
+/**
+ * « Revanche » on the end plank (D-08): a seated person agrees to a new game at the same table, or
+ * withdraws (a second tap). The game starts when every seated person online agrees.
+ */
+export type RematchFrame = { t: "rematch"; agree: boolean };
 export type ClientFrame =
   | HelloFrame
   | SitFrame
@@ -142,7 +158,8 @@ export type ClientFrame =
   | StopFrame
   | ReclaimFrame
   | ReclaimAnswerFrame
-  | ChatSendFrame;
+  | ChatSendFrame
+  | RematchFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
@@ -202,9 +219,18 @@ export type PausePublic = {
   choosing: boolean;
 };
 
+/**
+ * A seat's answer to « Revanche » on the end plank: yes, not yet, its person is offline (their seat
+ * goes to the computer if the rematch starts), or a computer seat (always yes).
+ */
+export type RematchVote = "yes" | "no" | "offline" | "bot";
+
+export const REMATCH_VOTES: readonly RematchVote[] = ["yes", "no", "offline", "bot"];
+
 /** What anyone at the table may know of it. No token, no hash, no card. */
 export type TablePublic = {
-  status: "lobby" | "playing" | "paused" | "saved";
+  /** finished (plan 02-09): the game is won; the end plank shows and the rematch is voted. */
+  status: "lobby" | "playing" | "paused" | "saved" | "finished";
   seats: Record<Color, SeatPublic>;
   /**
    * The host's seat (« chef de table »): the creator, or while the creator is away during a game the
@@ -219,6 +245,10 @@ export type TablePublic = {
   unseated: string[];
   /** The pause, while the status is "paused"; else null. */
   pause: PausePublic | null;
+  /** The team that brought its eight knights home, while the status is "finished"; else null. */
+  winner: Team | null;
+  /** Each seat's answer to « Revanche », while the status is "finished"; else null. */
+  rematch: Record<Color, RematchVote> | null;
   /** The server's clock when the frame was built (ms since the epoch): the countdown's reference. */
   now: number;
 };
@@ -302,8 +332,9 @@ const pausePublic = z.object({
   choiceAt: count,
   choosing: z.boolean(),
 });
+const rematchVote = z.enum(REMATCH_VOTES as [RematchVote, ...RematchVote[]]);
 const tablePublic = z.object({
-  status: z.enum(["lobby", "playing", "paused", "saved"]),
+  status: z.enum(["lobby", "playing", "paused", "saved", "finished"]),
   seats: z.object({ bleu: seatPublic, jaune: seatPublic, rouge: seatPublic, vert: seatPublic }),
   host: z.nullable(colour),
   creatorName: z.nullable(z.string().check(z.maxLength(64))),
@@ -311,6 +342,10 @@ const tablePublic = z.object({
   thinking: z.nullable(colour),
   unseated: z.array(z.string().check(z.maxLength(64))).check(z.maxLength(64)),
   pause: z.nullable(pausePublic),
+  winner: z.nullable(z.enum(["bleu-rouge", "jaune-vert"])),
+  rematch: z.nullable(
+    z.object({ bleu: rematchVote, jaune: rematchVote, rouge: rematchVote, vert: rematchVote }),
+  ),
   now: count,
 });
 /** The view and the events come from the engine's own builders on the server; the envelope is checked. */
@@ -376,7 +411,45 @@ export type CreateTestOptions = {
   levels?: Partial<Record<Color, Level>>;
   /** The pause's minute, shortened for the end-to-end tests (plan 02-06), 500 ms to 60 s. */
   pauseMs?: number;
+  /**
+   * The game starts from this position instead of a deal (plan 02-09: a near-end table for the end
+   * plank and the rematch): a scenario's `before` block, at most MAX_BEFORE_CHARS characters.
+   */
+  before?: Scenario["before"];
 };
+
+/** The longest test start position, as JSON (T-02-39). */
+export const MAX_BEFORE_CHARS = 4096;
+
+const pawnSpec = z.union([
+  z.literal("S"),
+  z.strictObject({ p: z.int().check(z.minimum(-72), z.maximum(143)) }),
+  z.strictObject({ h: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]) }),
+]);
+const pawnSpecs = z.tuple([pawnSpec, pawnSpec, pawnSpec, pawnSpec]);
+const handSpec = z.array(card).check(z.maxLength(5));
+const beforeSchema = z.strictObject({
+  pawns: z.optional(
+    z.strictObject({
+      bleu: z.optional(pawnSpecs),
+      jaune: z.optional(pawnSpecs),
+      rouge: z.optional(pawnSpecs),
+      vert: z.optional(pawnSpecs),
+    }),
+  ),
+  hands: z.optional(
+    z.strictObject({
+      bleu: z.optional(handSpec),
+      jaune: z.optional(handSpec),
+      rouge: z.optional(handSpec),
+      vert: z.optional(handSpec),
+    }),
+  ),
+  turn: colour,
+  phase: z.optional(z.enum(["exchange", "play"])),
+  dealer: z.optional(colour),
+  dealIndex: z.optional(z.union([z.literal(0), z.literal(1), z.literal(2)])),
+});
 
 const testLevel = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
 const createTestSchema = z.strictObject({
@@ -390,12 +463,16 @@ const createTestSchema = z.strictObject({
     }),
   ),
   pauseMs: z.optional(z.int().check(z.minimum(500), z.maximum(60_000))),
+  before: z.optional(beforeSchema),
 });
 
 /** The test options of a parsed creation body, or null when absent or malformed. */
 export function parseCreateTestOptions(body: unknown): CreateTestOptions | null {
   if (typeof body !== "object" || body === null) return null;
-  const parsed = createTestSchema.safeParse((body as { test?: unknown }).test);
+  const test = (body as { test?: unknown }).test;
+  const before = (test as { before?: unknown } | null | undefined)?.before;
+  if (before !== undefined && JSON.stringify(before).length > MAX_BEFORE_CHARS) return null;
+  const parsed = createTestSchema.safeParse(test);
   return parsed.success ? (parsed.data as CreateTestOptions) : null;
 }
 

@@ -9,6 +9,7 @@ import { personOf } from "./frames.ts";
 import type { Table } from "./table.ts";
 
 function statusOf(table: Table): TableStatus {
+  // A snapshot from before plan 02-09 kept a won game « playing ».
   if (table.status === "playing" && table.game?.phase === "won") return "finished";
   return table.status;
 }

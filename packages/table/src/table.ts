@@ -5,7 +5,7 @@
 // Durable Object: the token itself never reaches the table, and `who` never leaves the server.
 
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
-import { COLORS, type Color, type GameState, type Rng } from "@toc/engine";
+import { COLORS, type Color, type GameState, type Rng, type Scenario } from "@toc/engine";
 import type { ChatEntry } from "@toc/protocol";
 
 export type Person = {
@@ -45,6 +45,11 @@ export type TestOptions = {
   levels?: Partial<Record<Color, BotLevel>>;
   /** The pause's minute, shortened for the end-to-end tests (plan 02-06). */
   pauseMs?: number;
+  /**
+   * The first game starts from this position instead of a deal (plan 02-09, a near-end table for the
+   * end plank and the rematch). A rematch always deals a real game.
+   */
+  before?: Scenario["before"];
 };
 
 /**
@@ -88,9 +93,10 @@ export type Table = {
   /**
    * lobby → playing (start) → paused (a seated person is missing, D-04) → playing (back, or handed
    * to the computer) or saved (« Sauvegarder et arrêter », or nobody online at the end of the
-   * minute) → playing or paused (« Reprendre la partie »).
+   * minute) → playing or paused (« Reprendre la partie »). playing → finished when the game is won
+   * (plan 02-09) → playing again when the rematch starts (rematch.ts).
    */
-  status: "lobby" | "playing" | "paused" | "saved";
+  status: "lobby" | "playing" | "paused" | "saved" | "finished";
   createdAt: number;
   lastActivity: number;
   tableId: string;
@@ -107,6 +113,16 @@ export type Table = {
   /** Bumped by every change of the game; an act must name it as its base. */
   seq: number;
   gameNo: number;
+  /** The first dealer of the current game (the rematch's is the seat after it, A6); null before. */
+  firstDealer: Color | null;
+  /** When the current game started and ended (server time); null before its start, before its end. */
+  startedAt: number | null;
+  endedAt: number | null;
+  /**
+   * The seats whose person agreed to « Revanche » (plan 02-09), while the status is "finished".
+   * Computer seats always agree and are not listed; a person who goes offline loses their vote.
+   */
+  rematch: Partial<Record<Color, true>>;
   /** The computer players' random stream: first dealer, horse names, then their choices. */
   botRng: Rng;
   /**
@@ -165,6 +181,10 @@ export function createTable(options: {
     game: null,
     seq: 0,
     gameNo: 0,
+    firstDealer: null,
+    startedAt: null,
+    endedAt: null,
+    rematch: {},
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: { expire: { at: options.now + EXPIRY_MS } },
     reclaims: {},
@@ -187,6 +207,12 @@ export function copyTable(table: Table): Table {
   copy.pause ??= null;
   copy.reclaims ??= {};
   copy.deadlines.expire ??= { at: copy.lastActivity + EXPIRY_MS };
+  // Before plan 02-09 a won game stayed « playing », without votes or times.
+  copy.rematch ??= {};
+  copy.firstDealer ??= null;
+  copy.startedAt ??= null;
+  copy.endedAt ??= null;
+  if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }
 

@@ -13,6 +13,7 @@ import type {
   WelcomeFrame,
 } from "@toc/protocol";
 import { hostOf } from "./presence.ts";
+import { rematchVotes } from "./rematch.ts";
 import { personOf, type Table } from "./table.ts";
 
 export { personOf };
@@ -68,6 +69,8 @@ export function tablePublic(table: Table, now: number = table.lastActivity): Tab
             choiceAt: pause.choiceAt,
             choosing: pause.choosing,
           },
+    winner: table.status === "finished" ? (table.game?.winner ?? null) : null,
+    rematch: rematchVotes(table),
     now,
   };
 }

@@ -27,6 +27,8 @@ const TABLE: TablePublic = {
   thinking: null,
   unseated: [],
   pause: null,
+  winner: null,
+  rematch: null,
   now: 0,
 };
 

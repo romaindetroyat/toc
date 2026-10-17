@@ -40,6 +40,14 @@ export {
   type Reduced,
   reduce,
 } from "./reduce.ts";
+export {
+  dropVote,
+  everyoneAgrees,
+  maybeStartRematch,
+  onGameWon,
+  rematchVotes,
+  vote,
+} from "./rematch.ts";
 export { summary } from "./summary.ts";
 export {
   computerLevel,

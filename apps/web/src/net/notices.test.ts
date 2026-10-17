@@ -26,6 +26,8 @@ function table(
     thinking: null,
     unseated,
     pause: null,
+    winner: null,
+    rematch: null,
     now: 0,
   };
 }

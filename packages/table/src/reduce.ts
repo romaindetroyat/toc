@@ -22,6 +22,7 @@ import {
   IllegalActionError,
   next as nextRandom,
   type Rng,
+  scenarioState,
   shuffle,
   startGame,
 } from "@toc/engine";
@@ -36,6 +37,7 @@ import type {
   PauseFrame,
   ReclaimAnswerFrame,
   ReclaimFrame,
+  RematchFrame,
   ServerFrame,
 } from "@toc/protocol";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
@@ -53,6 +55,7 @@ import {
   stopGame,
   wantsSweep,
 } from "./presence.ts";
+import { dropVote, maybeStartRematch, onGameWon, vote } from "./rematch.ts";
 import { copyTable, personOf, type Table } from "./table.ts";
 
 export type Command =
@@ -112,7 +115,12 @@ function publicChanges(before: Table, after: Table, skip: ReadonlySet<string>, n
     .map((person) => ({ to: person.who, frame }));
 }
 
-/** An accepted change of the game: the new state, the log line, one events frame per seated person. */
+/**
+ * An accepted change of the game: the new state, the log line, one events frame per seated person. A
+ * play that wins the game makes the table finished first (plan 02-09), so no computer is due after it.
+ * `publicFirst` (the rematch) sends the table frame before the events, so a device knows the new game
+ * number before its first batch.
+ */
 function commitPlay(
   before: Table,
   next: Table,
@@ -121,16 +129,19 @@ function commitPlay(
   action: Action | null,
   now: number,
   bot?: BotInfo,
+  publicFirst = false,
 ): Reduced {
   next.game = played.state;
   next.seq += 1;
+  onGameWon(next, now);
   scheduleBot(next, played.events, now);
   const out: Out[] = [];
+  if (publicFirst) out.push(...publicChanges(before, next, new Set(), now));
   for (const person of next.people) {
     if (person.seat === null) continue;
     out.push({ to: person.who, frame: eventsFrameFor(next, played.events, person.seat) });
   }
-  out.push(...publicChanges(before, next, new Set(), now));
+  if (!publicFirst) out.push(...publicChanges(before, next, new Set(), now));
   const entry: LogEntry = {
     seq: next.seq,
     gameNo: next.gameNo,
@@ -168,14 +179,27 @@ function hello(table: Table, who: string, name: string, now: number): Reduced {
   return { table: next, out, log: [] };
 }
 
-function gone(table: Table, who: string, now: number): Reduced {
+function gone(table: Table, who: string, ctx: Ctx): Reduced {
   if (personOf(table, who)?.online !== true) return unchanged(table);
   const next = copyTable(table);
   const person = personOf(next, who);
   if (person !== undefined) person.online = false;
   // A seated person missing during a game pauses it for everyone (NET-03, D-04).
-  onGone(next, who, now);
-  return { table: next, out: publicChanges(table, next, new Set([who]), now), log: [] };
+  onGone(next, who, ctx.now);
+  return wentAway(table, next, who, ctx);
+}
+
+/**
+ * After `who` went offline: at a finished table their vote goes, and the rematch may now start for
+ * the others (everyone still online agreed, plan 02-09); else the public changes.
+ */
+function wentAway(before: Table, next: Table, who: string, ctx: Ctx): Reduced {
+  dropVote(next, who);
+  const rematch = maybeStartRematch(next, ctx.seed, ctx.now);
+  if (rematch !== null) {
+    return commitPlay(before, next, rematch, null, null, ctx.now, undefined, true);
+  }
+  return { table: next, out: publicChanges(before, next, new Set([who]), ctx.now), log: [] };
 }
 
 /**
@@ -273,7 +297,8 @@ function level(table: Table, who: string, frame: LevelFrame, now: number): Reduc
  * seated person keeps the seat and goes offline: the game pauses for the others as when a socket
  * closes, and the same link brings them back (plan 02-07; the client then closes its socket).
  */
-function leave(table: Table, who: string, now: number): Reduced {
+function leave(table: Table, who: string, ctx: Ctx): Reduced {
+  const now = ctx.now;
   const person = personOf(table, who);
   if (person === undefined) return unchanged(table);
   if (table.status !== "lobby" && person.seat !== null) {
@@ -282,7 +307,8 @@ function leave(table: Table, who: string, now: number): Reduced {
     const self = personOf(away, who);
     if (self !== undefined) self.online = false;
     onGone(away, who, now);
-    return { table: away, out: publicChanges(table, away, new Set([who]), now), log: [] };
+    // From the end plank too (plan 02-09): offline, the vote gone, maybe the others' rematch.
+    return wentAway(table, away, who, ctx);
   }
   const next = copyTable(table);
   if (person.seat !== null) next.seats[person.seat] = { kind: "free" };
@@ -317,7 +343,33 @@ function start(table: Table, who: string, ctx: Ctx): Reduced {
   }
   next.status = "playing";
   next.gameNo += 1;
+  next.startedAt = ctx.now;
+  next.endedAt = null;
+  // Test mode only (T-02-39): the first game starts from a given position, without a deal.
+  const before = next.test?.before;
+  if (before !== undefined) {
+    const state = scenarioState(before, ctx.seed());
+    next.firstDealer = state.dealer;
+    return commitPlay(table, next, { state, events: [] }, null, null, ctx.now);
+  }
+  next.firstDealer = firstDealer;
   return commitPlay(table, next, startGame({ firstDealer }, ctx.seed()), null, null, ctx.now);
+}
+
+/**
+ * « Revanche » (plan 02-09, D-08): a seated person's vote at a finished table (anyone else, or before
+ * the end: refused). When everyone online agrees the new game starts at once, the table frame before
+ * each seated person's opening deal.
+ */
+function rematch(table: Table, who: string, frame: RematchFrame, ctx: Ctx): Reduced {
+  const next = copyTable(table);
+  if (!vote(next, who, frame.agree)) return refuse(table, who, "refused");
+  const started = maybeStartRematch(next, ctx.seed, ctx.now);
+  if (started !== null) {
+    return commitPlay(table, next, started, null, null, ctx.now, undefined, true);
+  }
+  const out = publicChanges(table, next, new Set(), ctx.now);
+  return out.length === 0 ? unchanged(table) : { table: next, out, log: [] };
 }
 
 function act(table: Table, who: string, frame: ActFrame, now: number): Reduced {
@@ -575,7 +627,7 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
     case "hello":
       return hello(table, command.who, command.name, ctx.now);
     case "gone":
-      return gone(table, command.who, ctx.now);
+      return gone(table, command.who, ctx);
     case "tick":
       return tick(table, ctx.now, command.retry);
     case "client": {
@@ -591,7 +643,7 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
         case "level":
           return level(table, command.who, frame, ctx.now);
         case "leave":
-          return leave(table, command.who, ctx.now);
+          return leave(table, command.who, ctx);
         case "start":
           return start(table, command.who, ctx);
         case "act":
@@ -608,6 +660,8 @@ function route(table: Table, command: Command, ctx: Ctx): Reduced {
           return reclaimAnswer(table, command.who, frame, ctx.now);
         case "chat":
           return chat(table, command.who, frame, ctx.now);
+        case "rematch":
+          return rematch(table, command.who, frame, ctx);
       }
     }
   }

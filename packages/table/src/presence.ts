@@ -210,7 +210,12 @@ export function onExpireDue(table: Table, now: number): boolean {
   return false;
 }
 
-/** Whether the sweep deadline should be armed: a game runs or waits with a seated person online. */
+/**
+ * Whether the sweep deadline should be armed: a game runs, waits, or is finished (its rematch vote
+ * waits for everyone online: a silent phone must not hold it, plan 02-09) with a seated person online.
+ */
 export function wantsSweep(table: Table): boolean {
-  return (table.status === "playing" || table.status === "paused") && anyoneSeatedOnline(table);
+  const live =
+    table.status === "playing" || table.status === "paused" || table.status === "finished";
+  return live && anyoneSeatedOnline(table);
 }
