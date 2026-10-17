@@ -55,7 +55,7 @@ const tableOf = async (client: Client, where: (table: TablePublic) => boolean) =
 
 async function hello(id: string, letter: string, name: string, ping = true): Promise<Client> {
   const client = await connect(id, {}, { ping });
-  client.send({ t: "hello", v: 4, token: token(letter), name });
+  client.send({ t: "hello", v: 5, token: token(letter), name });
   return client;
 }
 

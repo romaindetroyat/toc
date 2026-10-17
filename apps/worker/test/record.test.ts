@@ -55,12 +55,12 @@ async function bindDatabase(id: string, database: unknown): Promise<void> {
 async function nearEnd(): Promise<{ id: string; ana: Client; ben: Client }> {
   const id = await createTable({ pace: "zero", before: NEAR_END });
   const ana = await connect(id);
-  ana.send({ t: "hello", v: 4, token: token("a"), name: "Ana" });
+  ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
   await ana.next("welcome");
   ana.send({ t: "sit", seat: "bleu" });
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");
   const ben = await connect(id);
-  ben.send({ t: "hello", v: 4, token: token("b"), name: "Ben" });
+  ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
   await ben.next("welcome");
   ben.send({ t: "sit", seat: "jaune" });
   await ben.next("welcome", (frame) => frame.you.seat === "jaune");

@@ -2,7 +2,7 @@
 // zod/mini on both sides (CLAUDE.md: the server treats every client frame as hostile).
 //
 // Client → server: hello (always first), sit, stand, move, level, leave, start, act, pause, resume,
-// stop, reclaim, reclaimAnswer, chat, rematch. Server → client: welcome (the one snapshot), events (one batch of
+// stop, reclaim, reclaimAnswer, chat, rematch, speed. Server → client: welcome (the one snapshot), events (one batch of
 // play, already projected for its reader), table (public data only), error (a code, never a message),
 // the reclaim's reclaimRequest (to the chef de table) and reclaimResult (to the one who asked), and chat
 // (a quick message: a seat and one of twelve ids). No frame type carries a GameState, the deck rng, another seat's cards or a
@@ -32,8 +32,11 @@ import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
  * know (the chat frame, the welcome's chat key), and deploys are atomic.
  * 4 (plan 02-09): a won game makes the table « finished », with its winner and the rematch votes; a
  * page of version 3 cannot read that status (it would drop every table frame from the end on).
+ * 5 (plan 02-10b): the table's « Avance rapide » (TablePublic.fast, the speed frame); a page of
+ * version 4 would strip the flag and animate at the normal speed while the table plays at the fast
+ * pace (the computers no longer wait for its animations), so its moves would lag ever further behind.
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** The longest client frame, in characters, checked before JSON.parse (T-02-05). */
 export const MAX_FRAME_CHARS = 4096;
@@ -105,6 +108,7 @@ const clientFrameSchema = z.discriminatedUnion("t", [
   z.strictObject({ t: z.literal("reclaimAnswer"), seat: colour, accept: z.boolean() }),
   z.strictObject({ t: z.literal("chat"), msg: z.enum(QUICK_MESSAGES) }),
   z.strictObject({ t: z.literal("rematch"), agree: z.boolean() }),
+  z.strictObject({ t: z.literal("speed"), fast: z.boolean() }),
 ]);
 
 /** The first frame of every socket: the protocol version, the device token and the first name. */
@@ -151,6 +155,11 @@ export type ChatSendFrame = { t: "chat"; msg: QuickMessageId };
  * withdraws (a second tap). The game starts when every seated person online agrees.
  */
 export type RematchFrame = { t: "rematch"; agree: boolean };
+/**
+ * The chef de table switches the table's « Avance rapide » on or off (plan 02-10b): the computers
+ * think at the fast pace and every page plays the moves fast. Anyone else is refused (not-host).
+ */
+export type SpeedFrame = { t: "speed"; fast: boolean };
 export type ClientFrame =
   | HelloFrame
   | SitFrame
@@ -166,7 +175,8 @@ export type ClientFrame =
   | ReclaimFrame
   | ReclaimAnswerFrame
   | ChatSendFrame
-  | RematchFrame;
+  | RematchFrame
+  | SpeedFrame;
 
 export type ParsedClientFrame = { ok: true; frame: ClientFrame } | { ok: false };
 
@@ -256,6 +266,11 @@ export type TablePublic = {
   winner: Team | null;
   /** Each seat's answer to « Revanche », while the status is "finished"; else null. */
   rematch: Record<Color, RematchVote> | null;
+  /**
+   * The table's « Avance rapide » (plan 02-10b), set by the chef de table: the computers think at the
+   * fast pace, every page plays the moves fast.
+   */
+  fast: boolean;
   /** The server's clock when the frame was built (ms since the epoch): the countdown's reference. */
   now: number;
 };
@@ -353,6 +368,7 @@ const tablePublic = z.object({
   rematch: z.nullable(
     z.object({ bleu: rematchVote, jaune: rematchVote, rouge: rematchVote, vert: rematchVote }),
   ),
+  fast: z.boolean(),
   now: count,
 });
 /** The view and the events come from the engine's own builders on the server; the envelope is checked. */

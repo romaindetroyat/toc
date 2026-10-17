@@ -19,12 +19,12 @@ describe("the quick messages", () => {
     const stub = stubOf(id);
 
     const ana = await connect(id);
-    ana.send({ t: "hello", v: 4, token: token("a"), name: "Ana" });
+    ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
     await ana.next("welcome");
     ana.send({ t: "sit", seat: "bleu" });
     await ana.next("welcome", (frame) => frame.you.seat === "bleu");
     const ben = await connect(id);
-    ben.send({ t: "hello", v: 4, token: token("b"), name: "Ben" });
+    ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
     await ben.next("welcome");
     await evictDurableObject(stub);
 
@@ -62,7 +62,7 @@ describe("the quick messages", () => {
     ben.ws.close(1000, "bye");
     await ben.closed;
     const again = await connect(id);
-    again.send({ t: "hello", v: 4, token: token("b"), name: "Ben" });
+    again.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
     const welcome = await again.next("welcome");
     expect(welcome.chat.map((entry) => [entry.from, entry.msg])).toEqual([
       ["bleu", "bien-joue"],
