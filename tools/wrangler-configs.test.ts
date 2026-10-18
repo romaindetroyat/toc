@@ -4,7 +4,7 @@
 // one deploy would drop a class (02-RESEARCH Pitfall 8, 04-RESEARCH Pitfall 11). Neither may switch on the test-only shortcuts (T-02-07, Pitfall 11).
 
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -166,6 +166,60 @@ describe("wrangler configs", () => {
     }
     expect(embedded.vars).toEqual(upload.vars);
   });
+
+  // Plan 04-08: the embedded entry serves the service worker and the manifest of the web build. Its
+  // source runs here with the server and the file list replaced by stubs: /sw.js as JavaScript and
+  // /manifest.webmanifest as a manifest, both revalidated on every load (no-cache: a new service
+  // worker is found at once), while the hashed /assets/ files are immutable. The worker sits at the
+  // root, so its default scope is the whole origin and no Service-Worker-Allowed header is needed.
+  it("serves /sw.js and /manifest.webmanifest with their types and no-cache (plan 04-08)", async () => {
+    const source = readFileSync(join(ROOT, "worker-embedded/index.js"), "utf8");
+    const imports = [...source.matchAll(/^import .*;$/gm)].map((m) => m[0]);
+    expect(imports).toHaveLength(2);
+    const stubbed = source
+      .replace(
+        imports[0] ?? "",
+        "class GameRoom {}\nclass PlayerHub {}\nconst handleRequest = async () => null;",
+      )
+      .replace(
+        imports[1] ?? "",
+        'const files = { "/index.html": "<html></html>", "/sw.js": "self", ' +
+          '"/manifest.webmanifest": "{}", "/assets/index-abc.js": "app" };',
+      );
+    const dir = mkdtempSync(join(tmpdir(), "toc-entry-"));
+    const file = join(dir, "entry.mjs");
+    writeFileSync(file, stubbed);
+    const entry = (await import(file)) as {
+      default: { fetch: (request: Request, env: unknown) => Promise<Response> };
+    };
+    const get = (path: string) => entry.default.fetch(new Request(`https://toc.test${path}`), {});
+    const sw = await get("/sw.js");
+    expect(sw.status).toBe(200);
+    expect(sw.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+    expect(sw.headers.get("cache-control")).toBe("no-cache");
+    expect(await sw.text()).toBe("self");
+    const manifest = await get("/manifest.webmanifest");
+    expect(manifest.headers.get("content-type")).toBe("application/manifest+json");
+    expect(manifest.headers.get("cache-control")).toBe("no-cache");
+    const root = await get("/");
+    expect(root.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(root.headers.get("cache-control")).toBe("no-cache");
+    const hashed = await get("/assets/index-abc.js");
+    expect(hashed.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    // A missing file with a dot is a 404, never the app (a stale /sw-old.js must not get index.html).
+    expect((await get("/sw-old.js")).status).toBe(404);
+    rmSync(dir, { recursive: true });
+  });
+
+  // When the web build is there, it carries the service worker at its root (not under /assets/, so it
+  // is revalidated) and the build-embedded-worker tool picks it up with every other file.
+  it.runIf(existsSync(join(ROOT, "apps/web/dist/index.html")))(
+    "the web build has /sw.js and /manifest.webmanifest at its root (plan 04-08)",
+    () => {
+      expect(existsSync(join(ROOT, "apps/web/dist/sw.js"))).toBe(true);
+      expect(existsSync(join(ROOT, "apps/web/dist/manifest.webmanifest"))).toBe(true);
+    },
+  );
 
   it("names no secret in a deploy config (T-04-22, T-04-26)", () => {
     for (const file of ["wrangler.jsonc", "wrangler.embarque.jsonc"]) {
