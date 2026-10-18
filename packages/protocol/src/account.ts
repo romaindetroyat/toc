@@ -3,7 +3,9 @@
 // base32, 100 bits), the invitation code, the device label of a passkey, and the zod/mini bodies and
 // answers of the account API. Pure, no I/O; no e-mail anywhere (D-01).
 
+import { COLORS } from "@toc/engine";
 import * as z from "zod/mini";
+import { TABLE_ID_RE } from "./names.ts";
 
 // --- Pseudo (D-04) ---
 
@@ -334,3 +336,23 @@ const recoverRefusal = z.discriminatedUnion("error", [
 export type RecoverRefusal = z.infer<typeof recoverRefusal>;
 
 export const parseRecoverRefusal = read<RecoverRefusal>(recoverRefusal);
+
+// --- The account's tables (plan 04-04, ACCT-02) ---
+
+/** The most tables GET /api/me/tables lists, newest first (the device list keeps as many). */
+export const MAX_ACCOUNT_TABLES = 20;
+
+const accountTable = z.object({
+  tableId: z.string().check(z.regex(TABLE_ID_RE)),
+  /** The account's seat there; null when it is at the table without a seat. */
+  seat: z.nullable(z.enum(COLORS)),
+  joinedAt: z.number(),
+});
+
+/** One row of GET /api/me/tables: a table the account sits at (« Mes parties en cours »). */
+export type AccountTable = z.infer<typeof accountTable>;
+
+/** GET /api/me/tables: the account's tables, newest first, at most MAX_ACCOUNT_TABLES. */
+export const parseAccountTables = read<AccountTable[]>(
+  z.array(accountTable).check(z.maxLength(MAX_ACCOUNT_TABLES)),
+);

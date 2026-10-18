@@ -56,8 +56,8 @@ async function leaSignsUpAtHerSeat(): Promise<{ id: string; lea: Person; jar: Ja
   await hello(guest, "a", "Léo");
   guest.send({ t: "sit", seat: "bleu" });
   await guest.next("welcome", (frame) => frame.you.seat === "bleu");
+  // The page goes (its close event reaches the test side only with the next ping: not awaited).
   guest.ws.close(1000);
-  await guest.closed;
   const jar = newJar();
   const lea = await signUpPerson(pseudo("Léonie"), jar);
   return { id, lea, jar };
@@ -105,7 +105,6 @@ describe("the Worker forwards the account on the upgrade", () => {
     await hello(phone, "a", "Léo");
     await untilRows(1, MEMBERS);
     phone.ws.close(1000);
-    await phone.closed;
     const signedOut = await connect(id);
     const welcome = await hello(signedOut, "a", "Léo");
     expect(welcome.you.seat).toBeNull();

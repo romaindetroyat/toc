@@ -21,6 +21,12 @@
 //                                      locks after 5 wrong ones), then creation options for a passkey
 //   POST /api/auth/recover/verify    → the new passkey, every other session ended, a new session and
 //                                      a new backup code, shown once
+// Plan 04-04:
+//   GET  /api/me/tables              → the account's tables (« Mes parties en cours » everywhere)
+//   DELETE /api/me/tables/:id        → one forgotten (Origin, no body), 204
+//   GET  /ws/table/:id with a session cookie → our non-null Origin required; the upgrade reaches
+//                                      the GameRoom as a new request carrying x-toc-account and
+//                                      x-toc-pseudo, set by the Worker only
 //   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
@@ -38,11 +44,12 @@ import {
   removePasskey,
 } from "./auth/passkeys.ts";
 import { recoverOptions, recoverVerify } from "./auth/recover.ts";
+import { hasCookie, sessionUser } from "./auth/session.ts";
 import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./auth/signup.ts";
 import { Meter } from "./db.ts";
-import { GameRoom } from "./GameRoom.ts";
+import { ACCOUNT_HEADER, GameRoom, PSEUDO_HEADER } from "./GameRoom.ts";
 import { json, notAllowed, writeAllowed } from "./http.ts";
-import { meRoute } from "./me.ts";
+import { meRoute, meTablesRoute } from "./me.ts";
 import { PlayerHub } from "./PlayerHub.ts";
 
 // The two Durable Object classes of both deploy configs (GameRoom: migration v1; PlayerHub, one per
@@ -153,6 +160,8 @@ async function accountRoute(
     if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
     return meRoute(request, env, url, meter, now);
   }
+  const tables = await meTablesRoute(request, env, url, meter, now);
+  if (tables !== null) return tables;
   const post = POSTS.get(path);
   const key = post === undefined ? /^\/api\/auth\/passkeys\/([^/]+)$/.exec(path) : null;
   if (key !== null) {
@@ -168,6 +177,31 @@ async function accountRoute(
   if (!writeAllowed(request, url)) return json({ error: "origin" }, 403);
   if (post !== undefined) return post(request, env, url, meter, now);
   return mintInvitation(request, meter, now);
+}
+
+/**
+ * The table upgrade, forwarded as a new request (plan 04-04, T-04-08): only Upgrade, and for a
+ * session the account the Worker read from the cookie (x-toc-account, x-toc-pseudo encoded); a copy
+ * the client sent never reaches the GameRoom. With a session cookie the upgrade needs our own
+ * non-null Origin (T-04-02); a guest keeps the phase-2 rule (sameOrigin, checked before).
+ */
+async function tableUpgrade(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+  id: string,
+): Promise<Response> {
+  const me = hasCookie(request, url, env)
+    ? await sessionUser(request, url, env, meter, Date.now())
+    : null;
+  if (me !== null && !writeAllowed(request, url)) return new Response("Refusé", { status: 403 });
+  const headers = new Headers({ Upgrade: "websocket" });
+  if (me !== null) {
+    headers.set(ACCOUNT_HEADER, me.id);
+    headers.set(PSEUDO_HEADER, encodeURIComponent(me.pseudo));
+  }
+  return env.GAME_ROOM.getByName(id).fetch(new Request(request.url, { headers }));
 }
 
 async function route(request: Request, env: Env, url: URL, meter: Meter): Promise<Response | null> {
@@ -188,7 +222,7 @@ async function route(request: Request, env: Env, url: URL, meter: Meter): Promis
     // A malformed id never reaches getByName, so random paths create no object (T-02-04).
     if (!isTableId(id)) return new Response("Table introuvable", { status: 404 });
     if (!sameOrigin(request, url)) return new Response("Refusé", { status: 403 });
-    return env.GAME_ROOM.getByName(id).fetch(request);
+    return tableUpgrade(request, env, url, meter, id);
   }
 
   if (isApi(url.pathname) || url.pathname.startsWith("/ws/")) {

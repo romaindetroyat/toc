@@ -9,8 +9,8 @@
 // production's rescan, a minute later).
 //
 // Nothing lives only in memory: `cached` is a copy of the snapshot, dropped on eviction and read again
-// from SQLite. Sockets carry their person in their attachment ({ who, helloAt }), which survives
-// hibernation. No timer function anywhere: deadlines are alarms (CLAUDE.md, Hibernation API).
+// from SQLite. Sockets carry their person in their attachment ({ who, helloAt, account }), which
+// survives hibernation. No timer function anywhere: deadlines are alarms (CLAUDE.md, Hibernation API).
 //
 // Presence (plan 02-06, 02-RESEARCH Pattern 7, Pitfall 5): a socket closing is a `gone` (the fast
 // path, the page's pagehide closes with 1000). A locked phone may keep its socket open without a
@@ -30,6 +30,12 @@
 // D1 (src/record.ts, one row per game whatever happens) and, when written or when there is no DB
 // binding yet, the `recorded` command clears it. A failed write leaves it pending: the table already
 // armed its d1Retry deadline. Nothing on the game path reads D1.
+//
+// Accounts (plan 04-04, 04-RESEARCH Pattern 4): the Worker forwards the session's account on the
+// upgrade (x-toc-account, x-toc-pseudo, set by the Worker only); the attachment keeps it. At hello
+// the object hashes the device, guest and account ids, then @toc/table's resolveWho picks the person
+// (rules 1-4) on the table as it is after that await. A step that links a person or moves a linked
+// person's seat writes table_members after the commit (members.ts), best effort.
 
 import { DurableObject } from "cloudflare:workers";
 import type { Rng } from "@toc/engine";
@@ -48,18 +54,32 @@ import {
   type Command,
   createTable,
   type GameRecord,
+  type HelloAccount,
+  type Member,
   nextDeadline,
   reduce,
+  resolveWho,
   SILENCE_MS,
   summary,
   type Table,
   type TestOptions,
 } from "@toc/table";
+import { writeMembers } from "./members.ts";
 import { writeGame } from "./record.ts";
 import { commit, createSchema, hasTable, load } from "./storage.ts";
 
-/** What a socket remembers through hibernation: its person, once it said hello. */
-type Attachment = { who: string | null; helloAt: number };
+/**
+ * What a socket remembers through hibernation: its person, once it said hello, and the account the
+ * Worker forwarded on its upgrade (plan 04-04), null for a guest.
+ */
+type Attachment = { who: string | null; helloAt: number; account: HelloAccount | null };
+
+/** Set by the Worker only, from the session cookie (index.ts tableUpgrade, T-04-08). */
+export const ACCOUNT_HEADER = "x-toc-account";
+export const PSEUDO_HEADER = "x-toc-pseudo";
+
+/** A socket forgotten (closed by the object): its close handler finds no person. */
+const FORGOTTEN: Attachment = { who: null, helloAt: 0, account: null };
 
 /** Four words from the secure random source (deck seeds, the computers' stream). */
 export function randomSeed(): Rng {
@@ -68,18 +88,32 @@ export function randomSeed(): Rng {
   return [words[0] as number, words[1] as number, words[2] as number, words[3] as number];
 }
 
-/** A person's id at one table: SHA-256 of the table id and the device token (T-02-06). */
-async function personId(tableId: string, token: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(`${tableId}:${token}`),
-  );
+/**
+ * A person's id at one table: base64url SHA-256 of the table id and a device token (T-02-06), or of
+ * `${tableId}:guest:${token}` (a signed-out device on a linked person, rule 4) or
+ * `${tableId}:acct:${userId}` (a new account person, rule 3; plan 04-04).
+ */
+async function personId(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return toBase64Url(new Uint8Array(digest));
 }
 
 function attachmentOf(ws: WebSocket): Attachment {
   const value = ws.deserializeAttachment() as Partial<Attachment> | null;
-  return { who: value?.who ?? null, helloAt: value?.helloAt ?? 0 };
+  return { who: value?.who ?? null, helloAt: value?.helloAt ?? 0, account: value?.account ?? null };
+}
+
+/** The account the Worker forwarded on the upgrade, or null (a guest, or headers out of shape). */
+function forwardedAccount(request: Request): HelloAccount | null {
+  const id = request.headers.get(ACCOUNT_HEADER);
+  const encoded = request.headers.get(PSEUDO_HEADER);
+  if (id === null || encoded === null || id === "" || id.length > 64) return null;
+  try {
+    const pseudo = decodeURIComponent(encoded);
+    return pseudo === "" || pseudo.length > 200 ? null : { id, pseudo };
+  } catch {
+    return null;
+  }
 }
 
 export class GameRoom extends DurableObject<Env> {
@@ -125,7 +159,10 @@ export class GameRoom extends DurableObject<Env> {
     return table === null ? null : summary(table);
   }
 
-  /** The WebSocket upgrade, already checked by the Worker (id format, Origin). */
+  /**
+   * The WebSocket upgrade, already checked by the Worker (id format, Origin), which also set the
+   * account headers from the session cookie (plan 04-04).
+   */
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Upgrade attendu", { status: 426 });
@@ -134,7 +171,11 @@ export class GameRoom extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ who: null, helloAt: Date.now() } satisfies Attachment);
+    server.serializeAttachment({
+      who: null,
+      helloAt: Date.now(),
+      account: forwardedAccount(request),
+    } satisfies Attachment);
     // An unknown id: the socket is closed at once and nothing is written.
     if (!hasTable(this.ctx.storage.sql)) server.close(CLOSE_GONE, "table introuvable");
     return new Response(null, { status: 101, webSocket: client });
@@ -164,17 +205,36 @@ export class GameRoom extends DurableObject<Env> {
       ws.close(CLOSE_GONE, "table introuvable");
       return;
     }
-    // The only await of the handler, before the synchronous section.
-    const who = await personId(table.tableId, frame.token);
-    ws.serializeAttachment({ who, helloAt: Date.now() } satisfies Attachment);
-    // One live socket per device: the older one is told it is open elsewhere.
+    // The only await before the synchronous section: the device, guest and account hashes.
+    const tableId = table.tableId;
+    const account = attachment.account;
+    const [device, guest, accountWho] = await Promise.all([
+      personId(`${tableId}:${frame.token}`),
+      personId(`${tableId}:guest:${frame.token}`),
+      account === null ? null : personId(`${tableId}:acct:${account.id}`),
+    ]);
+    const current = this.table();
+    if (current === null) {
+      ws.close(CLOSE_GONE, "table introuvable");
+      return;
+    }
+    // The four rules of 04-RESEARCH Pattern 4 on the table as it is now (accounts.ts).
+    const who = resolveWho(current, {
+      device,
+      guest,
+      account: account === null || accountWho === null ? null : { id: account.id, who: accountWho },
+    });
+    ws.serializeAttachment({ who, helloAt: Date.now(), account } satisfies Attachment);
+    // One live socket per person: the older one is told it is open elsewhere (another device of
+    // the same account included, rule 1).
     for (const other of this.ctx.getWebSockets()) {
       if (other !== ws && attachmentOf(other).who === who) {
-        other.serializeAttachment({ who: null, helloAt: 0 } satisfies Attachment);
+        other.serializeAttachment(FORGOTTEN);
         other.close(CLOSE_ELSEWHERE, "ouverte ailleurs");
       }
     }
-    this.run({ t: "hello", who, name: frame.name });
+    // A link or a seat change writes table_members before the handler ends.
+    await this.run({ t: "hello", who, name: frame.name, account });
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -214,7 +274,7 @@ export class GameRoom extends DurableObject<Env> {
       const answered = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
       if (now - Math.max(answered, helloAt) <= SILENCE_MS) continue;
       // Its close handler must not run `gone` a second time: the attachment forgets the person.
-      ws.serializeAttachment({ who: null, helloAt: 0 } satisfies Attachment);
+      ws.serializeAttachment(FORGOTTEN);
       try {
         ws.close(CLOSE_SILENT, "silencieux");
       } catch {
@@ -251,7 +311,8 @@ export class GameRoom extends DurableObject<Env> {
   /**
    * reduce → commit (synchronous SQL) → per-person sends → the alarm at the next deadline. A purge
    * (only from a tick) returns the deletion's promise, which the alarm awaits; finished games'
-   * records return the D1 writes' promise, which the handler awaits.
+   * records and the account's tables (plan 04-04) return the D1 writes' promise, which the handler
+   * awaits.
    */
   private run(command: Command): Promise<void> | undefined {
     const table = this.table();
@@ -272,8 +333,28 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
     this.arm(nextDeadline(result.table));
+    const writes: Promise<void>[] = [];
     if (result.records !== undefined && result.records.length > 0) {
-      return this.record(result.table.tableId, result.records);
+      writes.push(this.record(result.table.tableId, result.records));
+    }
+    if (result.members !== undefined && result.members.length > 0) {
+      writes.push(this.members(result.table.tableId, result.members, now));
+    }
+    if (writes.length === 0) return;
+    return writes.length === 1 ? writes[0] : Promise.all(writes).then(() => undefined);
+  }
+
+  /**
+   * Writes the account's tables to D1 after the commit (plan 04-04, members.ts): best effort, a
+   * failure logged and ignored (the next seat change writes the row again); no DB binding is logged
+   * once, like the game records.
+   */
+  private async members(tableId: string, members: readonly Member[], now: number): Promise<void> {
+    const { outcome } = await writeMembers(this.env.DB, tableId, members, now);
+    if (outcome === "failed") console.warn("table members: not written to D1");
+    if (outcome === "skipped" && !this.toldNoDatabase) {
+      this.toldNoDatabase = true;
+      console.log("table members: no D1 binding (DB), the account's tables are not kept");
     }
   }
 
@@ -304,7 +385,7 @@ export class GameRoom extends DurableObject<Env> {
     this.cached = null;
     this.armed = null;
     for (const ws of this.ctx.getWebSockets()) {
-      ws.serializeAttachment({ who: null, helloAt: 0 } satisfies Attachment);
+      ws.serializeAttachment(FORGOTTEN);
       try {
         ws.close(CLOSE_GONE, "table effacée");
       } catch {
