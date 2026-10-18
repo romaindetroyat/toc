@@ -2,16 +2,24 @@ import type { MeAccount } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import type { ApiDeps } from "../net/api.ts";
 import {
+  acceptInvitation,
   addPasskey,
+  createInvitation,
+  disableInvitation,
   forgetMyTable,
+  friendCode,
+  friends,
   invitationState,
   logIn,
   logOut,
   me,
   myTables,
   newBackupCode,
+  pendingInvitations,
   recover,
   recoverVerify,
+  redeemFriendCode,
+  removeFriend,
   removePasskey,
   signUp,
 } from "./api.ts";
@@ -754,5 +762,201 @@ describe("myTables and forgetMyTable", () => {
     const bad = api(() => new Response(null, { status: 204 }));
     expect(await forgetMyTable("../../x", bad.deps)).toEqual({ ok: false, reason: "unknown" });
     expect(bad.calls).toHaveLength(0);
+  });
+});
+
+// --- Plan 04-05: invitation links, friend codes, the friends list ---
+
+describe("invitation links (plan 04-05)", () => {
+  const ID = "i".repeat(22);
+  const FRIEND = { id: "f".repeat(22), pseudo: "Zoé", since: 7 };
+
+  it("createInvitation: POST /api/invitations {}, the link; limit, signed-out, offline, server", async () => {
+    const created = { id: ID, code: CODE, expiresAt: 9 };
+    const { deps, calls } = api(() => json(created, 201));
+    expect(await createInvitation(deps)).toEqual({ ok: true, invitation: created });
+    expect(calls[0]?.url).toBe("/api/invitations");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.init?.body).toBe("{}");
+    const cases: [Response, string][] = [
+      [json({ error: "limit" }, 409), "limit"],
+      [json({ error: "signed-out" }, 401), "signed-out"],
+      [json({ error: "origin" }, 403), "server"],
+      [json({}, 500), "server"],
+      [json({ id: ID, code: "x", expiresAt: 9 }, 201), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      expect(await createInvitation(api(() => response.clone()).deps), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    expect(await createInvitation(api(() => json(created, 201), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+    const rejecting = api(() => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await createInvitation(rejecting.deps)).toEqual({ ok: false, reason: "offline" });
+  });
+
+  it("pendingInvitations: GET /api/invitations, read with the shared schema", async () => {
+    const list = [{ id: ID, createdAt: 1, expiresAt: 2 }];
+    const { deps, calls } = api(() => json(list, 200));
+    expect(await pendingInvitations(deps)).toEqual({ ok: true, invitations: list });
+    expect(calls[0]?.url).toBe("/api/invitations");
+    expect(calls[0]?.init?.method).toBe("GET");
+    expect(await pendingInvitations(api(() => json({ error: "signed-out" }, 401)).deps)).toEqual({
+      ok: false,
+      reason: "signed-out",
+    });
+    expect(await pendingInvitations(api(() => json([{ id: 1 }], 200)).deps)).toEqual({
+      ok: false,
+      reason: "server",
+    });
+    expect(await pendingInvitations(api(() => json(list, 200), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+
+  it("disableInvitation: DELETE /api/invitations/<id>; 404 unknown; a bad id never leaves", async () => {
+    const { deps, calls } = api(() => new Response(null, { status: 204 }));
+    expect(await disableInvitation(ID, deps)).toEqual({ ok: true });
+    expect(calls[0]?.url).toBe(`/api/invitations/${ID}`);
+    expect(calls[0]?.init?.method).toBe("DELETE");
+    expect(await disableInvitation(ID, api(() => json({ error: "not-found" }, 404)).deps)).toEqual({
+      ok: false,
+      reason: "unknown",
+    });
+    const bad = api(() => new Response(null, { status: 204 }));
+    expect(await disableInvitation("../x", bad.deps)).toEqual({ ok: false, reason: "unknown" });
+    expect(bad.calls).toHaveLength(0);
+  });
+
+  it("acceptInvitation: the friend, already or not; own, used, expired, unknown", async () => {
+    const { deps, calls } = api(() => json({ friend: FRIEND }, 200));
+    expect(await acceptInvitation(CODE, deps)).toEqual({
+      ok: true,
+      friend: FRIEND,
+      already: false,
+    });
+    expect(calls[0]?.url).toBe(`/api/invitations/${CODE}/accept`);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(
+      await acceptInvitation(CODE, api(() => json({ already: true, friend: FRIEND }, 200)).deps),
+    ).toEqual({ ok: true, friend: FRIEND, already: true });
+    const cases: [Response, string][] = [
+      [json({ error: "own" }, 409), "own"],
+      [json({ error: "used" }, 410), "used"],
+      [json({ error: "expired" }, 410), "expired"],
+      [json({ error: "unknown" }, 410), "unknown"],
+      [json({ error: "signed-out" }, 401), "signed-out"],
+      [json({ friend: { id: 1 } }, 200), "server"],
+      [json({}, 503), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      expect(await acceptInvitation(CODE, api(() => response.clone()).deps), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    const bad = api(() => json({ friend: FRIEND }, 200));
+    expect(await acceptInvitation("short", bad.deps)).toEqual({ ok: false, reason: "unknown" });
+    expect(bad.calls).toHaveLength(0);
+  });
+});
+
+describe("friend codes and the friends list (plan 04-05)", () => {
+  const FRIEND = { id: "f".repeat(22), pseudo: "Zoé", since: 7 };
+
+  it("friendCode: POST /api/friends/code {}, the code and its expiry", async () => {
+    const { deps, calls } = api(() => json({ code: "K7QM2XRA", expiresAt: 9 }, 201));
+    expect(await friendCode(deps)).toEqual({ ok: true, code: "K7QM2XRA", expiresAt: 9 });
+    expect(calls[0]?.url).toBe("/api/friends/code");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(await friendCode(api(() => json({ code: "nope", expiresAt: 9 }, 201)).deps)).toEqual({
+      ok: false,
+      reason: "server",
+    });
+    expect(await friendCode(api(() => json({ error: "signed-out" }, 401)).deps)).toEqual({
+      ok: false,
+      reason: "signed-out",
+    });
+    expect(await friendCode(api(() => json({}, 201), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+
+  it("redeemFriendCode: the code read back first; format never leaves", async () => {
+    const { deps, calls } = api(() => json({ friend: FRIEND }, 200));
+    expect(await redeemFriendCode("toc-k7qm-2xra", deps)).toEqual({
+      ok: true,
+      friend: FRIEND,
+      already: false,
+    });
+    expect(calls[0]?.url).toBe("/api/friends/code/redeem");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ code: "K7QM2XRA" });
+    const bad = api(() => json({ friend: FRIEND }, 200));
+    expect(await redeemFriendCode("TOC-K7QM", bad.deps)).toEqual({ ok: false, reason: "format" });
+    expect(bad.calls).toHaveLength(0);
+    const cases: [Response, string][] = [
+      [json({ error: "format" }, 400), "format"],
+      [json({ error: "unknown" }, 404), "unknown"],
+      [json({ error: "own" }, 409), "own"],
+      [json({ error: "rate" }, 429), "rate"],
+      [json({ error: "signed-out" }, 401), "signed-out"],
+      [json({ error: "config" }, 503), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      expect(await redeemFriendCode("K7QM2XRA", api(() => response.clone()).deps), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    expect(
+      await redeemFriendCode(
+        "K7QM2XRA",
+        api(() => json({ already: true, friend: FRIEND }, 200)).deps,
+      ),
+    ).toEqual({ ok: true, friend: FRIEND, already: true });
+    expect(await redeemFriendCode("K7QM2XRA", api(() => json({}, 200), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+
+  it("friends: GET /api/friends; removeFriend: DELETE /api/friends/<id>", async () => {
+    const { deps, calls } = api(() => json([FRIEND], 200));
+    expect(await friends(deps)).toEqual({ ok: true, friends: [FRIEND] });
+    expect(calls[0]?.url).toBe("/api/friends");
+    expect(await friends(api(() => json([{ pseudo: 3 }], 200)).deps)).toEqual({
+      ok: false,
+      reason: "server",
+    });
+    expect(await friends(api(() => json({ error: "signed-out" }, 401)).deps)).toEqual({
+      ok: false,
+      reason: "signed-out",
+    });
+
+    const removing = api(() => new Response(null, { status: 204 }));
+    expect(await removeFriend(FRIEND.id, removing.deps)).toEqual({ ok: true });
+    expect(removing.calls[0]?.url).toBe(`/api/friends/${FRIEND.id}`);
+    expect(removing.calls[0]?.init?.method).toBe("DELETE");
+    expect(
+      await removeFriend(FRIEND.id, api(() => json({ error: "not-found" }, 404)).deps),
+    ).toEqual({
+      ok: false,
+      reason: "unknown",
+    });
+    const bad = api(() => new Response(null, { status: 204 }));
+    expect(await removeFriend("code", bad.deps)).toEqual({ ok: false, reason: "unknown" });
+    expect(bad.calls).toHaveLength(0);
+    expect(await removeFriend(FRIEND.id, api(() => json({}, 204), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
   });
 });

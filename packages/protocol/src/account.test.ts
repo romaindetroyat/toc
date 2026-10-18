@@ -7,14 +7,20 @@ import {
   CROCKFORD,
   deviceLabel,
   EmptyBody,
+  FRIEND_CODE_LENGTH,
+  FRIEND_CODE_TTL_MS,
+  FriendCodeRedeemBody,
   formatBackupCode,
+  formatFriendCode,
   INVITE_TTL_MS,
   isInvitationCode,
   LoginVerifyBody,
   MAX_API_BODY,
   MAX_PENDING_INVITATIONS,
   newBackupCode,
+  newFriendCode,
   normalizeBackupCode,
+  normalizeFriendCode,
   normalizePseudo,
   PSEUDO_MAX,
   PSEUDO_MIN,
@@ -22,6 +28,7 @@ import {
   parseBackupCodeAnswer,
   parseCreatedInvitation,
   parseFriendAnswer,
+  parseFriendCodeAnswer,
   parseFriends,
   parseInvitationState,
   parseLoginAnswer,
@@ -478,5 +485,65 @@ describe("invitation links and friends (plan 04-05)", () => {
     expect(parseFriendAnswer({ already: true, friend })).toEqual({ already: true, friend });
     expect(parseFriendAnswer({ already: false, friend })).toBeNull();
     expect(parseFriendAnswer({})).toBeNull();
+  });
+});
+
+describe("friend codes (plan 04-05)", () => {
+  it("8 Crockford symbols (40 bits), valid 24 hours, shown as TOC-XXXX-XXXX", () => {
+    expect(FRIEND_CODE_LENGTH).toBe(8);
+    expect(FRIEND_CODE_TTL_MS).toBe(24 * 3600 * 1000);
+    const code = newFriendCode();
+    expect(code).toMatch(/^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$/);
+    expect(formatFriendCode("K7QM2XRA")).toBe("TOC-K7QM-2XRA");
+    // Each symbol from one byte: the whole alphabet is reachable.
+    expect(newFriendCode((bytes) => bytes.fill(31))).toBe("ZZZZZZZZ");
+    expect(newFriendCode((bytes) => bytes.fill(32))).toBe("00000000");
+  });
+
+  it("reads back what a person types: prefix or not, dashes, spaces, lower case, O, I and L", () => {
+    const cases: [string, string][] = [
+      ["TOC-K7QM-2XRA", "K7QM2XRA"],
+      ["K7QM-2XRA", "K7QM2XRA"],
+      ["k7qm2xra", "K7QM2XRA"],
+      [" toc k7qm 2xra ", "K7QM2XRA"],
+      ["TOC–K7QM–2XRA", "K7QM2XRA"],
+      ["t0c-k7qm-2xra", "K7QM2XRA"],
+      ["TOC-OOII-LLAA", "001111AA"],
+      ["T0C12345", "T0C12345"],
+    ];
+    for (const [typed, code] of cases) expect(normalizeFriendCode(typed), typed).toBe(code);
+    for (const bad of [
+      "K7QM2XR",
+      "K7QM2XRAP",
+      "TOC-K7QM-2XR",
+      "TOC-K7QM-2XRAP",
+      "UUUUUUUU",
+      "",
+      12,
+    ]) {
+      expect(normalizeFriendCode(bad), String(bad)).toBeNull();
+    }
+    expect(normalizeFriendCode("A".repeat(65))).toBeNull();
+  });
+
+  it("every new code reads back as itself, with or without its form", () => {
+    fc.assert(
+      fc.property(fc.uint8Array({ minLength: 8, maxLength: 8 }), (seed) => {
+        const code = newFriendCode((bytes) => bytes.set(seed));
+        return (
+          normalizeFriendCode(code) === code && normalizeFriendCode(formatFriendCode(code)) === code
+        );
+      }),
+    );
+  });
+
+  it("the redeem body and the code answer", () => {
+    expect(FriendCodeRedeemBody.safeParse({ code: "TOC-K7QM-2XRA" }).success).toBe(true);
+    expect(FriendCodeRedeemBody.safeParse({ code: "x".repeat(65) }).success).toBe(false);
+    expect(FriendCodeRedeemBody.safeParse({ code: "K7QM2XRA", more: 1 }).success).toBe(false);
+    const answer = { code: "K7QM2XRA", expiresAt: 5 };
+    expect(parseFriendCodeAnswer(answer)).toEqual(answer);
+    expect(parseFriendCodeAnswer({ ...answer, code: "TOC-K7QM-2XRA" })).toBeNull();
+    expect(parseFriendCodeAnswer({ code: "K7QM2XRA" })).toBeNull();
   });
 });

@@ -199,6 +199,20 @@ describe("PlayerHub.allow", () => {
     expect(await stub.allow({ kind: "x", max: 1, windowMs: HOUR })).toBe(true);
     expect(await stub.allow({ kind: "x", max: 1, windowMs: HOUR })).toBe(false);
   });
+
+  it("release gives back one call counted at that time, of that kind only (plan 04-05)", async () => {
+    const stub = hub();
+    const limit = { kind: "code-fail", max: 2, windowMs: HOUR };
+    expect(await stub.allow({ ...limit, now: T0 })).toBe(true);
+    expect(await stub.allow({ ...limit, now: T0 + 1 })).toBe(true);
+    expect(await stub.allow({ ...limit, now: T0 + 2 })).toBe(false);
+    await stub.release({ kind: "code-fail", at: T0 + 1 });
+    // Another kind or a time never counted gives nothing back.
+    await stub.release({ kind: "other", at: T0 });
+    await stub.release({ kind: "code-fail", at: T0 + 5 });
+    expect(await stub.allow({ ...limit, now: T0 + 3 })).toBe(true);
+    expect(await stub.allow({ ...limit, now: T0 + 4 })).toBe(false);
+  });
 });
 
 describe("PlayerHub per account", () => {
