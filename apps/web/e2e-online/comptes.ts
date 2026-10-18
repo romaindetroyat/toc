@@ -314,3 +314,39 @@ export async function befriend(a: Page, b: Page): Promise<void> {
   }, code);
   expect(status).toBe(200);
 }
+
+// --- Plan 04-11: the app's hub socket and « Se déconnecter », for amis-table.spec.ts ---
+
+/** A notice the page's PlayerHub sent (GET /ws/me): its kind and table. */
+export type HubNotice = { kind: string; table: string; from: string };
+
+/** Every notice frame `page` receives on its hub socket, in order (set up before the page loads). */
+export function listenNotices(page: Page): HubNotice[] {
+  const notices: HubNotice[] = [];
+  page.on("websocket", (ws) => {
+    if (!ws.url().endsWith("/ws/me")) return;
+    ws.on("framereceived", ({ payload }) => {
+      const text = typeof payload === "string" ? payload : payload.toString("utf8");
+      if (text === "pong") return;
+      const frame = JSON.parse(text) as { t?: string } & HubNotice;
+      if (frame.t === "notice")
+        notices.push({ kind: frame.kind, table: frame.table, from: frame.from });
+    });
+  });
+  return notices;
+}
+
+/** « Mon compte » → « Se déconnecter » → the confirmation's « Se déconnecter »: the guest home. */
+export async function signOutHere(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.goto("/#/compte");
+  await page
+    .locator("[data-account-identity]")
+    .getByRole("button", { name: "Se déconnecter" })
+    .click();
+  await page
+    .getByRole("dialog", { name: /^Se déconnecter de cet appareil\s\?$/ })
+    .getByRole("button", { name: "Se déconnecter" })
+    .click();
+  await expect(page.locator('[data-small-tile="connexion"]')).toBeVisible();
+}

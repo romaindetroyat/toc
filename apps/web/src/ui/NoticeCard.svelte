@@ -10,10 +10,10 @@
   // table that waits for this player, from the app's PlayerHub (hub.svelte.ts), whose rules
   // (noticeRule.ts) hold it during a game, at a table that plays, on the backup-code screen and in
   // sign-up or recovery, and keep only the latest. Top centre, 8 px under the safe area, at most
-  // 440 wide; one row from 600 px wide (icon, text, « Plus tard », the primary), else the text over the
-  // two buttons. Not modal: the focus stays where it is, the card comes first in the Tab order (App
-  // mounts it before the routes), Échap while the focus is in it is « Plus tard ». Its text is read
-  // once by a polite live region. The primary opens #/table/<id> (a table id only, T-04-71); from a
+  // 440 wide; one row from 600 px wide (icon, text, « Plus tard », the primary) when the buttons leave
+  // the text 160 px, else (and under 600 px) the text over the two buttons. Not modal: the focus stays
+  // where it is, the card comes first in the Tab order (App mounts it before the routes), Échap while
+  // the focus is in it is « Plus tard ». Its text is read once by a polite live region. The primary opens #/table/<id> (a table id only, T-04-71); from a
   // waiting room that leaves it as closing the page would (no confirmation, UI-SPEC « à confirmer » 11).
   type Props = { hub: HubConnection };
 
@@ -130,16 +130,22 @@
     min-height: var(--touch);
   }
 
-  /* One row from 600 px wide: icon, text (up to two lines), « Plus tard », the primary. */
+  /* One row from 600 px wide: icon, text (two lines), « Plus tard », the primary. The text keeps at
+     least 160 px: when the buttons do not fit beside it (« Revenir à la table » is 182 px), they go
+     under it, right-aligned, so the text never wraps into a narrow column. */
   @media (min-width: 600px) {
     .card {
-      flex-direction: row;
+      flex-flow: row wrap;
       align-items: center;
     }
 
     .text {
-      flex: 1 1 auto;
+      flex: 1 1 160px;
       align-items: center;
+    }
+
+    .buttons {
+      margin-left: auto;
     }
 
     .text :global(svg) {

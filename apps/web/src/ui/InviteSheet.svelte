@@ -348,9 +348,14 @@
       gap: var(--space-xs);
     }
 
-    /* The link tab fits the sheet's 199 px body at 844 x 390: 44 + 4 + 148 (UI-SPEC backstop). */
+    /* The link tab fits the sheet's 199 px body at 844 x 390 (UI-SPEC backstop): the control 44 high
+       borders included (40 + 2 x 2), 4, then the 02 column 148: 196. */
     .tabbed {
       gap: var(--space-xs);
+    }
+
+    .tabbed :global([role="radio"]) {
+      min-height: calc(var(--touch) - 4px);
     }
   }
 </style>

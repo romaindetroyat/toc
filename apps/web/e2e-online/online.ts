@@ -16,6 +16,8 @@ export type TableTest = {
   levels?: Partial<Record<"bleu" | "jaune" | "rouge" | "vert", 1 | 2 | 3 | 4 | 5>>;
   /** The pause's minute, shortened (plan 02-06). */
   pauseMs?: number;
+  /** The 30 s before « C’est ton tour » is sent to a missing account, shortened (plan 04-07). */
+  notifyMs?: number;
   /** The first game starts from this position instead of a deal (plan 02-09, a scenario's before). */
   before?: unknown;
 };
