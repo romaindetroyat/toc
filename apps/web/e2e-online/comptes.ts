@@ -69,6 +69,14 @@ export async function passkeyContext(
  */
 export async function signUp(page: Page, code: string, pseudo: string): Promise<string> {
   await page.goto(`/#/invitation/${code}`);
+  return completeSignUp(page, pseudo);
+}
+
+/**
+ * The sign-up from the pseudo step on (plan 04-13: the step is also reached from a pasted link): the
+ * pseudo, « Créer mon compte », the code screen and its confirmation, the home. Answers the code.
+ */
+export async function completeSignUp(page: Page, pseudo: string): Promise<string> {
   const form = page.locator("[data-pseudo-form]");
   await expect(form).toBeVisible();
   await form.getByRole("textbox").fill(pseudo);
