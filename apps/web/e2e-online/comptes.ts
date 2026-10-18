@@ -19,6 +19,14 @@ import { deviceOptions } from "./online.ts";
 export const TEST_PEPPER = "test-only-pepper-not-a-secret-0123456789";
 /** TEST-ONLY bootstrap code (22 base64url characters, the shape of an invitation code). */
 export const TEST_BOOTSTRAP = "TestOnlyBootstrap00000";
+/**
+ * TEST ONLY, NEVER DEPLOYED: a VAPID pair for the Web Push routes under `wrangler dev` (plan 04-07),
+ * generated once with tools/vapid-keys.mjs for the end-to-end tests. Its private part is public in this
+ * repository, so it can never be the production VAPID_PRIVATE_KEY (a Worker secret, put by the deploy
+ * through a pipe from tools/vapid-keys.mjs, never written anywhere).
+ */
+export const TEST_VAPID =
+  "NsaUGkfGYKVbIjjACcWCBaAUqdKb-wGl5KbP_einjtQ.cQd7Xdbe0mPv9VKiwjhJHcB9yhYvAZ9Wsbd1-HmkABk.-iGzIlhW1aku9y4p173x6uhVylPhB7gz4OLrDqoPMmI";
 
 export const BASE_URL = "http://localhost:8787";
 

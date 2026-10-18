@@ -14,9 +14,31 @@
 // Endpoints (T-04-53, SSRF): https on the default port, no credentials, at most MAX_ENDPOINT_CHARS,
 // and a host of the push services only (Apple, Google, Mozilla, Microsoft); the test host
 // push.toc.test only in TOC_TEST_MODE.
+//
+// The routes (plan 04-07; Pattern 7 « Storage », T-04-56):
+//   GET    /api/push/key             { key }: the public key, or 503 push-off without the secret
+//   POST   /api/push/subscriptions   { endpoint, keys { p256dh, auth } } (session, our Origin, JSON):
+//                                    400 endpoint (not a push service) or keys (not 65 and 16 bytes),
+//                                    else 201 and the row upserted for this account and this session
+//                                    (an endpoint known for another account moves to this one); an
+//                                    account keeps its MAX_SUBSCRIPTIONS newest rows
+//   DELETE /api/push/subscriptions   { endpoint } (session, our Origin, JSON): 204 for one's own row,
+//                                    404 otherwise
+// A signed-out or recovered device loses its rows with its session (push_subscriptions.session_hash
+// ON DELETE CASCADE, D-12).
 
 import { buildPushPayload } from "@block65/webcrypto-web-push";
-import { type NoticeKind, type PushPayload, toBase64Url } from "@toc/protocol";
+import {
+  type NoticeKind,
+  PushEndpointBody,
+  type PushKeyAnswer,
+  type PushPayload,
+  PushSubscriptionBody,
+  toBase64Url,
+} from "@toc/protocol";
+import { sessionUser } from "./auth/session.ts";
+import type { Meter } from "./db.ts";
+import { json, notAllowed, readJson, writeAllowed } from "./http.ts";
 
 /** How long a push service keeps an undelivered message (seconds). */
 export const PUSH_TTL_S = 3600;
@@ -144,4 +166,78 @@ export async function buildPush(
 /** The table id of a payload, from its link /#/table/<id>. */
 function tableOf(payload: PushPayload): string {
   return payload.url.slice(payload.url.lastIndexOf("/") + 1);
+}
+
+/** The most subscriptions an account keeps (T-04-57): the oldest goes for an 11th. */
+export const MAX_SUBSCRIPTIONS = 10;
+
+/** GET /api/push/key: the public key derived from the secret, or 503 push-off without it. */
+export function pushKeyRoute(env: Env): Response {
+  const vapid = vapidOf(env.VAPID_PRIVATE_KEY);
+  if (vapid === null) return json({ error: "push-off" }, 503);
+  return json({ key: vapid.publicKey } satisfies PushKeyAnswer, 200);
+}
+
+/** The push routes, or null for a path that is not one of them. */
+export async function pushRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+  now: number,
+): Promise<Response | null> {
+  if (url.pathname === "/api/push/key") {
+    if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
+    return pushKeyRoute(env);
+  }
+  if (url.pathname !== "/api/push/subscriptions") return null;
+  if (request.method !== "POST" && request.method !== "DELETE") return notAllowed("POST, DELETE");
+  // Our own non-null Origin first (403), then the JSON body (415, 413, 400), then the session (401).
+  if (!writeAllowed(request, url)) return json({ error: "origin" }, 403);
+  if (request.method === "DELETE") {
+    const read = await readJson(request, PushEndpointBody);
+    if (!read.ok) return read.response;
+    const me = await sessionUser(request, url, env, meter, now);
+    if (me === null) return json({ error: "signed-out" }, 401);
+    const done = await meter.run(
+      meter
+        .prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?")
+        .bind(read.body.endpoint, me.id),
+    );
+    return (done.meta?.changes ?? 0) > 0
+      ? new Response(null, { status: 204, headers: { "cache-control": "no-store" } })
+      : json({ error: "not-found" }, 404);
+  }
+  const read = await readJson(request, PushSubscriptionBody);
+  if (!read.ok) return read.response;
+  const me = await sessionUser(request, url, env, meter, now);
+  if (me === null) return json({ error: "signed-out" }, 401);
+  const { endpoint, keys } = read.body;
+  if (!isPushEndpoint(endpoint, env.TOC_TEST_MODE === "1")) {
+    return json({ error: "endpoint" }, 400);
+  }
+  const point = bytesOf(keys.p256dh, 65);
+  if (point === null || point[0] !== 4 || bytesOf(keys.auth, 16) === null) {
+    return json({ error: "keys" }, 400);
+  }
+  await meter.batch([
+    meter
+      .prepare(
+        `INSERT INTO push_subscriptions (endpoint, user_id, session_hash, p256dh, auth, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id,
+           session_hash = excluded.session_hash, p256dh = excluded.p256dh, auth = excluded.auth,
+           created_at = excluded.created_at, ok_at = NULL`,
+      )
+      .bind(endpoint, me.id, me.sessionHash, keys.p256dh, keys.auth, now),
+    // The account keeps its newest MAX_SUBSCRIPTIONS rows.
+    meter
+      .prepare(
+        `DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint NOT IN (
+           SELECT endpoint FROM push_subscriptions WHERE user_id = ?
+            ORDER BY created_at DESC, rowid DESC LIMIT ?)`,
+      )
+      .bind(me.id, me.id, MAX_SUBSCRIPTIONS),
+  ]);
+  return new Response(null, { status: 201, headers: { "cache-control": "no-store" } });
 }

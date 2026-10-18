@@ -473,3 +473,32 @@ const tableInviteAnswer = z.object({ state: z.enum(["sent", "here"]) });
 export type TableInviteAnswer = z.infer<typeof tableInviteAnswer>;
 
 export const parseTableInviteAnswer = read<TableInviteAnswer>(tableInviteAnswer);
+
+// --- Web Push subscriptions (plan 04-07, D-08, APP-03) ---
+
+/** The longest push endpoint the server keeps (T-04-53). */
+export const MAX_PUSH_ENDPOINT = 1024;
+
+/**
+ * POST /api/push/subscriptions: this device's subscription (PushSubscription.toJSON(): the endpoint
+ * and its two keys, base64url). The server checks the endpoint's host and the keys' sizes (65 and 16
+ * bytes) itself.
+ */
+export const PushSubscriptionBody = z.strictObject({
+  endpoint: z.string().check(z.minLength(1), z.maxLength(MAX_PUSH_ENDPOINT)),
+  keys: z.strictObject({ p256dh: base64url(128), auth: base64url(64) }),
+});
+
+export type PushSubscriptionInput = z.infer<typeof PushSubscriptionBody>;
+
+/** DELETE /api/push/subscriptions: the endpoint of one's own subscription. */
+export const PushEndpointBody = z.strictObject({
+  endpoint: z.string().check(z.minLength(1), z.maxLength(MAX_PUSH_ENDPOINT)),
+});
+
+/** GET /api/push/key: the VAPID public key, the 65-byte uncompressed point in base64url. */
+const pushKeyAnswer = z.object({ key: z.string().check(z.regex(/^[A-Za-z0-9_-]{87}$/)) });
+
+export type PushKeyAnswer = z.infer<typeof pushKeyAnswer>;
+
+export const parsePushKeyAnswer = read<PushKeyAnswer>(pushKeyAnswer);

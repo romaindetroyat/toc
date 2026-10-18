@@ -58,6 +58,7 @@ import {
   buildPush,
   isPushEndpoint,
   JWT_REUSE_MS,
+  MAX_SUBSCRIPTIONS,
   type StoredSubscription,
   type Vapid,
   vapidOf,
@@ -94,9 +95,6 @@ export type NotifyInput = {
  * 04-07); away: nobody present and nothing sent (no subscription, no VAPID secret); dup: already sent.
  */
 export type NotifyAnswer = "notice" | "push" | "away" | "dup";
-
-/** The most subscriptions an account keeps (plan 04-07): one push per subscription and notice. */
-export const MAX_SUBSCRIPTIONS = 10;
 
 function seenOf(ws: WebSocket): Seen {
   const value = ws.deserializeAttachment() as Partial<Seen> | null;

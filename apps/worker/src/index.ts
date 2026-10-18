@@ -45,6 +45,11 @@
 //   GET  /ws/me                      → the app's socket to its PlayerHub (presence, notices): a
 //                                      session (401) and our non-null Origin (403) required; the hub
 //                                      gets a new request with only Upgrade and x-toc-account
+// Plan 04-07 (push.ts):
+//   GET  /api/push/key               → { key }: the VAPID public key (503 push-off without the secret)
+//   POST /api/push/subscriptions     → { endpoint, keys }: this device's subscription (session, Origin,
+//                                      JSON; push services only; 10 per account), 201
+//   DELETE /api/push/subscriptions   → { endpoint }: one's own subscription removed, 204 (404 else)
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -69,6 +74,7 @@ import { json, notAllowed, writeAllowed } from "./http.ts";
 import { inviteRoute } from "./invite.ts";
 import { meRoute, meTablesRoute } from "./me.ts";
 import { PlayerHub } from "./PlayerHub.ts";
+import { pushRoute } from "./push.ts";
 import { socialRoute } from "./social.ts";
 
 // The two Durable Object classes of both deploy configs (GameRoom: migration v1; PlayerHub, one per
@@ -187,6 +193,9 @@ async function accountRoute(
   }
   const tables = await meTablesRoute(request, env, url, meter, now);
   if (tables !== null) return tables;
+  // Plan 04-07: the key and the subscriptions of Web Push (/api/push/key, /api/push/subscriptions).
+  const push = await pushRoute(request, env, url, meter, now);
+  if (push !== null) return push;
   const post = POSTS.get(path);
   const key = post === undefined ? /^\/api\/auth\/passkeys\/([^/]+)$/.exec(path) : null;
   if (key !== null) {

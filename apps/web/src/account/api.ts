@@ -3,7 +3,7 @@
 // (usernameless), the logout, adding and removing a passkey and a new backup code (step-up); since
 // 04-03 the recovery with the backup code (« Retrouver mon compte »); since 04-04 the account's tables;
 // since 04-05 the invitation links, the friend codes and the friends list; since 04-06 inviting a
-// friend to one's table. fetch, the online flag and the
+// friend to one's table; since 04-07 the push key and this device's push subscription. fetch, the online flag and the
 // passkey ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every
 // answer is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly
 // cookie the browser keeps and sends by itself: no token ever reaches this code.
@@ -25,6 +25,7 @@ import {
   normalizeFriendCode,
   type PasskeyInfo,
   type PendingInvitation,
+  type PushSubscriptionInput,
   parseAccountTables,
   parseAddPasskeyAnswer,
   parseBackupCodeAnswer,
@@ -37,6 +38,7 @@ import {
   parseLoginAnswer,
   parseMeAccount,
   parsePendingInvitations,
+  parsePushKeyAnswer,
   parseRecoverAnswer,
   parseRecoverRefusal,
   parseRequestOptions,
@@ -765,5 +767,65 @@ export async function inviteFriend(
       typeof error === "string" && (known as readonly string[]).includes(error)
         ? (error as InviteFriendFailure)
         : "server",
+  };
+}
+
+// --- Plan 04-07: Web Push (D-08, APP-03) ---
+
+/** Why the push key cannot be had: the server sends no notifications (off), offline, server. */
+export type PushKeyResult =
+  | { ok: true; key: string }
+  | { ok: false; reason: "off" | "offline" | "server" };
+
+/**
+ * GET /api/push/key: the server's VAPID public key. Fetched when the « Notifications » panel opens,
+ * before the tap (04-RESEARCH Pitfall 2: the tap's handler must call the permission and subscribe
+ * without waiting for the network).
+ */
+export async function pushKey(api: ApiDeps = browserApi): Promise<PushKeyResult> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await call(api, "/api/push/key", "GET");
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 503 && errorOf(answer.body) === "push-off") {
+    return { ok: false, reason: "off" };
+  }
+  const parsed = answer.status === 200 ? parsePushKeyAnswer(answer.body) : null;
+  return parsed === null ? { ok: false, reason: "server" } : { ok: true, key: parsed.key };
+}
+
+/** POST /api/push/subscriptions: this device's subscription, tied to its session. */
+export async function saveSubscription(
+  subscription: PushSubscriptionInput,
+  api: ApiDeps = browserApi,
+): Promise<AccountResult> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, "/api/push/subscriptions", subscription);
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 201) return { ok: true };
+  return { ok: false, reason: refusal(answer, {}) };
+}
+
+/** DELETE /api/push/subscriptions { endpoint }: this device no longer receives the notifications. */
+export async function deleteSubscription(
+  endpoint: string,
+  api: ApiDeps = browserApi,
+): Promise<AccountResult> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  let response: Response;
+  try {
+    response = await api.fetch("/api/push/subscriptions", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ endpoint }),
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, reason: "offline" };
+  }
+  if (response.status === 204) return { ok: true };
+  if (response.status === 404) return { ok: false, reason: "unknown" };
+  return {
+    ok: false,
+    reason: refusal({ status: response.status, body: await bodyOf(response) }, {}),
   };
 }

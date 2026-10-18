@@ -205,10 +205,11 @@ describe("enablePush, inside the tap", () => {
   });
 
   it("the server refuses or the network fails: failed, and the device unsubscribes", async () => {
-    for (const answers of [
+    const refusals: Record<string, () => Response>[] = [
       { "POST /api/push/subscriptions": () => json({ error: "endpoint" }, 400) },
       {},
-    ]) {
+    ];
+    for (const answers of refusals) {
       const calls: Call[] = [];
       const result = await enablePush({
         key: KEY_A,
