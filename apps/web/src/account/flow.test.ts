@@ -1,16 +1,22 @@
+import type { PasskeyInfo } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import {
+  accountSeats,
   dateText,
   formatCodeInput,
   homeTiles,
   invitationRow,
   lockText,
+  notificationPlatform,
+  notificationsView,
+  passkeyLine,
   prefill,
   pseudoError,
   recoverError,
   recoverKeyError,
   signInLine,
   signInToast,
+  signOutBody,
 } from "./flow.ts";
 
 // The pure decisions of the account screens (plan 04-09; 04-UI-SPEC « Small tiles », « Sign-in
@@ -362,5 +368,165 @@ describe("recoverKeyError", () => {
       back: false,
       line: "Le compte n’a pas pu être retrouvé. Réessaie dans un instant.",
     });
+  });
+});
+
+// --- Plan 04-10: « Mon compte » (04-UI-SPEC « Mon compte », « Notifications », « Clés d’accès »,
+// « Se déconnecter ») ---
+
+const IPHONE_17 =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+const ANDROID =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36";
+const WINDOWS =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
+
+describe("notificationPlatform", () => {
+  it("iPhone and iPad, Android, else a computer", () => {
+    expect(notificationPlatform(IPHONE_17, true)).toBe("ios");
+    expect(notificationPlatform(ANDROID, false)).toBe("android");
+    expect(notificationPlatform(WINDOWS, false)).toBe("computer");
+  });
+});
+
+describe("notificationsView", () => {
+  it("no Push API: one line, nothing to press", () => {
+    const view = notificationsView("unsupported", "computer");
+    expect(view.line).toBe("Ce navigateur ne peut pas recevoir les notifications de TOC.");
+    expect(view.action).toBeNull();
+    expect(view.toggle).toBeNull();
+  });
+
+  it("an iPhone in a Safari tab: install first, with « Installer l’application »", () => {
+    const view = notificationsView("install-first", "ios");
+    expect(view.line).toBe(
+      "Sur iPhone et iPad, les notifications marchent seulement dans l’application installée (iOS 16.4 ou plus récent). Installe TOC sur l’écran d’accueil, ouvre-le, connecte-toi, puis reviens ici.",
+    );
+    expect(view.action).toEqual({
+      kind: "install",
+      label: "Installer l’application",
+      busy: null,
+      primary: false,
+    });
+  });
+
+  it("an installed iPhone before iOS 16.4", () => {
+    const view = notificationsView("ios-too-old", "ios");
+    expect(view.line).toBe(
+      "Cet iPhone ne reçoit pas les notifications des applications web. Il faut iOS 16.4 ou plus récent.",
+    );
+    expect(view.action).toBeNull();
+  });
+
+  it("not asked yet: the primary « Activer les notifications », busy « Activation… »", () => {
+    const view = notificationsView("ask", "computer");
+    expect(view.action).toEqual({
+      kind: "enable",
+      label: "Activer les notifications",
+      busy: "Activation…",
+      primary: true,
+    });
+    expect(view.error).toBeNull();
+    expect(view.toggle).toBeNull();
+  });
+
+  it("the activation failed: the same primary and its line", () => {
+    const view = notificationsView("failed", "computer");
+    expect(view.action?.kind).toBe("enable");
+    expect(view.error).toBe("L’activation n’a pas marché. Réessaie dans un instant.");
+  });
+
+  it("on and off: the switch « Sur cet appareil » with its helper", () => {
+    expect(notificationsView("on", "android").toggle).toEqual({
+      label: "Sur cet appareil",
+      checked: true,
+      helper: "Activées. Tu les reçois seulement quand TOC est fermé.",
+    });
+    expect(notificationsView("off", "android").toggle).toEqual({
+      label: "Sur cet appareil",
+      checked: false,
+      helper: "Désactivées sur cet appareil.",
+    });
+    expect(notificationsView("on", "android").action).toBeNull();
+  });
+
+  it("blocked: bell-off, the line and each platform's way to allow them", () => {
+    const ios = notificationsView("blocked", "ios");
+    expect(ios.blocked).toBe(true);
+    expect(ios.line).toBe("Les notifications sont bloquées pour TOC sur cet appareil.");
+    expect(ios.help).toBe(
+      "Pour les autoriser : Réglages › Notifications › TOC. Reviens ici ensuite.",
+    );
+    expect(notificationsView("blocked", "android").help).toBe(
+      "Pour les autoriser : appui long sur l’icône de TOC › Infos sur l’appli › Notifications. Reviens ici ensuite.",
+    );
+    expect(notificationsView("blocked", "computer").help).toBe(
+      "Pour les autoriser : le cadenas à côté de l’adresse › Notifications. Reviens ici ensuite.",
+    );
+    expect(ios.action).toBeNull();
+    expect(notificationsView("ask", "ios").blocked).toBe(false);
+  });
+});
+
+describe("passkeyLine", () => {
+  const now = new Date(2026, 9, 18, 12).getTime();
+  const key = (over: Partial<PasskeyInfo>): PasskeyInfo => ({
+    id: "AAAAAAAAAAAAAAAAAAAAAA",
+    label: "iPhone",
+    createdAt: new Date(2026, 9, 3, 9).getTime(),
+    lastUsedAt: null,
+    backedUp: false,
+    current: false,
+    ...over,
+  });
+
+  it("added and used, this device: the line and the sentence", () => {
+    const shown = passkeyLine(key({ current: true, lastUsedAt: now - 86_400_000 }), now);
+    expect(shown.name).toBe("iPhone");
+    expect(shown.current).toBe(true);
+    expect(shown.line).toBe("Ajoutée le 3 octobre · utilisée hier");
+    expect(shown.sentence).toBe("iPhone, cet appareil, ajoutée le 3 octobre, utilisée hier");
+  });
+
+  it("never used since: the date alone; synced: « · synchronisée »", () => {
+    const shown = passkeyLine(key({ label: "Mac", backedUp: true }), now);
+    expect(shown.line).toBe("Ajoutée le 3 octobre · synchronisée");
+    expect(shown.sentence).toBe("Mac, ajoutée le 3 octobre, synchronisée");
+    expect(shown.current).toBe(false);
+  });
+
+  it("an older year shows the year, a use three days ago reads « il y a 3 jours »", () => {
+    const shown = passkeyLine(
+      key({ createdAt: new Date(2025, 0, 2, 9).getTime(), lastUsedAt: now - 3 * 86_400_000 }),
+      now,
+    );
+    expect(shown.line).toBe("Ajoutée le 2 janvier 2025 · utilisée il y a 3 jours");
+  });
+});
+
+describe("signOutBody and accountSeats", () => {
+  const body =
+    "Tes places dans les parties en cours ne seront plus jouables sur cet appareil jusqu’à ta prochaine connexion. Cet appareil ne recevra plus tes notifications. Tes autres appareils ne changent pas.";
+
+  it("the D-12 body, plus « Parties concernées : n. » when this device holds seats", () => {
+    expect(signOutBody(0)).toBe(body);
+    expect(signOutBody(1)).toBe(`${body} Parties concernées : 1.`);
+    expect(signOutBody(3)).toBe(`${body} Parties concernées : 3.`);
+  });
+
+  it("counts this device's entries of the account that hold a seat", () => {
+    const id = "BBBBBBBBBBBBBBBBBBBBBB";
+    expect(
+      accountSeats(
+        [
+          { id: "t1", seat: "bleu", joinedAt: 1, account: id },
+          { id: "t2", seat: null, joinedAt: 2, account: id },
+          { id: "t3", seat: "rouge", joinedAt: 3 },
+          { id: "t4", seat: "vert", joinedAt: 4, account: "CCCCCCCCCCCCCCCCCCCCCC" },
+          { id: "t5", seat: "jaune", joinedAt: 5, account: id },
+        ],
+        id,
+      ),
+    ).toBe(2);
   });
 });

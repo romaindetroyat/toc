@@ -77,14 +77,13 @@ test("retrouver son compte avec le code de secours sur un nouvel appareil", asyn
   await screen.getByRole("button", { name: "J’ai gardé mon code" }).click();
   await two.getByRole("button", { name: "Oui, je l’ai gardé" }).click();
 
-  // #/compte (the home until « Mon compte » exists), signed in, with the toast.
+  // « Mon compte » (plan 04-10), signed in, with the toast; « Clés d’accès » lists the lost key too.
   await expect(two).toHaveURL(/#\/compte$/);
   await expect(two.locator("[data-toast]")).toContainText(
     "Compte retrouvé. Retire la clé de l’appareil perdu dans",
   );
-  await expect(two.locator('[data-small-tile="compte"]')).toHaveAccessibleName(
-    `Mon compte (${pseudo})`,
-  );
+  await expect(two.locator("[data-account-pseudo]")).toHaveText(pseudo);
+  await expect(two.locator("[data-passkey-row]")).toHaveCount(2);
 
   // Device 1: its session ended; its next account call says so, once, with « Se connecter ».
   await one.reload();

@@ -1,3 +1,4 @@
+import { createECDH, randomBytes } from "node:crypto";
 import {
   type APIRequestContext,
   type Browser,
@@ -117,4 +118,152 @@ export async function signInFromHome(page: Page): Promise<void> {
   const sheet = page.locator("[data-signin-sheet]");
   await expect(sheet).toBeVisible();
   await sheet.getByRole("button", { name: "Utiliser ma clé d’accès" }).click();
+}
+
+// --- Plan 04-10: the browser's push, stood in for (service workers are blocked in these suites) ---
+
+/** An iPhone on iOS 17.4 (the push of an installed web app needs iOS 16.4 or newer). */
+export const IPHONE_17_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+
+const base64url = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");
+
+export type PushStubOptions = {
+  /** Notification.permission before any tap (default "default"). */
+  permission?: NotificationPermission;
+  /** What Notification.requestPermission() answers (default "granted"). */
+  answer?: NotificationPermission;
+  /** navigator.standalone: the installed app on an iPhone (default true; ignored elsewhere). */
+  standalone?: boolean;
+};
+
+/**
+ * Stands in, for every page of `context`, for what the suites cannot have: the service worker's
+ * PushManager (navigator.serviceWorker.ready and getRegistration answer a registration whose
+ * pushManager makes subscriptions on push.toc.test, which the Worker accepts in TOC_TEST_MODE),
+ * Notification.permission and Notification.requestPermission (each call counted), and
+ * navigator.standalone. The state lives in the page's localStorage (test.permission, test.answer,
+ * test.standalone, test.push, test.asks), so a test changes it and reloads.
+ */
+export async function stubPush(
+  context: BrowserContext,
+  options: PushStubOptions = {},
+): Promise<void> {
+  const ecdh = createECDH("prime256v1");
+  const init = {
+    permission: options.permission ?? "default",
+    answer: options.answer ?? "granted",
+    standalone: options.standalone ?? true,
+    p256dh: base64url(ecdh.generateKeys()),
+    auth: base64url(randomBytes(16)),
+  };
+  await context.addInitScript((init) => {
+    const get = (key: string, fallback: string): string => {
+      try {
+        return localStorage.getItem(key) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    };
+    const set = (key: string, value: string | null): void => {
+      try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      } catch {
+        // Nothing to keep.
+      }
+    };
+    const encode = (bytes: Uint8Array): string =>
+      btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    const decode = (text: string): Uint8Array => {
+      const plain = text.replace(/-/g, "+").replace(/_/g, "/");
+      const binary = atob(plain + "=".repeat((4 - (plain.length % 4)) % 4));
+      return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    };
+    Object.defineProperty(Notification, "permission", {
+      configurable: true,
+      get: () => get("test.permission", init.permission),
+    });
+    Notification.requestPermission = () => {
+      set("test.asks", String(Number(get("test.asks", "0")) + 1));
+      const answer = get("test.answer", init.answer);
+      set("test.permission", answer);
+      return Promise.resolve(answer as NotificationPermission);
+    };
+    type Stored = { endpoint: string; key: string };
+    const subscription = (stored: Stored) => ({
+      endpoint: stored.endpoint,
+      options: { applicationServerKey: decode(stored.key).buffer, userVisibleOnly: true },
+      toJSON: () => ({ endpoint: stored.endpoint, keys: { p256dh: init.p256dh, auth: init.auth } }),
+      unsubscribe: async () => {
+        set("test.push", null);
+        return true;
+      },
+    });
+    const pushManager = {
+      getSubscription: async () => {
+        const raw = get("test.push", "");
+        return raw === "" ? null : subscription(JSON.parse(raw) as Stored);
+      },
+      subscribe: async (options: { applicationServerKey: ArrayBuffer | ArrayBufferView }) => {
+        if (get("test.permission", init.permission) !== "granted") {
+          throw new DOMException("Permission denied", "NotAllowedError");
+        }
+        const key = options.applicationServerKey;
+        const bytes = ArrayBuffer.isView(key)
+          ? new Uint8Array(key.buffer, key.byteOffset, key.byteLength)
+          : new Uint8Array(key);
+        const id = encode(crypto.getRandomValues(new Uint8Array(12)));
+        const stored = { endpoint: `https://push.toc.test/${id}`, key: encode(bytes) };
+        set("test.push", JSON.stringify(stored));
+        return subscription(stored);
+      },
+    };
+    const registration = { pushManager };
+    Object.defineProperty(ServiceWorkerContainer.prototype, "ready", {
+      configurable: true,
+      get: () => Promise.resolve(registration),
+    });
+    ServiceWorkerContainer.prototype.getRegistration = () =>
+      Promise.resolve(registration as unknown as ServiceWorkerRegistration);
+    Object.defineProperty(Navigator.prototype, "standalone", {
+      configurable: true,
+      get: () => get("test.standalone", init.standalone ? "1" : "0") === "1",
+    });
+  }, init);
+}
+
+/** What the stub saw: how many times the permission was asked, and this device's endpoint. */
+export async function pushStubState(
+  page: Page,
+): Promise<{ asks: number; endpoint: string | null }> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem("test.push");
+    return {
+      asks: Number(localStorage.getItem("test.asks") ?? "0"),
+      endpoint: raw === null ? null : (JSON.parse(raw) as { endpoint: string }).endpoint,
+    };
+  });
+}
+
+/**
+ * A passkey context (passkeyContext) with the push stub; on the phone project its user agent is an
+ * iPhone on iOS 17.4, so the installed app (navigator.standalone) may turn the notifications on.
+ */
+export async function accountContext(
+  browser: Browser,
+  testInfo: TestInfo,
+  push: PushStubOptions = {},
+): Promise<BrowserContext> {
+  const options = deviceOptions(testInfo);
+  const phone = testInfo.project.name === "phone";
+  const context = await browser.newContext(
+    phone ? { ...options, userAgent: IPHONE_17_UA } : options,
+  );
+  await context.credentials.install();
+  await stubPush(context, push);
+  return context;
 }
