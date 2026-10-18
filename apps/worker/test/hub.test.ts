@@ -144,7 +144,8 @@ describe("PlayerHub.checkBackupCode", () => {
     const text = JSON.stringify(dump);
     expect(text).not.toContain(EXPECTED);
     expect(text).not.toContain(WRONG);
-    expect(dump.map((table) => table.name).sort()).toEqual(["attempts", "limits"]);
+    // Plan 04-06 adds `sent` (the notices' dedupe keys): no MAC there either.
+    expect(dump.map((table) => table.name).sort()).toEqual(["attempts", "limits", "sent"]);
   });
 
   it("uses the real clock when no time is given", async () => {

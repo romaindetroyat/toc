@@ -38,6 +38,10 @@
 //   POST /api/friends/code/redeem    → { code }: its owner becomes a friend (10 failures an hour)
 //   GET  /api/friends                → the caller's friends { id, pseudo, since }
 //   DELETE /api/friends/:id          → the friendship goes, both ways, 204
+// Plan 04-06:
+//   GET  /ws/me                      → the app's socket to its PlayerHub (presence, notices): a
+//                                      session (401) and our non-null Origin (403) required; the hub
+//                                      gets a new request with only Upgrade and x-toc-account
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -216,6 +220,25 @@ async function tableUpgrade(
   return env.GAME_ROOM.getByName(id).fetch(new Request(request.url, { headers }));
 }
 
+/**
+ * GET /ws/me (plan 04-06, T-04-49): the signed-in app's socket to its own PlayerHub. Upgrade (426),
+ * our own non-null Origin (403, checked before any D1 read), a session (401); the hub is the
+ * cookie's account, forwarded in a new request that carries nothing the client sent.
+ */
+async function hubUpgrade(request: Request, env: Env, url: URL, meter: Meter): Promise<Response> {
+  if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+    return new Response("Upgrade attendu", { status: 426 });
+  }
+  if (!writeAllowed(request, url)) return new Response("Refusé", { status: 403 });
+  const me = hasCookie(request, url, env)
+    ? await sessionUser(request, url, env, meter, Date.now())
+    : null;
+  if (me === null) return new Response("Non connecté", { status: 401 });
+  const headers = new Headers({ Upgrade: "websocket" });
+  headers.set(ACCOUNT_HEADER, me.id);
+  return env.PLAYER_HUB.getByName(me.id).fetch(new Request(request.url, { headers }));
+}
+
 async function route(request: Request, env: Env, url: URL, meter: Meter): Promise<Response | null> {
   if (url.pathname === "/api/tables") return createTableRoute(request, env, url);
 
@@ -224,6 +247,8 @@ async function route(request: Request, env: Env, url: URL, meter: Meter): Promis
 
   const account = await accountRoute(request, env, url, meter);
   if (account !== null) return account;
+
+  if (url.pathname === "/ws/me") return hubUpgrade(request, env, url, meter);
 
   const socket = /^\/ws\/table\/([^/]*)$/.exec(url.pathname);
   if (socket !== null) {

@@ -1,7 +1,8 @@
 // One account's own Durable Object (plan 04-03; 04-RESEARCH Patterns 3 and 6): PLAYER_HUB.getByName(
-// userId), SQLite-backed, created by migration v2. Only the Worker reaches it, through RPC; no route
-// forwards a request to it in this plan. It holds what must be counted strongly and per account
-// without writing D1 on every call:
+// userId), SQLite-backed, created by migration v2. Only the Worker reaches it: through RPC, and since
+// plan 04-06 through the /ws/me upgrade it forwards (the account read from the session cookie, in
+// x-toc-account). It holds what must be counted strongly and per account without writing D1 on every
+// call:
 //   checkBackupCode   the backup-code attempts of a recovery (T-04-34). The Worker passes the MAC
 //                     stored in D1 and the MAC of the code typed; the hub compares them in constant time
 //                     and keeps neither. BACKUP_FAILURES wrong codes in a row lock the account
@@ -12,14 +13,68 @@
 //                     true and counted for the first `max` calls inside `windowMs`, then false (not
 //                     counted) until the oldest leaves the window
 //   release           gives one counted call back (04-05: a friend code that worked is no failure)
-// Presence, notices and Web Push come in plans 04-06 and 04-07.
+//
+// Presence (plan 04-06, D-08; Pattern 6, Pitfall 1): the app keeps one hibernating socket to its hub
+// on every screen while signed in. It says hi with HUB_VERSION (another version: closed with 4002;
+// frames before hi are ignored), then vis { visible } on open and on every visibility change. The
+// attachment { hi, visible, seenAt } survives hibernation. The app pings every 20 s while visible;
+// the runtime answers "pong" without waking the hub and records when. A socket is present when it
+// said hi, its last vis was visible and its last sign of life (a frame, or that pong) is at most
+// HUB_SILENCE_MS old: a hidden tab, a locked phone or a closed app is away. The browser never decides.
+//   notify            { kind, table, from, own?, resumed?, key, now? }: the same invite (key = sender
+//                     and table) within INVITE_DEDUPE_MS, or the same turn key (table and pause) within
+//                     TURN_KEEP_MS, answers dup and sends nothing; else the notice frame goes to every
+//                     present socket ("notice"), or nobody is present ("away": plan 04-07 sends the
+//                     push then). Each kept key is one row of `sent`, pruned on every notify.
 //
 // Times come from the caller (`now`, Date.now() by default) and are compared on each call: no timer
 // function and no alarm (a lock ends by itself when its time has passed). The tables are created on
 // first use, so an account that never recovers anything keeps an empty object.
 
 import { DurableObject } from "cloudflare:workers";
+import {
+  CLOSE_VERSION,
+  HUB_VERSION,
+  NOTICE_FROM_MAX,
+  type NoticeFrame,
+  type NoticeKind,
+  parseHubClientFrame,
+} from "@toc/protocol";
 import { sameMac } from "./auth/backup.ts";
+import { ACCOUNT_HEADER } from "./GameRoom.ts";
+
+/** A visible socket with no sign of life for longer than this is away (the app pings every 20 s). */
+export const HUB_SILENCE_MS = 45_000;
+/** One invite per sender and table in this window (T-04-50); the UI shows « Invitation envoyée ». */
+export const INVITE_DEDUPE_MS = 10 * 60_000;
+/** A turn key (a table and its pause) is kept this long: the same pause is never notified twice. */
+export const TURN_KEEP_MS = 24 * 3600_000;
+
+/** What a hub socket remembers through hibernation. */
+type Seen = { hi: boolean; visible: boolean; seenAt: number };
+
+export type NotifyInput = {
+  kind: NoticeKind;
+  table: string;
+  from: string;
+  own?: boolean;
+  resumed?: boolean;
+  /** The dedupe key: `${sender}:${table}` for an invite, `${table}:${pause}` for a turn. */
+  key: string;
+  now?: number;
+};
+
+/** notice: shown in the open app; away: nobody present (a push, 04-07); dup: already sent. */
+export type NotifyAnswer = "notice" | "away" | "dup";
+
+function seenOf(ws: WebSocket): Seen {
+  const value = ws.deserializeAttachment() as Partial<Seen> | null;
+  return {
+    hi: value?.hi === true,
+    visible: value?.visible === true,
+    seenAt: typeof value?.seenAt === "number" ? value.seenAt : 0,
+  };
+}
 
 /** Wrong codes in a row before the first lock. */
 export const BACKUP_FAILURES = 5;
@@ -45,6 +100,12 @@ export class PlayerHub extends DurableObject<Env> {
   /** The tables exist in this instance's SQLite (checked once per instance). */
   private ready = false;
 
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // The app's heartbeat is answered by the runtime without waking the hub (T-04-52).
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
   private sql(): SqlStorage {
     const sql = this.ctx.storage.sql;
     if (!this.ready) {
@@ -64,6 +125,15 @@ export class PlayerHub extends DurableObject<Env> {
          )`,
       );
       sql.exec("CREATE INDEX IF NOT EXISTS limits_kind_at ON limits (kind, at)");
+      // Plan 04-06: the notices sent, for the dedupe (one row per kind and key).
+      sql.exec(
+        `CREATE TABLE IF NOT EXISTS sent (
+           kind TEXT NOT NULL,
+           key TEXT NOT NULL,
+           at INTEGER NOT NULL,
+           PRIMARY KEY (kind, key)
+         ) WITHOUT ROWID`,
+      );
       this.ready = true;
     }
     return sql;
@@ -159,5 +229,95 @@ export class PlayerHub extends DurableObject<Env> {
       input.kind,
       input.at,
     );
+  }
+
+  /**
+   * The /ws/me upgrade, already checked by the Worker (session, our Origin), which set the account
+   * from the cookie (x-toc-account). The socket hibernates; it is away until hi and vis visible.
+   */
+  async fetch(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      return new Response("Upgrade attendu", { status: 426 });
+    }
+    if (!request.headers.get(ACCOUNT_HEADER)) return new Response("Refusé", { status: 403 });
+    const pair = new WebSocketPair();
+    const server = pair[1];
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ hi: false, visible: false, seenAt: Date.now() } satisfies Seen);
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== "string") return;
+    const frame = parseHubClientFrame(message);
+    if (frame === null) return;
+    const seen = seenOf(ws);
+    if (frame.t === "hi") {
+      if (frame.v !== HUB_VERSION) {
+        ws.close(CLOSE_VERSION, "nouvelle version");
+        return;
+      }
+      ws.serializeAttachment({ ...seen, hi: true, seenAt: Date.now() } satisfies Seen);
+      return;
+    }
+    // Frames before hi are ignored.
+    if (!seen.hi) return;
+    ws.serializeAttachment({ hi: true, visible: frame.visible, seenAt: Date.now() } satisfies Seen);
+  }
+
+  async webSocketClose(): Promise<void> {
+    // Nothing kept per socket: a closed socket is simply no longer among getWebSockets().
+  }
+
+  async webSocketError(): Promise<void> {}
+
+  /** The open sockets present at `now`: said hi, last vis visible, a sign of life recent enough. */
+  private present(now: number): WebSocket[] {
+    return this.ctx.getWebSockets().filter((ws) => {
+      if (ws.readyState !== WebSocket.OPEN) return false;
+      const seen = seenOf(ws);
+      if (!seen.hi || !seen.visible) return false;
+      const answered = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
+      return now - Math.max(seen.seenAt, answered) <= HUB_SILENCE_MS;
+    });
+  }
+
+  /**
+   * RPC from the Worker (an invite, invite.ts) and later from a GameRoom (a turn, plan 04-07): dup
+   * when this kind and key were sent recently, else the notice to every present socket, or away.
+   * The key is remembered either way, so a push is not sent twice either.
+   */
+  async notify(input: NotifyInput): Promise<NotifyAnswer> {
+    const now = input.now ?? Date.now();
+    const sql = this.sql();
+    sql.exec(
+      "DELETE FROM sent WHERE (kind = 'invite' AND at <= ?) OR (kind <> 'invite' AND at <= ?)",
+      now - INVITE_DEDUPE_MS,
+      now - TURN_KEEP_MS,
+    );
+    const known = sql.exec("SELECT 1 FROM sent WHERE kind = ? AND key = ?", input.kind, input.key);
+    if (known.toArray().length > 0) return "dup";
+    sql.exec("INSERT INTO sent (kind, key, at) VALUES (?, ?, ?)", input.kind, input.key, now);
+
+    const sockets = this.present(now);
+    if (sockets.length === 0) return "away";
+    const frame: NoticeFrame = {
+      t: "notice",
+      kind: input.kind,
+      table: input.table,
+      from: [...input.from].slice(0, NOTICE_FROM_MAX).join(""),
+      ...(input.own === undefined ? {} : { own: input.own }),
+      ...(input.resumed === undefined ? {} : { resumed: input.resumed }),
+      at: now,
+    };
+    const text = JSON.stringify(frame);
+    for (const ws of sockets) {
+      try {
+        ws.send(text);
+      } catch {
+        // Closing meanwhile.
+      }
+    }
+    return "notice";
   }
 }
