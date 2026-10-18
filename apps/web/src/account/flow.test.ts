@@ -266,3 +266,96 @@ describe("prefill", () => {
     expect(prefill(null)).toBe("");
   });
 });
+
+// --- Task 3: « Retrouver mon compte » (04-UI-SPEC « Recovery ») ---
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+
+describe("lockText", () => {
+  it("the remaining lock, rounded up to the ladder's step", () => {
+    const at = Date.UTC(2026, 9, 18, 12);
+    expect(lockText(at + 15 * MINUTE, at)).toBe("15 minutes");
+    expect(lockText(at + 14 * MINUTE + 30_000, at)).toBe("15 minutes");
+    expect(lockText(at + 1000, at)).toBe("15 minutes");
+    expect(lockText(at + 16 * MINUTE, at)).toBe("30 minutes");
+    expect(lockText(at + 30 * MINUTE, at)).toBe("30 minutes");
+    expect(lockText(at + 59 * MINUTE, at)).toBe("1 heure");
+    expect(lockText(at + 2 * HOUR, at)).toBe("2 heures");
+    expect(lockText(at + 3 * HOUR, at)).toBe("4 heures");
+    expect(lockText(at + 8 * HOUR, at)).toBe("8 heures");
+    expect(lockText(at + 9 * HOUR, at)).toBe("16 heures");
+    expect(lockText(at + 20 * HOUR, at)).toBe("24 heures");
+    expect(lockText(at + 30 * HOUR, at)).toBe("24 heures");
+    // Already over (a slow answer): the shortest step.
+    expect(lockText(at - 1000, at)).toBe("15 minutes");
+  });
+});
+
+describe("formatCodeInput", () => {
+  it("upper case, dashes every four symbols, at most 24 characters", () => {
+    expect(formatCodeInput("k7qm")).toBe("K7QM");
+    expect(formatCodeInput("k7qm2")).toBe("K7QM-2");
+    expect(formatCodeInput("k7qm 2xra p9dw")).toBe("K7QM-2XRA-P9DW");
+    expect(formatCodeInput("K7QM-2XRA-P9DW-HT4E-NB6Z")).toBe("K7QM-2XRA-P9DW-HT4E-NB6Z");
+    expect(formatCodeInput("k7qm2xrap9dwht4enb6zEXTRA")).toBe("K7QM-2XRA-P9DW-HT4E-NB6Z");
+    expect(formatCodeInput("K7QM-")).toBe("K7QM");
+    expect(formatCodeInput("")).toBe("");
+  });
+
+  it("O is read as 0, I and L as 1; other signs are dropped", () => {
+    expect(formatCodeInput("oil0")).toBe("0110");
+    expect(formatCodeInput("a.b,c/d")).toBe("ABCD");
+  });
+});
+
+describe("recoverError", () => {
+  it("one line per refusal; a wrong pseudo and a wrong code read the same", () => {
+    const at = Date.UTC(2026, 9, 18, 12);
+    expect(recoverError({ reason: "empty" })).toBe("Écris ton pseudo et ton code.");
+    expect(recoverError({ reason: "format" })).toBe(
+      "Un code de secours a 20 caractères, comme K7QM-2XRA-P9DW-HT4E-NB6Z.",
+    );
+    expect(recoverError({ reason: "wrong" })).toBe(
+      "Pseudo ou code incorrect. Vérifie, puis réessaie.",
+    );
+    expect(recoverError({ reason: "locked", until: at + 15 * MINUTE, now: at })).toBe(
+      "Trop d’essais. Réessaie dans 15 minutes.",
+    );
+    expect(recoverError({ reason: "locked", until: at + 50 * MINUTE, now: at })).toBe(
+      "Trop d’essais. Réessaie dans 1 heure.",
+    );
+    expect(recoverError({ reason: "offline" })).toBe(
+      "Pas de connexion. Vérifie le réseau, puis réessaie.",
+    );
+    expect(recoverError({ reason: "server" })).toBe(
+      "Le compte n’a pas pu être retrouvé. Réessaie dans un instant.",
+    );
+  });
+});
+
+describe("recoverKeyError", () => {
+  it("cancelled stays on step 2; the delay over goes back to step 1", () => {
+    expect(recoverKeyError("cancelled")).toEqual({
+      back: false,
+      line: "Création annulée. Touche « Créer ma clé d’accès » pour réessayer.".replace(
+        /« (.*) »/,
+        "«\u202f$1\u202f»",
+      ),
+    });
+    expect(recoverKeyError("expired")).toEqual({
+      back: true,
+      line: "Le délai de 5 minutes est passé. Entre de nouveau ton code.",
+    });
+    expect(recoverKeyError("wrong-address").line).toBe(
+      "Les clés d’accès ne marchent qu’à l’adresse toc.romaindetroyat.workers.dev.",
+    );
+    expect(recoverKeyError("offline").line).toBe(
+      "Pas de connexion. Vérifie le réseau, puis réessaie.",
+    );
+    expect(recoverKeyError("server")).toEqual({
+      back: false,
+      line: "Le compte n’a pas pu être retrouvé. Réessaie dans un instant.",
+    });
+  });
+});
