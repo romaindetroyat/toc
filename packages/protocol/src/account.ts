@@ -196,6 +196,18 @@ export const AddPasskeyVerifyBody = z.strictObject({ response: registrationRespo
 /** POST /api/auth/backup-code/verify (plan 04-02): the step-up assertion of one of the account's keys. */
 export const BackupCodeVerifyBody = z.strictObject({ response: authenticationResponse });
 
+/**
+ * POST /api/auth/recover (plan 04-03, D-02): the pseudo and the backup code as typed (the Worker
+ * normalises both; a code is at most 100 characters before that).
+ */
+export const RecoverBody = z.strictObject({
+  pseudo: z.string().check(z.maxLength(200)),
+  code: z.string().check(z.maxLength(100)),
+});
+
+/** POST /api/auth/recover/verify (plan 04-03): the new passkey's registration on this device. */
+export const RecoverVerifyBody = z.strictObject({ response: registrationResponse });
+
 /** POST /api/test/invitation (TOC_TEST_MODE only): a fresh invitation, or a used or expired one. */
 export const TestInvitationBody = z.strictObject({
   used: z.optional(z.boolean()),
@@ -303,3 +315,22 @@ export const parseRequestOptions = read<RequestOptions>(requestOptions);
 export const parseAddPasskeyAnswer = read<AddPasskeyAnswer>(addPasskeyAnswer);
 export const parseBackupCodeAnswer = read<BackupCodeAnswer>(backupCodeAnswer);
 export const parseLoginAnswer = read<LoginAnswer>(loginAnswer);
+
+/** POST /api/auth/recover/verify (plan 04-03): the account recovered and its new code, shown once. */
+export type RecoverAnswer = SignupAnswer;
+
+export const parseRecoverAnswer = read<RecoverAnswer>(signupAnswer);
+
+const recoverRefusal = z.discriminatedUnion("error", [
+  /** The code is not 20 symbols of the alphabet once read back (400). */
+  z.object({ error: z.literal("format") }),
+  /** No such pseudo, or not its code: the same answer for both (400, T-04-03). */
+  z.object({ error: z.literal("wrong") }),
+  /** Too many wrong codes: the account opens again at `until`, ms since the epoch (429). */
+  z.object({ error: z.literal("locked"), until: z.number() }),
+]);
+
+/** Why POST /api/auth/recover refused (plan 04-03). */
+export type RecoverRefusal = z.infer<typeof recoverRefusal>;
+
+export const parseRecoverRefusal = read<RecoverRefusal>(recoverRefusal);

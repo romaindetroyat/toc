@@ -120,6 +120,29 @@ export async function takeChallenge(
   return taken === null ? undefined : taken.pending;
 }
 
+/**
+ * Takes (deletes) a still valid challenge row of this purpose bound to some account, when the caller
+ * has no session to name it (the recovery, plan 04-03): the account and the pending data, or
+ * undefined (spent, expired, another purpose, never handed out). Single use, like takeChallenge.
+ */
+export async function takeBoundChallenge(
+  meter: Meter,
+  challenge: string,
+  purpose: Exclude<Purpose, "login" | "register">,
+  now: number,
+): Promise<{ userId: string; pending: string | null } | undefined> {
+  const taken = await meter.first<{ user_id: string; pending: string | null }>(
+    meter
+      .prepare(
+        `DELETE FROM challenges
+          WHERE challenge = ? AND purpose = ? AND user_id IS NOT NULL AND expires_at > ?
+         RETURNING user_id, pending`,
+      )
+      .bind(challenge, purpose, now),
+  );
+  return taken === null ? undefined : { userId: taken.user_id, pending: taken.pending };
+}
+
 // --- The signed login challenge ---
 
 const VERSION = 1;

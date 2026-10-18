@@ -79,8 +79,11 @@ export function signedIn(handler: Handler) {
 
 type KeyRow = { id: string; transports: string | null };
 
-/** The account's passkeys, as WebAuthn descriptors (excludeCredentials, allowCredentials). */
-async function keysOf(
+/**
+ * The account's passkeys, as WebAuthn descriptors (excludeCredentials, allowCredentials; the recovery's
+ * excludeCredentials too, plan 04-03).
+ */
+export async function keysOf(
   meter: Meter,
   userId: string,
 ): Promise<{ id: string; transports: string[] }[]> {

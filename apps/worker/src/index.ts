@@ -16,6 +16,11 @@
 //   DELETE /api/auth/passkeys/:id    → one's own passkey goes, never the last (Origin, no body)
 //   POST /api/auth/backup-code/options → step-up options (the account's passkeys)
 //   POST /api/auth/backup-code/verify  → the step-up and a new backup code, shown once
+// Plan 04-03 (no session needed; Origin and JSON as above):
+//   POST /api/auth/recover           → { pseudo, code }: the account's PlayerHub checks the code (and
+//                                      locks after 5 wrong ones), then creation options for a passkey
+//   POST /api/auth/recover/verify    → the new passkey, every other session ended, a new session and
+//                                      a new backup code, shown once
 //   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
@@ -32,6 +37,7 @@ import {
   backupCodeVerify,
   removePasskey,
 } from "./auth/passkeys.ts";
+import { recoverOptions, recoverVerify } from "./auth/recover.ts";
 import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./auth/signup.ts";
 import { Meter } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
@@ -111,7 +117,7 @@ async function summaryRoute(request: Request, env: Env, id: string): Promise<Res
 
 type Post = (request: Request, env: Env, url: URL, meter: Meter, now: number) => Promise<Response>;
 
-/** The POST routes of the accounts (plans 04-01, 04-02), each behind writeAllowed and readJson. */
+/** The POST routes of the accounts (plans 04-01 to 04-03), each behind writeAllowed and readJson. */
 const POSTS = new Map<string, Post>([
   ["/api/auth/signup/options", signupOptions],
   ["/api/auth/signup/verify", signupVerify],
@@ -125,6 +131,8 @@ const POSTS = new Map<string, Post>([
   ["/api/auth/passkeys/verify", addVerify],
   ["/api/auth/backup-code/options", backupCodeOptions],
   ["/api/auth/backup-code/verify", backupCodeVerify],
+  ["/api/auth/recover", recoverOptions],
+  ["/api/auth/recover/verify", recoverVerify],
 ]);
 
 /** The account routes (plans 04-01, 04-02), or null for a path that is not one of them. */

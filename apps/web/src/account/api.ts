@@ -1,18 +1,21 @@
-// The account calls of the page (plans 04-01 and 04-02, ACCT-01, ACCT-02, D-02, D-12): the state of
-// an invitation link, the sign-up (options, the passkey, verify), GET /api/me, and since 04-02 the
-// login (usernameless), the logout, adding and removing a passkey and a new backup code (step-up). fetch, the online flag and the passkey
-// ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every answer
-// is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly cookie
-// the browser keeps and sends by itself: no token ever reaches this code.
+// The account calls of the page (plans 04-01 to 04-03, ACCT-01, ACCT-02, D-02, D-12): the state of
+// an invitation link, the sign-up (options, the passkey, verify), GET /api/me; since 04-02 the login
+// (usernameless), the logout, adding and removing a passkey and a new backup code (step-up); since
+// 04-03 the recovery with the backup code (« Retrouver mon compte »). fetch, the online flag and the
+// passkey ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every
+// answer is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly
+// cookie the browser keeps and sends by itself: no token ever reaches this code.
 
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 import {
+  type CreationOptions,
   type InvitationState,
   isInvitationCode,
   type MeAccount,
+  normalizeBackupCode,
   type PasskeyInfo,
   parseAddPasskeyAnswer,
   parseBackupCodeAnswer,
@@ -20,6 +23,8 @@ import {
   parseInvitationState,
   parseLoginAnswer,
   parseMeAccount,
+  parseRecoverAnswer,
+  parseRecoverRefusal,
   parseRequestOptions,
   parseSignupAnswer,
 } from "@toc/protocol";
@@ -374,4 +379,89 @@ export async function newBackupCode(
       : { ok: true, backupCode: answer.backupCode };
   }
   return { ok: false, reason: refusal(verified, { refused: "unknown", expired: "expired" }) };
+}
+
+// --- Plan 04-03: « Retrouver mon compte » with the backup code (D-02) ---
+
+/** Why the pseudo and the code did not open the account (04-UI-SPEC « Recovery », step 1). */
+export type RecoverFailure = "format" | "wrong" | "offline" | "server";
+
+export type RecoverResult =
+  | { ok: true; optionsJSON: CreationOptions }
+  | { ok: false; reason: "locked"; until: number }
+  | { ok: false; reason: RecoverFailure };
+
+/**
+ * Step 1: POST /api/auth/recover { pseudo, code }. The code is read back first (upper case, no dashes
+ * or spaces, O for 0, I and L for 1); one that cannot be a code is « format » without a request.
+ * The creation options of the account's new passkey (step 2: recoverVerify), or why not: wrong (no
+ * such pseudo, or not its code: the server never says which), locked until a time, offline, server.
+ */
+export async function recover(
+  pseudo: string,
+  code: string,
+  api: ApiDeps = browserApi,
+): Promise<RecoverResult> {
+  const canonical = normalizeBackupCode(code);
+  if (canonical === null) return { ok: false, reason: "format" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, "/api/auth/recover", { pseudo, code: canonical });
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) {
+    const options = parseCreationOptions(answer.body);
+    return options === null ? { ok: false, reason: "server" } : { ok: true, optionsJSON: options };
+  }
+  const refusal = answer.status < 500 ? parseRecoverRefusal(answer.body) : null;
+  if (refusal === null) return { ok: false, reason: "server" };
+  if (refusal.error === "locked") {
+    return answer.status === 429
+      ? { ok: false, reason: "locked", until: refusal.until }
+      : { ok: false, reason: "server" };
+  }
+  return answer.status === 400
+    ? { ok: false, reason: refusal.error }
+    : { ok: false, reason: "server" };
+}
+
+/** Why the new passkey did not finish the recovery (step 2): expired is « Le délai de 5 minutes est passé ». */
+export type RecoverVerifyFailure = PasskeyFailure | "expired" | "offline";
+
+export type RecoverVerifyResult =
+  | { ok: true; me: MeAccount; backupCode: string }
+  | { ok: false; reason: RecoverVerifyFailure };
+
+/**
+ * Step 2: the passkey's registration with the options of step 1, then POST /api/auth/recover/verify.
+ * The account (now signed in on this device only: every other session ended) and its new backup code,
+ * shown once (step 3), or why not. The old code stays valid until this succeeds.
+ */
+export async function recoverVerify(
+  optionsJSON: CreationOptions,
+  deps: Deps = {},
+): Promise<RecoverVerifyResult> {
+  const api = deps.api ?? browserApi;
+  const passkeys = deps.passkeys ?? browserCeremonies;
+  if (!passkeys.supported()) return { ok: false, reason: "unsupported" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+
+  const created = await createPasskey(
+    optionsJSON as unknown as PublicKeyCredentialCreationOptionsJSON,
+    passkeys,
+  );
+  if (!created.ok) return { ok: false, reason: created.reason };
+
+  const verified = await postJson(api, "/api/auth/recover/verify", { response: created.response });
+  if (verified === null) return { ok: false, reason: "offline" };
+  if (verified.status === 200) {
+    const answer = parseRecoverAnswer(verified.body);
+    return answer === null
+      ? { ok: false, reason: "server" }
+      : { ok: true, me: answer.me, backupCode: answer.backupCode };
+  }
+  const error = errorOf(verified.body);
+  if (verified.status === 400 && error === "expired") return { ok: false, reason: "expired" };
+  if (verified.status === 409 && error === "already-here") {
+    return { ok: false, reason: "already-here" };
+  }
+  return { ok: false, reason: "server" };
 }
