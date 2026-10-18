@@ -1,12 +1,14 @@
 // The pure decisions of the account screens (plan 04-09; 04-UI-SPEC « Small tiles », « Sign-in
 // sheet », « Invitation », « Recovery »): which small tiles the home shows and what they say, the line the sign-in
-// sheet shows for each failure, the welcome toast after a sign-in, the row an invitation link opens
+// sheet shows for each failure, the welcome toast after a sign-in, the code of a pasted invitation
+// link (plan 04-13), the row an invitation link opens
 // on, the pseudo step's errors and its prefill, and the recovery's code field, errors and lock time.
 // No DOM, no storage: the screens pass in what they
 // know, so every case runs under Node.
 
 import {
   type FriendEntry,
+  isInvitationCode,
   isTableId,
   type NoticeFrame,
   normalizePseudo,
@@ -121,6 +123,25 @@ export function signInLine(reason: AccountFailure): string {
 /** The toast after a sign-in: « Bonjour {Pseudo} ! », and the line about this device's tables. */
 export function signInToast(pseudo: string, linked: number): string {
   return linked > 0 ? compte.signIn.helloLinked(pseudo) : compte.signIn.hello(pseudo);
+}
+
+/** Longer than any link and message a person would paste: refused before any search. */
+const PASTED_MAX = 2000;
+/** The route of an invitation link, wherever it sits in the pasted text; the code is checked after. */
+const PASTED_INVITATION = /#\/invitation\/([A-Za-z0-9_-]+)/;
+
+/**
+ * « J’ai une invitation » (plan 04-13): on iOS a tapped link opens Safari, never the installed app,
+ * so the person pastes the link, the shared message around it, or the bare code into the sign-in
+ * sheet. Answers the invitation code (checked by isInvitationCode), or null for anything else. The
+ * link's origin is ignored: the app only ever opens its own #/invitation/<code>.
+ */
+export function invitationFromInput(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > PASTED_MAX) return null;
+  const trimmed = raw.trim();
+  if (isInvitationCode(trimmed)) return trimmed;
+  const found = PASTED_INVITATION.exec(trimmed)?.[1];
+  return isInvitationCode(found) ? found : null;
 }
 
 // --- The invitation link (04-UI-SPEC « Opening the link », « Step 1 ») ---
