@@ -3,7 +3,7 @@ status: testing
 phase: 04-comptes-amis-et-application-installable
 source: [04-CONTEXT.md, 04-UI-SPEC.md, 04-12-SUMMARY.md]
 started: 2026-10-18T14:40:00Z
-updated: 2026-10-18T14:40:00Z
+updated: 2026-10-18T17:38:48Z
 ---
 
 ## Current Test
@@ -40,7 +40,7 @@ expected: Sur Android (Chrome) et sur l’ordinateur (Chrome ou Edge), l’accue
 result: pending
 
 ### 3. Ton premier compte
-expected: Dans l’application installée sur l’iPhone, ouvre le lien privé de ton premier compte (donné lors de la mise en ligne). La page propose ton prénom comme pseudo. Choisis ton pseudo et touche « Créer mon compte ». L’iPhone demande Face ID ou Touch ID pour créer la clé d’accès. Ensuite s’affiche « Ton code de secours » : 20 caractères en cinq groupes. Fais une capture d’écran ou recopie-le sur papier, garde-le en lieu sûr. « J’ai gardé mon code » demande « Tu as bien gardé ton code ? ». Réponds « Oui, je l’ai gardé ». L’accueil affiche « Bienvenue, {ton pseudo} ! » et la petite tuile « Mon compte » avec ton pseudo. Le lien privé ne sert plus à rien ensuite.
+expected: Dans l’application installée sur l’iPhone, ouvre le lien privé de ton premier compte (donné lors de la mise en ligne). Sur l’iPhone, toucher un lien ouvre toujours Safari, jamais l’application installée : copie donc le lien, ouvre TOC depuis son icône, touche la petite tuile « Se connecter », colle le lien dans « J’ai une invitation » et touche « Continuer » (test 60, en ligne après la prochaine mise en ligne). La page propose ton prénom comme pseudo. Choisis ton pseudo et touche « Créer mon compte ». L’iPhone demande Face ID ou Touch ID pour créer la clé d’accès. Ensuite s’affiche « Ton code de secours » : 20 caractères en cinq groupes. Fais une capture d’écran ou recopie-le sur papier, garde-le en lieu sûr. « J’ai gardé mon code » demande « Tu as bien gardé ton code ? ». Réponds « Oui, je l’ai gardé ». L’accueil affiche « Bienvenue, {ton pseudo} ! » et la petite tuile « Mon compte » avec ton pseudo. Le lien privé ne sert plus à rien ensuite.
 result: pending
 
 ### 4. Inviter un proche par un lien
@@ -301,12 +301,23 @@ result: pending
 expected: Les chiffres du test 20 te vont-ils, ou préfères-tu prévoir l’offre payante (5 $ par mois) si la famille joue beaucoup contre des Champions ?
 result: pending
 
+### 60. Créer son compte dans l’application installée en collant le lien (iPhone)
+expected: |
+  Ajouté par le plan 04-13, après ton essai du 2026-10-18 (« Il n’y a pas d’option face id » dans l’application installée). À faire après la prochaine mise en ligne.
+  Sur l’iPhone, TOC est installé et tu n’as pas de compte dans l’application installée (ou demande à un proche qui n’a pas encore de compte). Un proche qui a un compte t’envoie un lien d’invitation par WhatsApp ou par SMS. Dans WhatsApp ou Messages, appuie longuement sur le lien (ou sur le message) et choisis « Copier ». Ouvre TOC depuis son icône. Touche la petite tuile « Se connecter » (« Créer un compte » dessous). Sous « Pas encore de compte ? », la fenêtre montre le champ « J’ai une invitation », le bouton « Continuer » et la phrase « Sur iPhone, ouvre ton lien d’invitation dans Safari, ou colle-le ici dans l’application. ». Touche le champ, puis « Coller ». Le lien complet, le message entier ou le code seul marchent. Touche « Continuer » : la fenêtre se ferme et l’étape du pseudo s’ouvre, dans l’application. Choisis ton pseudo, touche « Créer mon compte » : l’iPhone demande Face ID. Garde le code de secours, confirme. L’accueil de l’application affiche « Mon compte » avec ton pseudo. Ferme l’application et rouvre-la : tu es toujours dans ton compte.
+  Essaie aussi de coller autre chose (un lien de table, un mot) : sous le champ s’affiche « Ce lien d’invitation n’est pas reconnu. Colle le lien complet reçu de ton proche. », et rien ne s’ouvre. TOC ne lit jamais ton presse-papiers tout seul : seul ton geste « Coller » remplit le champ.
+result: pending
+
+### 61. À confirmer : « J’ai une invitation » dans la fenêtre « Se connecter »
+expected: Le champ « J’ai une invitation » est dans la fenêtre « Se connecter », sous « Pas encore de compte ? », sur tous les appareils (pas seulement sur iPhone), avec la phrase « Sur iPhone, ouvre ton lien d’invitation dans Safari, ou colle-le ici dans l’application. » juste dessous. La fenêtre « Installer TOC » ne change pas. Sur un téléphone tenu en largeur, il faut faire défiler la fenêtre pour voir le champ (la clé d’accès reste en haut). Ça te va, ou préfères-tu ce champ ailleurs (par exemple en haut de la fenêtre, ou dans « Installer TOC ») ?
+result: pending
+
 ## Summary
 
-total: 59
+total: 61
 passed: 0
 issues: 0
-pending: 59
+pending: 61
 skipped: 0
 blocked: 0
 

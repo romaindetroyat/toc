@@ -379,6 +379,7 @@ The existing `Sheet`. Body content, top to bottom:
 | Note under it (Label muted) | « Sur un ordinateur, tu peux choisir ton téléphone comme clé : ton navigateur montre alors un code QR. » |
 | Text button | « J’ai perdu ma clé : code de secours » → `#/secours` |
 | Hint (after a 1 px `--brun-aide-memoire` rule; Label 700 + Label 400 muted) | « Pas encore de compte ? » / « Il faut l’invitation d’un proche qui a déjà un compte : demande-lui le lien. » |
+| « J’ai une invitation » (plan 04-13, gap of Romain’s iPhone 2026-10-18: on iOS a tapped link opens Safari, never the installed app), in the hint, 8 under its text | Label 700 label « J’ai une invitation »; [text field, flex][« Continuer » secondary] 8 apart (the FriendCodeSheet field, same tokens); a pasted link of any origin, the message around it or the bare code → the sheet closes and `#/invitation/<code>` opens (the flow above takes over); else the line (x 16, Label, polite) « Ce lien d’invitation n’est pas reconnu. Colle le lien complet reçu de ton proche. »; then Label muted « Sur iPhone, ouvre ton lien d’invitation dans Safari, ou colle-le ici dans l’application. ». The clipboard is never read by the app. Shown with or without WebAuthn **(à confirmer par Romain)** |
 | Close | « Fermer » (the sheet's own) |
 
 | State | What shows |
@@ -391,7 +392,7 @@ The existing `Sheet`. Body content, top to bottom:
 | Server error | « La connexion n’a pas marché. Réessaie dans un instant. » |
 | Success | the sheet closes; toast « Bonjour {Pseudo} ! »; when this device had guest tables: « Bonjour {Pseudo} ! Tes parties sur cet appareil sont maintenant liées à ton compte. » |
 
-Fit: at 844 × 390 the sheet is the 480 dialog with 90 % of 390 = 351 px; its chrome (24 + title 24 + 16 + 16 + « Fermer » 48 + 24) leaves 199 px of body: text 24 + 16 + primary 48 + 4 + note 40 = 132 is in sight without scrolling, the recovery link and the hint scroll. At 750 × 342 the body has 156 px: the primary is still in sight. At 1280 × 800 the whole body (≈ 260) shows.
+Fit: at 844 × 390 the sheet is the 480 dialog with 90 % of 390 = 351 px; its chrome (24 + title 24 + 16 + 16 + « Fermer » 48 + 24) leaves 199 px of body: text 24 + 16 + primary 48 + 4 + note 40 = 132 is in sight without scrolling, the recovery link and the hint (with « J’ai une invitation », plan 04-13) scroll inside the sheet. At 750 × 342 the body has 156 px: the primary is still in sight. At 1280 × 800 the whole body (≈ 260) shows.
 
 - Accessibility: the sheet's focus rules (02); the result line is in a polite live region; after success the focus goes to the home's « Mon compte » tile.
 - Motion: the sheet's own (unchanged; reduced: fade).
