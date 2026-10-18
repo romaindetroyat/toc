@@ -14,17 +14,36 @@
 //                                        guarded claim as the sign-up (used_at), then one batch with
 //                                        the two friendship rows and used_by; one's own link (409 own)
 //                                        and a friend's link (200 already) are not spent
+//   POST   /api/friends/code             the caller's friend code: 8 Crockford symbols (40 bits),
+//                                        24 hours, kept in `invitations` (kind 'code') as an HMAC
+//                                        under the TOC_PEPPER secret, never in clear; the newest
+//                                        replaces the older one (201 { code, expiresAt })
+//   POST   /api/friends/code/redeem      { code } typed by another signed-in player: 400 format (not
+//                                        counted); the requester's PlayerHub allows 10 failures an
+//                                        hour, charged before the lookup (429 rate, nothing looked
+//                                        up) and given back unless the code was unknown or expired
+//                                        (404 unknown); 409 own; 200 { already, friend }; 200 { friend }
+//                                        with the two rows. The code stays valid until it expires.
+//   GET    /api/friends                  the caller's friends { id, pseudo, since }, in French
+//                                        alphabetical order (localeCompare fr, base)
+//   DELETE /api/friends/:id              the friendship goes, both directions in one statement (204)
 // A friendship is two rows of `friendships`, one per direction (D-06). Nothing here searches a pseudo:
 // a friendship needs a link, a code or a sign-up through an invitation.
 
 import {
   EmptyBody,
+  FRIEND_CODE_TTL_MS,
+  FriendCodeRedeemBody,
   type FriendEntry,
   INVITATION_RE,
   INVITE_TTL_MS,
   MAX_PENDING_INVITATIONS,
+  newFriendCode,
+  normalizeFriendCode,
   type PendingInvitation,
+  toBase64Url,
 } from "@toc/protocol";
+import { pepperOf } from "./auth/challenge.ts";
 import { sessionUser } from "./auth/session.ts";
 import { stateOf } from "./auth/signup.ts";
 import type { Meter } from "./db.ts";
@@ -199,6 +218,153 @@ function acceptInvitation(code: string): Route {
   };
 }
 
+// --- Friend codes, the list, the removal ---
+
+/** Failed friend codes allowed per requester and hour (T-04-44). */
+export const CODE_FAILURES = 10;
+const CODE_WINDOW_MS = 3600_000;
+const CODE_FAIL = "code-fail";
+
+/** How a friend code is kept: base64url HMAC-SHA-256 under the pepper (40 bits: a bare hash is guessable). */
+async function codeMac(pepper: string, code: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(pepper),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(`friend-code:${code}`));
+  return toBase64Url(new Uint8Array(mac));
+}
+
+/** POST /api/friends/code: 201 { code, expiresAt }; the caller's older code stops working. */
+const createFriendCode: Route = async (request, env, url, meter, now) => {
+  const read = await readJson(request, EmptyBody);
+  if (!read.ok) return read.response;
+  const user = await sessionUser(request, url, env, meter, now);
+  if (user === null) return signedOut();
+  const pepper = pepperOf(env);
+  if (pepper instanceof Response) return pepper;
+  const expiresAt = now + FRIEND_CODE_TTL_MS;
+  // Two codes of 40 bits may meet (the primary key refuses the second): draw again, a few times.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = newFriendCode();
+    try {
+      await meter.batch([
+        meter
+          .prepare("DELETE FROM invitations WHERE inviter_id = ? AND kind = 'code'")
+          .bind(user.id),
+        meter
+          .prepare(
+            `INSERT INTO invitations (code_hash, id, kind, inviter_id, created_at, expires_at)
+             VALUES (?, ?, 'code', ?, ?, ?)`,
+          )
+          .bind(await codeMac(pepper, code), randomUrl(16), user.id, now, expiresAt),
+      ]);
+      return json({ code, expiresAt }, 201);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/UNIQUE|constraint/i.test(message)) {
+        console.error("friend code failed", message);
+        return json({ error: "server" }, 500);
+      }
+    }
+  }
+  return json({ error: "server" }, 500);
+};
+
+type CodeRow = { inviter_id: string | null; expires_at: number; pseudo: string | null };
+
+/** POST /api/friends/code/redeem (the router checked our Origin). */
+const redeemFriendCode: Route = async (request, env, url, meter, now) => {
+  const read = await readJson(request, FriendCodeRedeemBody);
+  if (!read.ok) return read.response;
+  const user = await sessionUser(request, url, env, meter, now);
+  if (user === null) return signedOut();
+  const pepper = pepperOf(env);
+  if (pepper instanceof Response) return pepper;
+  const code = normalizeFriendCode(read.body.code);
+  if (code === null) return json({ error: "format" }, 400);
+
+  // Charged before the lookup, so the eleventh failure in the hour is never looked up, even in
+  // parallel; given back below when the code was not a failure.
+  const hub = env.PLAYER_HUB.getByName(user.id);
+  if (!(await hub.allow({ kind: CODE_FAIL, max: CODE_FAILURES, windowMs: CODE_WINDOW_MS, now }))) {
+    return json({ error: "rate" }, 429);
+  }
+  const row = await meter.first<CodeRow>(
+    meter
+      .prepare(
+        `SELECT i.inviter_id, i.expires_at, u.pseudo
+           FROM invitations i JOIN users u ON u.id = i.inviter_id
+          WHERE i.code_hash = ? AND i.kind = 'code'`,
+      )
+      .bind(await codeMac(pepper, code)),
+  );
+  if (row === null || row.inviter_id === null || row.expires_at <= now) {
+    return json({ error: "unknown" }, 404);
+  }
+  await hub.release({ kind: CODE_FAIL, at: now });
+  const friendId = row.inviter_id;
+  if (friendId === user.id) return json({ error: "own" }, 409);
+  const known = await friendOf(meter, user.id, friendId);
+  if (known !== null) return json({ already: true, friend: known }, 200);
+  await meter.batch(befriend(meter, friendId, user.id, now));
+  const friend: FriendEntry = { id: friendId, pseudo: row.pseudo ?? "", since: now };
+  return json({ friend }, 200);
+};
+
+type FriendRow = { id: string; pseudo: string; since: number };
+
+/** The most friends GET /api/friends answers (a family circle is far below). */
+const MAX_FRIENDS = 500;
+
+/** GET /api/friends: the caller's friends, in French alphabetical order. */
+const listFriends: Route = async (request, env, url, meter, now) => {
+  const user = await sessionUser(request, url, env, meter, now);
+  if (user === null) return signedOut();
+  const found = await meter.all<FriendRow>(
+    meter
+      .prepare(
+        `SELECT u.id, u.pseudo, f.created_at AS since
+           FROM friendships f JOIN users u ON u.id = f.friend_id
+          WHERE f.user_id = ? LIMIT ?`,
+      )
+      .bind(user.id, MAX_FRIENDS),
+  );
+  const list: FriendEntry[] = found.results.map((row) => ({
+    id: row.id,
+    pseudo: row.pseudo,
+    since: row.since,
+  }));
+  list.sort(
+    (a, b) =>
+      a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  return json(list, 200);
+};
+
+/** DELETE /api/friends/:id (the router checked our Origin): 204, or 404 when not a friend. */
+function removeFriend(id: string): Route {
+  return async (request, env, url, meter, now) => {
+    const user = await sessionUser(request, url, env, meter, now);
+    if (user === null) return signedOut();
+    if (!INVITATION_RE.test(id)) return json({ error: "not-found" }, 404);
+    const removed = await meter.run(
+      meter
+        .prepare(
+          `DELETE FROM friendships
+            WHERE (user_id = ?1 AND friend_id = ?2) OR (user_id = ?2 AND friend_id = ?1)`,
+        )
+        .bind(user.id, id),
+    );
+    return removed.meta.changes > 0 ? noContent() : json({ error: "not-found" }, 404);
+  };
+}
+
 /** A write route: our own non-null Origin first (403). */
 function guarded(request: Request, url: URL, route: Route): Route | Response {
   return writeAllowed(request, url) ? route : json({ error: "origin" }, 403);
@@ -217,6 +383,19 @@ function pick(request: Request, url: URL): Route | Response | null {
   if (accept !== null) {
     if (method !== "POST") return notAllowed("POST");
     return guarded(request, url, acceptInvitation(accept[1] ?? ""));
+  }
+  if (path === "/api/friends") return read ? listFriends : notAllowed("GET");
+  if (path === "/api/friends/code") {
+    return method === "POST" ? guarded(request, url, createFriendCode) : notAllowed("POST");
+  }
+  if (path === "/api/friends/code/redeem") {
+    return method === "POST" ? guarded(request, url, redeemFriendCode) : notAllowed("POST");
+  }
+  const friend = /^\/api\/friends\/([^/]*)$/.exec(path);
+  if (friend !== null) {
+    return method === "DELETE"
+      ? guarded(request, url, removeFriend(friend[1] ?? ""))
+      : notAllowed("DELETE");
   }
   const one = /^\/api\/invitations\/([^/]*)$/.exec(path);
   if (one !== null) {

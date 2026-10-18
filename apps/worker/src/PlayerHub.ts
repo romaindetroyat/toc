@@ -11,6 +11,7 @@
 //   allow             sliding-window rate limits per kind (friend codes in 04-05, invitations later):
 //                     true and counted for the first `max` calls inside `windowMs`, then false (not
 //                     counted) until the oldest leaves the window
+//   release           gives one counted call back (04-05: a friend code that worked is no failure)
 // Presence, notices and Web Push come in plans 04-06 and 04-07.
 //
 // Times come from the caller (`now`, Date.now() by default) and are compared on each call: no timer
@@ -144,5 +145,19 @@ export class PlayerHub extends DurableObject<Env> {
     if (count >= input.max) return false;
     sql.exec("INSERT INTO limits (kind, at) VALUES (?, ?)", input.kind, now);
     return true;
+  }
+
+  /**
+   * RPC from the Worker (plan 04-05): gives back one call of `kind` that allow counted at `at`, when
+   * that call turned out not to be what the limit counts (a friend code that worked: only failures
+   * count). Charging first and giving back after keeps parallel calls inside the limit.
+   */
+  async release(input: { kind: string; at: number }): Promise<void> {
+    this.sql().exec(
+      `DELETE FROM limits WHERE rowid =
+         (SELECT rowid FROM limits WHERE kind = ? AND at = ? LIMIT 1)`,
+      input.kind,
+      input.at,
+    );
   }
 }

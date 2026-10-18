@@ -1,7 +1,8 @@
 // The account calls of the page (plans 04-01 to 04-03, ACCT-01, ACCT-02, D-02, D-12): the state of
 // an invitation link, the sign-up (options, the passkey, verify), GET /api/me; since 04-02 the login
 // (usernameless), the logout, adding and removing a passkey and a new backup code (step-up); since
-// 04-03 the recovery with the backup code (« Retrouver mon compte »); since 04-04 the account's tables. fetch, the online flag and the
+// 04-03 the recovery with the backup code (« Retrouver mon compte »); since 04-04 the account's tables;
+// since 04-05 the invitation links, the friend codes and the friends list. fetch, the online flag and the
 // passkey ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every
 // answer is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly
 // cookie the browser keeps and sends by itself: no token ever reaches this code.
@@ -12,20 +13,29 @@ import type {
 } from "@simplewebauthn/browser";
 import {
   type AccountTable,
+  type CreatedInvitation,
   type CreationOptions,
+  type FriendEntry,
   type InvitationState,
   isInvitationCode,
   isTableId,
   type MeAccount,
   normalizeBackupCode,
+  normalizeFriendCode,
   type PasskeyInfo,
+  type PendingInvitation,
   parseAccountTables,
   parseAddPasskeyAnswer,
   parseBackupCodeAnswer,
+  parseCreatedInvitation,
   parseCreationOptions,
+  parseFriendAnswer,
+  parseFriendCodeAnswer,
+  parseFriends,
   parseInvitationState,
   parseLoginAnswer,
   parseMeAccount,
+  parsePendingInvitations,
   parseRecoverAnswer,
   parseRecoverRefusal,
   parseRequestOptions,
@@ -510,4 +520,193 @@ export async function forgetMyTable(id: string, api: ApiDeps = browserApi): Prom
     ok: false,
     reason: refusal({ status: response.status, body: await bodyOf(response) }, {}),
   };
+}
+
+// --- Plan 04-05: invitation links, friend codes, the friends list (ACCT-03, D-06, D-11) ---
+
+/** Why a friends call did not go through; the page has a sentence for each (04-UI-SPEC « Mes amis »). */
+export type SocialFailure =
+  | "limit"
+  | "own"
+  | "used"
+  | "expired"
+  | "unknown"
+  | "format"
+  | "rate"
+  | "offline"
+  | "server"
+  | "signed-out";
+
+export type SocialResult<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; reason: SocialFailure };
+
+/** A refusal: 401 signed-out, then the known `error` of that status, else server. */
+function socialRefusal(
+  answer: Answer,
+  known: Partial<Record<number, readonly SocialFailure[]>>,
+): SocialFailure {
+  if (answer.status === 401) return "signed-out";
+  const error = errorOf(answer.body);
+  const allowed = known[answer.status] ?? [];
+  return typeof error === "string" && (allowed as readonly string[]).includes(error)
+    ? (error as SocialFailure)
+    : "server";
+}
+
+/** A GET or DELETE without a body; null when the network failed. */
+async function call(api: ApiDeps, url: string, method: "GET" | "DELETE"): Promise<Answer | null> {
+  try {
+    const response = await api.fetch(url, {
+      method,
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    return {
+      status: response.status,
+      body: response.status === 204 ? null : await bodyOf(response),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** « Inviter un proche »: POST /api/invitations {}. The new link (its code is only here), or why not. */
+export async function createInvitation(
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ invitation: CreatedInvitation }>> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, "/api/invitations", {});
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 201) {
+    const invitation = parseCreatedInvitation(answer.body);
+    return invitation === null ? { ok: false, reason: "server" } : { ok: true, invitation };
+  }
+  return { ok: false, reason: socialRefusal(answer, { 409: ["limit"] }) };
+}
+
+/** « Invitations en attente »: GET /api/invitations, the account's pending links (no codes). */
+export async function pendingInvitations(
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ invitations: PendingInvitation[] }>> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await call(api, "/api/invitations", "GET");
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) {
+    const invitations = parsePendingInvitations(answer.body);
+    return invitations === null ? { ok: false, reason: "server" } : { ok: true, invitations };
+  }
+  return { ok: false, reason: socialRefusal(answer, {}) };
+}
+
+/** « Désactiver ce lien »: DELETE /api/invitations/<id>; unknown when it is no longer pending. */
+export async function disableInvitation(
+  id: string,
+  api: ApiDeps = browserApi,
+): Promise<SocialResult> {
+  if (!isInvitationCode(id)) return { ok: false, reason: "unknown" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await call(api, `/api/invitations/${id}`, "DELETE");
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 204) return { ok: true };
+  if (answer.status === 404) return { ok: false, reason: "unknown" };
+  return { ok: false, reason: socialRefusal(answer, {}) };
+}
+
+/** A friend just added, or already there (`already`), from an accept or a redeem answer. */
+function friendResult(answer: Answer): SocialResult<{ friend: FriendEntry; already: boolean }> {
+  const parsed = parseFriendAnswer(answer.body);
+  return parsed === null
+    ? { ok: false, reason: "server" }
+    : { ok: true, friend: parsed.friend, already: parsed.already === true };
+}
+
+/**
+ * « Ajouter à mes amis » on someone else's link, signed in: POST /api/invitations/<code>/accept {}.
+ * The friend (already: it was a friend before, the link stays valid), or why not: own (one's own
+ * link, not spent), used, expired, unknown.
+ */
+export async function acceptInvitation(
+  code: string,
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ friend: FriendEntry; already: boolean }>> {
+  if (!isInvitationCode(code)) return { ok: false, reason: "unknown" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, `/api/invitations/${code}/accept`, {});
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) return friendResult(answer);
+  return {
+    ok: false,
+    reason: socialRefusal(answer, { 409: ["own"], 410: ["used", "expired", "unknown"] }),
+  };
+}
+
+/**
+ * « Donner mon code »: POST /api/friends/code {}. The account's new friend code (8 symbols: show it
+ * with formatFriendCode) and its expiry, 24 hours; the older code stops working.
+ */
+export async function friendCode(
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ code: string; expiresAt: number }>> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, "/api/friends/code", {});
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 201) {
+    const parsed = parseFriendCodeAnswer(answer.body);
+    return parsed === null
+      ? { ok: false, reason: "server" }
+      : { ok: true, code: parsed.code, expiresAt: parsed.expiresAt };
+  }
+  return { ok: false, reason: socialRefusal(answer, {}) };
+}
+
+/**
+ * « Entrer un code »: the code is read back first (TOC- or not, dashes, spaces, lower case, O, I and
+ * L); one that cannot be a code is « format » without a request. Then POST /api/friends/code/redeem.
+ * The friend, or why not: unknown (or expired), own, rate (10 failures an hour).
+ */
+export async function redeemFriendCode(
+  typed: string,
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ friend: FriendEntry; already: boolean }>> {
+  const code = normalizeFriendCode(typed);
+  if (code === null) return { ok: false, reason: "format" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, "/api/friends/code/redeem", { code });
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) return friendResult(answer);
+  return {
+    ok: false,
+    reason: socialRefusal(answer, {
+      400: ["format"],
+      404: ["unknown"],
+      409: ["own"],
+      429: ["rate"],
+    }),
+  };
+}
+
+/** « Mes amis »: GET /api/friends, in French alphabetical order (the server's). */
+export async function friends(
+  api: ApiDeps = browserApi,
+): Promise<SocialResult<{ friends: FriendEntry[] }>> {
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await call(api, "/api/friends", "GET");
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) {
+    const list = parseFriends(answer.body);
+    return list === null ? { ok: false, reason: "server" } : { ok: true, friends: list };
+  }
+  return { ok: false, reason: socialRefusal(answer, {}) };
+}
+
+/** « Retirer de mes amis »: DELETE /api/friends/<id> (both directions); unknown when not a friend. */
+export async function removeFriend(id: string, api: ApiDeps = browserApi): Promise<SocialResult> {
+  if (!isInvitationCode(id)) return { ok: false, reason: "unknown" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await call(api, `/api/friends/${id}`, "DELETE");
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 204) return { ok: true };
+  if (answer.status === 404) return { ok: false, reason: "unknown" };
+  return { ok: false, reason: socialRefusal(answer, {}) };
 }

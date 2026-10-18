@@ -34,6 +34,10 @@
 //   DELETE /api/invitations/:id      → one pending link disabled, 204
 //   GET  /api/invitations/:code      → also own and friend for a signed-in caller
 //   POST /api/invitations/:code/accept → the inviter becomes a friend, the link is spent
+//   POST /api/friends/code           → the caller's friend code { code, expiresAt } (24 hours)
+//   POST /api/friends/code/redeem    → { code }: its owner becomes a friend (10 failures an hour)
+//   GET  /api/friends                → the caller's friends { id, pseudo, since }
+//   DELETE /api/friends/:id          → the friendship goes, both ways, 204
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)

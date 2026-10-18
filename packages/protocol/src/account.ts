@@ -410,3 +410,51 @@ export const parsePendingInvitations = read<PendingInvitation[]>(
 );
 export const parseFriends = read<FriendEntry[]>(z.array(friendEntry));
 export const parseFriendAnswer = read<FriendAnswer>(friendAnswer);
+
+// --- Friend codes (plan 04-05, ACCT-03; 04-RESEARCH Pattern 5, T-04-04) ---
+
+/** 8 symbols of Crockford base32: 40 bits, for signed-in players only (never a sign-up). */
+export const FRIEND_CODE_LENGTH = 8;
+/** A friend code lives 24 hours; the newest of an account replaces the older one. */
+export const FRIEND_CODE_TTL_MS = 24 * 3600 * 1000;
+
+const FRIEND_CODE_RE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$/;
+
+/** A new friend code: 8 symbols, each from one random byte (no bias, as the backup code). */
+export function newFriendCode(random: RandomFill = secureFill): string {
+  const bytes = new Uint8Array(FRIEND_CODE_LENGTH);
+  random(bytes);
+  let code = "";
+  for (const byte of bytes) code += CROCKFORD[byte & 31];
+  return code;
+}
+
+/** « TOC-K7QM-2XRA »: the prefix and two groups of four. */
+export function formatFriendCode(code: string): string {
+  return `TOC-${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
+/**
+ * The friend code a person typed, or null: upper case, spaces and dashes dropped, the « TOC » prefix
+ * dropped when 8 symbols follow it, O read as 0, I and L as 1; exactly 8 symbols of the alphabet.
+ */
+export function normalizeFriendCode(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > 64) return null;
+  let code = raw.toUpperCase().replace(/[\s\-‐‑–—]/g, "");
+  if (code.length === FRIEND_CODE_LENGTH + 3 && /^T[O0]C/.test(code)) code = code.slice(3);
+  code = code.replace(/O/g, "0").replace(/[IL]/g, "1");
+  return FRIEND_CODE_RE.test(code) ? code : null;
+}
+
+/** POST /api/friends/code/redeem: the code as typed (the Worker reads it back). */
+export const FriendCodeRedeemBody = z.strictObject({ code: z.string().check(z.maxLength(64)) });
+
+const friendCodeAnswer = z.object({
+  code: z.string().check(z.regex(FRIEND_CODE_RE)),
+  expiresAt: z.number(),
+});
+
+/** POST /api/friends/code: the account's new code (8 symbols, shown as TOC-XXXX-XXXX). */
+export type FriendCodeAnswer = z.infer<typeof friendCodeAnswer>;
+
+export const parseFriendCodeAnswer = read<FriendCodeAnswer>(friendCodeAnswer);

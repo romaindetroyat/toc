@@ -89,7 +89,10 @@ describe("POST /api/friends/code", () => {
     const zoe = await account("Zoé");
     const yann = await account("Yann");
     const first = await codeOf(zoe);
-    const second = await codeOf(zoe);
+    const replacing = await post("/api/friends/code", {}, { jar: zoe.jar });
+    expect(replacing.status).toBe(201);
+    console.log(`friend code replacing one: x-toc-d1 ${replacing.headers.get("x-toc-d1")}`);
+    const second = (await replacing.json()) as { code: string; expiresAt: number };
     expect(second.code).not.toBe(first.code);
     expect(await rows("SELECT id FROM invitations WHERE kind = 'code'")).toHaveLength(1);
     const old = await redeem(yann, first.code);
