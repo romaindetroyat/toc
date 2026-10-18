@@ -1,7 +1,7 @@
 // The two deploy configs (wrangler.jsonc with the assets upload, wrangler.embarque.jsonc with the assets
-// embedded in the script) deploy the same Worker « toc »: they must declare the same Durable Object,
-// the same migrations and the same compatibility date, or one deploy would drop the GameRoom class
-// (02-RESEARCH Pitfall 8). Neither may switch on the test-only shortcuts (T-02-07, Pitfall 11).
+// embedded in the script) deploy the same Worker « toc »: they must declare the same Durable Objects
+// (GameRoom, and PlayerHub since plan 04-03), the same migrations and the same compatibility date, or
+// one deploy would drop a class (02-RESEARCH Pitfall 8, 04-RESEARCH Pitfall 11). Neither may switch on the test-only shortcuts (T-02-07, Pitfall 11).
 
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -75,13 +75,31 @@ describe("wrangler configs", () => {
     });
   });
 
-  it("declares the GameRoom Durable Object and its SQLite migration in both files", () => {
+  // Plan 04-03 (Pitfall 11, T-04-38): PlayerHub, one Durable Object per account, comes with the
+  // migration v2 appended after v1. v1 never changes: it created GameRoom in production, and editing,
+  // reordering or removing it would make the next deploy fail or drop the tables.
+  it("declares GameRoom and PlayerHub with their SQLite migrations v1 and v2 in both files", () => {
     for (const config of [upload, embedded]) {
       expect(config.name).toBe("toc");
       expect(config.durable_objects).toEqual({
-        bindings: [{ name: "GAME_ROOM", class_name: "GameRoom" }],
+        bindings: [
+          { name: "GAME_ROOM", class_name: "GameRoom" },
+          { name: "PLAYER_HUB", class_name: "PlayerHub" },
+        ],
       });
-      expect(config.migrations).toEqual([{ tag: "v1", new_sqlite_classes: ["GameRoom"] }]);
+      expect(config.migrations).toEqual([
+        { tag: "v1", new_sqlite_classes: ["GameRoom"] },
+        { tag: "v2", new_sqlite_classes: ["PlayerHub"] },
+      ]);
+    }
+  });
+
+  it("keeps migration v1 first and byte for byte as deployed", () => {
+    for (const file of ["wrangler.jsonc", "wrangler.embarque.jsonc"]) {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      const v1 = '{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }';
+      expect(text, file).toContain(v1);
+      expect(text.indexOf(v1), file).toBeLessThan(text.indexOf('"tag": "v2"'));
     }
   });
 
@@ -190,7 +208,8 @@ describe("tools/check-bundle.mjs", () => {
       'import { DurableObject } from "cloudflare:workers";',
       ...imports.map((file, i) => `import m${i} from "./${file}";`),
       "var GameRoom = class extends DurableObject {};",
-      "export { GameRoom };",
+      "var PlayerHub = class extends DurableObject {};",
+      "export { GameRoom, PlayerHub };",
     ].join("\n");
 
   it("passes when every separate module is a file of the web build", () => {
@@ -227,10 +246,35 @@ describe("tools/check-bundle.mjs", () => {
   it("refuses an entry without the GameRoom class, and a directory that is not a dry run", () => {
     const f = fixture();
     writeFileSync(join(f.out, "index.js"), "export default {};");
-    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the GameRoom class"]);
+    expect(bundleProblems(f.out, f.dist)).toEqual([
+      "index.js does not define the GameRoom class",
+      "index.js does not define the PlayerHub class",
+    ]);
     expect(bundleProblems(f.dist, f.dist)).toEqual([
       `${f.dist}: no index.js (not a dry-run output)`,
     ]);
+    rmSync(f.dir, { recursive: true });
+  });
+
+  // Plan 04-03 (Pitfall 11): a bundle without PlayerHub would deploy migration v2 for a class the
+  // script does not export, and the deploy would fail (or the hub's binding would answer nothing).
+  it("refuses an entry defining GameRoom but not PlayerHub, and passes with both", () => {
+    const f = fixture();
+    const room =
+      'import { DurableObject } from "cloudflare:workers";\nvar GameRoom = class extends DurableObject {};';
+    writeFileSync(join(f.out, "index.js"), `${room}\nexport { GameRoom };`);
+    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the PlayerHub class"]);
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObject {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
+    // esbuild may also keep the class syntax.
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nclass PlayerHub extends DurableObject {}\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
     rmSync(f.dir, { recursive: true });
   });
 });
