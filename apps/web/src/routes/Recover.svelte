@@ -10,6 +10,7 @@
   import BackupCodeScreen from "../ui/BackupCodeScreen.svelte";
   import HomeStrip from "../ui/HomeStrip.svelte";
   import Icon from "../ui/Icon.svelte";
+  import OfflinePage from "../ui/OfflinePage.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import { stepIn } from "../ui/stepIn.ts";
   import { showToast } from "../ui/toast.svelte.ts";
@@ -36,6 +37,15 @@
   let pseudoField = $state<HTMLInputElement | null>(null);
 
   const compact = $derived(screen.chrome === "compact");
+
+  // Plan 04-10: without a network, step 1 is the offline page of the online features (04-UI-SPEC
+  // « Offline »); it goes by itself when the network is back.
+  let online = $state(typeof navigator === "undefined" || navigator.onLine !== false);
+
+  function retry() {
+    online = typeof navigator === "undefined" || navigator.onLine !== false;
+    if (online) void focusHeading();
+  }
 
   async function focusHeading() {
     await tick();
@@ -119,7 +129,11 @@
   }
 </script>
 
-{#if step === 3}
+<svelte:window onoffline={() => (online = false)} />
+
+{#if step === 1 && !online}
+  <OfflinePage onretry={retry} />
+{:else if step === 3}
   <div in:stepIn>
     <BackupCodeScreen code={backupCode} form="recovery" onkept={kept} />
   </div>

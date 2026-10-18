@@ -5,9 +5,10 @@
 // No DOM, no storage: the screens pass in what they
 // know, so every case runs under Node.
 
-import { normalizePseudo } from "@toc/protocol";
+import { normalizePseudo, type PasskeyInfo } from "@toc/protocol";
 import { accueil } from "../i18n/fr/accueil.ts";
 import { compte } from "../i18n/fr/compte.ts";
+import { type TableEntry, timeAgo } from "../net/tables.ts";
 import type { IconName } from "../ui/icons.ts";
 import type {
   AccountFailure,
@@ -16,6 +17,7 @@ import type {
   RecoverVerifyFailure,
   SignUpFailure,
 } from "./api.ts";
+import type { PushState } from "./push.ts";
 
 export type TileKind = "prenom" | "connexion" | "amis" | "compte";
 
@@ -348,4 +350,122 @@ export function recoverKeyError(reason: RecoverVerifyFailure): { line: string; b
     default:
       return { line: compte.recover.errors.server, back: false };
   }
+}
+
+// --- « Mon compte » (plan 04-10; 04-UI-SPEC « Mon compte », « Notifications », « Clés d’accès »,
+// « Se déconnecter ») ---
+
+/** Whose way to allow blocked notifications the page explains. */
+export type NotificationPlatform = "ios" | "android" | "computer";
+
+/** iPhone and iPad (platform.ts isAppleMobile), Android, else a computer. */
+export function notificationPlatform(userAgent: string, apple: boolean): NotificationPlatform {
+  if (apple) return "ios";
+  return /\bAndroid\b/.test(userAgent) ? "android" : "computer";
+}
+
+/** What the section « Notifications » shows for one state of push.ts pushState. */
+export type NotificationsView = {
+  state: PushState;
+  /** The state's line, null when the button or the switch says it all. */
+  line: string | null;
+  /** Blocked: the line comes after the bell-off icon. */
+  blocked: boolean;
+  /** Blocked: this platform's way to allow them, then « Reviens ici ensuite. ». */
+  help: string | null;
+  /** « Activer les notifications » (primary) or « Installer l’application » (secondary). */
+  action: {
+    kind: "enable" | "install";
+    label: string;
+    busy: string | null;
+    primary: boolean;
+  } | null;
+  /** The switch « Sur cet appareil » and its helper. */
+  toggle: { label: string; checked: boolean; helper: string } | null;
+  /** The line under the primary after a failed activation. */
+  error: string | null;
+};
+
+/** The UI-SPEC row of the section « Notifications » for `state` on `platform`. */
+export function notificationsView(
+  state: PushState,
+  platform: NotificationPlatform,
+): NotificationsView {
+  const copy = compte.notifications;
+  const view: NotificationsView = {
+    state,
+    line: null,
+    blocked: false,
+    help: null,
+    action: null,
+    toggle: null,
+    error: null,
+  };
+  const enable = {
+    kind: "enable" as const,
+    label: copy.enable,
+    busy: copy.enabling,
+    primary: true,
+  };
+  switch (state) {
+    case "unsupported":
+      return { ...view, line: copy.unsupported };
+    case "install-first":
+      return {
+        ...view,
+        line: copy.installFirst,
+        action: { kind: "install", label: copy.install, busy: null, primary: false },
+      };
+    case "ios-too-old":
+      return { ...view, line: copy.iosTooOld };
+    case "blocked":
+      return {
+        ...view,
+        line: copy.blocked,
+        blocked: true,
+        help: `${copy.allow[platform]} ${copy.back}`,
+      };
+    case "failed":
+      return { ...view, action: enable, error: copy.failed };
+    case "on":
+      return { ...view, toggle: { label: copy.toggle, checked: true, helper: copy.on } };
+    case "off":
+      return { ...view, toggle: { label: copy.toggle, checked: false, helper: copy.off } };
+    default:
+      return { ...view, action: enable };
+  }
+}
+
+/** One row of « Clés d’accès »: its name, « cet appareil », line 2, and the row as one sentence. */
+export function passkeyLine(
+  passkey: PasskeyInfo,
+  now: number,
+): { name: string; current: boolean; line: string; sentence: string } {
+  const copy = compte.keys;
+  const added = dateText(passkey.createdAt, now);
+  const used = passkey.lastUsedAt === null ? null : copy.used(timeAgo(passkey.lastUsedAt, now));
+  const line = [copy.added(added), used, passkey.backedUp ? copy.synced : null]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+  const sentence = [
+    passkey.label,
+    passkey.current ? copy.thisDevice : null,
+    copy.addedLower(added),
+    used,
+    passkey.backedUp ? copy.synced : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(", ");
+  return { name: passkey.label, current: passkey.current, line, sentence };
+}
+
+/** The confirmation « Se déconnecter de cet appareil ? »: the D-12 body, and the seats it concerns. */
+export function signOutBody(seats: number): string {
+  const copy = compte.signOut;
+  return seats > 0 ? `${copy.body} ${copy.seats(seats)}` : copy.body;
+}
+
+/** This device's entries of the account that hold a seat (« Parties concernées : n. »). */
+export function accountSeats(entries: readonly TableEntry[], accountId: string): number {
+  return entries.filter((entry) => entry.account === accountId && entry.seat !== null).length;
 }

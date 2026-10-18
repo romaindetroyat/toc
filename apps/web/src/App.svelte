@@ -2,6 +2,7 @@
   import { signInSheet, startAccount } from "./account/store.svelte.ts";
   import KnightDefs from "./board/KnightDefs.svelte";
   import { game } from "./i18n/fr/game.ts";
+  import Account from "./routes/Account.svelte";
   import Game from "./routes/Game.svelte";
   import Home from "./routes/Home.svelte";
   import Invitation from "./routes/Invitation.svelte";
@@ -77,6 +78,10 @@
   {:else if route === "#/secours"}
     <!-- « Retrouver mon compte » (plan 04-09): not behind « Tourne ton téléphone » either. -->
     <Recover />
+  {:else if route === "#/compte"}
+    <!-- « Mon compte » (plan 04-10): signed in only; signed out, the home with the sign-in sheet open
+         and the session-ended toast. Not behind « Tourne ton téléphone ». -->
+    <Account />
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}

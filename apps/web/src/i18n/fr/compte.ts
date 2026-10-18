@@ -191,4 +191,94 @@ export const compte = {
     ended: "Ta session a pris fin : connecte-toi de nouveau.",
     signIn: "Se connecter",
   },
+  /** Plan 04-10: « Mon compte » at #/compte (04-UI-SPEC « Mon compte »). */
+  account: {
+    title: "Mon compte",
+    home: "Accueil",
+    pseudoLabel: "Ton pseudo",
+    created: (date: string) => `Compte créé le ${date}`,
+    signOut: "Se déconnecter",
+    signOutNote: "Sur cet appareil seulement.",
+    loading: "Chargement…",
+    sectionError: "Impossible de charger cette partie de ton compte.",
+    retry: "Réessayer",
+  },
+  /** Plan 04-10: the section « Notifications » (D-08, APP-03; its seven states). */
+  notifications: {
+    heading: "Notifications",
+    intro:
+      "TOC te prévient quand c’est ton tour ou qu’un ami t’invite à sa table, seulement quand l’application est fermée.",
+    unsupported: "Ce navigateur ne peut pas recevoir les notifications de TOC.",
+    installFirst:
+      "Sur iPhone et iPad, les notifications marchent seulement dans l’application installée (iOS 16.4 ou plus récent). Installe TOC sur l’écran d’accueil, ouvre-le, connecte-toi, puis reviens ici.",
+    install: "Installer l’application",
+    iosTooOld:
+      "Cet iPhone ne reçoit pas les notifications des applications web. Il faut iOS 16.4 ou plus récent.",
+    enable: "Activer les notifications",
+    enabling: "Activation…",
+    toggle: "Sur cet appareil",
+    on: "Activées. Tu les reçois seulement quand TOC est fermé.",
+    off: "Désactivées sur cet appareil.",
+    blocked: "Les notifications sont bloquées pour TOC sur cet appareil.",
+    allow: {
+      ios: "Pour les autoriser : Réglages › Notifications › TOC.",
+      android:
+        "Pour les autoriser : appui long sur l’icône de TOC › Infos sur l’appli › Notifications.",
+      computer: "Pour les autoriser : le cadenas à côté de l’adresse › Notifications.",
+    },
+    back: "Reviens ici ensuite.",
+    failed: "L’activation n’a pas marché. Réessaie dans un instant.",
+    done: "Notifications activées sur cet appareil.",
+  },
+  /** Plan 04-10: the section « Clés d’accès » (no renaming in this phase). */
+  keys: {
+    heading: "Clés d’accès",
+    thisDevice: "cet appareil",
+    added: (date: string) => `Ajoutée le ${date}`,
+    used: (when: string) => `utilisée ${when}`,
+    synced: "synchronisée",
+    /** The row read as one sentence: « iPhone, cet appareil, ajoutée le 3 octobre, utilisée hier ». */
+    addedLower: (date: string) => `ajoutée le ${date}`,
+    remove: (name: string) => `Retirer la clé ${name}`,
+    last: "C’est ta seule clé : ajoute-en une autre avant de retirer celle-ci.",
+    add: "Ajouter une clé d’accès",
+    adding: "Suis les instructions de ton appareil…",
+    addDone: "Clé ajoutée.",
+    alreadyHere: "Cet appareil a déjà une clé pour ton compte.",
+    addCancelled: "Ajout annulé.",
+    addFailed: "L’ajout n’a pas marché. Réessaie dans un instant.",
+    removeFailed: "La clé n’a pas pu être retirée. Réessaie dans un instant.",
+    offline: "Pas de connexion. Vérifie le réseau, puis réessaie.",
+    confirm: {
+      title: "Retirer la clé ?",
+      body: (name: string) => `La clé « ${name} » ne pourra plus ouvrir ton compte.`,
+      safe: "Garder la clé",
+      other: "Retirer la clé",
+    },
+  },
+  /** Plan 04-10: the section « Code de secours » (D-02: a new code behind the passkey). */
+  code: {
+    heading: "Code de secours",
+    created: (date: string) => `Créé le ${date}.`,
+    none: "Aucun code pour l’instant.",
+    renew: "Créer un nouveau code",
+    saved: "Nouveau code enregistré.",
+    notConfirmed: "Code non remplacé : la clé d’accès n’a pas été confirmée.",
+    failed: "Le code n’a pas pu être remplacé. Réessaie dans un instant.",
+    confirm: {
+      title: "Remplacer ton code de secours ?",
+      body: "L’ancien code ne marchera plus. Ta clé d’accès te sera demandée.",
+      safe: "Garder mon code",
+      other: "Créer un nouveau code",
+    },
+  },
+  /** Plan 04-10: « Se déconnecter » (D-12), confirmed but not destructive. */
+  signOut: {
+    title: "Se déconnecter de cet appareil ?",
+    body: "Tes places dans les parties en cours ne seront plus jouables sur cet appareil jusqu’à ta prochaine connexion. Cet appareil ne recevra plus tes notifications. Tes autres appareils ne changent pas.",
+    seats: (n: number) => `Parties concernées : ${n}.`,
+    safe: "Rester sur mon compte",
+    other: "Se déconnecter",
+    done: "Session fermée sur cet appareil.",
+  },
 } as const;

@@ -1,4 +1,3 @@
-import { createECDH, randomBytes } from "node:crypto";
 import {
   type APIRequestContext,
   type Browser,
@@ -126,7 +125,11 @@ export async function signInFromHome(page: Page): Promise<void> {
 export const IPHONE_17_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
 
-const base64url = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");
+const base64url = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
 export type PushStubOptions = {
   /** Notification.permission before any tap (default "default"). */
@@ -149,13 +152,17 @@ export async function stubPush(
   context: BrowserContext,
   options: PushStubOptions = {},
 ): Promise<void> {
-  const ecdh = createECDH("prime256v1");
+  // A real P-256 public point (65 bytes, 0x04 first) and a 16-byte secret, as a browser makes them.
+  const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveBits",
+  ]);
+  const point = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
   const init = {
     permission: options.permission ?? "default",
     answer: options.answer ?? "granted",
     standalone: options.standalone ?? true,
-    p256dh: base64url(ecdh.generateKeys()),
-    auth: base64url(randomBytes(16)),
+    p256dh: base64url(point),
+    auth: base64url(crypto.getRandomValues(new Uint8Array(16))),
   };
   await context.addInitScript((init) => {
     const get = (key: string, fallback: string): string => {

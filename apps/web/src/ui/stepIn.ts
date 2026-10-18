@@ -21,3 +21,12 @@ export function stepIn(_node: Element): TransitionConfig {
     css: (t) => `opacity: ${t}; transform: translateX(${(1 - t) * 12}px)`,
   };
 }
+
+/**
+ * A list row that comes or goes (plan 04-10; 04-UI-SPEC « Motion »: list row removed / added): a
+ * 150 ms fade; instant under reduced motion.
+ */
+export function rowFade(_node: Element): TransitionConfig {
+  if (reduced()) return { duration: 0 };
+  return { duration: 150, css: (t) => `opacity: ${t}` };
+}

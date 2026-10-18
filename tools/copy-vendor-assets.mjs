@@ -28,7 +28,8 @@ const SUBSETS = ["latin", "latin-ext"];
  * Exactly the icons of UI-SPEC « Design System » (phase 1, then the six of 02-UI-SPEC), then those of
  * 04-UI-SPEC as their screens come (plan 04-01: user, triangle-alert; copy was there; plan 04-08:
  * refresh-cw, download, share, square-plus for the home strip and « Installer TOC »; plan 04-09:
- * log-in, key-round, handshake for the small tiles and « Se connecter »).
+ * log-in, key-round, handshake for the small tiles and « Se connecter »; plan 04-10: log-out, bell,
+ * bell-off for « Mon compte », link, user-plus for « Mes amis »).
  */
 const ICON_NAMES = [
   "settings",
@@ -58,6 +59,11 @@ const ICON_NAMES = [
   "log-in",
   "key-round",
   "handshake",
+  "log-out",
+  "bell",
+  "bell-off",
+  "link",
+  "user-plus",
 ];
 
 mkdirSync(fontsOut, { recursive: true });

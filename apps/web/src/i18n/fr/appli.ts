@@ -37,4 +37,11 @@ export const appli = {
       "Ouvre TOC depuis sa nouvelle icône et connecte-toi une fois : l’application ne partage pas la session de Safari.",
     close: "Fermer",
   },
+  /** Plan 04-10: the offline page of the online features (04-UI-SPEC « Offline »). */
+  offlinePage: {
+    heading: "Pas de connexion",
+    body: "Cette page a besoin d’Internet. Vérifie le réseau, puis réessaie. Sans réseau, tu peux jouer contre l’ordinateur.",
+    retry: "Réessayer",
+    solo: "Jouer contre l’ordinateur",
+  },
 } as const;
