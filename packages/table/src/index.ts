@@ -1,4 +1,13 @@
 export {
+  type HelloAccount,
+  linkPerson,
+  type Member,
+  memberChanges,
+  newPerson,
+  resolveWho,
+  type SocketIds,
+} from "./accounts.ts";
+export {
   FALLBACK_LEVEL,
   SLICE_UNITS,
   scheduleBot,

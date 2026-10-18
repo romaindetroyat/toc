@@ -10,6 +10,9 @@
 // Plan 02-07: activity (lastActivity, the 30-day clock of EXPIRY_MS) is a hello or a client frame
 // that changed the table, set here once for all; a tick (a computer's move included) or a socket gone
 // is not. A tick past the idle days answers `purge`: the Durable Object then deletes everything.
+//
+// Plan 04-04: a hello may carry the socket's account (accounts.ts); every result lists the
+// table_members rows its change calls for (`members`).
 
 import { BOT_NAMES, type BotLevel, parseBotLevel } from "@toc/bots";
 import {
@@ -41,6 +44,13 @@ import type {
   ServerFrame,
   SpeedFrame,
 } from "@toc/protocol";
+import {
+  type HelloAccount,
+  linkPerson,
+  type Member,
+  memberChanges,
+  newPerson,
+} from "./accounts.ts";
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
 import { canChat, keepMessage, overRate } from "./chat.ts";
 import { chatFrame, eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
@@ -61,8 +71,12 @@ import { dropVote, maybeStartRematch, onGameWon, vote } from "./rematch.ts";
 import { copyTable, personOf, type Table } from "./table.ts";
 
 export type Command =
-  /** A socket said hello: `who` is the hash of the table id and its device token. */
-  | { t: "hello"; who: string; name: string }
+  /**
+   * A socket said hello: `who` is the person the Durable Object resolved (accounts.ts resolveWho,
+   * plan 04-04); `account` the socket's account (from the Worker's session), null or absent for a
+   * guest.
+   */
+  | { t: "hello"; who: string; name: string; account?: HelloAccount | null }
   /** The last socket of `who` closed, or the Durable Object swept it as silent (plan 02-06). */
   | { t: "gone"; who: string }
   /** The alarm fired; `retry` when the runtime retries it after a failed invocation (D-11). */
@@ -109,6 +123,11 @@ export type Reduced = {
   log: LogEntry[];
   purge?: true;
   records?: GameRecord[];
+  /**
+   * The table_members rows to write to D1 after the commit (plan 04-04, accounts.ts memberChanges):
+   * a linked person who became linked, sat, stood, was moved or left. Absent when empty; never sent.
+   */
+  members?: Member[];
 };
 
 const unchanged = (table: Table): Reduced => ({ table, out: [], log: [] });
@@ -173,15 +192,19 @@ function commitPlay(
   return result;
 }
 
-function hello(table: Table, who: string, name: string, now: number): Reduced {
+function hello(
+  table: Table,
+  who: string,
+  name: string,
+  account: HelloAccount | null,
+  now: number,
+): Reduced {
   const next = copyTable(table);
   if (next.creator === null) next.creator = who;
   const person = personOf(next, who);
-  if (person === undefined) next.people.push({ who, name, seat: null, online: true });
-  else {
-    person.name = name;
-    person.online = true;
-  }
+  // An account's person is linked and named by its pseudo (plan 04-04).
+  if (person === undefined) next.people.push(newPerson(who, account, name));
+  else linkPerson(person, account, name);
   // Back at the table: the pause may end, a handed-over seat is theirs again (plan 02-06).
   const { regained } = onHello(next, who, now);
   const out: Out[] = [
@@ -650,6 +673,13 @@ function reclaimsForHost(before: Table, result: Reduced, command: Command): Out[
  * changed the table is activity (EXPIRY_MS counts from it).
  */
 export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
+  const result = settle(table, command, ctx);
+  if (result.purge === true || result.table === table) return result;
+  const members = memberChanges(table, result.table);
+  return members.length === 0 ? result : { ...result, members };
+}
+
+function settle(table: Table, command: Command, ctx: Ctx): Reduced {
   let result = route(table, command, ctx);
   if (result.purge === true) return result;
   if (result.table !== table && (command.t === "hello" || command.t === "client")) {
@@ -669,7 +699,7 @@ export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
 function route(table: Table, command: Command, ctx: Ctx): Reduced {
   switch (command.t) {
     case "hello":
-      return hello(table, command.who, command.name, ctx.now);
+      return hello(table, command.who, command.name, command.account ?? null, ctx.now);
     case "gone":
       return gone(table, command.who, ctx);
     case "tick":

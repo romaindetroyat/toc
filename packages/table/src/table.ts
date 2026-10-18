@@ -2,7 +2,8 @@
 // snapshot). Pure, no I/O: the clock and the seeds come from the reducer's context.
 //
 // A person is known by `who`, the SHA-256 of the table id and the device token, computed by the
-// Durable Object: the token itself never reaches the table, and `who` never leaves the server.
+// Durable Object: the token itself never reaches the table, and `who` never leaves the server. Plan
+// 04-04 adds the account a person is linked to (accounts.ts), server-only too.
 
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
 import { COLORS, type Color, type GameState, type Rng, type Scenario } from "@toc/engine";
@@ -15,6 +16,11 @@ export type Person = {
   seat: Color | null;
   /** The person has an open socket on the table. */
   online: boolean;
+  /**
+   * The account the person is linked to (plan 04-04, D-05), or null for a guest. Server-only: never
+   * put in a frame. Absent in a snapshot from before plan 04-04 (copyTable sets null).
+   */
+  account: string | null;
 };
 
 export type Seat =
@@ -230,6 +236,8 @@ export function copyTable(table: Table): Table {
   copy.endedAt ??= null;
   // Before plan 02-10b a table had no « Avance rapide ».
   copy.fast ??= false;
+  // Before plan 04-04 nobody was linked to an account.
+  for (const person of copy.people) person.account ??= null;
   if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }
