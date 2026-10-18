@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { StorageLike } from "../net/device.ts";
 import {
   codeFor,
+  FRIEND_CODE_KEY,
   forgetInvite,
   INVITES_KEY,
   keepPending,
+  loadFriendCode,
   loadInvites,
   MAX_INVITES,
+  rememberFriendCode,
   rememberInvite,
   type StoredInvite,
 } from "./invites.ts";
@@ -138,5 +141,62 @@ describe("keepPending (plan 04-10)", () => {
     expect(keepPending(storage, [], NOW)).toEqual([]);
     expect(loadInvites(storage, NOW)).toEqual([]);
     expect(keepPending(memory("{not json"), [id(1)], NOW)).toEqual([]);
+  });
+});
+
+describe("the friend code this device received (plan 04-10, toc.friendcode.v1)", () => {
+  const ACCOUNT = "AAAAAAAAAAAAAAAAAAAAAA";
+  const OTHER = "BBBBBBBBBBBBBBBBBBBBBB";
+
+  function codeStore(initial?: string): StorageLike & { value: string | null } {
+    const store = {
+      value: initial ?? null,
+      getItem: (key: string) => (key === FRIEND_CODE_KEY ? store.value : null),
+      setItem: (key: string, value: string) => {
+        if (key === FRIEND_CODE_KEY) store.value = value;
+      },
+    };
+    return store;
+  }
+
+  it("is reused by its account while it is valid", () => {
+    const storage = codeStore();
+    rememberFriendCode(storage, { account: ACCOUNT, code: "K7QM2XRA", expiresAt: NOW + DAY }, NOW);
+    expect(loadFriendCode(storage, ACCOUNT, NOW + 1000)).toEqual({
+      code: "K7QM2XRA",
+      expiresAt: NOW + DAY,
+    });
+    expect(loadFriendCode(storage, OTHER, NOW)).toBeNull();
+    expect(loadFriendCode(storage, ACCOUNT, NOW + DAY)).toBeNull();
+  });
+
+  it("a hostile or broken value gives none; a malformed code is not kept", () => {
+    expect(loadFriendCode(codeStore("{not json"), ACCOUNT, NOW)).toBeNull();
+    expect(
+      loadFriendCode(
+        codeStore(JSON.stringify({ account: ACCOUNT, code: "<b>", expiresAt: NOW + DAY })),
+        ACCOUNT,
+        NOW,
+      ),
+    ).toBeNull();
+    const storage = codeStore();
+    rememberFriendCode(storage, { account: ACCOUNT, code: "OOPS", expiresAt: NOW + DAY }, NOW);
+    expect(storage.value).toBeNull();
+    const throwing: StorageLike = {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    };
+    expect(() =>
+      rememberFriendCode(
+        throwing,
+        { account: ACCOUNT, code: "K7QM2XRA", expiresAt: NOW + DAY },
+        NOW,
+      ),
+    ).not.toThrow();
+    expect(loadFriendCode(throwing, ACCOUNT, NOW)).toBeNull();
   });
 });

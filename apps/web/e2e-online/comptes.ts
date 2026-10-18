@@ -274,3 +274,43 @@ export async function accountContext(
   await stubPush(context, push);
   return context;
 }
+
+// --- Plan 04-10: friends through the API, for the specs of « Mes amis » ---
+
+/** POST /api/invitations from `page`'s account: a pending link this device does not remember. */
+export async function apiInvitation(page: Page): Promise<{ id: string; code: string }> {
+  const answer = await page.evaluate(async () => {
+    const response = await fetch("/api/invitations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    return {
+      status: response.status,
+      body: (await response.json()) as { id: string; code: string },
+    };
+  });
+  expect(answer.status).toBe(201);
+  return answer.body;
+}
+
+/** `a` gives a friend code and `b` redeems it through the API: they are friends. */
+export async function befriend(a: Page, b: Page): Promise<void> {
+  const code = await a.evaluate(async () => {
+    const response = await fetch("/api/friends/code", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    return ((await response.json()) as { code: string }).code;
+  });
+  const status = await b.evaluate(async (code) => {
+    const response = await fetch("/api/friends/code/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    return response.status;
+  }, code);
+  expect(status).toBe(200);
+}

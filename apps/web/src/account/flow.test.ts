@@ -4,6 +4,8 @@ import {
   accountSeats,
   dateText,
   formatCodeInput,
+  friendCodeInput,
+  friendCodeResult,
   friendSentence,
   friendSince,
   homeTiles,
@@ -584,5 +586,84 @@ describe("pendingLine", () => {
         new Date(2026, 11, 30, 12).getTime(),
       ).line,
     ).toBe("Valable jusqu’au 5 janvier 2027 · une seule fois");
+  });
+});
+
+// --- Plan 04-10: « Ajouter avec un code » (04-UI-SPEC « Code-ami sheet ») ---
+
+describe("friendCodeInput", () => {
+  it("adds « TOC- » and the dash after four symbols, at most 13 characters", () => {
+    expect(friendCodeInput("k7qm2xra")).toBe("TOC-K7QM-2XRA");
+    expect(friendCodeInput("k")).toBe("TOC-K");
+    expect(friendCodeInput("k7qm")).toBe("TOC-K7QM");
+    expect(friendCodeInput("k7qm2")).toBe("TOC-K7QM-2");
+    expect(friendCodeInput("TOC-K7QM-2XRAZZZ")).toBe("TOC-K7QM-2XRA");
+    expect(friendCodeInput("TOC-K7QM-2XRAZZZ")).toHaveLength(13);
+  });
+
+  it("reads a pasted or typed prefix once, spaces and dashes, O for 0 and I or L for 1", () => {
+    expect(friendCodeInput("toc-k7qm-2xra")).toBe("TOC-K7QM-2XRA");
+    expect(friendCodeInput("TOC k7qm 2xra")).toBe("TOC-K7QM-2XRA");
+    expect(friendCodeInput("TOC-T")).toBe("TOC-T");
+    expect(friendCodeInput("TOC-TOC")).toBe("TOC-T0C");
+    expect(friendCodeInput("o1l")).toBe("TOC-011");
+  });
+
+  it("lets the player type the prefix, and empty it again", () => {
+    expect(friendCodeInput("")).toBe("");
+    expect(friendCodeInput("t")).toBe("T");
+    expect(friendCodeInput("to")).toBe("TO");
+    expect(friendCodeInput("toc")).toBe("TOC");
+    expect(friendCodeInput("TOC-")).toBe("TOC-");
+    expect(friendCodeInput("tk")).toBe("TOC-TK");
+  });
+});
+
+describe("friendCodeResult", () => {
+  const friend = { id: "AAAAAAAAAAAAAAAAAAAAAA", pseudo: "Marie", since: 1 };
+
+  it("added: the sheet closes with the toast", () => {
+    expect(friendCodeResult({ ok: true, friend, already: false })).toEqual({
+      kind: "added",
+      toast: "Marie est maintenant dans tes amis.",
+    });
+  });
+
+  it("one line per refusal, from the UI-SPEC table", () => {
+    expect(friendCodeResult({ ok: true, friend, already: true })).toEqual({
+      kind: "line",
+      line: "Marie est déjà dans tes amis.",
+    });
+    expect(friendCodeResult({ ok: false, reason: "format" })).toEqual({
+      kind: "line",
+      line: "Un code ami ressemble à TOC-K7QM-2XRA.",
+    });
+    const unknown =
+      "Ce code ne marche pas : il a peut-être expiré (24 heures). Demande un nouveau code.";
+    expect(friendCodeResult({ ok: false, reason: "unknown" })).toEqual({
+      kind: "line",
+      line: unknown,
+    });
+    expect(friendCodeResult({ ok: false, reason: "expired" })).toEqual({
+      kind: "line",
+      line: unknown,
+    });
+    expect(friendCodeResult({ ok: false, reason: "own" })).toEqual({
+      kind: "line",
+      line: "C’est ton propre code : donne-le à ton proche.",
+    });
+    expect(friendCodeResult({ ok: false, reason: "rate" })).toEqual({
+      kind: "line",
+      line: "Trop d’essais. Réessaie dans une heure.",
+    });
+    expect(friendCodeResult({ ok: false, reason: "offline" })).toEqual({
+      kind: "line",
+      line: "Pas de connexion. Vérifie le réseau, puis réessaie.",
+    });
+    expect(friendCodeResult({ ok: false, reason: "server" })).toEqual({
+      kind: "line",
+      line: "L’ajout n’a pas marché. Réessaie dans un instant.",
+    });
+    expect(friendCodeResult({ ok: false, reason: "signed-out" })).toEqual({ kind: "signed-out" });
   });
 });
