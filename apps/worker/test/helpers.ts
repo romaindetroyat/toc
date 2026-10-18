@@ -365,3 +365,78 @@ export async function untilRows(count: number, sql: string, ...values: unknown[]
   }
   throw new Error(`expected ${count} rows, found ${found.length}: ${sql}`);
 }
+
+// --- The app's own socket to its PlayerHub (plan 04-06) ---
+
+/** The raw answer to GET /ws/me, as a browser with this jar and Origin sends it. */
+export async function hubUpgrade(
+  options: UpgradeOptions & { upgrade?: boolean } = {},
+): Promise<Response> {
+  const headers = upgradeHeaders(options);
+  if (options.upgrade !== false) headers.Upgrade = "websocket";
+  return SELF.fetch(`${ORIGIN}/ws/me`, { headers });
+}
+
+export type HubClient = {
+  ws: WebSocket;
+  /** Every text frame received (pongs apart), parsed, in order. */
+  frames: Record<string, unknown>[];
+  send(frame: Record<string, unknown> | string): void;
+  /** The next frame not yet taken (wall time, 10 s), or throws. */
+  next(): Promise<Record<string, unknown>>;
+  /** A pong after a ping, in wall time (5 s), or throws. */
+  ping(): Promise<void>;
+  closed: Promise<{ code: number }>;
+};
+
+/** A hub socket opened by a browser with this jar (its session cookie) and our Origin. */
+export async function openHub(options: UpgradeOptions = {}): Promise<HubClient> {
+  const response = await hubUpgrade(options);
+  const ws = response.webSocket;
+  if (ws === null || ws === undefined) throw new Error(`no hub socket: ${response.status}`);
+  ws.accept();
+  const frames: Record<string, unknown>[] = [];
+  let cursor = 0;
+  let pongs = 0;
+  let wake: (() => void) | null = null;
+  ws.addEventListener("message", (event) => {
+    const text = typeof event.data === "string" ? event.data : "";
+    if (text === "pong") pongs++;
+    else frames.push(JSON.parse(text) as Record<string, unknown>);
+    wake?.();
+  });
+  const closed = new Promise<{ code: number }>((resolve) => {
+    ws.addEventListener("close", (event) => {
+      resolve({ code: event.code });
+      wake?.();
+    });
+  });
+  const waitFor = async <T>(take: () => T | undefined, ms: number, what: string): Promise<T> => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const taken = take();
+      if (taken !== undefined) return taken;
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+        setTimeout(resolve, 5);
+      });
+      wake = null;
+    }
+    throw new Error(`no ${what}`);
+  };
+  return {
+    ws,
+    frames,
+    send(frame) {
+      ws.send(typeof frame === "string" ? frame : JSON.stringify(frame));
+    },
+    next: () =>
+      waitFor(() => (cursor < frames.length ? frames[cursor++] : undefined), 10_000, "frame"),
+    async ping() {
+      const before = pongs;
+      ws.send("ping");
+      await waitFor(() => (pongs > before ? true : undefined), 5_000, "pong");
+    },
+    closed,
+  };
+}
