@@ -257,6 +257,8 @@ export type Person = {
   passkey: SoftAuthenticator;
   /** The account's WebAuthn user handle (what a discoverable passkey answers as userHandle). */
   handle: string;
+  /** The backup code shown at the sign-up. */
+  backupCode: string;
 };
 
 /** A new account through a test invitation, signed in on `jar` (its first device). */
@@ -273,8 +275,17 @@ export async function signUpPerson(pseudo: string, jar: Jar = newJar()): Promise
     { jar, userAgent: IPHONE_UA },
   );
   if (verified.status !== 201) throw new Error(`signup verify: ${verified.status}`);
-  const body = (await verified.json()) as { me: { id: string; pseudo: string } };
-  return { id: body.me.id, pseudo: body.me.pseudo, passkey, handle: options.user.id };
+  const body = (await verified.json()) as {
+    me: { id: string; pseudo: string };
+    backupCode: string;
+  };
+  return {
+    id: body.me.id,
+    pseudo: body.me.pseudo,
+    passkey,
+    handle: options.user.id,
+    backupCode: body.backupCode,
+  };
 }
 
 /** The usernameless login: options, the passkey's assertion, verify. Answers both responses. */

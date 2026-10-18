@@ -6,6 +6,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  del,
   get,
   type Jar,
   newJar,
@@ -18,13 +19,21 @@ import {
 
 beforeEach(resetAccounts);
 
-/** Every POST of the account API that a browser with a session cookie can reach (04-01, 04-02). */
+/**
+ * Every POST of the account API that a browser with a session cookie can reach (04-01, 04-02). The
+ * one DELETE, /api/auth/passkeys/:id, has no body: it needs the Origin only (passkeys.test.ts and
+ * below).
+ */
 const WRITES = [
   "/api/auth/signup/options",
   "/api/auth/signup/verify",
   "/api/auth/login/options",
   "/api/auth/login/verify",
   "/api/auth/logout",
+  "/api/auth/passkeys/options",
+  "/api/auth/passkeys/verify",
+  "/api/auth/backup-code/options",
+  "/api/auth/backup-code/verify",
 ];
 
 /** What D1 holds of the account, to prove a refused call changed nothing. */
@@ -44,6 +53,17 @@ async function signedIn(): Promise<Jar> {
 }
 
 describe("cookie-authenticated writes", () => {
+  it("DELETE /api/auth/passkeys/:id without our non-null Origin: 403, the key stays", async () => {
+    const jar = await signedIn();
+    const [key] = await rows("SELECT id FROM passkeys");
+    const before = await snapshot();
+    for (const origin of [null, "https://evil.test", "null", "http://toc.test"]) {
+      const response = await del(`/api/auth/passkeys/${key?.id}`, { jar: { ...jar }, origin });
+      expect(response.status, String(origin)).toBe(403);
+    }
+    expect(await snapshot()).toBe(before);
+  });
+
   it("no Origin, a foreign Origin or a null Origin: 403, and nothing changes", async () => {
     const jar = await signedIn();
     const before = await snapshot();

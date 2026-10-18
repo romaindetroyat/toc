@@ -1,7 +1,16 @@
 import type { MeAccount } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import type { ApiDeps } from "../net/api.ts";
-import { invitationState, me, signUp } from "./api.ts";
+import {
+  addPasskey,
+  invitationState,
+  logIn,
+  logOut,
+  me,
+  newBackupCode,
+  removePasskey,
+  signUp,
+} from "./api.ts";
 import type { Ceremonies } from "./webauthn.ts";
 
 // The account calls of the page (plan 04-01): the invitation's state, the sign-up (options, the
@@ -69,6 +78,42 @@ function passkeys(result: () => Promise<typeof RESPONSE>, supported = true) {
     register: async (options) => {
       seen.push(options);
       return result();
+    },
+    authenticate: async () => {
+      throw new Error("not this ceremony");
+    },
+  };
+  return { ceremonies, seen };
+}
+
+const ASSERTION = {
+  id: "AAAA",
+  rawId: "AAAA",
+  type: "public-key" as const,
+  response: { clientDataJSON: "e30", authenticatorData: "SZY", signature: "MEU", userHandle: "dQ" },
+  clientExtensionResults: {},
+};
+
+const REQUEST = { challenge: "Y2hhbGxlbmdl", rpId: "localhost", userVerification: "preferred" };
+
+/** A ceremony fake for assertions (login, step-up) and registrations (adding a key). */
+function both(
+  options: {
+    get?: () => Promise<typeof ASSERTION>;
+    create?: () => Promise<typeof RESPONSE>;
+    supported?: boolean;
+  } = {},
+) {
+  const seen: { kind: "get" | "create"; options: unknown }[] = [];
+  const ceremonies: Ceremonies = {
+    supported: () => options.supported ?? true,
+    register: async (given) => {
+      seen.push({ kind: "create", options: given });
+      return (options.create ?? (async () => RESPONSE))();
+    },
+    authenticate: async (given) => {
+      seen.push({ kind: "get", options: given });
+      return (options.get ?? (async () => ASSERTION))();
     },
   };
   return { ceremonies, seen };
@@ -260,5 +305,269 @@ describe("me()", () => {
       ),
     ).toBe("offline");
     expect(await me(api(() => json({}, 500)).deps)).toBe("offline");
+  });
+});
+
+// --- Plan 04-02: logIn, logOut, addPasskey, removePasskey, newBackupCode ---
+
+describe("logIn()", () => {
+  it("options {}, then the passkey with { optionsJSON }, then verify: the account", async () => {
+    const { deps, calls } = api((call) =>
+      call.url.endsWith("/options") ? json(REQUEST, 200) : json({ me: ME }, 200),
+    );
+    const { ceremonies, seen } = both();
+    expect(await logIn({ api: deps, passkeys: ceremonies })).toEqual({ ok: true, me: ME });
+    expect(calls.map((call) => call.url)).toEqual([
+      "/api/auth/login/options",
+      "/api/auth/login/verify",
+    ]);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({});
+    expect(seen).toEqual([{ kind: "get", options: { optionsJSON: REQUEST } }]);
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({ response: ASSERTION });
+    for (const call of calls) {
+      expect(new Headers(call.init?.headers).get("content-type")).toBe("application/json");
+    }
+  });
+
+  it("the passkey's failures, and no verify call", async () => {
+    for (const [name, reason] of [
+      ["NotAllowedError", "cancelled"],
+      ["AbortError", "cancelled"],
+      ["SecurityError", "wrong-address"],
+      ["UnknownError", "server"],
+    ] as const) {
+      const { deps, calls } = api(() => json(REQUEST, 200));
+      const { ceremonies } = both({ get: failing(name) as never });
+      expect(await logIn({ api: deps, passkeys: ceremonies })).toEqual({ ok: false, reason });
+      expect(calls).toHaveLength(1);
+    }
+    const { deps, calls } = api(() => json(REQUEST, 200));
+    expect(await logIn({ api: deps, passkeys: both({ supported: false }).ceremonies })).toEqual({
+      ok: false,
+      reason: "unsupported",
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("the server's refusals: unknown key, expired, anything else", async () => {
+    const cases: [Response, string][] = [
+      [json({ error: "unknown" }, 400), "unknown"],
+      [json({ error: "expired" }, 400), "expired"],
+      [json({ error: "refused" }, 400), "server"],
+      [json({ error: "config" }, 503), "server"],
+      [json({ me: { id: 1 } }, 200), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      const { deps } = api((call) =>
+        call.url.endsWith("/options") ? json(REQUEST, 200) : response.clone(),
+      );
+      expect(await logIn({ api: deps, passkeys: both().ceremonies }), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    const badOptions = api(() => json({ nope: 1 }, 200));
+    expect(await logIn({ api: badOptions.deps, passkeys: both().ceremonies })).toEqual({
+      ok: false,
+      reason: "server",
+    });
+  });
+
+  it("offline before or during", async () => {
+    expect(
+      await logIn({ api: api(() => json(REQUEST, 200), false).deps, passkeys: both().ceremonies }),
+    ).toEqual({ ok: false, reason: "offline" });
+    const dropped = api((call) => {
+      if (call.url.endsWith("/verify")) throw new TypeError("Failed to fetch");
+      return json(REQUEST, 200);
+    });
+    expect(await logIn({ api: dropped.deps, passkeys: both().ceremonies })).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+});
+
+describe("logOut()", () => {
+  it("POST /api/auth/logout {}, and the cached account forgotten", async () => {
+    const { deps, calls } = api(() => new Response(null, { status: 204 }));
+    let forgotten = 0;
+    expect(await logOut({ api: deps, forget: () => forgotten++ })).toEqual({ ok: true });
+    expect(calls[0]?.url).toBe("/api/auth/logout");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({});
+    expect(forgotten).toBe(1);
+  });
+
+  it("forgets the account on this device even when the call fails", async () => {
+    for (const [respond, online, reason] of [
+      [() => json({}, 500), true, "server"],
+      [
+        () => {
+          throw new TypeError("Failed to fetch");
+        },
+        true,
+        "offline",
+      ],
+      [() => new Response(null, { status: 204 }), false, "offline"],
+    ] as const) {
+      let forgotten = 0;
+      const result = await logOut({ api: api(respond, online).deps, forget: () => forgotten++ });
+      expect(result).toEqual({ ok: false, reason });
+      expect(forgotten).toBe(1);
+    }
+  });
+});
+
+describe("addPasskey()", () => {
+  const PASSKEY = {
+    id: "BBBB",
+    label: "Mac",
+    createdAt: 1_792_000_000_000,
+    lastUsedAt: null,
+    backedUp: false,
+    current: true,
+  };
+
+  it("options {}, the registration with { optionsJSON }, verify: the new key", async () => {
+    const { deps, calls } = api((call) =>
+      call.url.endsWith("/options") ? json(OPTIONS, 200) : json({ passkey: PASSKEY }, 201),
+    );
+    const { ceremonies, seen } = both();
+    expect(await addPasskey({ api: deps, passkeys: ceremonies })).toEqual({
+      ok: true,
+      passkey: PASSKEY,
+    });
+    expect(calls.map((call) => call.url)).toEqual([
+      "/api/auth/passkeys/options",
+      "/api/auth/passkeys/verify",
+    ]);
+    expect(seen).toEqual([{ kind: "create", options: { optionsJSON: OPTIONS } }]);
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({ response: RESPONSE });
+  });
+
+  it("this device already has a key: InvalidStateError from the browser, or 409 from the server", async () => {
+    const browser = api(() => json(OPTIONS, 200));
+    expect(
+      await addPasskey({
+        api: browser.deps,
+        passkeys: both({ create: failing("InvalidStateError") as never }).ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "already-here" });
+    expect(browser.calls).toHaveLength(1);
+    const server = api((call) =>
+      call.url.endsWith("/options") ? json(OPTIONS, 200) : json({ error: "already-here" }, 409),
+    );
+    expect(await addPasskey({ api: server.deps, passkeys: both().ceremonies })).toEqual({
+      ok: false,
+      reason: "already-here",
+    });
+  });
+
+  it("signed out, cancelled, expired, offline", async () => {
+    expect(
+      await addPasskey({
+        api: api(() => json({ error: "signed-out" }, 401)).deps,
+        passkeys: both().ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "signed-out" });
+    expect(
+      await addPasskey({
+        api: api(() => json(OPTIONS, 200)).deps,
+        passkeys: both({ create: failing("NotAllowedError") as never }).ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "cancelled" });
+    const expired = api((call) =>
+      call.url.endsWith("/options") ? json(OPTIONS, 200) : json({ error: "expired" }, 400),
+    );
+    expect(await addPasskey({ api: expired.deps, passkeys: both().ceremonies })).toEqual({
+      ok: false,
+      reason: "expired",
+    });
+    expect(
+      await addPasskey({
+        api: api(() => json(OPTIONS, 200), false).deps,
+        passkeys: both().ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "offline" });
+  });
+});
+
+describe("removePasskey(id)", () => {
+  it("DELETE /api/auth/passkeys/<id> with no body", async () => {
+    const { deps, calls } = api(() => new Response(null, { status: 204 }));
+    expect(await removePasskey("AB-c_9", deps)).toEqual({ ok: true });
+    expect(calls[0]?.url).toBe("/api/auth/passkeys/AB-c_9");
+    expect(calls[0]?.init?.method).toBe("DELETE");
+    expect(calls[0]?.init?.body).toBeUndefined();
+  });
+
+  it("the last key, signed out, already gone, a server error, offline", async () => {
+    const cases: [() => Response, string][] = [
+      [() => json({ error: "last" }, 409), "last"],
+      [() => json({ error: "signed-out" }, 401), "signed-out"],
+      [() => json({ error: "not-found" }, 404), "unknown"],
+      [() => json({}, 500), "server"],
+    ];
+    for (const [respond, reason] of cases) {
+      expect(await removePasskey("AAAA", api(respond).deps), reason).toEqual({ ok: false, reason });
+    }
+    expect(await removePasskey("AAAA", api(() => json({}, 204), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+
+  it("an id that cannot be a credential id: no request", async () => {
+    const { deps, calls } = api(() => new Response(null, { status: 204 }));
+    expect(await removePasskey("../me", deps)).toEqual({ ok: false, reason: "unknown" });
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("newBackupCode()", () => {
+  it("options {}, the step-up assertion, verify: the new code", async () => {
+    const { deps, calls } = api((call) =>
+      call.url.endsWith("/options")
+        ? json({ ...REQUEST, allowCredentials: [{ id: "AAAA", type: "public-key" }] }, 200)
+        : json({ backupCode: "K7QM2XRAP9DWHT4ENB6Z" }, 200),
+    );
+    const { ceremonies, seen } = both();
+    expect(await newBackupCode({ api: deps, passkeys: ceremonies })).toEqual({
+      ok: true,
+      backupCode: "K7QM2XRAP9DWHT4ENB6Z",
+    });
+    expect(calls.map((call) => call.url)).toEqual([
+      "/api/auth/backup-code/options",
+      "/api/auth/backup-code/verify",
+    ]);
+    expect(seen[0]?.kind).toBe("get");
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({ response: ASSERTION });
+  });
+
+  it("the step-up cancelled, another account's key, expired, signed out", async () => {
+    const cancelled = api(() => json(REQUEST, 200));
+    expect(
+      await newBackupCode({
+        api: cancelled.deps,
+        passkeys: both({ get: failing("NotAllowedError") as never }).ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "cancelled" });
+    expect(cancelled.calls).toHaveLength(1);
+    const cases: [Response, string][] = [
+      [json({ error: "refused" }, 400), "unknown"],
+      [json({ error: "expired" }, 400), "expired"],
+      [json({ error: "signed-out" }, 401), "signed-out"],
+      [json({ backupCode: "short" }, 200), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      const { deps } = api((call) =>
+        call.url.endsWith("/options") ? json(REQUEST, 200) : response.clone(),
+      );
+      expect(await newBackupCode({ api: deps, passkeys: both().ceremonies }), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
   });
 });

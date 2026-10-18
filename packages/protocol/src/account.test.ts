@@ -1,7 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  AddPasskeyVerifyBody,
   BACKUP_CODE_LENGTH,
+  BackupCodeVerifyBody,
   CROCKFORD,
   deviceLabel,
   EmptyBody,
@@ -15,6 +17,8 @@ import {
   normalizePseudo,
   PSEUDO_MAX,
   PSEUDO_MIN,
+  parseAddPasskeyAnswer,
+  parseBackupCodeAnswer,
   parseInvitationState,
   parseLoginAnswer,
   parseMeAccount,
@@ -330,5 +334,40 @@ describe("login and logout bodies (plan 04-02)", () => {
     expect(parseLoginAnswer({ me })).toEqual({ me });
     expect(parseLoginAnswer({ me: { ...me, pseudo: 1 } })).toBeNull();
     expect(parseLoginAnswer(me)).toBeNull();
+  });
+});
+
+// --- Plan 04-02: passkeys and a new backup code ---
+
+describe("passkey and backup-code bodies and answers (plan 04-02)", () => {
+  it("adding a passkey takes a registration response, strict", () => {
+    expect(AddPasskeyVerifyBody.safeParse({ response: REGISTRATION }).success).toBe(true);
+    expect(AddPasskeyVerifyBody.safeParse({ response: ASSERTION }).success).toBe(false);
+    expect(AddPasskeyVerifyBody.safeParse({ response: REGISTRATION, x: 1 }).success).toBe(false);
+  });
+
+  it("the step-up of a new backup code takes an authentication response, strict", () => {
+    expect(BackupCodeVerifyBody.safeParse({ response: ASSERTION }).success).toBe(true);
+    expect(BackupCodeVerifyBody.safeParse({ response: REGISTRATION }).success).toBe(false);
+    expect(BackupCodeVerifyBody.safeParse({ response: ASSERTION, x: 1 }).success).toBe(false);
+  });
+
+  it("reads the new passkey and the new code", () => {
+    const passkey = {
+      id: "AAAA",
+      label: "Mac",
+      createdAt: 1,
+      lastUsedAt: null,
+      backedUp: false,
+      current: true,
+    };
+    expect(parseAddPasskeyAnswer({ passkey })).toEqual({ passkey });
+    expect(parseAddPasskeyAnswer({ passkey: { ...passkey, label: 3 } })).toBeNull();
+    expect(parseAddPasskeyAnswer(passkey)).toBeNull();
+    expect(parseBackupCodeAnswer({ backupCode: "K7QM2XRAP9DWHT4ENB6Z" })).toEqual({
+      backupCode: "K7QM2XRAP9DWHT4ENB6Z",
+    });
+    expect(parseBackupCodeAnswer({ backupCode: "K7QM-2XRA" })).toBeNull();
+    expect(parseBackupCodeAnswer({})).toBeNull();
   });
 });

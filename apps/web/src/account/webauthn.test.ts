@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Ceremonies, createPasskey, passkeyFailure } from "./webauthn.ts";
+import { type Ceremonies, createPasskey, getPasskey, passkeyFailure } from "./webauthn.ts";
 
 // The browser's passkey ceremony behind a seam (plan 04-01): @simplewebauthn/browser's
 // startRegistration is injected, so these rules run in Node with fakes.
@@ -27,6 +27,9 @@ function fake(register: Ceremonies["register"], supported = true) {
       calls.push(options);
       return register(options);
     },
+    authenticate: async () => {
+      throw new Error("not this ceremony");
+    },
   };
   return { ceremonies, calls };
 }
@@ -39,7 +42,8 @@ describe("passkeyFailure", () => {
     expect(passkeyFailure(named("NotAllowedError"))).toBe("cancelled");
     expect(passkeyFailure(named("AbortError"))).toBe("cancelled");
     expect(passkeyFailure(new DOMException("rp", "SecurityError"))).toBe("wrong-address");
-    expect(passkeyFailure(named("InvalidStateError"))).toBe("server");
+    // A device that already holds a key of this account (excludeCredentials, plan 04-02).
+    expect(passkeyFailure(named("InvalidStateError"))).toBe("already-here");
     expect(passkeyFailure(new TypeError("x"))).toBe("server");
     expect(passkeyFailure("odd")).toBe("server");
   });
@@ -68,6 +72,56 @@ describe("createPasskey", () => {
         throw error;
       });
       expect(await createPasskey(OPTIONS, ceremonies)).toEqual({ ok: false, reason });
+    }
+  });
+});
+
+// Plan 04-02: the assertion (login, step-up) behind the same seam.
+describe("getPasskey", () => {
+  const REQUEST = { challenge: "Y2hhbGxlbmdl", rpId: "localhost" };
+  const ASSERTION = {
+    id: "AAAA",
+    rawId: "AAAA",
+    type: "public-key" as const,
+    response: { clientDataJSON: "e30", authenticatorData: "SZY", signature: "MEU" },
+    clientExtensionResults: {},
+  };
+
+  function asserting(get: Ceremonies["authenticate"], supported = true) {
+    const calls: unknown[] = [];
+    const ceremonies: Ceremonies = {
+      supported: () => supported,
+      register: async () => {
+        throw new Error("not this ceremony");
+      },
+      authenticate: async (options) => {
+        calls.push(options);
+        return get(options);
+      },
+    };
+    return { ceremonies, calls };
+  }
+
+  it("passes the options as { optionsJSON } and answers the assertion", async () => {
+    const { ceremonies, calls } = asserting(async () => ASSERTION);
+    expect(await getPasskey(REQUEST, ceremonies)).toEqual({ ok: true, response: ASSERTION });
+    expect(calls).toEqual([{ optionsJSON: REQUEST }]);
+  });
+
+  it("unsupported, cancelled, a wrong address, anything else", async () => {
+    expect(await getPasskey(REQUEST, asserting(async () => ASSERTION, false).ceremonies)).toEqual({
+      ok: false,
+      reason: "unsupported",
+    });
+    for (const [error, reason] of [
+      [new DOMException("no", "NotAllowedError"), "cancelled"],
+      [new DOMException("rp", "SecurityError"), "wrong-address"],
+      [new Error("boom"), "server"],
+    ] as const) {
+      const { ceremonies } = asserting(async () => {
+        throw error;
+      });
+      expect(await getPasskey(REQUEST, ceremonies)).toEqual({ ok: false, reason });
     }
   });
 });
