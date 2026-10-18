@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
+import { deviceOptions } from "./online.ts";
 
 // The first account, end to end against `wrangler dev` (plan 04-01, ACCT-01, ACCT-02, D-02, D-03):
 // an invitation link, a pseudo, a passkey made by Playwright's virtual authenticator, the backup code
@@ -11,7 +12,9 @@ test("créer son compte par une invitation, et le garder après un rechargement"
 }, testInfo) => {
   test.setTimeout(120_000);
   const code = await mintInvitation(request);
-  const context = await passkeyContext(browser, testInfo);
+  // Playwright's virtual authenticator answers navigator.credentials.create() (a resident ES256 key).
+  const context = await browser.newContext(deviceOptions(testInfo));
+  await context.credentials.install();
   const page = await context.newPage();
   const pseudo = uniquePseudo("Zoé");
 

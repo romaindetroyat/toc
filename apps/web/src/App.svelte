@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { startAccount } from "./account/store.svelte.ts";
   import KnightDefs from "./board/KnightDefs.svelte";
   import { game } from "./i18n/fr/game.ts";
   import Game from "./routes/Game.svelte";
   import Home from "./routes/Home.svelte";
+  import Invitation from "./routes/Invitation.svelte";
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
   import Table from "./routes/Table.svelte";
@@ -30,6 +32,14 @@
   /** An online table's link: #/table/<id> (the id is checked by the route). */
   const TABLE_PREFIX = "#/table/";
   const tableId = $derived(route.startsWith(TABLE_PREFIX) ? route.slice(TABLE_PREFIX.length) : null);
+  /** An account invitation's link: #/invitation/<code> (plan 04-01; the code is checked by the route). */
+  const INVITATION_PREFIX = "#/invitation/";
+  const invitationCode = $derived(
+    route.startsWith(INVITATION_PREFIX) ? route.slice(INVITATION_PREFIX.length) : null,
+  );
+
+  // The signed-in account (plan 04-01): the cached one at once, GET /api/me next.
+  startAccount();
 
   $effect(() => {
     const onHashChange = () => {
@@ -53,6 +63,11 @@
   {:else if tableId !== null}
     {#key tableId}
       <Table id={tableId} />
+    {/key}
+  {:else if invitationCode !== null}
+    <!-- Not behind « Tourne ton téléphone »: a link opened from a messaging app arrives upright. -->
+    {#key invitationCode}
+      <Invitation code={invitationCode} />
     {/key}
   {:else if route === "#/sons"}
     <SoundTest />

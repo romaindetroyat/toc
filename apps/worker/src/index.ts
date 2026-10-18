@@ -2,13 +2,24 @@
 //   POST /api/tables        → a new table: 128-bit id, the GameRoom creates it, 201 { id }
 //   GET  /api/tables/:id    → the table's public summary (02-04), 404 when there is no such table
 //   GET  /ws/table/:id      → the WebSocket upgrade, handed to that table's GameRoom
+// Accounts (plan 04-01, src/auth, src/me.ts; every POST needs our own Origin and a JSON body):
+//   GET  /api/invitations/:code      → the state of an invitation link (or the bootstrap code)
+//   POST /api/auth/signup/options    → a passkey's creation options for { invitation, pseudo }
+//   POST /api/auth/signup/verify     → the account, its session cookie and its backup code
+//   GET  /api/me                     → the signed-in account, or 401
+//   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
 //   other /api/*            → 404
+// In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
 // handleRequest answers null for what is not its own, so both deploy entries can share it.
 
 import { isTableId, parseCreateTestOptions, toBase64Url } from "@toc/protocol";
 import type { TestOptions } from "@toc/table";
+import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./auth/signup.ts";
+import { Meter } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
+import { json, notAllowed, writeAllowed } from "./http.ts";
+import { meRoute } from "./me.ts";
 
 export { GameRoom };
 
@@ -17,13 +28,14 @@ declare global {
   interface Env {
     /** "1" only under `wrangler dev --var TOC_TEST_MODE:1` and the workerd tests (T-02-07). */
     TOC_TEST_MODE?: string;
+    /** Secret (wrangler secret put): the HMAC key of the backup codes (plan 04-01, D-02). */
+    TOC_PEPPER?: string;
+    /** Secret: the one-time code of the first account, accepted while no account exists (D-03). */
+    TOC_BOOTSTRAP?: string;
   }
 }
 
 const MAX_BODY = 1024;
-
-const json = (body: unknown, status: number) =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 /** A WebSocket or a request from another site is refused (T-02-03); no Origin (a native app) passes. */
 function sameOrigin(request: Request, url: URL): boolean {
@@ -77,12 +89,44 @@ async function summaryRoute(request: Request, env: Env, id: string): Promise<Res
   return found === null ? json({ error: "not-found" }, 404) : json(found, 200);
 }
 
-export async function handleRequest(request: Request, env: Env): Promise<Response | null> {
-  const url = new URL(request.url);
+/** The account routes (plan 04-01), or null for a path that is not one of them. */
+async function accountRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+): Promise<Response | null> {
+  const now = Date.now();
+  const path = url.pathname;
+  const invitation = /^\/api\/invitations\/([^/]*)$/.exec(path);
+  if (invitation !== null) {
+    if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
+    return invitationRoute(invitation[1] ?? "", env, meter, now);
+  }
+  if (path === "/api/me") {
+    if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
+    return meRoute(request, env, url, meter, now);
+  }
+  const write =
+    path === "/api/auth/signup/options" ||
+    path === "/api/auth/signup/verify" ||
+    (path === "/api/test/invitation" && env.TOC_TEST_MODE === "1");
+  if (!write) return null;
+  if (request.method !== "POST") return notAllowed("POST");
+  if (!writeAllowed(request, url)) return json({ error: "origin" }, 403);
+  if (path === "/api/auth/signup/options") return signupOptions(request, env, url, meter, now);
+  if (path === "/api/auth/signup/verify") return signupVerify(request, env, url, meter, now);
+  return mintInvitation(request, meter, now);
+}
+
+async function route(request: Request, env: Env, url: URL, meter: Meter): Promise<Response | null> {
   if (url.pathname === "/api/tables") return createTableRoute(request, env, url);
 
   const summary = /^\/api\/tables\/([^/]*)$/.exec(url.pathname);
   if (summary !== null) return summaryRoute(request, env, summary[1] ?? "");
+
+  const account = await accountRoute(request, env, url, meter);
+  if (account !== null) return account;
 
   const socket = /^\/ws\/table\/([^/]*)$/.exec(url.pathname);
   if (socket !== null) {
@@ -96,14 +140,23 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     return env.GAME_ROOM.getByName(id).fetch(request);
   }
 
-  if (
-    url.pathname === "/api" ||
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/ws/")
-  ) {
+  if (isApi(url.pathname) || url.pathname.startsWith("/ws/")) {
     return json({ error: "not-found" }, 404);
   }
   return null;
+}
+
+const isApi = (path: string) => path === "/api" || path.startsWith("/api/");
+
+export async function handleRequest(request: Request, env: Env): Promise<Response | null> {
+  const url = new URL(request.url);
+  const meter = new Meter(env.DB);
+  const response = await route(request, env, url, meter);
+  if (response === null || env.TOC_TEST_MODE !== "1" || !isApi(url.pathname)) return response;
+  // Test mode: what this request cost in D1 rows (T-04-27, the Free plan's 100 000 writes a day).
+  const measured = new Response(response.body, response);
+  measured.headers.set("x-toc-d1", meter.header());
+  return measured;
 }
 
 export default {

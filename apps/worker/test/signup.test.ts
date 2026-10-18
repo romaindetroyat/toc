@@ -109,7 +109,7 @@ async function signUp(
   invitation: string,
   pseudo: string,
   jar: Jar = newJar(),
-): Promise<{ response: Response; options: Options }> {
+): Promise<{ response: Response; options: Options; optionsCost: string | null }> {
   const opened = await post("/api/auth/signup/options", { invitation, pseudo }, { jar });
   expect(opened.status, await opened.clone().text()).toBe(200);
   const options = (await opened.json()) as Options;
@@ -120,7 +120,7 @@ async function signUp(
     { response: created },
     { jar, userAgent: IPHONE },
   );
-  return { response, options };
+  return { response, options, optionsCost: opened.headers.get("x-toc-d1") };
 }
 
 describe("GET /api/invitations/:code", () => {
@@ -269,9 +269,11 @@ describe("POST /api/auth/signup/verify", () => {
     const ana = await insertUser("Ana");
     const code = await insertInvitation(ana);
     const jar = newJar();
-    const { response } = await signUp(code, "Zoé", jar);
+    const { response, optionsCost } = await signUp(code, "Zoé", jar);
     expect(response.status, await response.clone().text()).toBe(201);
-    console.log(`sign-up with an inviter: x-toc-d1 ${response.headers.get("x-toc-d1")}`);
+    console.log(
+      `sign-up with an inviter: options x-toc-d1 ${optionsCost}, verify x-toc-d1 ${response.headers.get("x-toc-d1")}`,
+    );
 
     const set = response.headers.get("set-cookie") ?? "";
     expect(set).toMatch(/^__Host-toc_session=[A-Za-z0-9_-]{43};/);
@@ -356,9 +358,11 @@ describe("POST /api/auth/signup/verify", () => {
   });
 
   it("the bootstrap code makes the first account, with no friendship (D-03)", async () => {
-    const { response } = await signUp(env.TOC_BOOTSTRAP as string, "Romain");
+    const { response, optionsCost } = await signUp(env.TOC_BOOTSTRAP as string, "Romain");
     expect(response.status, await response.clone().text()).toBe(201);
-    console.log(`bootstrap sign-up: x-toc-d1 ${response.headers.get("x-toc-d1")}`);
+    console.log(
+      `bootstrap sign-up: options x-toc-d1 ${optionsCost}, verify x-toc-d1 ${response.headers.get("x-toc-d1")}`,
+    );
     const body = (await response.json()) as { me: { id: string; pseudo: string } };
     expect(body.me.pseudo).toBe("Romain");
     expect(await rows("SELECT * FROM friendships")).toEqual([]);

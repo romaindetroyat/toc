@@ -4,5 +4,8 @@
 declare namespace Cloudflare {
   interface Env {
     TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
+    /** Plan 04-01: the two account secrets, with fixed test-only values (vitest.config.ts). */
+    TOC_PEPPER?: string;
+    TOC_BOOTSTRAP?: string;
   }
 }

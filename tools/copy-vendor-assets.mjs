@@ -24,7 +24,10 @@ const FAMILIES = [
 ];
 const SUBSETS = ["latin", "latin-ext"];
 
-/** Exactly the icons of UI-SPEC « Design System » (phase 1, then the six of 02-UI-SPEC). */
+/**
+ * Exactly the icons of UI-SPEC « Design System » (phase 1, then the six of 02-UI-SPEC), then those of
+ * 04-UI-SPEC as their screens come (plan 04-01: user, triangle-alert; copy was there).
+ */
 const ICON_NAMES = [
   "settings",
   "fast-forward",
@@ -44,6 +47,8 @@ const ICON_NAMES = [
   "wifi-off",
   "bot",
   "crown",
+  "user",
+  "triangle-alert",
 ];
 
 mkdirSync(fontsOut, { recursive: true });

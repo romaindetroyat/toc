@@ -18,6 +18,9 @@
     { "type": "Text", "globs": ["**/apps/web/dist/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
     { "type": "Data", "globs": ["**/*.png", "**/*.webp", "**/*.woff2", "**/*.ico", "**/*.mp3", "**/*.m4a", "**/*.ogg", "**/*.wav"], "fallthrough": false }
   ],
+  // Les clés d'accès (passkeys) : l'identifiant du site (RP ID) et son origine, identiques dans les deux
+  // fichiers (D-10). Les secrets (TOC_PEPPER, TOC_BOOTSTRAP) ne sont jamais ici : wrangler secret put.
+  "vars": { "RP_ID": "toc.romaindetroyat.workers.dev", "ORIGIN": "https://toc.romaindetroyat.workers.dev" },
   "durable_objects": {
     "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
   },

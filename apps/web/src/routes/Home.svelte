@@ -1,12 +1,15 @@
 <script lang="ts">
+  import { account } from "../account/store.svelte.ts";
   import logo from "../assets/logo/logo-128.webp";
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
+  import { compte } from "../i18n/fr/compte.ts";
   import { browserApi, createTable } from "../net/api.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import SmallTile from "../ui/SmallTile.svelte";
   import { markNewTable } from "../ui/InviteSheet.svelte";
   import TableList from "../ui/TableList.svelte";
   import { screen } from "../ui/screen.svelte.ts";
@@ -18,6 +21,8 @@
   // Romain's logo (2026-10-17, plan 02-04b) sits before « TOC »: as high as the title row in the
   // compact layouts (34, no change to the fit), 64 beside the title and the tagline elsewhere. It
   // is decorative (alt=""): the heading already says « TOC ».
+  // Plan 04-01: signed in, the small tile « Mon compte » (the pseudo under it) takes the place of the
+  // name line (04-UI-SPEC « Small tiles »); the guest home is unchanged.
 
   const storage = pageStorage();
   let device = $state(loadDevice(storage));
@@ -149,7 +154,19 @@
           compact={layout !== "computer"}
         />
       </div>
-      {#if device.name !== null}
+      {#if account.current !== null}
+        <div class="small-tiles" data-small-tiles>
+          <SmallTile
+            kind="compte"
+            icon="user"
+            label={compte.tile.account}
+            sub={account.current.pseudo}
+            name={compte.tile.accountLabel(account.current.pseudo)}
+            href="#/compte"
+            wide={layout === "computer"}
+          />
+        </div>
+      {:else if device.name !== null}
         <p class="name-line" data-name-line>
           <span class="name-text">
             {accueil.home.nameLabel}
@@ -262,6 +279,18 @@
 
   .name-line .btn-text {
     flex: none;
+  }
+
+  /* The row of small tiles (136 or 152 wide, 48 high), 8 apart (16 on the computer). */
+  .small-tiles {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+
+  .home[data-layout="computer"] .small-tiles {
+    gap: var(--space-md);
+    margin-top: var(--space-md);
   }
 
   .tables {
