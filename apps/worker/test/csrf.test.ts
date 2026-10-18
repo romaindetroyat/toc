@@ -20,7 +20,7 @@ import {
 beforeEach(resetAccounts);
 
 /**
- * Every POST of the account API that a browser with a session cookie can reach (04-01, 04-02). The
+ * Every POST of the account API that a browser with a session cookie can reach (04-01 to 04-03). The
  * one DELETE, /api/auth/passkeys/:id, has no body: it needs the Origin only (passkeys.test.ts and
  * below).
  */
@@ -34,6 +34,10 @@ const WRITES = [
   "/api/auth/passkeys/verify",
   "/api/auth/backup-code/options",
   "/api/auth/backup-code/verify",
+  // Plan 04-03: the recovery needs no session, but it is a write all the same (a new passkey, every
+  // session ended, a new code), behind the same Origin and JSON checks.
+  "/api/auth/recover",
+  "/api/auth/recover/verify",
 ];
 
 /** What D1 holds of the account, to prove a refused call changed nothing. */

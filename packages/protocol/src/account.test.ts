@@ -22,9 +22,13 @@ import {
   parseInvitationState,
   parseLoginAnswer,
   parseMeAccount,
+  parseRecoverAnswer,
+  parseRecoverRefusal,
   parseRequestOptions,
   parseSignupAnswer,
   pseudoKey,
+  RecoverBody,
+  RecoverVerifyBody,
   SignupOptionsBody,
   SignupVerifyBody,
 } from "./account.ts";
@@ -369,5 +373,57 @@ describe("passkey and backup-code bodies and answers (plan 04-02)", () => {
     });
     expect(parseBackupCodeAnswer({ backupCode: "K7QM-2XRA" })).toBeNull();
     expect(parseBackupCodeAnswer({})).toBeNull();
+  });
+});
+
+// --- Plan 04-03: recovering an account with its backup code ---
+
+describe("recovery bodies and answers (plan 04-03)", () => {
+  it("the recovery body is { pseudo, code }, strict and length-capped", () => {
+    expect(RecoverBody.safeParse({ pseudo: "Zoé", code: "K7QM-2XRA-P9DW-HT4E-NB6Z" }).success).toBe(
+      true,
+    );
+    expect(RecoverBody.safeParse({ pseudo: "Zoé" }).success).toBe(false);
+    expect(RecoverBody.safeParse({ code: "K7QM2XRAP9DWHT4ENB6Z" }).success).toBe(false);
+    expect(RecoverBody.safeParse({ pseudo: "Zoé", code: 12 }).success).toBe(false);
+    expect(
+      RecoverBody.safeParse({ pseudo: "Zoé", code: "K7QM2XRAP9DWHT4ENB6Z", more: 1 }).success,
+    ).toBe(false);
+    expect(RecoverBody.safeParse({ pseudo: "x".repeat(201), code: "" }).success).toBe(false);
+    expect(RecoverBody.safeParse({ pseudo: "Zoé", code: "K".repeat(101) }).success).toBe(false);
+  });
+
+  it("the recovery verify body takes a registration response, strict", () => {
+    expect(RecoverVerifyBody.safeParse({ response: REGISTRATION }).success).toBe(true);
+    expect(RecoverVerifyBody.safeParse({ response: ASSERTION }).success).toBe(false);
+    expect(RecoverVerifyBody.safeParse({ response: REGISTRATION, x: 1 }).success).toBe(false);
+  });
+
+  it("reads the recovered account and its new code", () => {
+    const me = {
+      id: "u".repeat(22),
+      pseudo: "Zoé",
+      createdAt: 1,
+      passkeys: [],
+      hasBackupCode: true,
+      backupAt: 2,
+    };
+    const answer = { me, backupCode: "K7QM2XRAP9DWHT4ENB6Z" };
+    expect(parseRecoverAnswer(answer)).toEqual(answer);
+    expect(parseRecoverAnswer({ me, backupCode: "K7QM-2XRA" })).toBeNull();
+    expect(parseRecoverAnswer({ backupCode: "K7QM2XRAP9DWHT4ENB6Z" })).toBeNull();
+  });
+
+  it("reads the refusals of a recovery: format, wrong, locked with its time", () => {
+    expect(parseRecoverRefusal({ error: "format" })).toEqual({ error: "format" });
+    expect(parseRecoverRefusal({ error: "wrong" })).toEqual({ error: "wrong" });
+    expect(parseRecoverRefusal({ error: "locked", until: 1_800_000_000_000 })).toEqual({
+      error: "locked",
+      until: 1_800_000_000_000,
+    });
+    expect(parseRecoverRefusal({ error: "locked" })).toBeNull();
+    expect(parseRecoverRefusal({ error: "locked", until: "soon" })).toBeNull();
+    expect(parseRecoverRefusal({ error: "other" })).toBeNull();
+    expect(parseRecoverRefusal(null)).toBeNull();
   });
 });

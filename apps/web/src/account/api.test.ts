@@ -8,6 +8,8 @@ import {
   logOut,
   me,
   newBackupCode,
+  recover,
+  recoverVerify,
   removePasskey,
   signUp,
 } from "./api.ts";
@@ -569,5 +571,138 @@ describe("newBackupCode()", () => {
         reason,
       });
     }
+  });
+});
+
+// --- Plan 04-03: « Retrouver mon compte » with the backup code ---
+
+describe("recover(pseudo, code)", () => {
+  it("POST /api/auth/recover { pseudo, code } with the code read back: the creation options", async () => {
+    const { deps, calls } = api(() => json(OPTIONS, 200));
+    expect(await recover("Zoé", "k7qm 2xra-p9dw ht4e nb6z", deps)).toEqual({
+      ok: true,
+      optionsJSON: OPTIONS,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("/api/auth/recover");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      pseudo: "Zoé",
+      code: "K7QM2XRAP9DWHT4ENB6Z",
+    });
+  });
+
+  it("a code that cannot be one: format, without a request", async () => {
+    const { deps, calls } = api(() => json(OPTIONS, 200));
+    for (const code of [
+      "",
+      "K7QM-2XRA",
+      "K7QM-2XRA-P9DW-HT4E-NB6Z-AAAA",
+      "K7QM-2XRA-P9DW-HT4E-NB6U",
+    ]) {
+      expect(await recover("Zoé", code, deps), code).toEqual({ ok: false, reason: "format" });
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("the server's refusals: format, wrong (pseudo or code), locked until a time", async () => {
+    const until = 1_800_000_900_000;
+    const cases: [Response, unknown][] = [
+      [json({ error: "format" }, 400), { ok: false, reason: "format" }],
+      [json({ error: "wrong" }, 400), { ok: false, reason: "wrong" }],
+      [json({ error: "locked", until }, 429), { ok: false, reason: "locked", until }],
+      [json({ error: "locked" }, 429), { ok: false, reason: "server" }],
+      [json({ error: "config" }, 503), { ok: false, reason: "server" }],
+      [json({ error: "body" }, 400), { ok: false, reason: "server" }],
+      [json({ challenge: 1 }, 200), { ok: false, reason: "server" }],
+      [new Response("<html>", { status: 200 }), { ok: false, reason: "server" }],
+    ];
+    for (const [response, expected] of cases) {
+      const { deps } = api(() => response.clone());
+      expect(await recover("Zoé", "K7QM2XRAP9DWHT4ENB6Z", deps)).toEqual(expected);
+    }
+  });
+
+  it("offline: the browser says so, or fetch rejects", async () => {
+    expect(
+      await recover("Zoé", "K7QM2XRAP9DWHT4ENB6Z", api(() => json(OPTIONS, 200), false).deps),
+    ).toEqual({ ok: false, reason: "offline" });
+    const rejecting = api(() => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await recover("Zoé", "K7QM2XRAP9DWHT4ENB6Z", rejecting.deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+});
+
+describe("recoverVerify(optionsJSON)", () => {
+  const ANSWER = { me: ME, backupCode: "K7QM2XRAP9DWHT4ENB6Z" };
+
+  it("the registration with { optionsJSON }, then verify: the account and its new code", async () => {
+    const { deps, calls } = api(() => json(ANSWER, 200));
+    const { ceremonies, seen } = both();
+    expect(await recoverVerify(OPTIONS as never, { api: deps, passkeys: ceremonies })).toEqual({
+      ok: true,
+      me: ME,
+      backupCode: "K7QM2XRAP9DWHT4ENB6Z",
+    });
+    expect(seen).toEqual([{ kind: "create", options: { optionsJSON: OPTIONS } }]);
+    expect(calls.map((call) => call.url)).toEqual(["/api/auth/recover/verify"]);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ response: RESPONSE });
+  });
+
+  it("cancelled or the wrong address: no verify call", async () => {
+    for (const [name, reason] of [
+      ["NotAllowedError", "cancelled"],
+      ["SecurityError", "wrong-address"],
+    ]) {
+      const { deps, calls } = api(() => json(ANSWER, 200));
+      expect(
+        await recoverVerify(OPTIONS as never, {
+          api: deps,
+          passkeys: both({ create: failing(name as string) as never }).ceremonies,
+        }),
+      ).toEqual({ ok: false, reason });
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it("the server's refusals: the delay is over (expired), anything else", async () => {
+    const cases: [Response, string][] = [
+      [json({ error: "expired" }, 400), "expired"],
+      [json({ error: "refused" }, 400), "server"],
+      [json({ error: "server" }, 500), "server"],
+      [json({ me: ME, backupCode: "short" }, 200), "server"],
+    ];
+    for (const [response, reason] of cases) {
+      const { deps } = api(() => response.clone());
+      expect(
+        await recoverVerify(OPTIONS as never, { api: deps, passkeys: both().ceremonies }),
+        reason,
+      ).toEqual({ ok: false, reason });
+    }
+  });
+
+  it("offline before or during, and a browser without passkeys", async () => {
+    expect(
+      await recoverVerify(OPTIONS as never, {
+        api: api(() => json(ANSWER, 200), false).deps,
+        passkeys: both().ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "offline" });
+    const rejecting = api(() => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(
+      await recoverVerify(OPTIONS as never, { api: rejecting.deps, passkeys: both().ceremonies }),
+    ).toEqual({ ok: false, reason: "offline" });
+    expect(
+      await recoverVerify(OPTIONS as never, {
+        api: api(() => json(ANSWER, 200)).deps,
+        passkeys: both({ supported: false }).ceremonies,
+      }),
+    ).toEqual({ ok: false, reason: "unsupported" });
   });
 });
