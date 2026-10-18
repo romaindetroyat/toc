@@ -4,7 +4,8 @@
   // One connecting or error screen of the online table (02-UI-SPEC « Connecting, errors »): a heading,
   // a body, 0 to 2 buttons (the primary first in the DOM, as in the copy table), and whatever the case
   // adds under them (the slow-connection line). Works upright and sideways. data-notice names the case.
-  type Action = { label: string; run: () => void };
+  /** busy (plan 04-09): the action runs; its label says so and the button is aria-busy. */
+  type Action = { label: string; run: () => void; busy?: boolean };
 
   type Props = {
     /** The case: introuvable, commencee, ailleurs, version, horsligne, connexion… */
@@ -28,7 +29,14 @@
   {#if primary || secondary}
     <div class="buttons">
       {#if primary}
-        <button type="button" class="btn btn-primary" onclick={primary.run}>{primary.label}</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          aria-busy={primary.busy === true ? true : undefined}
+          onclick={primary.run}
+        >
+          {primary.label}
+        </button>
       {/if}
       {#if secondary}
         <button type="button" class="btn btn-secondary" onclick={secondary.run}>

@@ -135,6 +135,8 @@ test("l’écran du code ne se quitte pas par mégarde, et tient à 844 × 390 e
   const context = await passkeyContext(browser, testInfo);
   const page = await context.newPage();
   await page.setViewportSize({ width: 844, height: 390 });
+  // The home first, so the back button stays in the app (a first entry leaves it: beforeunload, below).
+  await page.goto("/");
   await page.goto(`/#/invitation/${await mintInvitation(request)}`);
   const form = page.locator("[data-pseudo-form]");
   await form.getByRole("textbox").fill(uniquePseudo("Gaspard"));

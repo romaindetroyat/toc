@@ -228,7 +228,12 @@ describe("pseudoError", () => {
     expect(pseudoError("taken-meanwhile")).toEqual({
       line: "Ce pseudo vient d’être pris. Choisis-en un autre.",
     });
-    expect(pseudoError("cancelled").line).toMatch(/^Création annulée\. Touche /);
+    expect(pseudoError("cancelled")).toEqual({
+      line: "Création annulée. Touche « Créer mon compte » pour réessayer.".replace(
+        /« (.*) »/,
+        "«\u202f$1\u202f»",
+      ),
+    });
     expect(pseudoError("wrong-address")).toEqual({
       line: "Les clés d’accès ne marchent qu’à l’adresse toc.romaindetroyat.workers.dev.",
     });

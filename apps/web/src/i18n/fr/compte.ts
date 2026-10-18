@@ -36,6 +36,27 @@ export const compte = {
       body: "L’invitation a besoin d’Internet. Vérifie le réseau, puis réessaie.",
       retry: "Réessayer",
     },
+    /** Plan 04-09: « Se connecter » on a used link. */
+    signIn: "Se connecter",
+    /** Plan 04-09: the signed-in rows (04-UI-SPEC « Opening the link »). */
+    addFriend: {
+      heading: (inviter: string) => `Ajouter ${inviter} à tes amis ?`,
+      body: (inviter: string) =>
+        `${inviter} t’a envoyé ce lien. Vous pourrez vous inviter à vos tables.`,
+      accept: "Ajouter à mes amis",
+      busy: "Ajout…",
+      added: (inviter: string) => `${inviter} est maintenant dans tes amis.`,
+      failed: "L’ajout n’a pas marché. Réessaie dans un instant.",
+    },
+    friend: {
+      heading: (inviter: string) => `${inviter} est déjà dans tes amis`,
+      body: (date: string) => `Ce lien reste valable pour un autre proche jusqu’au ${date}.`,
+    },
+    own: {
+      heading: "C’est ton invitation",
+      body: (date: string) => `Envoie ce lien à un proche : il sert une fois, jusqu’au ${date}.`,
+    },
+    friends: "Mes amis",
   },
   pseudo: {
     step: "Étape 1 sur 2",
@@ -49,6 +70,10 @@ export const compte = {
     device: "Suis les instructions de ton appareil…",
     submit: "Créer mon compte",
     busy: "Création du compte…",
+    /** Plan 04-09: opens the sign-in sheet. */
+    haveAccount: "J’ai déjà un compte",
+    /** Plan 04-09: only when this device has guest tables. */
+    seats: "Tes parties en cours sur cet appareil passeront sur ton compte.",
     explanation:
       "Pas de mot de passe ni d’e-mail : ton appareil crée une clé d’accès (passkey), que tu ouvres avec ton visage, ton doigt ou le code de l’appareil. Ensuite, tu recevras un code de secours à garder.",
     errors: {
@@ -68,6 +93,10 @@ export const compte = {
   backup: {
     step: "Étape 2 sur 2",
     heading: "Ton code de secours",
+    /** Plan 04-09: after a recovery or « Créer un nouveau code ». */
+    newHeading: "Ton nouveau code de secours",
+    afterRecovery: "L’ancien code ne marche plus, et tes autres appareils ont été déconnectés.",
+    afterRegeneration: "L’ancien code ne marche plus.",
     body: "Si tu perds ton téléphone, ce code te permet de retrouver ton compte sur un autre appareil.",
     /** The code panel's accessible name: the code spelled one symbol at a time, groups by commas. */
     groupLabel: (spelled: string) => `Code de secours : ${spelled}`,

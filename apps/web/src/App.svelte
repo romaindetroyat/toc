@@ -8,6 +8,7 @@
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
   import Table from "./routes/Table.svelte";
+  import { leaveBlocked } from "./ui/leaveGuard.ts";
   import SignInSheet from "./ui/SignInSheet.svelte";
   import Toast from "./ui/Toast.svelte";
 
@@ -44,6 +45,8 @@
 
   $effect(() => {
     const onHashChange = () => {
+      // Plan 04-09: the backup code on screen undoes a stray change (the back button) and asks first.
+      if (leaveBlocked()) return;
       hash = location.hash;
     };
     window.addEventListener("hashchange", onHashChange);

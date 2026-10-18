@@ -1,54 +1,70 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { acceptInvitation, type InvitationView, invitationState, signUp } from "../account/api.ts";
+  import { invitationRow, prefill, pseudoError, type RowAction } from "../account/flow.ts";
   import {
-    type InvitationView,
-    invitationState,
-    type SignUpFailure,
-    signUp,
-  } from "../account/api.ts";
-  import { setAccount } from "../account/store.svelte.ts";
+    account,
+    openSignIn,
+    refreshAccount,
+    sessionEnded,
+    setAccount,
+  } from "../account/store.svelte.ts";
   import { browserCeremonies } from "../account/webauthn.ts";
   import { compte } from "../i18n/fr/compte.ts";
+  import { browserApi } from "../net/api.ts";
   import { loadDevice, pageStorage } from "../net/device.ts";
-  import { normalizePseudo } from "@toc/protocol";
+  import { loadTables } from "../net/tables.ts";
   import BackupCodeScreen from "../ui/BackupCodeScreen.svelte";
+  import HomeStrip from "../ui/HomeStrip.svelte";
   import Notice from "../ui/Notice.svelte";
   import PseudoForm from "../ui/PseudoForm.svelte";
   import { screen } from "../ui/screen.svelte.ts";
+  import { stepIn } from "../ui/stepIn.ts";
   import { showToast } from "../ui/toast.svelte.ts";
 
-  // #/invitation/<code> (plan 04-01, 04-UI-SPEC « Invitation », ACCT-01, D-02, D-03, D-06, D-11): the
-  // state of the link first (« Ouverture de l’invitation… »), then either a notice (unknown, used,
-  // expired, offline, a browser without passkeys) or the two steps of a sign-up: the pseudo and the
-  // passkey, then the backup code shown once. After « Oui, je l’ai gardé », the home, signed in, with
-  // the welcome toast. data-invitation names the case. Still to come: « J’ai déjà un compte » and
-  // « Se connecter » (04-02), the signed-in cases (04-05), the leave guard of the code (04-09).
+  // #/invitation/<code> (plans 04-01 and 04-09, 04-UI-SPEC « Invitation », ACCT-01, D-02, D-03, D-04,
+  // D-06, D-11): the state of the link first (« Ouverture de l’invitation… », the slow line after
+  // 10 s), then the row flow.invitationRow picks: unknown, used (« Se connecter »), expired, offline
+  // (« Réessayer »), a browser without passkeys (« Copier le lien »), and for a signed-in player « Ajouter
+  // {Inviteur} à tes amis ? », « {Inviteur} est déjà dans tes amis » or « C’est ton invitation »;
+  // signed out, the two steps of a sign-up: the pseudo and the passkey, then the backup code shown
+  // once. « J’ai déjà un compte » and « Se connecter » open the sign-in sheet; once signed in, the
+  // link is asked again and the signed-in rows apply. So does the server's refusal of a second account
+  // (signed in meanwhile, in another tab). After the code, the home with the welcome toast.
+  // data-invitation names the case ("ok" for the pseudo step).
   type Props = { code: string };
 
   let { code }: Props = $props();
 
-  type View = InvitationView | { state: "loading" } | { state: "unsupported" };
-
-  let view = $state<View>({ state: "loading" });
+  let view = $state<InvitationView | { state: "loading" }>({ state: "loading" });
   let slow = $state(false);
   let step = $state<"pseudo" | "code">("pseudo");
   let busy = $state(false);
+  let accepting = $state(false);
   let error = $state<string | null>(null);
   let backupCode = $state("");
   let pseudo = $state("");
   let heading = $state<HTMLHeadingElement | null>(null);
+  let haveAccount = $state<HTMLButtonElement | null>(null);
 
   const SLOW_MS = 10_000;
 
-  // This device's first name, when it is a valid pseudo (UI-SPEC « Field »).
-  const device = loadDevice(pageStorage());
-  const named = device.name === null ? null : normalizePseudo(device.name);
-  const initial = named?.ok ? named.pseudo : "";
+  // This device's first name, when it is a valid pseudo (UI-SPEC « Field »); its guest tables (the
+  // seats line: they pass to the account).
+  const storage = pageStorage();
+  const initial = prefill(loadDevice(storage).name);
+  const guestTables = loadTables(storage).some((entry) => entry.account === undefined);
 
-  const inviter = $derived(
-    "inviter" in view && view.inviter !== null ? view.inviter : null,
+  const row = $derived(
+    invitationRow({
+      view,
+      signedIn: account.current !== null,
+      webauthn: browserCeremonies.supported(),
+      online: view.state === "loading" || browserApi.online(),
+      now: Date.now(),
+    }),
   );
-  const inviterName = $derived(inviter ?? compte.invitation.someone);
+  const inviter = $derived("inviter" in view && view.inviter !== null ? view.inviter : null);
   const bootstrap = $derived(view.state === "ok" && "bootstrap" in view && view.bootstrap === true);
   const context = $derived(
     bootstrap
@@ -62,14 +78,15 @@
   async function load() {
     view = { state: "loading" };
     slow = false;
+    error = null;
     const timer = setTimeout(() => {
       slow = true;
     }, SLOW_MS);
     const state = await invitationState(code);
     clearTimeout(timer);
-    view = state.state === "ok" && !browserCeremonies.supported() ? { state: "unsupported" } : state;
+    view = state;
     // The step's h1 takes the focus, except with a fine pointer, where the field's autofocus keeps it.
-    if (view.state === "ok" && !window.matchMedia("(pointer: fine)").matches) {
+    if (row.kind === "pseudo" && !window.matchMedia("(pointer: fine)").matches) {
       await tick();
       heading?.focus();
     }
@@ -79,15 +96,11 @@
     void load();
   });
 
-  const errorFor: Partial<Record<SignUpFailure, string>> = {
-    pseudo: compte.pseudo.errors.chars,
-    taken: compte.pseudo.errors.taken,
-    "taken-meanwhile": compte.pseudo.errors.takenMeanwhile,
-    cancelled: compte.pseudo.errors.cancelled,
-    "wrong-address": compte.pseudo.errors.wrongAddress,
-    offline: compte.pseudo.errors.offline,
-    server: compte.pseudo.errors.server,
-  };
+  /** Signed in meanwhile (the sheet, or another tab): the account, then the link again. */
+  async function signedInMeanwhile() {
+    await refreshAccount();
+    await load();
+  }
 
   async function create(chosen: string) {
     busy = true;
@@ -101,18 +114,15 @@
       step = "code";
       return;
     }
-    if (result.reason === "used" || result.reason === "expired" || result.reason === "unknown") {
-      view =
-        result.reason === "unknown"
-          ? { state: "unknown" }
-          : { state: result.reason, inviter };
+    const shown = pseudoError(result.reason);
+    if ("line" in shown) {
+      error = shown.line;
       return;
     }
-    if (result.reason === "unsupported") {
-      view = { state: "unsupported" };
-      return;
-    }
-    error = errorFor[result.reason] ?? compte.pseudo.errors.server;
+    if (shown.row === "signed-in") void signedInMeanwhile();
+    else if (shown.row === "unknown") view = { state: "unknown" };
+    else if (shown.row === "unsupported") void load();
+    else view = { state: shown.row, inviter };
   }
 
   function kept() {
@@ -124,8 +134,41 @@
     location.hash = "#/";
   }
 
-  function home() {
-    location.hash = "#/";
+  async function accept() {
+    if (accepting) return;
+    accepting = true;
+    const result = await acceptInvitation(code);
+    accepting = false;
+    if (result.ok) {
+      if (result.already) {
+        await load();
+        return;
+      }
+      showToast(compte.invitation.addFriend.added(result.friend.pseudo));
+      location.hash = "#/amis";
+      return;
+    }
+    switch (result.reason) {
+      case "signed-out":
+        sessionEnded();
+        await load();
+        return;
+      case "own":
+        await load();
+        return;
+      case "used":
+      case "expired":
+        view = { state: result.reason, inviter };
+        return;
+      case "unknown":
+        view = { state: "unknown" };
+        return;
+      case "offline":
+        view = { state: "offline" };
+        return;
+      default:
+        showToast(compte.invitation.addFriend.failed);
+    }
   }
 
   async function copyLink() {
@@ -136,71 +179,79 @@
       showToast(compte.invitation.unsupported.copyFailed);
     }
   }
+
+  function run(action: RowAction, opener: HTMLElement | null = null) {
+    switch (action) {
+      case "home":
+        location.hash = "#/";
+        return;
+      case "friends":
+        location.hash = "#/amis";
+        return;
+      case "retry":
+        void load();
+        return;
+      case "copy-link":
+        void copyLink();
+        return;
+      case "sign-in":
+        openSignIn(opener, () => void load());
+        return;
+      case "accept":
+        void accept();
+        return;
+    }
+  }
+
+  function signIn() {
+    openSignIn(haveAccount, () => void load());
+  }
+
+  const active = () =>
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
 </script>
 
 {#if step === "code"}
-  <BackupCodeScreen code={backupCode} step={compte.backup.step} onkept={kept} />
-{:else if view.state === "loading"}
+  <div class="step" in:stepIn>
+    <BackupCodeScreen code={backupCode} step={compte.backup.step} onkept={kept} />
+  </div>
+{:else if row.kind === "loading"}
   <div class="case" data-invitation="loading">
     <Notice
       kind="invitation-loading"
-      heading={compte.invitation.loading}
+      heading={row.heading}
       body={slow ? compte.invitation.slow : undefined}
-      secondary={slow ? { label: compte.invitation.home, run: home } : undefined}
+      secondary={slow ? { label: compte.invitation.home, run: () => run("home") } : undefined}
       live
     />
   </div>
-{:else if view.state === "unknown"}
-  <div class="case" data-invitation="unknown">
+{:else if row.kind !== "pseudo"}
+  {@const primary = row.primary}
+  {@const secondary = row.secondary}
+  <div class="case" data-invitation={row.kind}>
     <Notice
-      kind="invitation-unknown"
-      heading={compte.invitation.unknown.heading}
-      body={compte.invitation.unknown.body}
-      primary={{ label: compte.invitation.home, run: home }}
-    />
-  </div>
-{:else if view.state === "used"}
-  <div class="case" data-invitation="used">
-    <Notice
-      kind="invitation-used"
-      heading={compte.invitation.used.heading}
-      body={compte.invitation.used.body(inviterName)}
-      primary={{ label: compte.invitation.home, run: home }}
-    />
-  </div>
-{:else if view.state === "expired"}
-  <div class="case" data-invitation="expired">
-    <Notice
-      kind="invitation-expired"
-      heading={compte.invitation.expired.heading}
-      body={compte.invitation.expired.body(inviterName)}
-      primary={{ label: compte.invitation.home, run: home }}
-    />
-  </div>
-{:else if view.state === "offline"}
-  <div class="case" data-invitation="offline">
-    <Notice
-      kind="invitation-offline"
-      heading={compte.invitation.offline.heading}
-      body={compte.invitation.offline.body}
-      primary={{ label: compte.invitation.offline.retry, run: () => void load() }}
-      secondary={{ label: compte.invitation.home, run: home }}
-    />
-  </div>
-{:else if view.state === "unsupported"}
-  <div class="case" data-invitation="unsupported">
-    <Notice
-      kind="invitation-unsupported"
-      heading={compte.invitation.unsupported.heading}
-      body={compte.invitation.unsupported.body}
-      primary={{ label: compte.invitation.unsupported.copy, run: () => void copyLink() }}
-      secondary={{ label: compte.invitation.home, run: home }}
+      kind={`invitation-${row.kind}`}
+      heading={row.heading}
+      body={row.body ?? undefined}
+      primary={primary === null
+        ? undefined
+        : {
+            label:
+              primary.action === "accept" && accepting
+                ? compte.invitation.addFriend.busy
+                : primary.label,
+            busy: primary.action === "accept" && accepting,
+            run: () => run(primary.action, active()),
+          }}
+      secondary={secondary === null
+        ? undefined
+        : { label: secondary.label, run: () => run(secondary.action, active()) }}
     />
   </div>
 {:else}
-  <main class="page" data-invitation="ok">
-    <div class="column">
-      <p class="t-label step" class:sr-only={compact}>{compte.pseudo.step}</p>
+  <main class="page" data-invitation="ok" aria-busy={busy}>
+    <div class="column" in:stepIn>
+      <p class="t-label step-line" class:sr-only={compact}>{compte.pseudo.step}</p>
       <h1
         class="t-heading"
         id="pseudo-heading"
@@ -214,6 +265,21 @@
       <div class="field">
         <PseudoForm labelledby="pseudo-heading" {initial} {busy} {error} onsubmit={create} />
       </div>
+      {#if guestTables}
+        <p class="t-label muted seats" data-invitation-seats>{compte.pseudo.seats}</p>
+      {/if}
+      <button
+        type="button"
+        class="btn btn-text have-account"
+        aria-haspopup="dialog"
+        bind:this={haveAccount}
+        onclick={signIn}
+      >
+        {compte.pseudo.haveAccount}
+      </button>
+      <!-- Plan 04-09: the update strip's place at the bottom of the column; the rules of 04-08 never
+           offer an update during a sign-up (04-UI-SPEC « Update »), so it stays empty here. -->
+      <HomeStrip kinds={["update"]} margin="var(--space-md) 0 0" />
     </div>
   </main>
 {/if}
@@ -251,7 +317,7 @@
     outline: none;
   }
 
-  .step {
+  .step-line {
     margin-bottom: var(--space-xs);
     color: var(--creme-attenuee);
     font-weight: 700;
@@ -263,6 +329,20 @@
   }
 
   .field {
+    margin-top: var(--space-md);
+  }
+
+  .muted {
+    color: var(--creme-attenuee);
+  }
+
+  .seats {
+    margin-top: var(--space-sm);
+  }
+
+  .have-account {
+    align-self: flex-start;
+    min-height: var(--touch);
     margin-top: var(--space-md);
   }
 

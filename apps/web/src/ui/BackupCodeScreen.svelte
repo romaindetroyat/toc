@@ -4,28 +4,43 @@
   import { holdUpdates } from "../pwa/update.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Icon from "./Icon.svelte";
+  import { setLeaveGuard } from "./leaveGuard.ts";
   import { showToast } from "./toast.svelte.ts";
 
   // « Ton code de secours » (04-UI-SPEC « Backup-code screen », D-02): shown once, full screen (never a
   // sheet: a stray tap must not close it). The cream panel shows the code in five groups that wrap
   // only between groups; « Copier le code »; the warning; « J’ai gardé mon code » asks first, and
-  // its safe answer « Revoir mon code » is the primary, focused one. The leave guard (beforeunload,
-  // the hash guard) comes with plan 04-09.
+  // its safe answer « Revoir mon code » is the primary, focused one.
+  // Plan 04-09: the three forms (after a sign-up, a recovery, a regeneration: the heading and the extra
+  // line), and the leave guard. While the screen is up, beforeunload is armed (the browser's own
+  // « Quitter la page ? »), and a hash change away (the back button, a notification) is undone, before
+  // the router acts on it (leaveGuard.ts), and opens the same confirmation. Only « Oui, je l’ai
+  // gardé » lets it go.
   type Props = {
     /** The code, 20 symbols, as the server sent it once. */
     code: string;
     /** « Étape 2 sur 2 » in the sign-up flow. */
     step?: string;
+    /** Which screen: after a sign-up (default), a recovery or « Créer un nouveau code ». */
+    form?: "signup" | "recovery" | "regeneration";
     /** The player confirmed they kept it. */
     onkept: () => void;
   };
 
-  let { code, step, onkept }: Props = $props();
+  let { code, step, form = "signup", onkept }: Props = $props();
 
   const groups = $derived(code.match(/.{1,4}/g) ?? []);
   const formatted = $derived(formatBackupCode(code));
   /** « K 7 Q M, 2 X R A, … »: read one symbol at a time, the groups apart. */
   const spelled = $derived(groups.map((group) => [...group].join(" ")).join(", "));
+  const title = $derived(form === "signup" ? compte.backup.heading : compte.backup.newHeading);
+  const extra = $derived(
+    form === "recovery"
+      ? compte.backup.afterRecovery
+      : form === "regeneration"
+        ? compte.backup.afterRegeneration
+        : null,
+  );
 
   let heading = $state<HTMLHeadingElement | null>(null);
   let keptButton = $state<HTMLButtonElement | null>(null);
@@ -39,6 +54,38 @@
     heading?.focus();
   });
 
+  // The leave guard (plan 04-09): armed until « Oui, je l’ai gardé ».
+  let leaving = false;
+
+  $effect(() => {
+    const here = location.href;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (leaving) return;
+      event.preventDefault();
+      // Older browsers need a value to show their dialog.
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    // The router (App.svelte) asks this guard first on each hash change: the change is undone (the
+    // address back to this screen's, no new hashchange) and the confirmation opens.
+    const unguard = setLeaveGuard(() => {
+      if (leaving || location.href === here) return false;
+      history.pushState(history.state, "", here);
+      confirming = true;
+      return true;
+    });
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      unguard();
+    };
+  });
+
+  function confirmed() {
+    leaving = true;
+    confirming = false;
+    onkept();
+  }
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(formatted);
@@ -50,11 +97,12 @@
 </script>
 
 <!-- DOM order = the computer's order: the text, the code, the warning, the buttons. -->
-<main class="screen" data-backup-code>
+<main class="screen" data-backup-code={form}>
   <div class="text">
     {#if step}<p class="t-label step">{step}</p>{/if}
-    <h1 class="t-heading" tabindex="-1" bind:this={heading}>{compte.backup.heading}</h1>
+    <h1 class="t-heading" tabindex="-1" bind:this={heading}>{title}</h1>
     <p class="t-body body">{compte.backup.body}</p>
+    {#if extra !== null}<p class="t-body extra" data-backup-extra>{extra}</p>{/if}
   </div>
   <div class="panel tabular" role="group" aria-label={compte.backup.groupLabel(spelled)} data-code>
     {#each groups as group, i (i)}{#if i > 0}-<wbr />{/if}<span class="group">{group}</span>{/each}
@@ -89,10 +137,7 @@
     destructive={false}
     opener={keptButton}
     oncancel={() => (confirming = false)}
-    onconfirm={() => {
-      confirming = false;
-      onkept();
-    }}
+    onconfirm={confirmed}
   />
 {/if}
 
@@ -137,8 +182,13 @@
     font-weight: 700;
   }
 
-  .body {
+  .body,
+  .extra {
     margin-top: var(--space-sm);
+  }
+
+  .extra {
+    color: var(--creme-attenuee);
   }
 
   .warning {
