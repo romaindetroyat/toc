@@ -269,6 +269,18 @@ describe("tools/check-bundle.mjs", () => {
       `${room}\nvar PlayerHub = class extends DurableObject {};\nexport { GameRoom, PlayerHub };`,
     );
     expect(bundleProblems(f.out, f.dist)).toEqual([]);
+    // esbuild renames the base class imported by a second module (seen in the real dry run).
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObject2 {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
+    // A class extending something else is not a Durable Object.
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObjectish {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the PlayerHub class"]);
     // esbuild may also keep the class syntax.
     writeFileSync(
       join(f.out, "index.js"),

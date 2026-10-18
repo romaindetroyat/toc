@@ -37,8 +37,11 @@ import { Meter } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
 import { json, notAllowed, writeAllowed } from "./http.ts";
 import { meRoute } from "./me.ts";
+import { PlayerHub } from "./PlayerHub.ts";
 
-export { GameRoom };
+// The two Durable Object classes of both deploy configs (GameRoom: migration v1; PlayerHub, one per
+// account: migration v2, plan 04-03). The embedded entry re-exports both (worker-embedded/index.js).
+export { GameRoom, PlayerHub };
 
 declare global {
   // Not in the deploy configs, so `wrangler types` does not list it (tools/wrangler-configs.test.ts).
