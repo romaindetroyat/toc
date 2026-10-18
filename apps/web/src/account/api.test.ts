@@ -211,6 +211,8 @@ describe("signUp(code, pseudo)", () => {
     const cases: [Response, string][] = [
       [json({ error: "pseudo", reason: "chars" }, 400), "pseudo"],
       [json({ error: "taken" }, 409), "taken"],
+      // Plan 04-09: this browser already has a session; no second account.
+      [json({ error: "signed-in" }, 409), "signed-in"],
       [json({ error: "used" }, 410), "used"],
       [json({ error: "expired" }, 410), "expired"],
       [json({ error: "unknown" }, 410), "unknown"],
@@ -252,6 +254,7 @@ describe("signUp(code, pseudo)", () => {
   it("the verify call's refusals: taken meanwhile, the invitation gone, a server error", async () => {
     const cases: [Response, string][] = [
       [json({ error: "taken" }, 409), "taken-meanwhile"],
+      [json({ error: "signed-in" }, 409), "signed-in"],
       [json({ error: "used" }, 410), "used"],
       [json({ error: "expired" }, 410), "expired"],
       [json({ error: "expired" }, 400), "server"],

@@ -428,6 +428,58 @@ describe("POST /api/auth/signup/verify", () => {
     expect(await rows("SELECT * FROM passkeys")).toHaveLength(1);
   });
 
+  it("a caller already signed in cannot make a second account: 409 signed-in, nothing written (plan 04-09)", async () => {
+    const ana = await insertUser("Ana");
+    const jar = newJar();
+    expect((await signUp(await insertInvitation(ana), "Zoé", jar)).response.status).toBe(201);
+    const users = (await rows("SELECT id FROM users")).length;
+
+    // Options: refused before the invitation is read, and no challenge row is written.
+    const code = await insertInvitation(ana);
+    await db().prepare("DELETE FROM challenges").run();
+    const opened = await post(
+      "/api/auth/signup/options",
+      { invitation: code, pseudo: "Lou" },
+      { jar },
+    );
+    expect(opened.status).toBe(409);
+    expect(await opened.json()).toEqual({ error: "signed-in" });
+    expect(await rows("SELECT * FROM challenges")).toEqual([]);
+
+    // Verify: options taken by a guest browser, the answer sent with the signed-in cookie. The
+    // invitation is not claimed and no account is made.
+    const guest = (await (
+      await post("/api/auth/signup/options", { invitation: code, pseudo: "Lou" })
+    ).json()) as Options;
+    const created = await (await softAuthenticator("toc.test", ORIGIN)).create(guest.challenge);
+    const verified = await post("/api/auth/signup/verify", { response: created }, { jar });
+    expect(verified.status).toBe(409);
+    expect(await verified.json()).toEqual({ error: "signed-in" });
+    expect(verified.headers.get("set-cookie")).toBeNull();
+    expect(await rows("SELECT id FROM users")).toHaveLength(users);
+    expect(await (await get(`/api/invitations/${code}`)).json()).toMatchObject({ state: "ok" });
+
+    // The bootstrap is refused the same way.
+    const bootstrap = await post(
+      "/api/auth/signup/options",
+      { invitation: env.TOC_BOOTSTRAP as string, pseudo: "Lou" },
+      { jar },
+    );
+    expect(bootstrap.status).toBe(409);
+  });
+
+  it("a stale or unknown session cookie is a guest: the sign-up goes on", async () => {
+    const ana = await insertUser("Ana");
+    const jar = newJar();
+    jar.cookie = `__Host-toc_session=${"A".repeat(43)}`;
+    const opened = await post(
+      "/api/auth/signup/options",
+      { invitation: await insertInvitation(ana), pseudo: "Lou" },
+      { jar },
+    );
+    expect(opened.status).toBe(200);
+  });
+
   it("without the pepper secret the sign-up calls answer 503 config", async () => {
     const code = await insertInvitation(await insertUser("Ana"));
     const bare = { ...env, TOC_PEPPER: undefined } as Env;
