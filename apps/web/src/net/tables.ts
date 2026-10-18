@@ -144,6 +144,24 @@ export function mergeTables(
   return [...byId.values()].sort((a, b) => b.joinedAt - a.joinedAt).slice(0, MAX_TABLES);
 }
 
+/**
+ * Signing in on this device (plan 04-09, D-05): the device's guest entries pass to the account (the
+ * server links the seats at the next hello, 04-RESEARCH Pattern 4 rule 2); entries of another account
+ * stay as they are. Answers how many were linked (the sign-in toast says so when there were some).
+ */
+export function linkTables(storage: StorageLike | null, accountId: string): number {
+  if (!ACCOUNT_ID_RE.test(accountId)) return 0;
+  const entries = loadTables(storage);
+  let linked = 0;
+  const next = entries.map((entry) => {
+    if (entry.account !== undefined) return entry;
+    linked++;
+    return { ...entry, account: accountId };
+  });
+  if (linked > 0) write(storage, next);
+  return linked;
+}
+
 /** Removes the table from this device's list; its entry and place, for « Remettre ». */
 export function forgetTable(
   storage: StorageLike | null,

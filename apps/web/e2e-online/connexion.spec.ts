@@ -94,6 +94,8 @@ test("se connecter sur un nouvel appareil avec sa clé, et y retrouver ses parti
   await expect(row(one, id)).toHaveCount(0);
   const kept = await one.evaluate(() => localStorage.getItem("toc.tables.v1") ?? "");
   expect(kept).toContain(id);
+  // The passkey was used on device 2 since: the sync brings its counter back to device 1.
+  expect(await copyPasskey(second, first)).toBe(1);
   await signInFromHome(one);
   await expect(one.locator("[data-toast]")).toContainText(`Bonjour ${pseudo}`);
   await expect(row(one, id)).toBeVisible();
@@ -150,11 +152,10 @@ test("un pseudo de 20 caractères ne déborde jamais de sa petite tuile", async 
       };
     });
     expect(fit.height).toBe(48);
-    // 136 and 152 cut the pseudo with an ellipsis; one column (480 × 320) has wider tiles.
-    if (size.tile !== null) {
-      expect(fit.width).toBe(size.tile);
-      expect(fit.cut, `${size.width} × ${size.height}`).toBe(true);
-    }
+    // The phone's 136 cuts the pseudo with an ellipsis (line 2 gets 120 px); the computer's 152 gives
+    // line 2 136 px, which may hold it whole; one column (480 × 320) has wider tiles.
+    if (size.tile !== null) expect(fit.width).toBe(size.tile);
+    if (size.tile === 136) expect(fit.cut, `${size.width} × ${size.height}`).toBe(true);
     expect(fit.ellipsis).toBe("ellipsis");
     expect(fit.right).toBeLessThanOrEqual(size.width);
     expect(fit.page).toBe(0);

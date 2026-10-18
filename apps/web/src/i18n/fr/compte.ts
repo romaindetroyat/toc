@@ -93,5 +93,42 @@ export const compte = {
     account: "Mon compte",
     /** Accessible name of the tile: « Mon compte (Marie) ». */
     accountLabel: (pseudo: string) => `Mon compte (${pseudo})`,
+    /** Plan 04-09: the signed-in tile 1, a link to #/amis. */
+    friends: "Mes amis",
+    friendsSub: "Inviter un proche",
+    /** Plan 04-09: the guest's tile, which opens the sign-in sheet. */
+    signIn: "Se connecter",
+    signInSub: "Créer un compte",
+    signInLabel: "Se connecter ou créer un compte",
+  },
+  /** Plan 04-09: the sign-in sheet « Se connecter » (04-UI-SPEC « Sign-in sheet »). */
+  signIn: {
+    title: "Se connecter",
+    text: "Utilise la clé d’accès de ton compte TOC.",
+    use: "Utiliser ma clé d’accès",
+    busy: "Suis les instructions de ton appareil…",
+    note: "Sur un ordinateur, tu peux choisir ton téléphone comme clé : ton navigateur montre alors un code QR.",
+    lost: "J’ai perdu ma clé : code de secours",
+    hintHeading: "Pas encore de compte ?",
+    hintBody: "Il faut l’invitation d’un proche qui a déjà un compte : demande-lui le lien.",
+    lines: {
+      unsupported:
+        "Ce navigateur ne gère pas les clés d’accès. Ouvre TOC dans Safari, Chrome ou Edge à jour.",
+      cancelled:
+        "Connexion annulée. Pas de clé sur cet appareil ? Choisis ton téléphone, ou utilise ton code de secours.",
+      unknown:
+        "Cette clé d’accès n’ouvre aucun compte TOC. Elle a peut-être été retirée. Essaie une autre clé ou ton code de secours.",
+      wrongAddress: "Les clés d’accès ne marchent qu’à l’adresse toc.romaindetroyat.workers.dev.",
+      offline: "Pas de connexion. Vérifie le réseau, puis réessaie.",
+      server: "La connexion n’a pas marché. Réessaie dans un instant.",
+    },
+    hello: (pseudo: string) => `Bonjour ${pseudo} !`,
+    helloLinked: (pseudo: string) =>
+      `Bonjour ${pseudo} ! Tes parties sur cet appareil sont maintenant liées à ton compte.`,
+  },
+  /** Plan 04-09: a 401 on an account call (04-UI-SPEC « Home: states »). */
+  session: {
+    ended: "Ta session a pris fin : connecte-toi de nouveau.",
+    signIn: "Se connecter",
   },
 } as const;

@@ -90,11 +90,15 @@ export const RP_ID = "localhost";
 /**
  * A synced passkey (plan 04-09): every passkey `from` holds for TOC is copied into `to`'s virtual
  * authenticator, keys and counter included, as iCloud or Google would carry it to a new device.
- * `to` must have its authenticator installed (passkeyContext). Answers how many were copied.
+ * `to` must have its authenticator installed (passkeyContext). Copying again re-syncs (the server
+ * refuses a counter that goes backwards, as it would for a cloned key). Answers how many were copied.
  */
 export async function copyPasskey(from: BrowserContext, to: BrowserContext): Promise<number> {
   const held = await from.credentials.get({ rpId: RP_ID });
+  const there = new Set((await to.credentials.get({ rpId: RP_ID })).map((each) => each.id));
   for (const credential of held) {
+    // A sync replaces the older copy: its counter must follow, or the server sees it go backwards.
+    if (there.has(credential.id)) await to.credentials.delete(credential.id);
     await to.credentials.create(RP_ID, {
       id: credential.id,
       userHandle: credential.userHandle,

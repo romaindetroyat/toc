@@ -538,6 +538,75 @@ export const ICONS = {
       },
     },
   ],
+  "log-in": [
+    {
+      tag: "path",
+      attrs: {
+        d: "m10 17 5-5-5-5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M15 12H3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4",
+      },
+    },
+  ],
+  "key-round": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z",
+      },
+    },
+    {
+      tag: "circle",
+      attrs: {
+        cx: "16.5",
+        cy: "7.5",
+        r: ".5",
+        fill: "currentColor",
+      },
+    },
+  ],
+  handshake: [
+    {
+      tag: "path",
+      attrs: {
+        d: "m11 17 2 2a1 1 0 1 0 3-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m21 3 1 11h-2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 4h8",
+      },
+    },
+  ],
 } as const;
 
 export type IconName = keyof typeof ICONS;

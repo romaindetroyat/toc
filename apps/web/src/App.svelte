@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { startAccount } from "./account/store.svelte.ts";
+  import { signInSheet, startAccount } from "./account/store.svelte.ts";
   import KnightDefs from "./board/KnightDefs.svelte";
   import { game } from "./i18n/fr/game.ts";
   import Game from "./routes/Game.svelte";
@@ -8,6 +8,7 @@
   import Launch from "./routes/Launch.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
   import Table from "./routes/Table.svelte";
+  import SignInSheet from "./ui/SignInSheet.svelte";
   import Toast from "./ui/Toast.svelte";
 
   /** Debug builds only (route #/panne): an error thrown while the screen is drawn, to see the error screen. */
@@ -93,6 +94,11 @@
     </main>
   {/snippet}
 </svelte:boundary>
+
+<!-- « Se connecter » (plan 04-09): one sheet for the whole app, over whatever screen opened it. -->
+{#if signInSheet.open}
+  <SignInSheet />
+{/if}
 
 <!-- The one transient message of the app (UI-SPEC « Toast »). -->
 <Toast />

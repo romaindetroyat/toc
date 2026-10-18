@@ -4,8 +4,14 @@
 // Worker behind the page (the local preview: a 404 or HTML), the guest state stays, without a strip
 // or an error. The session itself is the HttpOnly cookie, out of this code's reach. Plan 04-02:
 // signedIn(me) after a login, signedOut() after « Se déconnecter » (pass it as logOut's `forget`).
+// Plan 04-09: the sign-in sheet's place (one sheet for the whole app, opened from the home's tile,
+// « J’ai déjà un compte », an used invitation, the session-ended toast), and the end of a session: a
+// 401 on an account call while this page believed it signed in clears the account and says once
+// « Ta session a pris fin : connecte-toi de nouveau. » with « Se connecter ».
 
+import { compte } from "../i18n/fr/compte.ts";
 import { type ApiDeps, browserApi } from "../net/api.ts";
+import { showToast } from "../ui/toast.svelte.ts";
 import { me } from "./api.ts";
 import {
   type AccountStorage,
@@ -23,15 +29,18 @@ export const account = $state<{
   reachable: boolean;
 }>({ current: null, reachable: true });
 
-/** browserApi, noting whether the request got no answer at all. */
-function watched(): { deps: ApiDeps; threw: () => boolean } {
+/** browserApi, noting whether the request got no answer at all, and the status of the one it got. */
+function watched(): { deps: ApiDeps; threw: () => boolean; status: () => number | null } {
   let threw = false;
+  let status: number | null = null;
   return {
     deps: {
       online: browserApi.online,
       fetch: async (input, init) => {
         try {
-          return await browserApi.fetch(input, init);
+          const response = await browserApi.fetch(input, init);
+          status = response.status;
+          return response;
         } catch (error) {
           threw = true;
           throw error;
@@ -39,6 +48,7 @@ function watched(): { deps: ApiDeps; threw: () => boolean } {
       },
     },
     threw: () => threw,
+    status: () => status,
   };
 }
 
@@ -51,6 +61,9 @@ function storage(): AccountStorage | null {
 }
 
 let started = false;
+
+/** The session-ended toast was shown since the last sign-in (plan 04-09: it is said once). */
+let endedSaid = false;
 
 /** Once per page, from App.svelte: the cached account now, the server's answer next. */
 export function startAccount(): void {
@@ -71,8 +84,10 @@ export async function refreshAccount(): Promise<void> {
   account.reachable = !call.threw();
   if (answer === "offline") return;
   if (answer === null) {
-    account.current = null;
-    writeCachedAccount(storage(), null);
+    // A 401 where this page believed it signed in: the session ended (another device recovered the
+    // account, or the session expired). A 404 or HTML (no Worker behind the page) only clears.
+    if (call.status() === 401) sessionEnded();
+    else signedOut();
     return;
   }
   setAccount(answer);
@@ -86,6 +101,7 @@ export function setAccount(next: { id: string; pseudo: string }): void {
 
 /** Signed in on this device (plan 04-02: a login, a new key). */
 export function signedIn(me: { id: string; pseudo: string }): void {
+  endedSaid = false;
   setAccount(me);
 }
 
@@ -93,4 +109,39 @@ export function signedIn(me: { id: string; pseudo: string }): void {
 export function signedOut(): void {
   account.current = null;
   writeCachedAccount(storage(), null);
+}
+
+// --- Plan 04-09: the end of a session, the sign-in sheet ---
+
+/**
+ * A 401 on an account call (04-UI-SPEC « Home: states »): signed out on this device; when the page
+ * believed it signed in, the toast « Ta session a pris fin : connecte-toi de nouveau. » once, with
+ * « Se connecter », which opens the sign-in sheet.
+ */
+export function sessionEnded(): void {
+  const was = account.current !== null;
+  signedOut();
+  if (!was || endedSaid) return;
+  endedSaid = true;
+  showToast(compte.session.ended, { label: compte.session.signIn, run: () => openSignIn() });
+}
+
+/** The sign-in sheet « Se connecter », mounted once by App.svelte. */
+export const signInSheet = $state<{
+  open: boolean;
+  /** The control that opened it: the focus goes back there when it closes without a sign-in. */
+  opener: HTMLElement | null;
+  /** Runs after a sign-in (the invitation page loads its signed-in case). */
+  after: (() => void) | null;
+}>({ open: false, opener: null, after: null });
+
+export function openSignIn(opener: HTMLElement | null = null, after: (() => void) | null = null) {
+  signInSheet.opener = opener;
+  signInSheet.after = after;
+  signInSheet.open = true;
+}
+
+export function closeSignIn(): void {
+  signInSheet.open = false;
+  signInSheet.after = null;
 }

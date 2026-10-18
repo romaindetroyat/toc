@@ -17,9 +17,24 @@
     href?: string;
     onclick?: () => void;
     wide?: boolean;
+    /** Plan 04-09: the one-column and portrait layouts share the row between the tiles. */
+    fill?: boolean;
+    /** The tile's element (the sheet it opens gives the focus back to it). */
+    element?: HTMLElement | null | undefined;
   };
 
-  let { kind, icon, label, sub, name, href, onclick, wide = false }: Props = $props();
+  let {
+    kind,
+    icon,
+    label,
+    sub,
+    name,
+    href,
+    onclick,
+    wide = false,
+    fill = false,
+    element = $bindable(),
+  }: Props = $props();
 </script>
 
 {#snippet content()}
@@ -27,11 +42,21 @@
     <Icon name={icon} size={20} />
     <span class="label">{label}</span>
   </span>
-  <span class="line2">{sub}</span>
+  <span class="line2" data-small-tile-sub>{sub}</span>
 {/snippet}
 
 {#if href !== undefined}
-  <a class="tile" class:wide {href} data-small-tile={kind} aria-label={name} title={sub} {onclick}>
+  <a
+    class="tile"
+    class:wide
+    class:fill
+    {href}
+    data-small-tile={kind}
+    aria-label={name}
+    title={sub}
+    bind:this={element}
+    {onclick}
+  >
     {@render content()}
   </a>
 {:else}
@@ -39,10 +64,12 @@
     type="button"
     class="tile"
     class:wide
+    class:fill
     data-small-tile={kind}
     aria-label={name}
     aria-haspopup="dialog"
     title={sub}
+    bind:this={element}
     {onclick}
   >
     {@render content()}
@@ -76,6 +103,13 @@
 
   .tile.wide {
     width: 152px;
+  }
+
+  /* One column and portrait: (column − 8) / 2 each. */
+  .tile.fill {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
   }
 
   .line1 {
