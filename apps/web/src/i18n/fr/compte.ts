@@ -171,6 +171,17 @@ export const compte = {
     lost: "J’ai perdu ma clé : code de secours",
     hintHeading: "Pas encore de compte ?",
     hintBody: "Il faut l’invitation d’un proche qui a déjà un compte : demande-lui le lien.",
+    /**
+     * Plan 04-13: « J’ai une invitation ». On iOS a tapped link opens Safari, never the installed
+     * app: the person pastes the link (or its code) here, and « Continuer » opens it in the app.
+     */
+    invite: {
+      label: "J’ai une invitation",
+      submit: "Continuer",
+      error: "Ce lien d’invitation n’est pas reconnu. Colle le lien complet reçu de ton proche.",
+      iphone:
+        "Sur iPhone, ouvre ton lien d’invitation dans Safari, ou colle-le ici dans l’application.",
+    },
     lines: {
       unsupported:
         "Ce navigateur ne gère pas les clés d’accès. Ouvre TOC dans Safari, Chrome ou Edge à jour.",
