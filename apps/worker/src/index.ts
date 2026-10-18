@@ -39,6 +39,9 @@
 //   GET  /api/friends                → the caller's friends { id, pseudo, since }
 //   DELETE /api/friends/:id          → the friendship goes, both ways, 204
 // Plan 04-06:
+//   POST /api/tables/:id/invite      → { friendId }: a friend told « {Pseudo} t’invite à sa table »
+//                                      (invite.ts: Origin, JSON, session, friendship, a person of the
+//                                      table, its lobby, 30 an hour; sent or here)
 //   GET  /ws/me                      → the app's socket to its PlayerHub (presence, notices): a
 //                                      session (401) and our non-null Origin (403) required; the hub
 //                                      gets a new request with only Upgrade and x-toc-account
@@ -63,6 +66,7 @@ import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./
 import { Meter } from "./db.ts";
 import { ACCOUNT_HEADER, GameRoom, PSEUDO_HEADER } from "./GameRoom.ts";
 import { json, notAllowed, writeAllowed } from "./http.ts";
+import { inviteRoute } from "./invite.ts";
 import { meRoute, meTablesRoute } from "./me.ts";
 import { PlayerHub } from "./PlayerHub.ts";
 import { socialRoute } from "./social.ts";
@@ -244,6 +248,9 @@ async function route(request: Request, env: Env, url: URL, meter: Meter): Promis
 
   const summary = /^\/api\/tables\/([^/]*)$/.exec(url.pathname);
   if (summary !== null) return summaryRoute(request, env, summary[1] ?? "");
+
+  const invite = /^\/api\/tables\/([^/]*)\/invite$/.exec(url.pathname);
+  if (invite !== null) return inviteRoute(request, env, url, meter, invite[1] ?? "");
 
   const account = await accountRoute(request, env, url, meter);
   if (account !== null) return account;

@@ -128,9 +128,8 @@ describe("POST /api/tables/:id/invite", () => {
     // Nothing but the table, the pseudo and the kind: no account id.
     expect(JSON.stringify(frame)).not.toContain(a.id);
     expect(JSON.stringify(frame)).not.toContain(b.id);
-    // D1: the session and the friendship are read, nothing is written (logged for the SUMMARY).
-    console.log(`D1 rows of one table invite: ${sent.headers.get("x-toc-d1")}`);
-    expect(sent.headers.get("x-toc-d1")).toMatch(/^w=0;/);
+    // D1: the session (2 rows) and the friendship (1) are read, nothing is written (SUMMARY).
+    expect(sent.headers.get("x-toc-d1")).toBe("w=0;r=3");
 
     const again = await invite(id, b.id, a);
     expect(again.status).toBe(200);

@@ -47,6 +47,7 @@ import {
   PROTOCOL_VERSION,
   parseClientFrame,
   type ServerFrame,
+  type TableStatus,
   type TableSummary,
   toBase64Url,
 } from "@toc/protocol";
@@ -77,6 +78,12 @@ type Attachment = { who: string | null; helloAt: number; account: HelloAccount |
 /** Set by the Worker only, from the session cookie (index.ts tableUpgrade, T-04-08). */
 export const ACCOUNT_HEADER = "x-toc-account";
 export const PSEUDO_HEADER = "x-toc-pseudo";
+
+/**
+ * What a table invite needs to know (plan 04-06, GameRoom.inviteInfo): the table's status, and
+ * whether the sender and the friend are people of it (by their accounts).
+ */
+export type InviteInfo = { status: TableStatus; senderHere: boolean; friendHere: boolean };
 
 /** A socket forgotten (closed by the object): its close handler finds no person. */
 const FORGOTTEN: Attachment = { who: null, helloAt: 0, account: null };
@@ -157,6 +164,21 @@ export class GameRoom extends DurableObject<Env> {
   async summary(): Promise<TableSummary | null> {
     const table = this.table();
     return table === null ? null : summary(table);
+  }
+
+  /**
+   * RPC from the Worker (plan 04-06, invite.ts): the status (as the summary words it) and whether
+   * the sender and the friend are people of the table, from the people's accounts; null when this id
+   * holds no table. Reads the snapshot only: nothing is written, no schema is created.
+   */
+  async inviteInfo(input: { sender: string; friend: string }): Promise<InviteInfo | null> {
+    const table = this.table();
+    if (table === null) return null;
+    return {
+      status: summary(table).status,
+      senderHere: table.people.some((person) => person.account === input.sender),
+      friendHere: table.people.some((person) => person.account === input.friend),
+    };
   }
 
   /**

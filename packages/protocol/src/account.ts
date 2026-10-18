@@ -458,3 +458,18 @@ const friendCodeAnswer = z.object({
 export type FriendCodeAnswer = z.infer<typeof friendCodeAnswer>;
 
 export const parseFriendCodeAnswer = read<FriendCodeAnswer>(friendCodeAnswer);
+
+// --- Inviting a friend to one's table (plan 04-06, ACCT-04, D-07) ---
+
+/** POST /api/tables/:id/invite: the friend to invite (their account id, from GET /api/friends). */
+export const TableInviteBody = z.strictObject({ friendId: opaqueId });
+
+const tableInviteAnswer = z.object({ state: z.enum(["sent", "here"]) });
+
+/**
+ * POST /api/tables/:id/invite: sent (the friend is told, in the app or later by a push; the same
+ * invite again within 10 minutes is « sent » too) or here (the friend already is at the table).
+ */
+export type TableInviteAnswer = z.infer<typeof tableInviteAnswer>;
+
+export const parseTableInviteAnswer = read<TableInviteAnswer>(tableInviteAnswer);
