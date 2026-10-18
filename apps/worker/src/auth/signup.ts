@@ -10,6 +10,8 @@
 //   POST /api/auth/signup/verify     { response } → the account, its passkey, the friendship with
 //                                    the inviter (D-06), the session cookie and the backup code,
 //                                    shown once (D-02)
+//                                    Both answer 409 { error: "signed-in" } to a caller whose
+//                                    cookie opens a valid session (plan 04-09): one account each
 //   POST /api/test/invitation        TOC_TEST_MODE only: a fresh, used or expired invitation with no
 //                                    inviter, for the browser tests
 //
@@ -184,6 +186,23 @@ function readPending(text: string | null): Pending | null {
   };
 }
 
+/**
+ * The caller already has a valid session on this browser (plan 04-09): a signed-in player cannot make
+ * a second account, not even through someone else's link. One D1 read, only when a cookie came; a
+ * stale or unknown cookie is a guest.
+ */
+async function signedInRefusal(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+  now: number,
+): Promise<Response | null> {
+  if (!hasCookie(request, url, env)) return null;
+  const user = await sessionUser(request, url, env, meter, now);
+  return user === null ? null : json({ error: "signed-in" }, 409);
+}
+
 /** POST /api/auth/signup/options (the router has checked the Origin). */
 export async function signupOptions(
   request: Request,
@@ -196,6 +215,8 @@ export async function signupOptions(
   if (pepper instanceof Response) return pepper;
   const read = await readJson(request, SignupOptionsBody);
   if (!read.ok) return read.response;
+  const signedIn = await signedInRefusal(request, env, url, meter, now);
+  if (signedIn !== null) return signedIn;
   const pseudo = normalizePseudo(read.body.pseudo);
   if (!pseudo.ok) return json({ error: "pseudo", reason: pseudo.reason }, 400);
 
@@ -268,6 +289,9 @@ export async function signupVerify(
   if (pepper instanceof Response) return pepper;
   const read = await readJson(request, SignupVerifyBody);
   if (!read.ok) return read.response;
+  // Before the challenge is taken: nothing of the sign-up is spent for a signed-in caller.
+  const signedIn = await signedInRefusal(request, env, url, meter, now);
+  if (signedIn !== null) return signedIn;
   const response = read.body.response;
 
   const challenge = challengeOf(response.response.clientDataJSON);

@@ -94,6 +94,8 @@ export async function invitationState(
 export type SignUpFailure =
   | "pseudo"
   | "taken"
+  /** Plan 04-09: this browser already has a session; the server makes no second account. */
+  | "signed-in"
   | "taken-meanwhile"
   | "used"
   | "expired"
@@ -139,6 +141,7 @@ export async function signUp(
   if (opened.status !== 200) {
     const error = errorOf(openedBody);
     if (opened.status === 400 && error === "pseudo") return { ok: false, reason: "pseudo" };
+    if (opened.status === 409 && error === "signed-in") return { ok: false, reason: "signed-in" };
     if (opened.status === 409) return { ok: false, reason: "taken" };
     if (opened.status === 410 && typeof error === "string" && INVITATION_ERRORS.has(error)) {
       return { ok: false, reason: error as "used" | "expired" | "unknown" };
@@ -168,6 +171,7 @@ export async function signUp(
       : { ok: true, me: answer.me, backupCode: answer.backupCode };
   }
   const error = errorOf(verifiedBody);
+  if (verified.status === 409 && error === "signed-in") return { ok: false, reason: "signed-in" };
   if (verified.status === 409) return { ok: false, reason: "taken-meanwhile" };
   if (verified.status === 410 && typeof error === "string" && INVITATION_ERRORS.has(error)) {
     return { ok: false, reason: error as "used" | "expired" | "unknown" };
