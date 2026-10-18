@@ -265,6 +265,11 @@ export type Person = {
 export async function signUpPerson(pseudo: string, jar: Jar = newJar()): Promise<Person> {
   const minted = await post("/api/test/invitation", {});
   const { code } = (await minted.json()) as { code: string };
+  return signUpWith(code, pseudo, jar);
+}
+
+/** A new account through the invitation `code` (a player's link, plan 04-05), signed in on `jar`. */
+export async function signUpWith(code: string, pseudo: string, jar: Jar = newJar()): Promise<Person> {
   const opened = await post("/api/auth/signup/options", { invitation: code, pseudo }, { jar });
   if (opened.status !== 200) throw new Error(`signup options: ${opened.status}`);
   const options = (await opened.json()) as { challenge: string; user: { id: string } };
@@ -332,6 +337,17 @@ export async function upgrade(id: string, options: UpgradeOptions = {}): Promise
 /** A table socket opened by a browser with this jar (its session cookie) and our Origin. */
 export async function connectAs(id: string, options: UpgradeOptions = {}): Promise<Client> {
   return connect(id, upgradeHeaders(options));
+}
+
+// --- Friends (plan 04-05) ---
+
+export type CreatedLink = { id: string; code: string; expiresAt: number };
+
+/** POST /api/invitations as the signed-in browser `jar`: its new link (throws unless 201). */
+export async function createLink(jar: Jar): Promise<CreatedLink> {
+  const response = await post("/api/invitations", {}, { jar });
+  if (response.status !== 201) throw new Error(`create link: ${response.status}`);
+  return (await response.json()) as CreatedLink;
 }
 
 /** Waits (wall time) until a query on the tests' D1 answers `count` rows; answers them. */

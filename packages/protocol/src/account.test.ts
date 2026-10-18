@@ -12,6 +12,7 @@ import {
   isInvitationCode,
   LoginVerifyBody,
   MAX_API_BODY,
+  MAX_PENDING_INVITATIONS,
   newBackupCode,
   normalizeBackupCode,
   normalizePseudo,
@@ -19,9 +20,13 @@ import {
   PSEUDO_MIN,
   parseAddPasskeyAnswer,
   parseBackupCodeAnswer,
+  parseCreatedInvitation,
+  parseFriendAnswer,
+  parseFriends,
   parseInvitationState,
   parseLoginAnswer,
   parseMeAccount,
+  parsePendingInvitations,
   parseRecoverAnswer,
   parseRecoverRefusal,
   parseRequestOptions,
@@ -425,5 +430,53 @@ describe("recovery bodies and answers (plan 04-03)", () => {
     expect(parseRecoverRefusal({ error: "locked", until: "soon" })).toBeNull();
     expect(parseRecoverRefusal({ error: "other" })).toBeNull();
     expect(parseRecoverRefusal(null)).toBeNull();
+  });
+});
+
+// --- Plan 04-05: invitation links and friends ---
+
+describe("invitation links and friends (plan 04-05)", () => {
+  const ID = "i".repeat(22);
+  const CODE = "abcdefghijklmnopqrstu_";
+  const AT = 1_792_000_000_000;
+
+  it("reads own and friend, each with the inviter and the expiry", () => {
+    for (const state of [
+      { state: "own", inviter: "Zoé", expiresAt: AT },
+      { state: "friend", inviter: "Zoé", expiresAt: AT },
+    ]) {
+      expect(parseInvitationState(state)).toEqual(state);
+    }
+    expect(parseInvitationState({ state: "own", inviter: "Zoé" })).toBeNull();
+    expect(parseInvitationState({ state: "friend", expiresAt: AT })).toBeNull();
+  });
+
+  it("reads a created link: its id, its 22-character code and its expiry", () => {
+    const created = { id: ID, code: CODE, expiresAt: AT };
+    expect(parseCreatedInvitation(created)).toEqual(created);
+    expect(parseCreatedInvitation({ ...created, code: "short" })).toBeNull();
+    expect(parseCreatedInvitation({ ...created, id: "../x" })).toBeNull();
+    expect(parseCreatedInvitation({ id: ID, code: CODE })).toBeNull();
+  });
+
+  it("reads the pending links: at most MAX_PENDING_INVITATIONS, never a code", () => {
+    const one = { id: ID, createdAt: AT, expiresAt: AT + 1 };
+    expect(MAX_PENDING_INVITATIONS).toBe(10);
+    expect(parsePendingInvitations([one])).toEqual([one]);
+    expect(parsePendingInvitations([])).toEqual([]);
+    expect(parsePendingInvitations(Array.from({ length: 11 }, () => one))).toBeNull();
+    expect(parsePendingInvitations([{ ...one, id: 3 }])).toBeNull();
+    expect(parsePendingInvitations({})).toBeNull();
+  });
+
+  it("reads a friend, the friends list and the answer of an accepted link", () => {
+    const friend = { id: ID, pseudo: "Zoé", since: AT };
+    expect(parseFriends([friend])).toEqual([friend]);
+    expect(parseFriends([{ ...friend, since: "hier" }])).toBeNull();
+    expect(parseFriends([{ ...friend, id: "x" }])).toBeNull();
+    expect(parseFriendAnswer({ friend })).toEqual({ friend });
+    expect(parseFriendAnswer({ already: true, friend })).toEqual({ already: true, friend });
+    expect(parseFriendAnswer({ already: false, friend })).toBeNull();
+    expect(parseFriendAnswer({})).toBeNull();
   });
 });
