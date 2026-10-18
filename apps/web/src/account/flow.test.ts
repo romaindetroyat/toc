@@ -1,17 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   dateText,
+  formatCodeInput,
   homeTiles,
   invitationRow,
+  lockText,
   prefill,
   pseudoError,
+  recoverError,
+  recoverKeyError,
   signInLine,
   signInToast,
 } from "./flow.ts";
 
 // The pure decisions of the account screens (plan 04-09; 04-UI-SPEC « Small tiles », « Sign-in
-// sheet »): which small tiles the home shows and what they say, and the line the sign-in sheet shows
-// for each failure.
+// sheet », « Invitation », « Recovery »): which small tiles the home shows and what they say, the line
+// the sign-in sheet shows for each failure, the invitation's rows, the pseudo step's errors, and the
+// recovery's code field, errors and lock time.
 
 describe("homeTiles", () => {
   it("a guest with a first name: « Ton prénom » then « Se connecter »", () => {

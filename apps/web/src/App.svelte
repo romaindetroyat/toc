@@ -6,6 +6,7 @@
   import Home from "./routes/Home.svelte";
   import Invitation from "./routes/Invitation.svelte";
   import Launch from "./routes/Launch.svelte";
+  import Recover from "./routes/Recover.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
   import Table from "./routes/Table.svelte";
   import { leaveBlocked } from "./ui/leaveGuard.ts";
@@ -73,6 +74,9 @@
     {#key invitationCode}
       <Invitation code={invitationCode} />
     {/key}
+  {:else if route === "#/secours"}
+    <!-- « Retrouver mon compte » (plan 04-09): not behind « Tourne ton téléphone » either. -->
+    <Recover />
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}

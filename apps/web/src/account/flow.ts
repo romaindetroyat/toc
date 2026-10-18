@@ -1,14 +1,21 @@
 // The pure decisions of the account screens (plan 04-09; 04-UI-SPEC « Small tiles », « Sign-in
-// sheet », « Invitation »): which small tiles the home shows and what they say, the line the sign-in
+// sheet », « Invitation », « Recovery »): which small tiles the home shows and what they say, the line the sign-in
 // sheet shows for each failure, the welcome toast after a sign-in, the row an invitation link opens
-// on, the pseudo step's errors and its prefill. No DOM, no storage: the screens pass in what they
+// on, the pseudo step's errors and its prefill, and the recovery's code field, errors and lock time.
+// No DOM, no storage: the screens pass in what they
 // know, so every case runs under Node.
 
 import { normalizePseudo } from "@toc/protocol";
 import { accueil } from "../i18n/fr/accueil.ts";
 import { compte } from "../i18n/fr/compte.ts";
 import type { IconName } from "../ui/icons.ts";
-import type { AccountFailure, InvitationView, SignUpFailure } from "./api.ts";
+import type {
+  AccountFailure,
+  InvitationView,
+  RecoverFailure,
+  RecoverVerifyFailure,
+  SignUpFailure,
+} from "./api.ts";
 
 export type TileKind = "prenom" | "connexion" | "amis" | "compte";
 
@@ -279,4 +286,66 @@ export function prefill(firstName: string | null): string {
   if (firstName === null) return "";
   const checked = normalizePseudo(firstName);
   return checked.ok ? checked.pseudo : "";
+}
+
+// --- « Retrouver mon compte » (04-UI-SPEC « Recovery ») ---
+
+const MINUTE = 60_000;
+
+/** The lock ladder of the account's hub (PlayerHub): 15 minutes, doubled each time, at most 24 hours. */
+const LOCK_STEPS_MIN = [15, 30, 60, 120, 240, 480, 960, 1440] as const;
+
+/** « 15 minutes », « 30 minutes », « 1 heure », « 2 heures »… « 24 heures »: the lock left, rounded up. */
+export function lockText(until: number, now: number): string {
+  const left = Math.max(0, until - now);
+  const step = LOCK_STEPS_MIN.find((minutes) => left <= minutes * MINUTE) ?? 1440;
+  return step < 60 ? compte.recover.minutes(step) : compte.recover.hours(step / 60);
+}
+
+/** The code field as the player types: upper case, O read as 0, I and L as 1, dashes every four. */
+export function formatCodeInput(typed: string): string {
+  const symbols = typed
+    .toUpperCase()
+    .replace(/O/g, "0")
+    .replace(/[IL]/g, "1")
+    .replace(/[^0-9A-Z]/g, "")
+    .slice(0, 20);
+  return (symbols.match(/.{1,4}/g) ?? []).join("-");
+}
+
+/** Step 1's line for a refusal: the same for a wrong pseudo and a wrong code (T-04-03). */
+export function recoverError(
+  input: { reason: "empty" | RecoverFailure } | { reason: "locked"; until: number; now: number },
+): string {
+  const errors = compte.recover.errors;
+  switch (input.reason) {
+    case "empty":
+      return errors.empty;
+    case "format":
+      return errors.format;
+    case "wrong":
+      return errors.wrong;
+    case "locked":
+      return errors.locked(lockText(input.until, input.now));
+    case "offline":
+      return errors.offline;
+    default:
+      return errors.server;
+  }
+}
+
+/** Step 2's line for a failed new passkey; `back`: the delay is over, step 1 again. */
+export function recoverKeyError(reason: RecoverVerifyFailure): { line: string; back: boolean } {
+  switch (reason) {
+    case "cancelled":
+      return { line: compte.recover.key.cancelled, back: false };
+    case "expired":
+      return { line: compte.recover.key.expired, back: true };
+    case "wrong-address":
+      return { line: compte.pseudo.errors.wrongAddress, back: false };
+    case "offline":
+      return { line: compte.recover.errors.offline, back: false };
+    default:
+      return { line: compte.recover.errors.server, back: false };
+  }
 }

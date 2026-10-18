@@ -113,6 +113,37 @@ export const compte = {
       other: "Oui, je l’ai gardé",
     },
   },
+  /** Plan 04-09: « Retrouver mon compte » at #/secours (04-UI-SPEC « Recovery »). */
+  recover: {
+    heading: "Retrouver mon compte",
+    context:
+      "Entre ton pseudo et ton code de secours. Tu créeras ensuite une clé d’accès sur cet appareil.",
+    pseudoLabel: "Ton pseudo",
+    codeLabel: "Code de secours",
+    verify: "Vérifier le code",
+    verifying: "Vérification…",
+    home: "Retour à l’accueil",
+    errors: {
+      empty: "Écris ton pseudo et ton code.",
+      format: "Un code de secours a 20 caractères, comme K7QM-2XRA-P9DW-HT4E-NB6Z.",
+      wrong: "Pseudo ou code incorrect. Vérifie, puis réessaie.",
+      locked: (duration: string) => `Trop d’essais. Réessaie dans ${duration}.`,
+      offline: "Pas de connexion. Vérifie le réseau, puis réessaie.",
+      server: "Le compte n’a pas pu être retrouvé. Réessaie dans un instant.",
+    },
+    /** The lock's remaining time, rounded up to the ladder's step. */
+    minutes: (n: number) => `${n} minutes`,
+    hours: (n: number) => (n === 1 ? "1 heure" : `${n} heures`),
+    key: {
+      heading: "Code accepté",
+      body: (pseudo: string) => `Crée maintenant une clé d’accès sur cet appareil pour ${pseudo}.`,
+      create: "Créer ma clé d’accès",
+      busy: "Suis les instructions de ton appareil…",
+      cancelled: "Création annulée. Touche « Créer ma clé d’accès » pour réessayer.",
+      expired: "Le délai de 5 minutes est passé. Entre de nouveau ton code.",
+    },
+    done: "Compte retrouvé. Retire la clé de l’appareil perdu dans « Clés d’accès ».",
+  },
   welcome: {
     alone: (pseudo: string) => `Bienvenue, ${pseudo} !`,
     withFriend: (pseudo: string, inviter: string) =>
