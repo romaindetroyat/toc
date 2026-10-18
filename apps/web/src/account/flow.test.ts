@@ -2,6 +2,8 @@ import type { PasskeyInfo } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import {
   accountSeats,
+  cardAction,
+  cardText,
   dateText,
   formatCodeInput,
   friendCodeInput,
@@ -16,6 +18,7 @@ import {
   inviteRowState,
   inviteTabDefault,
   lockText,
+  noticePlace,
   notificationPlatform,
   notificationsView,
   passkeyLine,
@@ -24,6 +27,7 @@ import {
   pseudoError,
   recoverError,
   recoverKeyError,
+  seatNeedsAccount,
   signInLine,
   signInToast,
   signOutBody,
@@ -739,5 +743,90 @@ describe("inviteHere", () => {
     expect(inviteHere("Marie", ["Romain", null, "Marie"])).toBe(true);
     expect(inviteHere("Marie", ["Romain", null])).toBe(false);
     expect(inviteHere("Marie", ["marie"])).toBe(false);
+  });
+});
+
+// --- Plan 04-11: the in-app card and the seat of an account (04-UI-SPEC « In-app card », « Guests ») ---
+
+describe("cardText", () => {
+  const at = 1;
+  const table = "AAAAAAAAAAAAAAAAAAAAAA";
+
+  it("an invitation: « {Pseudo} t’invite à sa table. »", () => {
+    expect(cardText({ t: "notice", kind: "invite", table, from: "Romain", at })).toBe(
+      "Romain t\u2019invite \u00e0 sa table.",
+    );
+  });
+
+  it("a turn: « La table de {Créateur} t’attend : c’est ton tour. », or « Ta table… » when own", () => {
+    expect(cardText({ t: "notice", kind: "turn", table, from: "Romain", at })).toBe(
+      "La table de Romain t\u2019attend\u00a0: c\u2019est ton tour.",
+    );
+    expect(cardText({ t: "notice", kind: "turn", table, from: "Romain", own: true, at })).toBe(
+      "Ta table t\u2019attend\u00a0: c\u2019est ton tour.",
+    );
+  });
+});
+
+describe("cardAction", () => {
+  const table = "AAAAAAAAAAAAAAAAAAAAAA";
+
+  it("« Rejoindre » for an invitation, « Revenir à la table » for a turn, both to #/table/<id>", () => {
+    expect(cardAction({ kind: "invite", table })).toEqual({
+      label: "Rejoindre",
+      href: `#/table/${table}`,
+    });
+    expect(cardAction({ kind: "turn", table })).toEqual({
+      label: "Revenir \u00e0 la table",
+      href: `#/table/${table}`,
+    });
+  });
+
+  it("never anything but a table id (T-04-71)", () => {
+    expect(cardAction({ kind: "invite", table: "../evil" }).href).toBeNull();
+    expect(cardAction({ kind: "turn", table: "https://example.com" }).href).toBeNull();
+  });
+});
+
+describe("seatNeedsAccount", () => {
+  const id = "AAAAAAAAAAAAAAAAAAAAAA";
+  const accountId = "BBBBBBBBBBBBBBBBBBBBBB";
+
+  it("true when this device's entry is tagged with an account and nobody is signed in", () => {
+    expect(seatNeedsAccount({ id, seat: "jaune", joinedAt: 1, account: accountId }, null)).toBe(
+      true,
+    );
+  });
+
+  it("false for a guest's entry, no entry, or a signed-in device", () => {
+    expect(seatNeedsAccount({ id, seat: "jaune", joinedAt: 1 }, null)).toBe(false);
+    expect(seatNeedsAccount(undefined, null)).toBe(false);
+    expect(
+      seatNeedsAccount(
+        { id, seat: "jaune", joinedAt: 1, account: accountId },
+        { id: accountId, pseudo: "Marie" },
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("noticePlace", () => {
+  it("the route without its query, and the table's status only at a table", () => {
+    expect(noticePlace({ hash: "#/", tableStatus: "playing", backupCode: false })).toEqual({
+      route: "#/",
+      tableStatus: null,
+      flow: null,
+    });
+    expect(
+      noticePlace({ hash: "#/table/AAAAAAAAAAAAAAAAAAAAAA?vitesse=test", tableStatus: "paused" }),
+    ).toEqual({ route: "#/table/AAAAAAAAAAAAAAAAAAAAAA", tableStatus: "paused", flow: null });
+    expect(noticePlace({ hash: "#/partie?graine=3" }).route).toBe("#/partie");
+  });
+
+  it("sign-up, recovery and the backup code on screen are flows that hold a card", () => {
+    expect(noticePlace({ hash: "#/invitation/AAAAAAAAAAAAAAAAAAAAAA" }).flow).toBe("signup");
+    expect(noticePlace({ hash: "#/secours" }).flow).toBe("recover");
+    expect(noticePlace({ hash: "#/compte", backupCode: true }).flow).toBe("backup");
+    expect(noticePlace({ hash: "#/secours", backupCode: true }).flow).toBe("backup");
   });
 });
