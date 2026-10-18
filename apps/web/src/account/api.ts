@@ -2,7 +2,8 @@
 // an invitation link, the sign-up (options, the passkey, verify), GET /api/me; since 04-02 the login
 // (usernameless), the logout, adding and removing a passkey and a new backup code (step-up); since
 // 04-03 the recovery with the backup code (« Retrouver mon compte »); since 04-04 the account's tables;
-// since 04-05 the invitation links, the friend codes and the friends list. fetch, the online flag and the
+// since 04-05 the invitation links, the friend codes and the friends list; since 04-06 inviting a
+// friend to one's table. fetch, the online flag and the
 // passkey ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every
 // answer is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly
 // cookie the browser keeps and sends by itself: no token ever reaches this code.
@@ -40,6 +41,7 @@ import {
   parseRecoverRefusal,
   parseRequestOptions,
   parseSignupAnswer,
+  parseTableInviteAnswer,
 } from "@toc/protocol";
 import { type ApiDeps, browserApi } from "../net/api.ts";
 import { writeCachedAccount } from "./cache.ts";
@@ -709,4 +711,59 @@ export async function removeFriend(id: string, api: ApiDeps = browserApi): Promi
   if (answer.status === 204) return { ok: true };
   if (answer.status === 404) return { ok: false, reason: "unknown" };
   return { ok: false, reason: socialRefusal(answer, {}) };
+}
+
+// --- Plan 04-06: inviting a friend to one's table (ACCT-04, D-07) ---
+
+/**
+ * Why « Inviter » did not go through (04-UI-SPEC « Inviting a friend to a table »): not-friend (« n’est
+ * plus dans tes amis »), not-here (the caller left the table), started (the game began), rate
+ * (« Doucement… »), offline and server (« L’invitation n’est pas partie… »).
+ */
+export type InviteFriendFailure =
+  | "not-friend"
+  | "not-here"
+  | "started"
+  | "rate"
+  | "offline"
+  | "server";
+
+export type InviteFriendResult =
+  | { ok: true; state: "sent" | "here" }
+  | { ok: false; reason: InviteFriendFailure };
+
+const INVITE_REFUSALS: Partial<Record<number, readonly InviteFriendFailure[]>> = {
+  403: ["not-friend", "not-here"],
+  409: ["started"],
+  429: ["rate"],
+};
+
+/**
+ * « Inviter » in the waiting room's « Mes amis »: POST /api/tables/<id>/invite { friendId }. sent (the
+ * friend is told; the same invite again within 10 minutes is sent too) or here (already at the
+ * table), or why not. A malformed id never leaves the page.
+ */
+export async function inviteFriend(
+  tableId: string,
+  friendId: string,
+  api: ApiDeps = browserApi,
+): Promise<InviteFriendResult> {
+  if (!isTableId(tableId)) return { ok: false, reason: "not-here" };
+  if (!isInvitationCode(friendId)) return { ok: false, reason: "not-friend" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  const answer = await postJson(api, `/api/tables/${tableId}/invite`, { friendId });
+  if (answer === null) return { ok: false, reason: "offline" };
+  if (answer.status === 200) {
+    const parsed = parseTableInviteAnswer(answer.body);
+    return parsed === null ? { ok: false, reason: "server" } : { ok: true, state: parsed.state };
+  }
+  const error = errorOf(answer.body);
+  const known = INVITE_REFUSALS[answer.status] ?? [];
+  return {
+    ok: false,
+    reason:
+      typeof error === "string" && (known as readonly string[]).includes(error)
+        ? (error as InviteFriendFailure)
+        : "server",
+  };
 }
