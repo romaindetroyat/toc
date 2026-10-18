@@ -3,6 +3,7 @@
 
 import { env, SELF } from "cloudflare:test";
 import { type ClientFrame, type ServerFrame, toBase64Url } from "@toc/protocol";
+import { GameRoom } from "../src/GameRoom.ts";
 import { type SoftAuthenticator, softAuthenticator } from "./authenticator.ts";
 
 export const ORIGIN = "https://toc.test";
@@ -438,5 +439,48 @@ export async function openHub(options: UpgradeOptions = {}): Promise<HubClient> 
       await waitFor(() => (pongs > before ? true : undefined), 5_000, "pong");
     },
     closed,
+  };
+}
+
+// --- Production's alarm delivery (debug slow-online-bots; pace.test.ts, plan 04-07 turn.test.ts) ---
+
+/**
+ * Production runs an alarm with Date.now() exactly at its scheduledTime, where workerd runs it a few
+ * ms later, and production drops an alarm its own handler leaves at that time (no write, nothing
+ * scheduled) until its rescan about a minute later. This runs every GameRoom alarm that way until the
+ * returned function is called: Date.now() reads scheduledTime during the handler, and an alarm the
+ * handler leaves at scheduledTime (after production's clamp to that Date.now()) is deleted.
+ */
+export function deliverAsProduction(): () => void {
+  const alarm = GameRoom.prototype.alarm;
+  GameRoom.prototype.alarm = async function (this: GameRoom, info?: AlarmInvocationInfo) {
+    if (info === undefined) return alarm.call(this, info);
+    const fired = info.scheduledTime;
+    const storage = (this as unknown as { ctx: DurableObjectState }).ctx.storage;
+    const { setAlarm, deleteAlarm } = storage;
+    // The alarm the handler leaves, as production stores it: whole ms, never before its Date.now().
+    let left: number | null = fired;
+    storage.setAlarm = (time, options) => {
+      left = Math.max(Math.trunc(Number(time)), fired);
+      return setAlarm.call(storage, time, options);
+    };
+    storage.deleteAlarm = (options) => {
+      left = null;
+      return deleteAlarm.call(storage, options);
+    };
+    const now = Date.now;
+    Date.now = () => fired;
+    try {
+      await alarm.call(this, info);
+    } finally {
+      Date.now = now;
+      storage.setAlarm = setAlarm;
+      storage.deleteAlarm = deleteAlarm;
+    }
+    // Left at its own time: production does not schedule it again.
+    if (left === fired) await deleteAlarm.call(storage);
+  };
+  return () => {
+    GameRoom.prototype.alarm = alarm;
   };
 }
