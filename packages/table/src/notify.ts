@@ -20,6 +20,7 @@
 // place. The items carry the account ids for the Durable Object only (Reduced.notify, never a frame).
 
 import { COLORS, type Color } from "@toc/engine";
+import { hostOf } from "./presence.ts";
 import { personOf, type Table } from "./table.ts";
 
 /** The delay before a missing player is told « C’est ton tour » (CONTEXT addendum, à confirmer at UAT). */
@@ -54,14 +55,20 @@ function missingAccount(table: Table, color: Color): string | null {
   return person.account ?? null;
 }
 
+/**
+ * The notice of a missing seat. `from` is the creator (« La table de Marie t’attend »), or for a
+ * resumed game the chef de table who resumed it (« Ben a repris la partie »): the creator when they
+ * are here, never the missing person themself.
+ */
 function noticeFor(table: Table, account: string, color: Color, resumed: boolean): TurnNotice {
-  const creator = table.creator === null ? undefined : personOf(table, table.creator);
+  const named = resumed ? (hostOf(table) ?? table.creator) : table.creator;
+  const person = named === null ? undefined : personOf(table, named);
   const seat = table.seats[color];
   const own = seat.kind === "human" && seat.who === table.creator;
   return {
     account,
     kind: "turn",
-    from: creator?.name || "TOC",
+    from: person?.name || "TOC",
     own,
     resumed,
     key: `${table.tableId}:${table.pause?.since ?? 0}`,
