@@ -4,12 +4,16 @@ import {
   accountSeats,
   dateText,
   formatCodeInput,
+  friendSentence,
+  friendSince,
   homeTiles,
+  initial,
   invitationRow,
   lockText,
   notificationPlatform,
   notificationsView,
   passkeyLine,
+  pendingLine,
   prefill,
   pseudoError,
   recoverError,
@@ -528,5 +532,57 @@ describe("signOutBody and accountSeats", () => {
         id,
       ),
     ).toBe(2);
+  });
+});
+
+// --- Plan 04-10: « Mes amis » (04-UI-SPEC « Mes amis ») ---
+
+describe("friendSince, friendSentence and initial", () => {
+  const since = new Date(2026, 9, 12, 15).getTime();
+
+  it("« Dans tes amis depuis octobre 2026 », and the row as one sentence", () => {
+    expect(friendSince(since)).toBe("Dans tes amis depuis octobre 2026");
+    expect(friendSince(new Date(2025, 0, 31, 9).getTime())).toBe(
+      "Dans tes amis depuis janvier 2025",
+    );
+    expect(friendSentence("Marie", since)).toBe("Marie, dans tes amis depuis octobre 2026");
+  });
+
+  it("the first grapheme in upper case", () => {
+    expect(initial("élodie")).toBe("É");
+    expect(initial("Marie-Claire")).toBe("M");
+    expect(initial("ñandú")).toBe("Ñ");
+    expect(initial("e\u0301mile")).toBe("É");
+    expect(initial("1er")).toBe("1");
+    expect(initial("")).toBe("");
+  });
+});
+
+describe("pendingLine", () => {
+  it("« Lien du {date} » and « Valable jusqu’au {date} · une seule fois »", () => {
+    const now = new Date(2026, 9, 18, 12).getTime();
+    expect(
+      pendingLine(
+        {
+          id: "AAAAAAAAAAAAAAAAAAAAAA",
+          createdAt: new Date(2026, 9, 18, 10).getTime(),
+          expiresAt: new Date(2026, 9, 25, 10).getTime(),
+        },
+        now,
+      ),
+    ).toEqual({
+      title: "Lien du 18 octobre",
+      line: "Valable jusqu’au 25 octobre · une seule fois",
+    });
+    expect(
+      pendingLine(
+        {
+          id: "AAAAAAAAAAAAAAAAAAAAAA",
+          createdAt: new Date(2026, 11, 29, 10).getTime(),
+          expiresAt: new Date(2027, 0, 5, 10).getTime(),
+        },
+        new Date(2026, 11, 30, 12).getTime(),
+      ).line,
+    ).toBe("Valable jusqu’au 5 janvier 2027 · une seule fois");
   });
 });

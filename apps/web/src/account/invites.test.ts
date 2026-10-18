@@ -4,6 +4,7 @@ import {
   codeFor,
   forgetInvite,
   INVITES_KEY,
+  keepPending,
   loadInvites,
   MAX_INVITES,
   rememberInvite,
@@ -111,5 +112,31 @@ describe("forgetInvite and codeFor", () => {
     expect(forgetInvite(storage, id(1), NOW)).toEqual([invite(2)]);
     expect(codeFor(storage, id(1), NOW)).toBeNull();
     expect(loadInvites(storage, NOW)).toEqual([invite(2)]);
+  });
+});
+
+describe("keepPending (plan 04-10)", () => {
+  it("forgets the links the server no longer lists (used or disabled), keeps the others", () => {
+    const storage = memory();
+    rememberInvite(storage, invite(1), NOW);
+    rememberInvite(storage, invite(2), NOW);
+    rememberInvite(storage, invite(3), NOW);
+    const kept = keepPending(storage, [id(1), id(3), id(9)], NOW);
+    expect(kept.map((entry) => entry.id).sort()).toEqual([id(1), id(3)]);
+    expect(
+      loadInvites(storage, NOW)
+        .map((entry) => entry.id)
+        .sort(),
+    ).toEqual([id(1), id(3)]);
+    expect(codeFor(storage, id(2), NOW)).toBeNull();
+    expect(codeFor(storage, id(3), NOW)).toBe(code(3));
+  });
+
+  it("an empty pending list forgets every link; a broken storage gives none", () => {
+    const storage = memory();
+    rememberInvite(storage, invite(1), NOW);
+    expect(keepPending(storage, [], NOW)).toEqual([]);
+    expect(loadInvites(storage, NOW)).toEqual([]);
+    expect(keepPending(memory("{not json"), [id(1)], NOW)).toEqual([]);
   });
 });
