@@ -115,3 +115,62 @@ export function keepPending(
   write(storage, next);
   return next;
 }
+
+// --- The friend code this device received (plan 04-10, toc.friendcode.v1) ---
+//
+// « Donner mon code » shows the code this device received for the account while it is valid (the
+// server makes a new one, and the older stops working, at each request), so reopening the sheet
+// does not change the code a proche is typing. Untrusted storage: one entry, checked field by field.
+
+export const FRIEND_CODE_KEY = "toc.friendcode.v1";
+
+const FRIEND_CODE_RE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$/;
+
+export type StoredFriendCode = { account: string; code: string; expiresAt: number };
+
+function validFriendCode(value: unknown, now: number): StoredFriendCode | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const account = Object.hasOwn(source, "account") ? source.account : undefined;
+  const code = Object.hasOwn(source, "code") ? source.code : undefined;
+  const expiresAt = Object.hasOwn(source, "expiresAt") ? source.expiresAt : undefined;
+  if (!isInvitationCode(account) || typeof code !== "string" || !FRIEND_CODE_RE.test(code)) {
+    return null;
+  }
+  if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt) || expiresAt <= now) return null;
+  return { account, code, expiresAt };
+}
+
+/** A code just received (POST /api/friends/code) replaces the stored one; a malformed one is not kept. */
+export function rememberFriendCode(
+  storage: StorageLike | null,
+  entry: StoredFriendCode,
+  now: number,
+): void {
+  const valid = validFriendCode(entry, now);
+  if (valid === null) return;
+  try {
+    storage?.setItem(FRIEND_CODE_KEY, JSON.stringify(valid));
+  } catch {
+    // Private browsing: the next opening asks the server again.
+  }
+}
+
+/** The account's code this device received, while it is valid; else null. */
+export function loadFriendCode(
+  storage: StorageLike | null,
+  account: string,
+  now: number,
+): { code: string; expiresAt: number } | null {
+  let raw: unknown = null;
+  try {
+    const text = storage?.getItem(FRIEND_CODE_KEY);
+    raw = text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+  const valid = validFriendCode(raw, now);
+  return valid === null || valid.account !== account
+    ? null
+    : { code: valid.code, expiresAt: valid.expiresAt };
+}

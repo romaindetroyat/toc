@@ -100,12 +100,15 @@
 
   let signOutButton = $state<HTMLButtonElement | null>(null);
   let signOutAsk = $state<string | null>(null);
+  /** The confirmation's body, kept while it slides out. */
+  let signOutText = $state("");
   let signingOut = $state(false);
 
   function askSignOut() {
     const id = account.current?.id ?? info?.id ?? null;
     const seats = id === null ? 0 : accountSeats(loadTables(pageStorage()), id);
-    signOutAsk = signOutBody(seats);
+    signOutText = signOutBody(seats);
+    signOutAsk = signOutText;
   }
 
   async function signOut() {
@@ -259,7 +262,7 @@
 {#if signOutAsk !== null}
   <ConfirmDialog
     title={compte.signOut.title}
-    body={signOutAsk}
+    body={signOutText}
     safeLabel={compte.signOut.safe}
     otherLabel={compte.signOut.other}
     destructive={false}

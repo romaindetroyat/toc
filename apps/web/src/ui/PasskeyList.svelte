@@ -37,6 +37,8 @@
   const last = $derived(visible.length <= 1);
 
   let confirming = $state<PasskeyInfo | null>(null);
+  /** The key the confirmation names, kept while it slides out. */
+  let confirmingName = $state("");
   let opener = $state<HTMLButtonElement | null>(null);
   let adding = $state(false);
   let addButton = $state<HTMLButtonElement | null>(null);
@@ -44,6 +46,7 @@
 
   function ask(key: PasskeyInfo, button: HTMLButtonElement) {
     opener = button;
+    confirmingName = key.label;
     confirming = key;
   }
 
@@ -157,7 +160,7 @@
 {#if confirming !== null}
   <ConfirmDialog
     title={copy.confirm.title}
-    body={copy.confirm.body(confirming.label)}
+    body={copy.confirm.body(confirmingName)}
     safeLabel={copy.confirm.safe}
     otherLabel={copy.confirm.other}
     destructive

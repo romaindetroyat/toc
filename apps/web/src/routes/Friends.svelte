@@ -16,6 +16,7 @@
   import { browserApi } from "../net/api.ts";
   import { pageStorage } from "../net/device.ts";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
+  import FriendCodeSheet from "../ui/FriendCodeSheet.svelte";
   import FriendRow from "../ui/FriendRow.svelte";
   import Icon from "../ui/Icon.svelte";
   import InviteSheet from "../ui/InviteSheet.svelte";
@@ -132,7 +133,15 @@
   let inviteButton = $state<HTMLButtonElement | null>(null);
   let creating = $state(false);
   /** The invite sheet: the link's code and its last day. */
-  let sheet = $state<{ code: string; expiresAt: number; opener: HTMLElement | null } | null>(null);
+  type SheetData = { code: string; expiresAt: number; opener: HTMLElement | null };
+  let sheet = $state<SheetData | null>(null);
+  /** What the sheet shows, kept while it slides out after `sheet` went back to null. */
+  let sheetShown = $state<SheetData>({ code: "", expiresAt: 0, opener: null });
+
+  function openSheet(data: SheetData) {
+    sheetShown = data;
+    sheet = data;
+  }
   const pseudo = $derived(account.current?.pseudo ?? "");
 
   async function invite() {
@@ -148,7 +157,7 @@
       const { id, code, expiresAt } = result.invitation;
       rememberInvite(storage, { id, code, expiresAt }, Date.now());
       invitesVersion++;
-      sheet = { code, expiresAt, opener: inviteButton };
+      openSheet({ code, expiresAt, opener: inviteButton });
       void loadPending();
       return;
     }
@@ -167,10 +176,10 @@
   function shareAgain(link: PendingInvitation, button: HTMLButtonElement) {
     const code = codeFor(storage, link.id, Date.now());
     if (code === null) return;
-    sheet = { code, expiresAt: link.expiresAt, opener: button };
+    openSheet({ code, expiresAt: link.expiresAt, opener: button });
   }
 
-  // --- « Ajouter avec un code » (its sheet comes with plan 04-10's third task) ---
+  // --- « Ajouter avec un code » ---
 
   let codeButton = $state<HTMLButtonElement | null>(null);
   let codeOpen = $state(false);
@@ -181,11 +190,14 @@
   const disableButtons = $state<Record<string, HTMLButtonElement | null>>({});
   let removing = $state<FriendEntry | null>(null);
   let disabling = $state<PendingInvitation | null>(null);
+  /** The friend the confirmation names, kept while it slides out. */
+  let removingShown = $state<FriendEntry>({ id: "", pseudo: "", since: 0 });
   let opener = $state<HTMLElement | null>(null);
   let working = false;
 
   function askRemove(friend: FriendEntry, button: HTMLButtonElement) {
     opener = button;
+    removingShown = friend;
     removing = friend;
   }
 
@@ -365,18 +377,27 @@
 {#if sheet !== null}
   <InviteSheet
     kind="proche"
-    url={`${location.origin}/#/invitation/${sheet.code}`}
+    url={`${location.origin}/#/invitation/${sheetShown.code}`}
     name={pseudo}
-    until={dateText(sheet.expiresAt, Date.now())}
-    opener={sheet.opener}
+    until={dateText(sheetShown.expiresAt, Date.now())}
+    opener={sheetShown.opener}
     onclose={() => (sheet = null)}
+  />
+{/if}
+
+{#if codeOpen}
+  <FriendCodeSheet
+    opener={codeButton}
+    onclose={() => (codeOpen = false)}
+    onadded={() => void loadFriends()}
+    onsignedout={signedOutHere}
   />
 {/if}
 
 {#if removing !== null}
   <ConfirmDialog
-    title={amis.confirm.remove.title(removing.pseudo)}
-    body={amis.confirm.remove.body(removing.pseudo)}
+    title={amis.confirm.remove.title(removingShown.pseudo)}
+    body={amis.confirm.remove.body(removingShown.pseudo)}
     safeLabel={amis.confirm.remove.safe}
     otherLabel={amis.confirm.remove.other}
     destructive
@@ -400,6 +421,7 @@
 {/if}
 
 <style>
+  h2,
   p {
     margin: 0;
   }

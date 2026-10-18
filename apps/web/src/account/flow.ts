@@ -5,7 +5,12 @@
 // No DOM, no storage: the screens pass in what they
 // know, so every case runs under Node.
 
-import { normalizePseudo, type PasskeyInfo, type PendingInvitation } from "@toc/protocol";
+import {
+  type FriendEntry,
+  normalizePseudo,
+  type PasskeyInfo,
+  type PendingInvitation,
+} from "@toc/protocol";
 import { accueil } from "../i18n/fr/accueil.ts";
 import { amis } from "../i18n/fr/amis.ts";
 import { compte } from "../i18n/fr/compte.ts";
@@ -17,6 +22,7 @@ import type {
   RecoverFailure,
   RecoverVerifyFailure,
   SignUpFailure,
+  SocialResult,
 } from "./api.ts";
 import type { PushState } from "./push.ts";
 
@@ -506,4 +512,66 @@ export function pendingLine(link: PendingInvitation, now: number): { title: stri
     title: amis.pending.title(dateText(link.createdAt, now)),
     line: amis.pending.line(dateText(link.expiresAt, now)),
   };
+}
+
+// --- « Ajouter avec un code » (plan 04-10; 04-UI-SPEC « Code-ami sheet ») ---
+
+/** The friend code alphabet (Crockford base32: no I, L, O, U). */
+const FRIEND_SYMBOLS = /[^0-9ABCDEFGHJKMNPQRSTVWXYZ]/g;
+
+/**
+ * The code field as the player types (« TOC-K7QM-2XRA », at most 13 characters): upper case, the
+ * « TOC » prefix read once (typed, pasted or the field's own), spaces and dashes dropped, O read as 0
+ * and I or L as 1, the dash after four symbols. While the player types the prefix (« T », « TO »,
+ * « TOC ») it stays as typed, and an emptied field stays empty.
+ */
+export function friendCodeInput(typed: string): string {
+  const upper = typed.toUpperCase();
+  const raw = upper.replace(/[^0-9A-Z]/g, "");
+  if (raw === "T" || raw === "TO") return raw;
+  const prefixed = raw.startsWith("TOC");
+  const symbols = (prefixed ? raw.slice(3) : raw)
+    .replace(/O/g, "0")
+    .replace(/[IL]/g, "1")
+    .replace(FRIEND_SYMBOLS, "")
+    .slice(0, 8);
+  if (symbols === "") {
+    const trimmed = upper.trim();
+    return "TOC-".startsWith(trimmed) ? trimmed : prefixed ? "TOC-" : "";
+  }
+  return symbols.length > 4 ? `TOC-${symbols.slice(0, 4)}-${symbols.slice(4)}` : `TOC-${symbols}`;
+}
+
+export type FriendCodeOutcome =
+  | { kind: "added"; toast: string }
+  | { kind: "line"; line: string }
+  | { kind: "signed-out" };
+
+/** What « Ajouter » shows: the toast of a new friend, else the result line (one per answer). */
+export function friendCodeResult(
+  result: SocialResult<{ friend: FriendEntry; already: boolean }>,
+): FriendCodeOutcome {
+  const copy = amis.code;
+  if (result.ok) {
+    return result.already
+      ? { kind: "line", line: copy.already(result.friend.pseudo) }
+      : { kind: "added", toast: copy.added(result.friend.pseudo) };
+  }
+  switch (result.reason) {
+    case "signed-out":
+      return { kind: "signed-out" };
+    case "format":
+      return { kind: "line", line: copy.format };
+    case "unknown":
+    case "expired":
+      return { kind: "line", line: copy.unknown };
+    case "own":
+      return { kind: "line", line: copy.own };
+    case "rate":
+      return { kind: "line", line: copy.rate };
+    case "offline":
+      return { kind: "line", line: copy.offline };
+    default:
+      return { kind: "line", line: copy.failed };
+  }
 }
