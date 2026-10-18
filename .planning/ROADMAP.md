@@ -303,11 +303,11 @@ Plans:
   4. Le jeu s'installe comme application sur téléphone et sur ordinateur, avec une icône et un écran de démarrage. Une nouvelle version ne recharge jamais une partie en cours : le joueur est invité à mettre à jour.
   5. Le joueur reçoit une notification quand c'est son tour ou qu'on l'invite à une table, y compris sur iPhone quand l'application est installée.
 
-**Plans:** 0/12 plans executed (the plans run one after the other on the main tree; each runs only the specs it touches; 04-01 starts by installing the six packages Romain approved on 2026-10-18; no plan runs a remote command: 04-12 runs everything, writes 04-UAT.md and the deploy steps the orchestrator runs (remote D1 migration 0002, secrets, deploy with the PlayerHub migration v2), then stops for Romain's checks on his iPhone and an Android phone)
+**Plans:** 1/12 plans executed (the plans run one after the other on the main tree; each runs only the specs it touches; 04-01 starts by installing the six packages Romain approved on 2026-10-18; no plan runs a remote command: 04-12 runs everything, writes 04-UAT.md and the deploy steps the orchestrator runs (remote D1 migration 0002, secrets, deploy with the PlayerHub migration v2), then stops for Romain's checks on his iPhone and an Android phone)
 
 Plans:
 **Wave 1**
-- [ ] 04-01-PLAN.md — Traceur : les six outils installés, et le premier compte de bout en bout (invitation, pseudo, clé d'accès, code de secours, toujours connecté après un rechargement)
+- [x] 04-01-PLAN.md — Traceur : les six outils installés, et le premier compte de bout en bout (invitation, pseudo, clé d'accès, code de secours, toujours connecté après un rechargement)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 04-02-PLAN.md — Se connecter avec sa clé d'accès, se déconnecter, ajouter ou retirer une clé, refaire son code de secours
@@ -370,5 +370,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
 | 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
-| 4. Comptes, amis et application installable | 0/TBD | Not started | - |
+| 4. Comptes, amis et application installable | 1/12 | In Progress | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
