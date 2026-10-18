@@ -1,7 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 
 // « Accueil » at #/ (02-UI-SPEC « Home « Accueil » », D-09, plan 02-04): the two oak choices, the name
-// line, « Mes parties en cours »; the game against the computer one tap away at #/ordinateur. The fit
+// line (since plan 04-09 the small tiles « Ton prénom » and « Se connecter », 04-UI-SPEC « Small
+// tiles »), « Mes parties en cours »; the game against the computer one tap away at #/ordinateur. The fit
 // table of the UI-SPEC: every size of FITS shows the whole home without scrolling; SCROLLS scroll in
 // one column; nothing ever scrolls sideways.
 
@@ -44,12 +45,14 @@ for (const size of FITS) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await page.goto("/");
     await expect(home(page)).toHaveAttribute("data-layout", size.layout);
-    await expect(page.locator("[data-name-line]")).toContainText("Marie-Charlotte");
+    // Plan 04-09: the name line is now the small tile « Ton prénom », beside « Se connecter ».
+    await expect(page.locator('[data-small-tile="prenom"]')).toContainText("Marie-Charlotte");
     expect(await scroll(page)).toEqual({ sideways: 0, down: 0 });
     for (const target of [
       tile(page, "ordinateur"),
       tile(page, "table"),
-      page.locator("[data-name-line]"),
+      page.locator('[data-small-tile="prenom"]'),
+      page.locator('[data-small-tile="connexion"]'),
       page.getByRole("heading", { name: "Mes parties en cours" }),
       page.getByRole("button", { name: "Réglages" }),
     ]) {
@@ -114,8 +117,13 @@ test("accueil : aucune touche d’ambre, les deux choix sont en chêne", async (
       .map((el) => el.outerHTML.slice(0, 80)),
   );
   expect(amber).toEqual([]);
-  // Without a stored first name there is no name line.
-  await expect(page.locator("[data-name-line]")).toHaveCount(0);
+  // Without a stored first name there is no name tile (plan 04-09: « Se connecter » alone).
+  await expect(page.locator('[data-small-tile="prenom"]')).toHaveCount(0);
+  await expect(page.locator('[data-small-tile="connexion"]')).toHaveCount(1);
+  await expect(page.locator('[data-small-tile="connexion"]')).toHaveCSS(
+    "background-color",
+    "rgb(74, 47, 26)",
+  );
 });
 
 test("accueil : « Jouer contre l’ordinateur » ouvre #/ordinateur, « Accueil » y ramène", async ({
@@ -158,7 +166,12 @@ test("accueil : au clavier, la roue puis les deux choix", async ({ page }) => {
   await page.keyboard.press("Tab");
   await expect(tile(page, "table")).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Changer de prénom" })).toBeFocused();
+  // Plan 04-09: « Changer » is now the small tile « Ton prénom », then « Se connecter ».
+  await expect(
+    page.getByRole("button", { name: "Changer de prénom (Marie-Charlotte)" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Se connecter ou créer un compte" })).toBeFocused();
   // Entrée on the solo tile opens the solo setup.
   await tile(page, "ordinateur").focus();
   await page.keyboard.press("Enter");
@@ -200,4 +213,35 @@ test("accueil : vingt parties, la liste défile dans sa colonne, jamais la page"
     expect(list.bottom).toBeLessThanOrEqual(size.height);
     await expect(tile(page, "table")).toBeInViewport({ ratio: 1 });
   }
+});
+
+test("accueil : un invité voit « Ton prénom » et « Se connecter », sans bandeau ni erreur (plan 04-09)", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await withName(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  const prenom = page.locator('[data-small-tile="prenom"]');
+  await expect(prenom).toContainText("Ton prénom");
+  await expect(prenom).toContainText("Marie-Charlotte");
+  await expect(prenom).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(page.locator('[data-small-tile="connexion"]')).toContainText("Se connecter");
+  await expect(page.locator('[data-small-tile="compte"]')).toHaveCount(0);
+  await expect(page.locator('[data-small-tile="amis"]')).toHaveCount(0);
+  // The 02 name line has become the tile; under the preview (no Worker) no strip shows.
+  await expect(page.locator("[data-name-line]")).toHaveCount(0);
+  await expect(page.locator('[data-home-strip="offline"]')).toHaveCount(0);
+  // « Ton prénom » opens « Changer de prénom », prefilled; the focus comes back to the tile.
+  await prenom.click();
+  const sheet = page.getByRole("dialog", { name: "Changer de prénom" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("textbox")).toHaveValue("Marie-Charlotte");
+  await sheet.getByRole("button", { name: "Fermer" }).click();
+  await expect(prenom).toBeFocused();
+  // « Se connecter » opens the sign-in sheet.
+  await page.locator('[data-small-tile="connexion"]').click();
+  await expect(page.locator("[data-signin-sheet]")).toBeVisible();
+  expect(errors).toEqual([]);
 });

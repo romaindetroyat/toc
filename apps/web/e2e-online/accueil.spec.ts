@@ -39,9 +39,10 @@ test("créer une table depuis l’accueil, la retrouver dans « Mes parties en c
   await seatTile(ana, "bleu").click();
   await expect(seatTile(ana, "bleu")).toHaveAttribute("data-seat-state", "you");
 
-  // Back home: the row, alone at the table, in the waiting room; the name line shows « Ana ».
+  // Back home: the row, alone at the table, in the waiting room; the name tile shows « Ana » (plan
+  // 04-09: the 02 name line became the small tile « Ton prénom »).
   await ana.goto("/");
-  await expect(ana.locator("[data-name-line]")).toContainText("Ana");
+  await expect(ana.locator('[data-small-tile="prenom"]')).toContainText("Ana");
   await expect(row(ana, id)).toContainText("Personne d’autre pour l’instant");
   await expect(row(ana, id)).toContainText("Salle d’attente");
   await expect(row(ana, id).getByRole("link")).toHaveAttribute("href", `#/table/${id}`);

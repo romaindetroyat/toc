@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { table as copy } from "../i18n/fr/table.ts";
 import {
   forgetTable,
+  linkTables,
   loadTables,
   MAX_TABLES,
   mergeTables,
@@ -310,5 +311,23 @@ describe("the account's tag (plan 04-04)", () => {
     expect(merged[0]?.id).toBe(id(129));
     // A malformed row from the server is skipped.
     expect(mergeTables([], [{ tableId: "../x", seat: null, joinedAt: 1 }], LEA)).toEqual([]);
+  });
+
+  it("linkTables: at sign-in this device's guest entries pass to the account, others stay (plan 04-09)", () => {
+    const storage = memory([
+      { id: id(1), seat: "bleu", joinedAt: 5 },
+      { id: id(2), seat: null, joinedAt: 4, account: PAUL },
+      { id: id(3), seat: "vert", joinedAt: 3 },
+    ]);
+    expect(linkTables(storage, LEA)).toBe(2);
+    expect(loadTables(storage)).toEqual([
+      { id: id(1), seat: "bleu", joinedAt: 5, account: LEA },
+      { id: id(2), seat: null, joinedAt: 4, account: PAUL },
+      { id: id(3), seat: "vert", joinedAt: 3, account: LEA },
+    ]);
+    // Nothing left to link; a malformed account id links nothing; a throwing storage is no error.
+    expect(linkTables(storage, LEA)).toBe(0);
+    expect(linkTables(memory([{ id: id(1), seat: null, joinedAt: 1 }]), "court")).toBe(0);
+    expect(linkTables(memory(undefined, true), LEA)).toBe(0);
   });
 });

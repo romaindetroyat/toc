@@ -83,3 +83,34 @@ export async function signUp(page: Page, code: string, pseudo: string): Promise<
   await expect(page.locator('[data-small-tile="compte"]')).toBeVisible();
   return shown;
 }
+
+/** The RP ID under `wrangler dev` in test mode (the request's own host): the suite's passkeys are made for it. */
+export const RP_ID = "localhost";
+
+/**
+ * A synced passkey (plan 04-09): every passkey `from` holds for TOC is copied into `to`'s virtual
+ * authenticator, keys and counter included, as iCloud or Google would carry it to a new device.
+ * `to` must have its authenticator installed (passkeyContext). Answers how many were copied.
+ */
+export async function copyPasskey(from: BrowserContext, to: BrowserContext): Promise<number> {
+  const held = await from.credentials.get({ rpId: RP_ID });
+  for (const credential of held) {
+    await to.credentials.create(RP_ID, {
+      id: credential.id,
+      userHandle: credential.userHandle,
+      privateKey: credential.privateKey,
+      publicKey: credential.publicKey,
+      signCount: credential.signCount,
+    });
+  }
+  return held.length;
+}
+
+/** Opens the sign-in sheet from the home's small tile and uses this device's passkey. */
+export async function signInFromHome(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.locator('[data-small-tile="connexion"]').click();
+  const sheet = page.locator("[data-signin-sheet]");
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("button", { name: "Utiliser ma clé d’accès" }).click();
+}
