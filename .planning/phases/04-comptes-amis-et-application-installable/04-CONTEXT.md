@@ -65,3 +65,19 @@ The game is published at https://toc.romaindetroyat.workers.dev (Worker « toc �
 
 *Phase: 04-comptes-amis-et-application-installable*
 *Context gathered: 2026-10-17*
+
+## Addendum — Romain's answers after research (2026-10-18)
+
+- **Packages approved.** AskUserQuestion « Pour les comptes, les notifications et l'application installable, j'ai besoin d'ajouter 6 outils libres… Tu valides leur installation ? » → « Oui, les 6 (Recommandé) ». The six are:
+  - @simplewebauthn/server 14.0.3
+  - @simplewebauthn/browser 14.0.0
+  - @block65/webcrypto-web-push 2.0.0
+  - vite-plugin-pwa 2.0.0
+  - workbox-precaching 7.4.1
+  - workbox-window 7.4.1
+
+  Pin the exact versions. better-auth, Drizzle and Hono are not used (04-RESEARCH option B).
+- **D-10: The address stays `toc.romaindetroyat.workers.dev`.** Romain: « Non, on garde workers.dev (Recommandé) ». The RP ID is that host, and no domain move is planned.
+- **D-11: Invitation links are single-use and expire after 7 days.** Romain: « Un par personne, 7 jours (Recommandé) ».
+- **D-12: Signing out gives the device's seats back.** The device must sign in again to resume the account's seats. Romain: « Non (Recommandé) », to whether a shared device keeps the seats after « Se déconnecter ».
+- **« C'est ton tour » timing (à confirmer par Romain at UAT).** This follows 04-RESEARCH's recommendation. A missing player is notified 30 s after the table pauses for them, and when a saved game is resumed without them. Nobody who is at the table is ever notified.
