@@ -2,7 +2,8 @@
 // guest, else { id, pseudo }. At start the cached copy (toc.me.v1, display only) shows at once, then
 // GET /api/me confirms it: an account replaces it, a 401 clears it, and no network keeps it. With no
 // Worker behind the page (the local preview: a 404 or HTML), the guest state stays, without a strip
-// or an error. The session itself is the HttpOnly cookie, out of this code's reach.
+// or an error. The session itself is the HttpOnly cookie, out of this code's reach. Plan 04-02:
+// signedIn(me) after a login, signedOut() after « Se déconnecter » (pass it as logOut's `forget`).
 
 import { me } from "./api.ts";
 import {
@@ -48,4 +49,15 @@ export async function refreshAccount(): Promise<void> {
 export function setAccount(next: { id: string; pseudo: string }): void {
   account.current = { id: next.id, pseudo: next.pseudo };
   writeCachedAccount(storage(), account.current);
+}
+
+/** Signed in on this device (plan 04-02: a login, a new key). */
+export function signedIn(me: { id: string; pseudo: string }): void {
+  setAccount(me);
+}
+
+/** Signed out on this device (plan 04-02, D-12): the account and its cached copy toc.me.v1 go. */
+export function signedOut(): void {
+  account.current = null;
+  writeCachedAccount(storage(), null);
 }

@@ -4,17 +4,27 @@
 // Node with fakes. What the platform throws becomes what the page says (04-UI-SPEC « Step 1 » errors):
 //   NotAllowedError, AbortError   cancelled: the dialog was closed or timed out
 //   SecurityError                 wrong-address: not the RP ID's own address (a preview URL)
+//   InvalidStateError             already-here: this device already holds a key of the account
+//                                 (excludeCredentials, plan 04-02)
 //   no PublicKeyCredential        unsupported: an in-app browser, an old one
 //   anything else                 server: « Le compte n’a pas pu être créé. Réessaie… »
 
 import {
+  type AuthenticationResponseJSON,
   browserSupportsWebAuthn,
   type PublicKeyCredentialCreationOptionsJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
   type RegistrationResponseJSON,
+  startAuthentication,
   startRegistration,
 } from "@simplewebauthn/browser";
 
-export type PasskeyFailure = "cancelled" | "wrong-address" | "unsupported" | "server";
+export type PasskeyFailure =
+  | "cancelled"
+  | "wrong-address"
+  | "already-here"
+  | "unsupported"
+  | "server";
 
 export type Ceremonies = {
   /** The browser can make a passkey at all. */
@@ -22,11 +32,16 @@ export type Ceremonies = {
   register: (options: {
     optionsJSON: PublicKeyCredentialCreationOptionsJSON;
   }) => Promise<RegistrationResponseJSON>;
+  /** An assertion with an existing passkey: the login and the step-up (plan 04-02). */
+  authenticate: (options: {
+    optionsJSON: PublicKeyCredentialRequestOptionsJSON;
+  }) => Promise<AuthenticationResponseJSON>;
 };
 
 export const browserCeremonies: Ceremonies = {
   supported: () => browserSupportsWebAuthn(),
   register: (options) => startRegistration(options),
+  authenticate: (options) => startAuthentication(options),
 };
 
 /** What a failed ceremony means for the page. */
@@ -35,6 +50,7 @@ export function passkeyFailure(error: unknown): PasskeyFailure {
     typeof error === "object" && error !== null ? (error as { name?: unknown }).name : undefined;
   if (name === "NotAllowedError" || name === "AbortError") return "cancelled";
   if (name === "SecurityError") return "wrong-address";
+  if (name === "InvalidStateError") return "already-here";
   return "server";
 }
 
@@ -50,6 +66,23 @@ export async function createPasskey(
   if (!ceremonies.supported()) return { ok: false, reason: "unsupported" };
   try {
     return { ok: true, response: await ceremonies.register({ optionsJSON }) };
+  } catch (error) {
+    return { ok: false, reason: passkeyFailure(error) };
+  }
+}
+
+export type AssertionResult =
+  | { ok: true; response: AuthenticationResponseJSON }
+  | { ok: false; reason: PasskeyFailure };
+
+/** Signs the server's challenge with an existing passkey (login, step-up); never throws. */
+export async function getPasskey(
+  optionsJSON: PublicKeyCredentialRequestOptionsJSON,
+  ceremonies: Ceremonies = browserCeremonies,
+): Promise<AssertionResult> {
+  if (!ceremonies.supported()) return { ok: false, reason: "unsupported" };
+  try {
+    return { ok: true, response: await ceremonies.authenticate({ optionsJSON }) };
   } catch (error) {
     return { ok: false, reason: passkeyFailure(error) };
   }

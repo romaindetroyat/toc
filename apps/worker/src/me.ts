@@ -26,7 +26,10 @@ export type AccountUser = {
   backupAt: number | null;
 };
 
-/** The account as the page sees it, with its passkeys; `current` is the session's own passkey. */
+/**
+ * The account as the page sees it, with its passkeys newest first; `current` is the session's own
+ * passkey (« cet appareil »), `backedUp` a synced one (« synchronisée »).
+ */
 export async function accountOf(
   meter: Meter,
   user: AccountUser,
@@ -36,7 +39,7 @@ export async function accountOf(
     meter
       .prepare(
         `SELECT id, label, created_at, last_used_at, backed_up FROM passkeys
-          WHERE user_id = ? ORDER BY created_at, id`,
+          WHERE user_id = ? ORDER BY created_at DESC, id DESC`,
       )
       .bind(user.id),
   );

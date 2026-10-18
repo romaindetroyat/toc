@@ -11,6 +11,11 @@
 //   POST /api/auth/login/options     → usernameless authentication options (nothing written)
 //   POST /api/auth/login/verify      → a new session on this device and the account
 //   POST /api/auth/logout            → this device's session ends, 204
+//   POST /api/auth/passkeys/options  → creation options for a passkey on this device (session)
+//   POST /api/auth/passkeys/verify   → the new passkey
+//   DELETE /api/auth/passkeys/:id    → one's own passkey goes, never the last (Origin, no body)
+//   POST /api/auth/backup-code/options → step-up options (the account's passkeys)
+//   POST /api/auth/backup-code/verify  → the step-up and a new backup code, shown once
 //   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
@@ -20,6 +25,13 @@
 import { isTableId, parseCreateTestOptions, toBase64Url } from "@toc/protocol";
 import type { TestOptions } from "@toc/table";
 import { loginOptions, loginVerify, logout } from "./auth/login.ts";
+import {
+  addOptions,
+  addVerify,
+  backupCodeOptions,
+  backupCodeVerify,
+  removePasskey,
+} from "./auth/passkeys.ts";
 import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./auth/signup.ts";
 import { Meter } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
@@ -106,6 +118,10 @@ const POSTS = new Map<string, Post>([
   ],
   ["/api/auth/login/verify", loginVerify],
   ["/api/auth/logout", (request, env, url, meter) => logout(request, env, url, meter)],
+  ["/api/auth/passkeys/options", addOptions],
+  ["/api/auth/passkeys/verify", addVerify],
+  ["/api/auth/backup-code/options", backupCodeOptions],
+  ["/api/auth/backup-code/verify", backupCodeVerify],
 ]);
 
 /** The account routes (plans 04-01, 04-02), or null for a path that is not one of them. */
@@ -127,6 +143,13 @@ async function accountRoute(
     return meRoute(request, env, url, meter, now);
   }
   const post = POSTS.get(path);
+  const key = post === undefined ? /^\/api\/auth\/passkeys\/([^/]+)$/.exec(path) : null;
+  if (key !== null) {
+    if (request.method !== "DELETE") return notAllowed("DELETE");
+    // No body: the Origin is the whole check (T-04-32).
+    if (!writeAllowed(request, url)) return json({ error: "origin" }, 403);
+    return removePasskey(key[1] ?? "")(request, env, url, meter, now);
+  }
   const test = path === "/api/test/invitation" && env.TOC_TEST_MODE === "1";
   if (post === undefined && !test) return null;
   if (request.method !== "POST") return notAllowed("POST");

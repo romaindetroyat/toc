@@ -190,6 +190,12 @@ export const EmptyBody = z.strictObject({});
 /** POST /api/auth/login/verify (plan 04-02): the passkey's authentication response. */
 export const LoginVerifyBody = z.strictObject({ response: authenticationResponse });
 
+/** POST /api/auth/passkeys/verify (plan 04-02): the registration of a passkey for this device. */
+export const AddPasskeyVerifyBody = z.strictObject({ response: registrationResponse });
+
+/** POST /api/auth/backup-code/verify (plan 04-02): the step-up assertion of one of the account's keys. */
+export const BackupCodeVerifyBody = z.strictObject({ response: authenticationResponse });
+
 /** POST /api/test/invitation (TOC_TEST_MODE only): a fresh invitation, or a used or expired one. */
 export const TestInvitationBody = z.strictObject({
   used: z.optional(z.boolean()),
@@ -272,6 +278,16 @@ const loginAnswer = z.object({ me: meAccount });
 /** POST /api/auth/login/verify (plan 04-02): the account now signed in on this device. */
 export type LoginAnswer = z.infer<typeof loginAnswer>;
 
+const addPasskeyAnswer = z.object({ passkey: passkeyInfo });
+
+/** POST /api/auth/passkeys/verify (plan 04-02): the key just added, now this device's. */
+export type AddPasskeyAnswer = z.infer<typeof addPasskeyAnswer>;
+
+const backupCodeAnswer = z.object({ backupCode: z.string().check(z.regex(BACKUP_CODE_RE)) });
+
+/** POST /api/auth/backup-code/verify (plan 04-02): the new backup code, shown once (D-02). */
+export type BackupCodeAnswer = z.infer<typeof backupCodeAnswer>;
+
 const read =
   <T>(schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } }) =>
   (data: unknown): T | null => {
@@ -284,4 +300,6 @@ export const parseInvitationState = read<InvitationState>(invitationState);
 export const parseSignupAnswer = read<SignupAnswer>(signupAnswer);
 export const parseCreationOptions = read<CreationOptions>(creationOptions);
 export const parseRequestOptions = read<RequestOptions>(requestOptions);
+export const parseAddPasskeyAnswer = read<AddPasskeyAnswer>(addPasskeyAnswer);
+export const parseBackupCodeAnswer = read<BackupCodeAnswer>(backupCodeAnswer);
 export const parseLoginAnswer = read<LoginAnswer>(loginAnswer);

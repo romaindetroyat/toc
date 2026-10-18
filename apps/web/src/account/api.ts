@@ -1,24 +1,35 @@
-// The account calls of the page (plan 04-01, ACCT-01, ACCT-02): the state of an invitation link, the
-// sign-up (options, the passkey, verify) and GET /api/me. fetch, the online flag and the passkey
+// The account calls of the page (plans 04-01 and 04-02, ACCT-01, ACCT-02, D-02, D-12): the state of
+// an invitation link, the sign-up (options, the passkey, verify), GET /api/me, and since 04-02 the
+// login (usernameless), the logout, adding and removing a passkey and a new backup code (step-up). fetch, the online flag and the passkey
 // ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every answer
 // is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly cookie
 // the browser keeps and sends by itself: no token ever reaches this code.
 
-import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/browser";
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
 import {
   type InvitationState,
   isInvitationCode,
   type MeAccount,
+  type PasskeyInfo,
+  parseAddPasskeyAnswer,
+  parseBackupCodeAnswer,
   parseCreationOptions,
   parseInvitationState,
+  parseLoginAnswer,
   parseMeAccount,
+  parseRequestOptions,
   parseSignupAnswer,
 } from "@toc/protocol";
 import { type ApiDeps, browserApi } from "../net/api.ts";
+import { writeCachedAccount } from "./cache.ts";
 import {
   browserCeremonies,
   type Ceremonies,
   createPasskey,
+  getPasskey,
   type PasskeyFailure,
 } from "./webauthn.ts";
 
@@ -162,4 +173,205 @@ export async function me(deps: ApiDeps = browserApi): Promise<MeAccount | null |
   if (response.status >= 500) return "offline";
   if (response.status !== 200) return null;
   return parseMeAccount(await bodyOf(response));
+}
+
+// --- Plan 04-02: sign in, sign out, the passkeys, a new backup code ---
+
+/** Why an account call did not go through; the page has a sentence for each (04-UI-SPEC). */
+export type AccountFailure =
+  | "cancelled"
+  | "unknown"
+  | "expired"
+  | "already-here"
+  | "last"
+  | "wrong-address"
+  | "unsupported"
+  | "offline"
+  | "server"
+  | "signed-out";
+
+export type AccountResult<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; reason: AccountFailure };
+
+type Answer = { status: number; body: unknown };
+
+/** A POST of JSON; null when the network failed. */
+async function postJson(api: ApiDeps, url: string, body: unknown): Promise<Answer | null> {
+  try {
+    const response = await post(api, url, body);
+    return { status: response.status, body: await bodyOf(response) };
+  } catch {
+    return null;
+  }
+}
+
+/** The refusals every signed-in call shares: 401 signed-out, a known error code, else server. */
+function refusal(answer: Answer, known: Partial<Record<string, AccountFailure>>): AccountFailure {
+  if (answer.status === 401) return "signed-out";
+  const error = errorOf(answer.body);
+  if (answer.status < 500 && typeof error === "string") return known[error] ?? "server";
+  return "server";
+}
+
+type Deps = { api?: ApiDeps; passkeys?: Ceremonies };
+
+/**
+ * Signing in on this device, without a pseudo: POST /api/auth/login/options {}, the passkey's
+ * assertion with { optionsJSON } (on a computer the browser offers the phone through a QR code), then
+ * POST /api/auth/login/verify. The account, or why not.
+ */
+export async function logIn(deps: Deps = {}): Promise<AccountResult<{ me: MeAccount }>> {
+  const api = deps.api ?? browserApi;
+  const passkeys = deps.passkeys ?? browserCeremonies;
+  if (!passkeys.supported()) return { ok: false, reason: "unsupported" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+
+  const opened = await postJson(api, "/api/auth/login/options", {});
+  if (opened === null) return { ok: false, reason: "offline" };
+  const options = opened.status === 200 ? parseRequestOptions(opened.body) : null;
+  if (options === null) return { ok: false, reason: "server" };
+
+  const assertion = await getPasskey(
+    options as unknown as PublicKeyCredentialRequestOptionsJSON,
+    passkeys,
+  );
+  if (!assertion.ok) return { ok: false, reason: assertion.reason };
+
+  const verified = await postJson(api, "/api/auth/login/verify", { response: assertion.response });
+  if (verified === null) return { ok: false, reason: "offline" };
+  if (verified.status === 200) {
+    const answer = parseLoginAnswer(verified.body);
+    return answer === null ? { ok: false, reason: "server" } : { ok: true, me: answer.me };
+  }
+  return { ok: false, reason: refusal(verified, { unknown: "unknown", expired: "expired" }) };
+}
+
+function browserStorage(): Storage | null {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * « Se déconnecter » (D-12): POST /api/auth/logout {}. This device forgets the account (toc.me.v1, and
+ * the page's store through `forget`) whatever the network says; the answer says whether the server
+ * ended the session too.
+ */
+export async function logOut(
+  deps: { api?: ApiDeps; forget?: () => void } = {},
+): Promise<AccountResult> {
+  const api = deps.api ?? browserApi;
+  const forget = deps.forget ?? (() => writeCachedAccount(browserStorage(), null));
+  try {
+    if (!api.online()) return { ok: false, reason: "offline" };
+    const answer = await postJson(api, "/api/auth/logout", {});
+    if (answer === null) return { ok: false, reason: "offline" };
+    return answer.status === 204 ? { ok: true } : { ok: false, reason: "server" };
+  } finally {
+    forget();
+  }
+}
+
+/**
+ * « Ajouter une clé d’accès »: POST /api/auth/passkeys/options {}, the registration with
+ * { optionsJSON } (a device that already holds a key of the account: already-here), then POST
+ * /api/auth/passkeys/verify. The new key, or why not.
+ */
+export async function addPasskey(
+  deps: Deps = {},
+): Promise<AccountResult<{ passkey: PasskeyInfo }>> {
+  const api = deps.api ?? browserApi;
+  const passkeys = deps.passkeys ?? browserCeremonies;
+  if (!passkeys.supported()) return { ok: false, reason: "unsupported" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+
+  const opened = await postJson(api, "/api/auth/passkeys/options", {});
+  if (opened === null) return { ok: false, reason: "offline" };
+  if (opened.status !== 200) return { ok: false, reason: refusal(opened, {}) };
+  const options = parseCreationOptions(opened.body);
+  if (options === null) return { ok: false, reason: "server" };
+
+  const created = await createPasskey(
+    options as unknown as PublicKeyCredentialCreationOptionsJSON,
+    passkeys,
+  );
+  if (!created.ok) return { ok: false, reason: created.reason };
+
+  const verified = await postJson(api, "/api/auth/passkeys/verify", { response: created.response });
+  if (verified === null) return { ok: false, reason: "offline" };
+  if (verified.status === 201) {
+    const answer = parseAddPasskeyAnswer(verified.body);
+    return answer === null
+      ? { ok: false, reason: "server" }
+      : { ok: true, passkey: answer.passkey };
+  }
+  return {
+    ok: false,
+    reason: refusal(verified, { "already-here": "already-here", expired: "expired" }),
+  };
+}
+
+const CREDENTIAL_ID_RE = /^[A-Za-z0-9_-]{1,1024}$/;
+
+/** « Retirer la clé »: DELETE /api/auth/passkeys/<id>, never the last (last). */
+export async function removePasskey(id: string, api: ApiDeps = browserApi): Promise<AccountResult> {
+  if (!CREDENTIAL_ID_RE.test(id)) return { ok: false, reason: "unknown" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  let response: Response;
+  try {
+    response = await api.fetch(`/api/auth/passkeys/${id}`, {
+      method: "DELETE",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, reason: "offline" };
+  }
+  if (response.status === 204) return { ok: true };
+  if (response.status === 404) return { ok: false, reason: "unknown" };
+  return {
+    ok: false,
+    reason: refusal({ status: response.status, body: await bodyOf(response) }, { last: "last" }),
+  };
+}
+
+/**
+ * « Créer un nouveau code » (D-02): POST /api/auth/backup-code/options {}, a fresh assertion of one
+ * of the account's passkeys (the step-up), then POST /api/auth/backup-code/verify. The new code,
+ * shown once, or why not (a key of another account: unknown).
+ */
+export async function newBackupCode(
+  deps: Deps = {},
+): Promise<AccountResult<{ backupCode: string }>> {
+  const api = deps.api ?? browserApi;
+  const passkeys = deps.passkeys ?? browserCeremonies;
+  if (!passkeys.supported()) return { ok: false, reason: "unsupported" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+
+  const opened = await postJson(api, "/api/auth/backup-code/options", {});
+  if (opened === null) return { ok: false, reason: "offline" };
+  if (opened.status !== 200) return { ok: false, reason: refusal(opened, {}) };
+  const options = parseRequestOptions(opened.body);
+  if (options === null) return { ok: false, reason: "server" };
+
+  const assertion = await getPasskey(
+    options as unknown as PublicKeyCredentialRequestOptionsJSON,
+    passkeys,
+  );
+  if (!assertion.ok) return { ok: false, reason: assertion.reason };
+
+  const verified = await postJson(api, "/api/auth/backup-code/verify", {
+    response: assertion.response,
+  });
+  if (verified === null) return { ok: false, reason: "offline" };
+  if (verified.status === 200) {
+    const answer = parseBackupCodeAnswer(verified.body);
+    return answer === null
+      ? { ok: false, reason: "server" }
+      : { ok: true, backupCode: answer.backupCode };
+  }
+  return { ok: false, reason: refusal(verified, { refused: "unknown", expired: "expired" }) };
 }
