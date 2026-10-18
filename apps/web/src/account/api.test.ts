@@ -10,6 +10,7 @@ import {
   friendCode,
   friends,
   invitationState,
+  inviteFriend,
   logIn,
   logOut,
   me,
@@ -958,5 +959,61 @@ describe("friend codes and the friends list (plan 04-05)", () => {
       ok: false,
       reason: "offline",
     });
+  });
+});
+
+describe("inviteFriend (plan 04-06)", () => {
+  const TABLE = "abcdefghijklmnopqrstuv";
+  const FRIEND_ID = "f".repeat(22);
+
+  it("POST /api/tables/<id>/invite { friendId }: sent or here", async () => {
+    const { deps, calls } = api(() => json({ state: "sent" }, 200));
+    expect(await inviteFriend(TABLE, FRIEND_ID, deps)).toEqual({ ok: true, state: "sent" });
+    expect(calls[0]?.url).toBe(`/api/tables/${TABLE}/invite`);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ friendId: FRIEND_ID });
+    expect(new Headers(calls[0]?.init?.headers).get("content-type")).toBe("application/json");
+    expect(
+      await inviteFriend(TABLE, FRIEND_ID, api(() => json({ state: "here" }, 200)).deps),
+    ).toEqual({ ok: true, state: "here" });
+  });
+
+  it("the refusals: not-friend, not-here, started, rate; offline; anything else is server", async () => {
+    const cases: [() => Response, string][] = [
+      [() => json({ error: "not-friend" }, 403), "not-friend"],
+      [() => json({ error: "not-here" }, 403), "not-here"],
+      [() => json({ error: "started" }, 409), "started"],
+      [() => json({ error: "rate" }, 429), "rate"],
+      [() => json({ error: "origin" }, 403), "server"],
+      [() => json({ error: "not-found" }, 404), "server"],
+      [() => json({ error: "signed-out" }, 401), "server"],
+      [() => json({ error: "server" }, 500), "server"],
+      [() => json({ state: "away" }, 200), "server"],
+      [() => new Response("<html>", { status: 200 }), "server"],
+    ];
+    for (const [respond, reason] of cases) {
+      expect(await inviteFriend(TABLE, FRIEND_ID, api(respond).deps), reason).toEqual({
+        ok: false,
+        reason,
+      });
+    }
+    expect(await inviteFriend(TABLE, FRIEND_ID, api(() => json({}, 200), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+    const failing = api(() => {
+      throw new TypeError("network");
+    });
+    expect(await inviteFriend(TABLE, FRIEND_ID, failing.deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+  });
+
+  it("a malformed id never leaves the page", async () => {
+    const { deps, calls } = api(() => json({ state: "sent" }, 200));
+    expect(await inviteFriend("../x", FRIEND_ID, deps)).toEqual({ ok: false, reason: "not-here" });
+    expect(await inviteFriend(TABLE, "bob", deps)).toEqual({ ok: false, reason: "not-friend" });
+    expect(calls).toHaveLength(0);
   });
 });
