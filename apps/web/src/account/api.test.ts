@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { ApiDeps } from "../net/api.ts";
 import {
   addPasskey,
+  forgetMyTable,
   invitationState,
   logIn,
   logOut,
   me,
+  myTables,
   newBackupCode,
   recover,
   recoverVerify,
@@ -704,5 +706,53 @@ describe("recoverVerify(optionsJSON)", () => {
         passkeys: both({ supported: false }).ceremonies,
       }),
     ).toEqual({ ok: false, reason: "unsupported" });
+  });
+});
+
+// --- Plan 04-04: the account's tables (« Mes parties en cours » on every device) ---
+
+describe("myTables and forgetMyTable", () => {
+  const TABLE = "abcdefghijklmnopqrstuv";
+
+  it("GET /api/me/tables: the rows, read with the shared schema", async () => {
+    const rows = [{ tableId: TABLE, seat: "bleu", joinedAt: 5 }];
+    const { deps, calls } = api(() => json(rows, 200));
+    expect(await myTables(deps)).toEqual(rows);
+    expect(calls[0]?.url).toBe("/api/me/tables");
+    expect(calls[0]?.init?.method).toBe("GET");
+  });
+
+  it("null when signed out, offline, failing, or with a body out of shape", async () => {
+    expect(await myTables(api(() => json({ error: "signed-out" }, 401)).deps)).toBeNull();
+    expect(await myTables(api(() => json([], 200), false).deps)).toBeNull();
+    expect(
+      await myTables(
+        api(() => {
+          throw new TypeError("network");
+        }).deps,
+      ),
+    ).toBeNull();
+    expect(await myTables(api(() => json({}, 500)).deps)).toBeNull();
+    expect(
+      await myTables(api(() => json([{ tableId: "../x", seat: "bleu", joinedAt: 1 }], 200)).deps),
+    ).toBeNull();
+  });
+
+  it("DELETE /api/me/tables/<id>: ok on 204, signed-out on 401; a bad id never leaves", async () => {
+    const { deps, calls } = api(() => new Response(null, { status: 204 }));
+    expect(await forgetMyTable(TABLE, deps)).toEqual({ ok: true });
+    expect(calls[0]?.url).toBe(`/api/me/tables/${TABLE}`);
+    expect(calls[0]?.init?.method).toBe("DELETE");
+    expect(await forgetMyTable(TABLE, api(() => json({ error: "signed-out" }, 401)).deps)).toEqual({
+      ok: false,
+      reason: "signed-out",
+    });
+    expect(await forgetMyTable(TABLE, api(() => json([], 200), false).deps)).toEqual({
+      ok: false,
+      reason: "offline",
+    });
+    const bad = api(() => new Response(null, { status: 204 }));
+    expect(await forgetMyTable("../../x", bad.deps)).toEqual({ ok: false, reason: "unknown" });
+    expect(bad.calls).toHaveLength(0);
   });
 });
