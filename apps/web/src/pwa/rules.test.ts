@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyOrReload, canPromptUpdate, inGameUpdateLine, routeOf } from "./rules.ts";
+import {
+  appleCanInstall,
+  applyOrReload,
+  canPromptUpdate,
+  INSTALL_HIDE_MS,
+  inGameUpdateLine,
+  installHiddenRecord,
+  readInstallHidden,
+  routeOf,
+  type StripInput,
+  stripFor,
+} from "./rules.ts";
 
 // Where a new version may be offered (plan 04-08, APP-02, 04-UI-SPEC « Update »): on the home, « Mon
 // compte », « Mes amis » and the solo setup; never in a game, at a table (waiting room included),
@@ -100,5 +111,130 @@ describe("applyOrReload (the 4002 notice's « Recharger la page »)", () => {
     });
     expect(await applyOrReload(d)).toBe("reloaded");
     expect(d.reload).toHaveBeenCalledOnce();
+  });
+});
+
+// Plan 04-08 Task 2: the home strip (04-UI-SPEC « Home strip »): at most one, offline > update >
+// install; « Plus tard » on the install strip hides it 30 days (toc.install.v1).
+describe("stripFor", () => {
+  const NOW = Date.UTC(2026, 9, 18, 12);
+  const base: StripInput = {
+    online: true,
+    apiReachable: true,
+    needRefresh: false,
+    updateDismissed: false,
+    installable: false,
+    appleMobile: false,
+    standalone: false,
+    installHiddenUntil: null,
+    now: NOW,
+  };
+
+  it("shows nothing by default (computer Firefox, desktop Safari, nothing new)", () => {
+    expect(stripFor(base)).toBeNull();
+  });
+
+  it("offline when the browser is offline or /api/me could not be reached", () => {
+    expect(stripFor({ ...base, online: false })).toBe("offline");
+    expect(stripFor({ ...base, apiReachable: false })).toBe("offline");
+  });
+
+  it("offline wins over an update and an install", () => {
+    expect(
+      stripFor({ ...base, online: false, needRefresh: true, installable: true, appleMobile: true }),
+    ).toBe("offline");
+  });
+
+  it("update when a new version waits, unless « Plus tard » hid it", () => {
+    expect(stripFor({ ...base, needRefresh: true })).toBe("update");
+    expect(stripFor({ ...base, needRefresh: true, updateDismissed: true })).toBeNull();
+  });
+
+  it("update wins over an install", () => {
+    expect(stripFor({ ...base, needRefresh: true, installable: true })).toBe("update");
+    expect(stripFor({ ...base, needRefresh: true, updateDismissed: true, installable: true })).toBe(
+      "install-prompt",
+    );
+  });
+
+  it("install with the browser's prompt on Android and computer Chrome or Edge", () => {
+    expect(stripFor({ ...base, installable: true })).toBe("install-prompt");
+  });
+
+  it("install with the steps on iPhone and iPad", () => {
+    expect(stripFor({ ...base, appleMobile: true })).toBe("install-apple");
+  });
+
+  it("never an install strip in the installed app", () => {
+    expect(stripFor({ ...base, installable: true, standalone: true })).toBeNull();
+    expect(stripFor({ ...base, appleMobile: true, standalone: true })).toBeNull();
+  });
+
+  it("no install strip before installHiddenUntil, again after it", () => {
+    const hidden = { ...base, appleMobile: true, installHiddenUntil: NOW + 1000 };
+    expect(stripFor(hidden)).toBeNull();
+    expect(stripFor({ ...hidden, now: NOW + 1000 })).toBe("install-apple");
+  });
+
+  it("the offline and update strips do not care about the install delay", () => {
+    expect(stripFor({ ...base, needRefresh: true, installHiddenUntil: NOW + 1000 })).toBe("update");
+  });
+});
+
+describe("toc.install.v1", () => {
+  const NOW = Date.UTC(2026, 9, 18, 12);
+
+  it("hides for 30 days", () => {
+    expect(INSTALL_HIDE_MS).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(JSON.parse(installHiddenRecord(NOW))).toEqual({ hiddenUntil: NOW + INSTALL_HIDE_MS });
+  });
+
+  it("reads back what it wrote", () => {
+    expect(readInstallHidden(installHiddenRecord(NOW))).toBe(NOW + INSTALL_HIDE_MS);
+  });
+
+  it.each([
+    null,
+    "",
+    "{pas du json",
+    "[]",
+    "null",
+    '{"hiddenUntil":"demain"}',
+    '{"hiddenUntil":-1}',
+    '{"hiddenUntil":1e400}',
+    '{"hiddenUntil":1.5}',
+  ])("ignores a missing or damaged value: %s", (raw) => {
+    expect(readInstallHidden(raw)).toBeNull();
+  });
+});
+
+describe("appleCanInstall", () => {
+  const SAFARI_15 =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1";
+  const CHROME_16_3 =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.6099.119 Mobile/15E148 Safari/604.1";
+  const CHROME_16_4 =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.6099.119 Mobile/15E148 Safari/604.1";
+  const FIREFOX_17 =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/120.0 Mobile/15E148 Safari/605.1.15";
+  const IPADOS_AS_MAC =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15";
+  const ANDROID =
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
+  it("Safari on iPhone and iPad can add to the home screen, whatever its version", () => {
+    expect(appleCanInstall(SAFARI_15, 5)).toBe(true);
+    expect(appleCanInstall(IPADOS_AS_MAC, 5)).toBe(true);
+  });
+
+  it("another browser on iOS only from 16.4", () => {
+    expect(appleCanInstall(CHROME_16_3, 5)).toBe(false);
+    expect(appleCanInstall(CHROME_16_4, 5)).toBe(true);
+    expect(appleCanInstall(FIREFOX_17, 5)).toBe(true);
+  });
+
+  it("never outside iPhone and iPad (desktop Safari: a Mac without touch)", () => {
+    expect(appleCanInstall(ANDROID, 5)).toBe(false);
+    expect(appleCanInstall(IPADOS_AS_MAC, 0)).toBe(false);
   });
 });
