@@ -3,6 +3,7 @@
   import KnightDefs from "./board/KnightDefs.svelte";
   import { game } from "./i18n/fr/game.ts";
   import Account from "./routes/Account.svelte";
+  import Friends from "./routes/Friends.svelte";
   import Game from "./routes/Game.svelte";
   import Home from "./routes/Home.svelte";
   import Invitation from "./routes/Invitation.svelte";
@@ -82,6 +83,9 @@
     <!-- « Mon compte » (plan 04-10): signed in only; signed out, the home with the sign-in sheet open
          and the session-ended toast. Not behind « Tourne ton téléphone ». -->
     <Account />
+  {:else if route === "#/amis"}
+    <!-- « Mes amis » (plan 04-10): signed in only, as « Mon compte ». -->
+    <Friends />
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}

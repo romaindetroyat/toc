@@ -5,8 +5,9 @@
 // No DOM, no storage: the screens pass in what they
 // know, so every case runs under Node.
 
-import { normalizePseudo, type PasskeyInfo } from "@toc/protocol";
+import { normalizePseudo, type PasskeyInfo, type PendingInvitation } from "@toc/protocol";
 import { accueil } from "../i18n/fr/accueil.ts";
+import { amis } from "../i18n/fr/amis.ts";
 import { compte } from "../i18n/fr/compte.ts";
 import { type TableEntry, timeAgo } from "../net/tables.ts";
 import type { IconName } from "../ui/icons.ts";
@@ -468,4 +469,41 @@ export function signOutBody(seats: number): string {
 /** This device's entries of the account that hold a seat (« Parties concernées : n. »). */
 export function accountSeats(entries: readonly TableEntry[], accountId: string): number {
   return entries.filter((entry) => entry.account === accountId && entry.seat !== null).length;
+}
+
+// --- « Mes amis » (plan 04-10; 04-UI-SPEC « Mes amis ») ---
+
+/** « octobre 2026 ». */
+function monthYear(at: number): string {
+  return new Intl.DateTimeFormat("fr", { month: "long", year: "numeric" }).format(at);
+}
+
+/** Line 2 of a friend row: « Dans tes amis depuis octobre 2026 ». */
+export function friendSince(since: number): string {
+  return amis.list.since(monthYear(since));
+}
+
+/** A friend row read as one sentence: « Marie, dans tes amis depuis octobre 2026 ». */
+export function friendSentence(pseudo: string, since: number): string {
+  return amis.list.sentence(pseudo, monthYear(since));
+}
+
+/** The initial in a friend's disc: the pseudo's first grapheme in upper case (« É » for « élodie »). */
+export function initial(pseudo: string): string {
+  let first = "";
+  try {
+    const segments = new Intl.Segmenter("fr", { granularity: "grapheme" }).segment(pseudo);
+    first = segments[Symbol.iterator]().next().value?.segment ?? "";
+  } catch {
+    first = [...pseudo][0] ?? "";
+  }
+  return first.toLocaleUpperCase("fr").normalize("NFC");
+}
+
+/** A row of « Invitations en attente »: « Lien du {date} », « Valable jusqu’au {date} · une seule fois ». */
+export function pendingLine(link: PendingInvitation, now: number): { title: string; line: string } {
+  return {
+    title: amis.pending.title(dateText(link.createdAt, now)),
+    line: amis.pending.line(dateText(link.expiresAt, now)),
+  };
 }

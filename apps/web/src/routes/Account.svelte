@@ -5,19 +5,18 @@
   import { browserPushManager } from "../account/browserPush.ts";
   import { accountSeats, dateText, signOutBody } from "../account/flow.ts";
   import { disablePush } from "../account/push.ts";
-  import { account, openSignIn, setAccount, signedOut } from "../account/store.svelte.ts";
+  import { account, requireSignIn, setAccount, signedOut } from "../account/store.svelte.ts";
   import { compte } from "../i18n/fr/compte.ts";
   import { browserApi } from "../net/api.ts";
   import { pageStorage } from "../net/device.ts";
   import { loadTables } from "../net/tables.ts";
   import BackupCodeScreen from "../ui/BackupCodeScreen.svelte";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
-  import HomeStrip from "../ui/HomeStrip.svelte";
   import Icon from "../ui/Icon.svelte";
   import NotificationsPanel from "../ui/NotificationsPanel.svelte";
   import OfflinePage from "../ui/OfflinePage.svelte";
+  import Page from "../ui/Page.svelte";
   import PasskeyList from "../ui/PasskeyList.svelte";
-  import { pageLayout } from "../ui/pageLayout.svelte.ts";
   import { showToast } from "../ui/toast.svelte.ts";
 
   // « Mon compte » at #/compte (plan 04-10, D-02, D-08, D-12, SC1; 04-UI-SPEC « Mon compte »), the
@@ -35,13 +34,10 @@
   // sur cet appareil. ». « Créer un nouveau code » (D-02) asks, then the passkey (step-up), then shows
   // the new code once (BackupCodeScreen, its regeneration form) and comes back with its toast.
 
-  const layout = pageLayout();
-
   let online = $state(typeof navigator === "undefined" || navigator.onLine !== false);
   let info = $state<MeAccount | null>(null);
   let status = $state<"loading" | "ready" | "error">("loading");
   let now = $state(Date.now());
-  let heading = $state<HTMLHeadingElement | null>(null);
 
   const pseudo = $derived(info?.pseudo ?? account.current?.pseudo ?? "");
 
@@ -52,10 +48,7 @@
   function signedOutHere() {
     if (leaving) return;
     leaving = true;
-    signedOut();
-    location.hash = "#/";
-    openSignIn();
-    showToast(compte.session.ended, { label: compte.session.signIn, run: () => openSignIn() });
+    requireSignIn();
   }
 
   async function load(): Promise<void> {
@@ -91,7 +84,6 @@
 
   onMount(() => {
     void load();
-    void tick().then(() => heading?.focus());
   });
 
   // The store cleared the account meanwhile (its own GET /api/me met a 401).
@@ -184,86 +176,84 @@
 {:else if !online}
   <OfflinePage onretry={() => void load()} />
 {:else}
-  <main class="page" data-account data-layout={layout.value} aria-busy={signingOut}>
-    <div class="frame">
-      <header class="header">
-        <a class="btn btn-text back" href="#/">{compte.account.home}</a>
-        <h1 class="t-heading" tabindex="-1" bind:this={heading}>{compte.account.title}</h1>
-      </header>
-      {#if layout.value === "one" || layout.value === "portrait"}
-        <HomeStrip kinds={["update"]} margin="0 0 var(--space-md)" />
-      {/if}
-      <div class="columns">
-        <section class="left" data-account-identity>
-          <p class="t-label muted">{compte.account.pseudoLabel}</p>
-          <p class="t-heading pseudo" title={pseudo} data-account-pseudo>{pseudo}</p>
-          <p class="t-label muted created">
-            {info === null ? compte.account.loading : compte.account.created(dateText(info.createdAt, now))}
+  <Page
+    title={compte.account.title}
+    homeLabel={compte.account.home}
+    busy={signingOut}
+    attrs={{ "data-account": "" }}
+    leftAttrs={{ "data-account-identity": "" }}
+    rightAttrs={{ "data-account-right": "" }}
+  >
+    {#snippet left()}
+      <p class="t-label muted">{compte.account.pseudoLabel}</p>
+      <p class="t-heading pseudo" title={pseudo} data-account-pseudo>{pseudo}</p>
+      <p class="t-label muted created">
+        {info === null
+          ? compte.account.loading
+          : compte.account.created(dateText(info.createdAt, now))}
+      </p>
+      <button
+        type="button"
+        class="btn btn-secondary wide"
+        aria-haspopup="dialog"
+        aria-busy={signingOut}
+        bind:this={signOutButton}
+        onclick={askSignOut}
+      >
+        <Icon name="log-out" size={20} />
+        {compte.account.signOut}
+      </button>
+      <p class="t-label muted note">{compte.account.signOutNote}</p>
+    {/snippet}
+
+    {#snippet right()}
+      <section
+        class="section"
+        data-account-section="notifications"
+        aria-labelledby="notifications-heading"
+      >
+        <h2 id="notifications-heading" class="t-heading">{compte.notifications.heading}</h2>
+        <NotificationsPanel onsignedout={signedOutHere} />
+      </section>
+
+      <section class="section" data-account-section="cles" aria-labelledby="keys-heading">
+        <h2 id="keys-heading" class="t-heading">{compte.keys.heading}</h2>
+        {#if status === "ready" && info !== null}
+          <PasskeyList
+            passkeys={info.passkeys}
+            {now}
+            onchanged={load}
+            onsignedout={signedOutHere}
+          />
+        {:else}
+          {@render sectionState()}
+        {/if}
+      </section>
+
+      <section class="section" data-account-section="code" aria-labelledby="code-heading">
+        <h2 id="code-heading" class="t-heading">{compte.code.heading}</h2>
+        {#if status === "ready" && info !== null}
+          <p class="t-body">
+            {info.backupAt === null
+              ? compte.code.none
+              : compte.code.created(dateText(info.backupAt, now))}
           </p>
           <button
             type="button"
-            class="btn btn-secondary sign-out"
+            class="btn btn-secondary wide"
             aria-haspopup="dialog"
-            aria-busy={signingOut}
-            bind:this={signOutButton}
-            onclick={askSignOut}
+            aria-busy={renewing}
+            bind:this={codeButton}
+            onclick={() => (codeAsk = true)}
           >
-            <Icon name="log-out" size={20} />
-            {compte.account.signOut}
+            {compte.code.renew}
           </button>
-          <p class="t-label muted">{compte.account.signOutNote}</p>
-        </section>
-
-        <div class="right" data-account-right>
-          <section class="section" data-account-section="notifications" aria-labelledby="notifications-heading">
-            <h2 id="notifications-heading" class="t-heading">{compte.notifications.heading}</h2>
-            <NotificationsPanel onsignedout={signedOutHere} />
-          </section>
-
-          <section class="section" data-account-section="cles" aria-labelledby="keys-heading">
-            <h2 id="keys-heading" class="t-heading">{compte.keys.heading}</h2>
-            {#if status === "ready" && info !== null}
-              <PasskeyList
-                passkeys={info.passkeys}
-                {now}
-                onchanged={load}
-                onsignedout={signedOutHere}
-              />
-            {:else}
-              {@render sectionState()}
-            {/if}
-          </section>
-
-          <section class="section" data-account-section="code" aria-labelledby="code-heading">
-            <h2 id="code-heading" class="t-heading">{compte.code.heading}</h2>
-            {#if status === "ready" && info !== null}
-              <p class="t-body">
-                {info.backupAt === null
-                  ? compte.code.none
-                  : compte.code.created(dateText(info.backupAt, now))}
-              </p>
-              <button
-                type="button"
-                class="btn btn-secondary wide"
-                aria-haspopup="dialog"
-                aria-busy={renewing}
-                bind:this={codeButton}
-                onclick={() => (codeAsk = true)}
-              >
-                {compte.code.renew}
-              </button>
-            {:else}
-              {@render sectionState()}
-            {/if}
-          </section>
-
-          {#if layout.value === "computer" || layout.value === "two"}
-            <HomeStrip kinds={["update"]} />
-          {/if}
-        </div>
-      </div>
-    </div>
-  </main>
+        {:else}
+          {@render sectionState()}
+        {/if}
+      </section>
+    {/snippet}
+  </Page>
 {/if}
 
 {#if signOutAsk !== null}
@@ -293,87 +283,37 @@
 {/if}
 
 <style>
-  /* The « Page » layout family (04-UI-SPEC « Mon compte »), shared with « Mes amis » (pageLayout). */
-  .page {
-    box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    min-height: 100dvh;
-  }
-
-  .frame {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    min-height: var(--touch);
-  }
-
-  .back {
-    flex: none;
-    margin-left: calc(-1 * var(--space-sm));
-  }
-
-  h1,
   h2,
   p {
     margin: 0;
-  }
-
-  h1:focus,
-  h1:focus-visible {
-    outline: none;
   }
 
   .muted {
     color: var(--creme-attenuee);
   }
 
-  .columns {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
-  }
-
-  .left,
-  .right {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .left {
-    gap: var(--space-xs);
-  }
-
+  /* The identity column: « Ton pseudo », the pseudo (ellipsis), the date, « Se déconnecter », the note. */
   .pseudo {
+    margin-top: var(--space-xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .created {
-    margin-bottom: var(--space-sm);
+    margin: var(--space-xs) 0 var(--space-md);
   }
 
-  .sign-out,
+  .note {
+    margin-top: var(--space-xs);
+  }
+
   .wide {
     width: 100%;
   }
 
-  .sign-out[aria-busy="true"],
   .wide[aria-busy="true"] {
     cursor: progress;
-  }
-
-  .right {
-    gap: var(--space-lg);
   }
 
   .section {
@@ -387,77 +327,5 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-xs) var(--space-sm);
-  }
-
-  /* Computer: padding 32, the header row 44, 32, two columns 320 + 48 + 520 centred with it. */
-  .page[data-layout="computer"] {
-    padding: calc(var(--space-xl) + env(safe-area-inset-top, 0px))
-      calc(var(--space-xl) + env(safe-area-inset-right, 0px))
-      calc(var(--space-xl) + env(safe-area-inset-bottom, 0px))
-      calc(var(--space-xl) + env(safe-area-inset-left, 0px));
-  }
-
-  .page[data-layout="computer"] .frame {
-    width: min(888px, 100%);
-  }
-
-  .page[data-layout="computer"] .header {
-    margin-bottom: var(--space-xl);
-  }
-
-  .page[data-layout="computer"] .columns {
-    display: grid;
-    grid-template-columns: 320px minmax(0, 520px);
-    align-items: start;
-    gap: var(--space-2xl);
-  }
-
-  /* A phone held sideways from 640 wide: padding 12, gutters 16, the header 44, 16, columns 280 + 24
-     + at most 480; the page scrolls. */
-  .page[data-layout="two"] {
-    padding: calc(12px + env(safe-area-inset-top, 0px))
-      calc(var(--space-md) + env(safe-area-inset-right, 0px))
-      calc(12px + env(safe-area-inset-bottom, 0px))
-      calc(var(--space-md) + env(safe-area-inset-left, 0px));
-  }
-
-  .page[data-layout="two"] .frame {
-    width: min(784px, 100%);
-  }
-
-  .page[data-layout="two"] .header {
-    margin-bottom: var(--space-md);
-  }
-
-  .page[data-layout="two"] .columns {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 480px);
-    align-items: start;
-    gap: var(--space-lg);
-  }
-
-  /* Under 640 wide: one column (the header, the identity, 24, the sections); the page scrolls. */
-  .page[data-layout="one"] {
-    padding: calc(12px + env(safe-area-inset-top, 0px))
-      calc(var(--space-md) + env(safe-area-inset-right, 0px))
-      calc(var(--space-md) + env(safe-area-inset-bottom, 0px))
-      calc(var(--space-md) + env(safe-area-inset-left, 0px));
-  }
-
-  .page[data-layout="one"] .header,
-  .page[data-layout="portrait"] .header {
-    margin-bottom: var(--space-md);
-  }
-
-  /* Portrait: the column max 480, padding 48 / 16, stacked. */
-  .page[data-layout="portrait"] {
-    padding: calc(var(--space-2xl) + env(safe-area-inset-top, 0px))
-      calc(var(--space-md) + env(safe-area-inset-right, 0px))
-      calc(var(--space-xl) + env(safe-area-inset-bottom, 0px))
-      calc(var(--space-md) + env(safe-area-inset-left, 0px));
-  }
-
-  .page[data-layout="portrait"] .frame {
-    width: min(480px, 100%);
   }
 </style>

@@ -100,3 +100,18 @@ export function forgetInvite(storage: StorageLike | null, id: string, now: numbe
 export function codeFor(storage: StorageLike | null, id: string, now: number): string | null {
   return loadInvites(storage, now).find((entry) => entry.id === id)?.code ?? null;
 }
+
+/**
+ * The server's pending list (GET /api/invitations, plan 04-10): a link it no longer lists was used or
+ * disabled, and this device forgets it. Returns the list as stored.
+ */
+export function keepPending(
+  storage: StorageLike | null,
+  pendingIds: readonly string[],
+  now: number,
+): StoredInvite[] {
+  const pending = new Set(pendingIds);
+  const next = loadInvites(storage, now).filter((entry) => pending.has(entry.id));
+  write(storage, next);
+  return next;
+}

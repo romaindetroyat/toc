@@ -145,3 +145,15 @@ export function closeSignIn(): void {
   signInSheet.open = false;
   signInSheet.after = null;
 }
+
+/**
+ * A page for signed-in players met no session (plan 04-10: « Mon compte », « Mes amis »; 04-UI-SPEC
+ * « States »): the account goes, the home opens with the sign-in sheet, and the toast « Ta session a
+ * pris fin : connecte-toi de nouveau. » with « Se connecter ».
+ */
+export function requireSignIn(): void {
+  signedOut();
+  location.hash = "#/";
+  openSignIn();
+  showToast(compte.session.ended, { label: compte.session.signIn, run: () => openSignIn() });
+}
