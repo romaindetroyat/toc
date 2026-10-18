@@ -13,6 +13,7 @@ import {
   homeTiles,
   INVITE_SENT_MS,
   initial,
+  invitationFromInput,
   invitationRow,
   inviteHere,
   inviteRowState,
@@ -828,5 +829,73 @@ describe("noticePlace", () => {
     expect(noticePlace({ hash: "#/secours" }).flow).toBe("recover");
     expect(noticePlace({ hash: "#/compte", backupCode: true }).flow).toBe("backup");
     expect(noticePlace({ hash: "#/secours", backupCode: true }).flow).toBe("backup");
+  });
+});
+
+describe("invitationFromInput", () => {
+  // Plan 04-13: « J’ai une invitation » in the sign-in sheet. On iOS a tapped link opens Safari, never
+  // the installed app, so the person pastes the link (or its code) into the app.
+  const code = "Ab3_-defGHIJklmnOPq9xZ";
+
+  it("a bare code, with spaces or line breaks around it", () => {
+    expect(invitationFromInput(code)).toBe(code);
+    expect(invitationFromInput(`  ${code}\n`)).toBe(code);
+    expect(invitationFromInput(`\t${code} `)).toBe(code);
+  });
+
+  it("the whole link, from any origin, with or without its scheme", () => {
+    expect(invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/invitation/${code}`)).toBe(
+      code,
+    );
+    expect(invitationFromInput(`http://localhost:8787/#/invitation/${code}`)).toBe(code);
+    expect(invitationFromInput(`https://exemple.fr/#/invitation/${code}`)).toBe(code);
+    expect(invitationFromInput(`toc.romaindetroyat.workers.dev/#/invitation/${code}`)).toBe(code);
+    expect(
+      invitationFromInput(` https://toc.romaindetroyat.workers.dev/#/invitation/${code} `),
+    ).toBe(code);
+  });
+
+  it("the shared message around the link, and what may follow the code", () => {
+    expect(
+      invitationFromInput(
+        `Marie t’invite sur TOC, le jeu de petits chevaux à cartes. Ce lien marche une fois, pendant 7 jours. https://toc.romaindetroyat.workers.dev/#/invitation/${code}`,
+      ),
+    ).toBe(code);
+    expect(
+      invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/invitation/${code}/`),
+    ).toBe(code);
+    expect(
+      invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/invitation/${code}?x=1`),
+    ).toBe(code);
+    expect(invitationFromInput(`#/invitation/${code}. À bientôt !`)).toBe(code);
+  });
+
+  it("nothing else: empty, the wrong length, a foreign character, another route", () => {
+    expect(invitationFromInput("")).toBeNull();
+    expect(invitationFromInput("   \n ")).toBeNull();
+    expect(invitationFromInput(code.slice(1))).toBeNull();
+    expect(invitationFromInput(`${code}A`)).toBeNull();
+    expect(invitationFromInput(`${code.slice(1)}=`)).toBeNull();
+    expect(invitationFromInput(`${code.slice(1)}+`)).toBeNull();
+    expect(invitationFromInput(`${code.slice(1)}/`)).toBeNull();
+    expect(
+      invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/invitation/${code}A`),
+    ).toBeNull();
+    expect(
+      invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/invitation/${code.slice(2)}`),
+    ).toBeNull();
+    expect(
+      invitationFromInput(`https://toc.romaindetroyat.workers.dev/#/table/${code}`),
+    ).toBeNull();
+    expect(invitationFromInput("https://toc.romaindetroyat.workers.dev/")).toBeNull();
+    expect(invitationFromInput("bonjour")).toBeNull();
+  });
+
+  it("never throws: not a string, or far too long", () => {
+    expect(invitationFromInput(null)).toBeNull();
+    expect(invitationFromInput(undefined)).toBeNull();
+    expect(invitationFromInput(42)).toBeNull();
+    expect(invitationFromInput({ code })).toBeNull();
+    expect(invitationFromInput(`${"x".repeat(2000)} #/invitation/${code}`)).toBeNull();
   });
 });
