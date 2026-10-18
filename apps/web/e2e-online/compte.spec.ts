@@ -124,3 +124,81 @@ test("signUp() helper reaches the home signed in", async ({ browser, request }, 
   await expect(page.locator('[data-small-tile="compte"]')).toContainText(pseudo);
   await context.close();
 });
+
+// Plan 04-09 (04-UI-SPEC « Backup-code screen », « Leaving the screen », « Layouts and fit »): the
+// code cannot be left by accident, and it fits at the two reference sizes.
+test("l’écran du code ne se quitte pas par mégarde, et tient à 844 × 390 et 1280 × 800", async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const context = await passkeyContext(browser, testInfo);
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto(`/#/invitation/${await mintInvitation(request)}`);
+  const form = page.locator("[data-pseudo-form]");
+  await form.getByRole("textbox").fill(uniquePseudo("Gaspard"));
+  await form.getByRole("button", { name: "Créer mon compte" }).click();
+  const screen = page.locator("[data-backup-code]");
+  await expect(screen).toBeVisible();
+  const url = page.url();
+
+  // The back button: the screen stays, the confirmation opens; « Revoir mon code » keeps it.
+  await page.goBack();
+  const confirm = page.getByRole("dialog", { name: /^Tu as bien gardé ton code\s\?$/ });
+  await expect(confirm).toBeVisible();
+  await expect(screen).toBeVisible();
+  expect(page.url()).toBe(url);
+  await confirm.getByRole("button", { name: "Revoir mon code" }).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(screen).toBeVisible();
+
+  // A hash change from elsewhere (a notification click) is undone the same way.
+  await page.evaluate(() => {
+    location.hash = "#/";
+  });
+  await expect(confirm).toBeVisible();
+  await expect(screen).toBeVisible();
+  await expect(page.locator("[data-home]")).toHaveCount(0);
+  await confirm.getByRole("button", { name: "Revoir mon code" }).click();
+
+  // No update strip on this screen.
+  await expect(page.locator("[data-home-strip]")).toHaveCount(0);
+
+  // The fit: two columns at 844 × 390, one column at 1280 × 800; never a scroll.
+  for (const size of [
+    { width: 844, height: 390, columns: 2 },
+    { width: 1280, height: 800, columns: 1 },
+  ]) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const fit = await page.evaluate(() => {
+      const box = (selector: string) =>
+        document.querySelector(selector)?.getBoundingClientRect() ?? new DOMRect();
+      const text = box("[data-backup-code] h1");
+      const panel = box("[data-backup-code] [data-code]");
+      return {
+        beside: panel.left >= text.right,
+        below: panel.top >= text.bottom,
+        codeLines: Math.round(panel.height),
+        sideways: document.documentElement.scrollWidth - window.innerWidth,
+        down: document.documentElement.scrollHeight - window.innerHeight,
+      };
+    });
+    expect(fit.sideways, `${size.width} × ${size.height}`).toBe(0);
+    expect(fit.down, `${size.width} × ${size.height}`).toBe(0);
+    if (size.columns === 2) expect(fit.beside).toBe(true);
+    else expect(fit.below).toBe(true);
+    // The code holds on one line in its panel: 16 + 24 + 16.
+    expect(fit.codeLines).toBe(56);
+  }
+
+  // Closing the page asks first (beforeunload), then the confirmed way out reaches the home.
+  const dialogs: string[] = [];
+  page.on("dialog", (dialog) => {
+    dialogs.push(dialog.type());
+    void dialog.dismiss();
+  });
+  await page.close({ runBeforeUnload: true });
+  await expect.poll(() => dialogs).toContain("beforeunload");
+  await context.close();
+});
