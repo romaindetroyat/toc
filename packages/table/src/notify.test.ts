@@ -216,6 +216,22 @@ describe("a saved game resumed without them tells them at once", () => {
     expect(resumed.notify).toBeUndefined();
   });
 
+  it("the creator missing, the chef de table who resumed is named: « Ben a repris la partie »", () => {
+    const gone = reduce(started(), { t: "gone", who: ANA }, ctx(3000)).table;
+    const saved = reduce(gone, client(BEN, { t: "stop" }), ctx(4000)).table;
+    expect(saved.status).toBe("saved");
+    const resumed = reduce(saved, client(BEN, { t: "resume" }), ctx(5000));
+    expect(resumed.notify).toEqual([
+      turnFor({
+        account: ANA_ACCOUNT.id,
+        from: "Ben",
+        own: true,
+        resumed: true,
+        key: `${ID}:5000`,
+      }),
+    ]);
+  });
+
   it("a guest missing at the resume is not told; an account missing is", () => {
     const gone = reduce(benGone().table, { t: "gone", who: CLO }, ctx(4000)).table;
     const saved = reduce(gone, client(ANA, { t: "stop" }), ctx(5000)).table;
