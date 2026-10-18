@@ -19,6 +19,7 @@ import {
   type HubClientFrame,
   type NoticeFrame,
   parseHubServerFrame,
+  type TableStatus,
 } from "@toc/protocol";
 import ReconnectingWebSocket from "partysocket/ws";
 import { tableSummary } from "../net/api.ts";
@@ -27,6 +28,12 @@ import { type NoticePlace, type NoticeSlot, placeChanged, receive, settle } from
 import { account } from "./store.svelte.ts";
 
 export type HubStatus = "off" | "connecting" | "open" | "closed";
+
+/**
+ * Plan 04-11: the status of the online table on screen (routes/Table.svelte sets it while it is
+ * mounted, null otherwise), so that App tells the hub when the player is in a game (the card waits).
+ */
+export const tableOnScreen = $state<{ status: TableStatus | null }>({ status: null });
 
 export type HubConnection = {
   /** The card to show now: the latest notice when it may show, else null (held or none). */

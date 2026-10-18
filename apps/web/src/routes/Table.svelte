@@ -1,10 +1,14 @@
 <script lang="ts">
   import { COLORS, type Color } from "@toc/engine";
   import { CLOSE_GONE, isTableId } from "@toc/protocol";
-  import { account } from "../account/store.svelte.ts";
+  import { onDestroy } from "svelte";
+  import { seatNeedsAccount } from "../account/flow.ts";
+  import { tableOnScreen } from "../account/hub.svelte.ts";
+  import { account, openSignIn } from "../account/store.svelte.ts";
   import { unlock } from "../audio/engine.ts";
   import type { ControllerFactory } from "../game/session.svelte.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
+  import { compte } from "../i18n/fr/compte.ts";
   import { messages } from "../i18n/fr/messages.ts";
   import { table as copy } from "../i18n/fr/table.ts";
   import { seats as seatCopy } from "../i18n/fr/seats.ts";
@@ -14,7 +18,7 @@
   import { BANNER_MS, closeNotice } from "../net/plate.ts";
   import { createRemoteGame } from "../net/remoteGame.ts";
   import { applyUpdateOrReload } from "../pwa/update.svelte.ts";
-  import { forgetTable, rememberTable } from "../net/tables.ts";
+  import { forgetTable, loadTables, rememberTable } from "../net/tables.ts";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import Notice from "../ui/Notice.svelte";
   import ReclaimDialog from "../ui/ReclaimDialog.svelte";
@@ -47,6 +51,17 @@
 
   const valid = $derived(isTableId(id));
 
+  // Plan 04-11 (D-12, 04-UI-SPEC « Guests » item 3): this device's seat here is linked to an account
+  // and nobody is signed in: « Connecte-toi pour reprendre ta place » before any socket opens (the
+  // server's rule 4 would make this device a new guest anyway). The sign-in sheet's success sets the
+  // account, and the table connects.
+  const needsAccount = $derived(
+    seatNeedsAccount(
+      loadTables(storage).find((entry) => entry.id === id),
+      account.current,
+    ),
+  );
+
   // No network when the link is opened: the « Pas de connexion » notice, « Réessayer » tries again.
   let offline = $state(!browserApi.online());
   let attempt = $state(0);
@@ -61,7 +76,7 @@
   let gone = $state(false);
 
   $effect(() => {
-    if (!valid || playName !== null) return;
+    if (!valid || playName !== null || needsAccount) return;
     let live = true;
     void tableSummary(id).then((result) => {
       if (!live) return;
@@ -75,9 +90,11 @@
 
   $effect(() => {
     const name = playName;
-    // « Réessayer » opens a new connection.
+    // « Réessayer » opens a new connection; so does a sign-in or a sign-out (plan 04-11): the next
+    // hello carries the session cookie, or no longer does.
     void attempt;
-    if (!valid || name === null || offline) return;
+    void accountId;
+    if (!valid || name === null || offline || needsAccount) return;
     const opened = connectTable(id, { token: device.token, name });
     connection = opened;
     reclaim = "idle";
@@ -163,6 +180,14 @@
 
   const creatorName = $derived(info?.creatorName ?? "");
 
+  // Plan 04-11: the in-app card waits while this table plays, is paused or saved (App tells the hub).
+  $effect(() => {
+    tableOnScreen.status = info?.status ?? null;
+  });
+  onDestroy(() => {
+    tableOnScreen.status = null;
+  });
+
   // The first welcome adds the table to « Mes parties en cours » on this device, and a change of this
   // device's seat updates it (D-06); signed in, the entry is tagged with the account (plan 04-04).
   const seatNow = $derived(you === null ? undefined : you.seat);
@@ -176,6 +201,7 @@
     if (!valid || closeCode === CLOSE_GONE || gone || health === "gone") {
       return "introuvable" as const;
     }
+    if (needsAccount) return "compte" as const;
     if (playName === null) return "prenom" as const;
     if (offline) return "horsligne" as const;
     if (ended !== null) return ended;
@@ -280,6 +306,14 @@
     myName={playName}
     onleave={leave}
     onhome={home}
+  />
+{:else if screenState === "compte"}
+  <Notice
+    kind="compte"
+    heading={compte.seat.heading}
+    body={compte.seat.body}
+    primary={{ label: compte.seat.signIn, run: () => openSignIn() }}
+    secondary={{ label: compte.seat.home, run: home }}
   />
 {:else if screenState === "introuvable"}
   <Notice

@@ -30,3 +30,20 @@ export function rowFade(_node: Element): TransitionConfig {
   if (reduced()) return { duration: 0 };
   return { duration: 150, css: (t) => `opacity: ${t}` };
 }
+
+/**
+ * The in-app card (plan 04-11; 04-UI-SPEC « Motion »): in over 200 ms, coming 12 px down with a fade;
+ * under reduced motion a 150 ms fade.
+ */
+export function cardIn(_node: Element): TransitionConfig {
+  if (reduced()) return { duration: 150, css: (t) => `opacity: ${t}` };
+  return {
+    duration: 200,
+    css: (t) => `opacity: ${t}; transform: translateY(${(t - 1) * 12}px)`,
+  };
+}
+
+/** The in-app card goes: a 150 ms fade, reduced motion or not. */
+export function cardOut(_node: Element): TransitionConfig {
+  return { duration: 150, css: (t) => `opacity: ${t}` };
+}

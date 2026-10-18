@@ -281,4 +281,14 @@ export const compte = {
     other: "Se déconnecter",
     done: "Session fermée sur cet appareil.",
   },
+  /**
+   * Plan 04-11 (D-12; 04-UI-SPEC « Guests » item 3): a table link opened on a signed-out device whose
+   * seat there is linked to an account.
+   */
+  seat: {
+    heading: "Connecte-toi pour reprendre ta place",
+    body: "Ta place dans cette partie est liée à ton compte.",
+    signIn: "Se connecter",
+    home: "Retour à l’accueil",
+  },
 } as const;

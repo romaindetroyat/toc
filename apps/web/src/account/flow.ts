@@ -7,9 +7,12 @@
 
 import {
   type FriendEntry,
+  isTableId,
+  type NoticeFrame,
   normalizePseudo,
   type PasskeyInfo,
   type PendingInvitation,
+  type TableStatus,
 } from "@toc/protocol";
 import { accueil } from "../i18n/fr/accueil.ts";
 import { amis } from "../i18n/fr/amis.ts";
@@ -25,6 +28,7 @@ import type {
   SignUpFailure,
   SocialResult,
 } from "./api.ts";
+import type { NoticePlace } from "./noticeRule.ts";
 import type { PushState } from "./push.ts";
 
 export type TileKind = "prenom" | "connexion" | "amis" | "compte";
@@ -634,4 +638,63 @@ export function inviteRowState(
  */
 export function inviteHere(pseudo: string, names: readonly (string | null)[]): boolean {
   return names.includes(pseudo);
+}
+
+// --- Plan 04-11: the in-app card (04-UI-SPEC « In-app card ») and the seat of an account (D-12) ---
+
+/** The card's text: « {Pseudo} t’invite à sa table. », « La table de {Créateur} t’attend… ». */
+export function cardText(notice: NoticeFrame): string {
+  if (notice.kind === "invite") return amis.card.invite(notice.from);
+  return notice.own === true ? amis.card.turnOwn : amis.card.turn(notice.from);
+}
+
+/**
+ * The card's primary: « Rejoindre » (invite) or « Revenir à la table » (turn), and where it goes:
+ * #/table/<id>, only for a table id (T-04-71), else null.
+ */
+export function cardAction(notice: Pick<NoticeFrame, "kind" | "table">): {
+  label: string;
+  href: string | null;
+} {
+  return {
+    label: notice.kind === "invite" ? amis.card.join : amis.card.back,
+    href: isTableId(notice.table) ? `#/table/${notice.table}` : null,
+  };
+}
+
+/**
+ * « Connecte-toi pour reprendre ta place » (D-12, 04-RESEARCH Pattern 4 rule 4): this device's entry
+ * for the table is tagged with an account and nobody is signed in.
+ */
+export function seatNeedsAccount(
+  entry: TableEntry | undefined,
+  signedIn: { id: string; pseudo: string } | null,
+): boolean {
+  return entry !== undefined && entry.account !== undefined && signedIn === null;
+}
+
+/**
+ * Where the player is, for the card's rules (noticeRule.ts): the route without its query, the table's
+ * status only at a table, and the screens a card must not interrupt (the backup code on screen first,
+ * then a sign-up at #/invitation/<code>, then the recovery at #/secours).
+ */
+export function noticePlace(input: {
+  hash: string;
+  tableStatus?: TableStatus | null;
+  backupCode?: boolean;
+}): Required<NoticePlace> {
+  const route = input.hash.split("?")[0] ?? "";
+  const flow =
+    input.backupCode === true
+      ? "backup"
+      : route.startsWith("#/invitation/")
+        ? "signup"
+        : route === "#/secours"
+          ? "recover"
+          : null;
+  return {
+    route,
+    tableStatus: route.startsWith("#/table/") ? (input.tableStatus ?? null) : null,
+    flow,
+  };
 }
