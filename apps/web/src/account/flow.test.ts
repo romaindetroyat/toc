@@ -9,7 +9,11 @@ import {
   friendSentence,
   friendSince,
   homeTiles,
+  INVITE_SENT_MS,
   initial,
+  inviteHere,
+  inviteRowState,
+  inviteTabDefault,
   invitationRow,
   lockText,
   notificationPlatform,
@@ -665,5 +669,75 @@ describe("friendCodeResult", () => {
       line: "L’ajout n’a pas marché. Réessaie dans un instant.",
     });
     expect(friendCodeResult({ ok: false, reason: "signed-out" })).toEqual({ kind: "signed-out" });
+  });
+});
+
+// --- Plan 04-11: « Inviter à la table », the « Mes amis » tab (04-UI-SPEC « In the waiting room ») ---
+
+describe("inviteTabDefault", () => {
+  it("« Mes amis » with at least one friend, else « Lien et QR code »", () => {
+    expect(inviteTabDefault(0)).toBe("lien");
+    expect(inviteTabDefault(1)).toBe("amis");
+    expect(inviteTabDefault(12)).toBe("amis");
+  });
+});
+
+describe("inviteRowState", () => {
+  const now = 1_000_000;
+
+  it("invite before any tap, sending while the server answers", () => {
+    expect(inviteRowState(null, null, now, "Marie")).toEqual({ state: "invite" });
+    expect(inviteRowState("sending", null, now, "Marie")).toEqual({ state: "sending" });
+  });
+
+  it("sent for 10 minutes (the hub's dedupe window), then invite again", () => {
+    expect(INVITE_SENT_MS).toBe(10 * 60_000);
+    const sent = { ok: true, state: "sent" } as const;
+    expect(inviteRowState(sent, now, now, "Marie")).toEqual({ state: "sent" });
+    expect(inviteRowState(sent, now, now + INVITE_SENT_MS - 1, "Marie")).toEqual({
+      state: "sent",
+    });
+    expect(inviteRowState(sent, now, now + INVITE_SENT_MS, "Marie")).toEqual({ state: "invite" });
+    expect(inviteRowState(sent, null, now, "Marie")).toEqual({ state: "invite" });
+  });
+
+  it("here: « Déjà à la table », no button", () => {
+    expect(inviteRowState({ ok: true, state: "here" }, now, now, "Marie")).toEqual({
+      state: "here",
+    });
+  });
+
+  it("not-friend: the row leaves with « {Pseudo} n’est plus dans tes amis. »", () => {
+    expect(inviteRowState({ ok: false, reason: "not-friend" }, null, now, "Marie")).toEqual({
+      state: "invite",
+      leave: true,
+      toast: "Marie n\u2019est plus dans tes amis.",
+    });
+  });
+
+  it("rate: « Doucement : attends un peu avant d’inviter de nouveau. »", () => {
+    expect(inviteRowState({ ok: false, reason: "rate" }, null, now, "Marie")).toEqual({
+      state: "invite",
+      toast: "Doucement\u00a0: attends un peu avant d\u2019inviter de nouveau.",
+    });
+  });
+
+  it("offline, server and the rest: « L’invitation n’est pas partie… »", () => {
+    const failed =
+      "L\u2019invitation n\u2019est pas partie. V\u00e9rifie le r\u00e9seau, puis r\u00e9essaie.";
+    for (const reason of ["offline", "server", "not-here", "started"] as const) {
+      expect(inviteRowState({ ok: false, reason }, null, now, "Marie")).toEqual({
+        state: "invite",
+        toast: failed,
+      });
+    }
+  });
+});
+
+describe("inviteHere", () => {
+  it("a friend whose pseudo is a name at the table (seated or not) is already there", () => {
+    expect(inviteHere("Marie", ["Romain", null, "Marie"])).toBe(true);
+    expect(inviteHere("Marie", ["Romain", null])).toBe(false);
+    expect(inviteHere("Marie", ["marie"])).toBe(false);
   });
 });
