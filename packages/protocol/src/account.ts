@@ -253,6 +253,10 @@ const invitationState = z.discriminatedUnion("state", [
   z.object({ state: z.literal("used"), inviter: z.nullable(z.string()) }),
   z.object({ state: z.literal("expired"), inviter: z.nullable(z.string()) }),
   z.object({ state: z.literal("unknown") }),
+  // Plan 04-05, for a signed-in caller only: the link is their own (never spent by opening it), or
+  // its inviter is already in their friends (not spent either).
+  z.object({ state: z.literal("own"), inviter: z.nullable(z.string()), expiresAt: z.number() }),
+  z.object({ state: z.literal("friend"), inviter: z.nullable(z.string()), expiresAt: z.number() }),
 ]);
 
 /** GET /api/invitations/:code. */
@@ -356,3 +360,53 @@ export type AccountTable = z.infer<typeof accountTable>;
 export const parseAccountTables = read<AccountTable[]>(
   z.array(accountTable).check(z.maxLength(MAX_ACCOUNT_TABLES)),
 );
+
+// --- Invitation links and friends (plan 04-05, ACCT-03, D-03, D-06, D-11) ---
+
+/** The most pending links an account can have (the 11th is refused: « limit »). */
+export const MAX_PENDING_INVITATIONS = 10;
+
+/** An account id or an invitation's opaque id: 16 random bytes in base64url. */
+const opaqueId = z.string().check(z.regex(INVITATION_RE));
+
+const createdInvitation = z.object({
+  /** The opaque id of the link (to list and disable it); never its code. */
+  id: opaqueId,
+  /** The code of the link, shown to its author once: the server keeps only its SHA-256. */
+  code: z.string().check(z.regex(INVITATION_RE)),
+  expiresAt: z.number(),
+});
+
+/** POST /api/invitations: the new link (the code is only in this answer). */
+export type CreatedInvitation = z.infer<typeof createdInvitation>;
+
+const pendingInvitation = z.object({ id: opaqueId, createdAt: z.number(), expiresAt: z.number() });
+
+/** One row of GET /api/invitations: a pending link of the caller (no code: only its hash exists). */
+export type PendingInvitation = z.infer<typeof pendingInvitation>;
+
+const friendEntry = z.object({
+  id: opaqueId,
+  pseudo: z.string(),
+  /** When the friendship began (ms since the epoch). */
+  since: z.number(),
+});
+
+/** One friend of GET /api/friends, and the friend an invitation or a code just added. */
+export type FriendEntry = z.infer<typeof friendEntry>;
+
+const friendAnswer = z.object({
+  friend: friendEntry,
+  /** Present (true) when that person was already a friend: nothing was spent or written. */
+  already: z.optional(z.literal(true)),
+});
+
+/** POST /api/invitations/:code/accept and POST /api/friends/code/redeem: the friend. */
+export type FriendAnswer = z.infer<typeof friendAnswer>;
+
+export const parseCreatedInvitation = read<CreatedInvitation>(createdInvitation);
+export const parsePendingInvitations = read<PendingInvitation[]>(
+  z.array(pendingInvitation).check(z.maxLength(MAX_PENDING_INVITATIONS)),
+);
+export const parseFriends = read<FriendEntry[]>(z.array(friendEntry));
+export const parseFriendAnswer = read<FriendAnswer>(friendAnswer);

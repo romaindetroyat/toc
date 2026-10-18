@@ -28,6 +28,12 @@
 //                                      the GameRoom as a new request carrying x-toc-account and
 //                                      x-toc-pseudo, set by the Worker only
 //   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
+// Plan 04-05 (social.ts; a session, and for a write our Origin, JSON for a POST):
+//   POST /api/invitations            → a new link { id, code, expiresAt } (10 pending at most)
+//   GET  /api/invitations            → the caller's pending links { id, createdAt, expiresAt }
+//   DELETE /api/invitations/:id      → one pending link disabled, 204
+//   GET  /api/invitations/:code      → also own and friend for a signed-in caller
+//   POST /api/invitations/:code/accept → the inviter becomes a friend, the link is spent
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -51,6 +57,7 @@ import { ACCOUNT_HEADER, GameRoom, PSEUDO_HEADER } from "./GameRoom.ts";
 import { json, notAllowed, writeAllowed } from "./http.ts";
 import { meRoute, meTablesRoute } from "./me.ts";
 import { PlayerHub } from "./PlayerHub.ts";
+import { socialRoute } from "./social.ts";
 
 // The two Durable Object classes of both deploy configs (GameRoom: migration v1; PlayerHub, one per
 // account: migration v2, plan 04-03). The embedded entry re-exports both (worker-embedded/index.js).
@@ -151,11 +158,12 @@ async function accountRoute(
 ): Promise<Response | null> {
   const now = Date.now();
   const path = url.pathname;
+  // Plan 04-05: the links made by players and the friends (social.ts); then the state of a link.
+  const social = await socialRoute(request, env, url, meter, now);
+  if (social !== null) return social;
   const invitation = /^\/api\/invitations\/([^/]*)$/.exec(path);
-  if (invitation !== null) {
-    if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
-    return invitationRoute(invitation[1] ?? "", env, meter, now);
-  }
+  if (invitation !== null)
+    return invitationRoute(request, env, url, meter, now, invitation[1] ?? "");
   if (path === "/api/me") {
     if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
     return meRoute(request, env, url, meter, now);

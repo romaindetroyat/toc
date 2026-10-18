@@ -269,7 +269,11 @@ export async function signUpPerson(pseudo: string, jar: Jar = newJar()): Promise
 }
 
 /** A new account through the invitation `code` (a player's link, plan 04-05), signed in on `jar`. */
-export async function signUpWith(code: string, pseudo: string, jar: Jar = newJar()): Promise<Person> {
+export async function signUpWith(
+  code: string,
+  pseudo: string,
+  jar: Jar = newJar(),
+): Promise<Person> {
   const opened = await post("/api/auth/signup/options", { invitation: code, pseudo }, { jar });
   if (opened.status !== 200) throw new Error(`signup options: ${opened.status}`);
   const options = (await opened.json()) as { challenge: string; user: { id: string } };

@@ -2,7 +2,9 @@
 // 3 and 5, Pitfall 6). There is no e-mail (D-01): an account is a pseudo and a passkey.
 //   GET  /api/invitations/:code      the state of an invitation: ok (with its inviter and expiry),
 //                                    used, expired or unknown; the bootstrap code is ok while no
-//                                    account exists (Romain's first account, D-03), then unknown
+//                                    account exists (Romain's first account, D-03), then unknown;
+//                                    since 04-05, for a signed-in caller, own (their own link) or
+//                                    friend (its inviter is already a friend) instead of ok
 //   POST /api/auth/signup/options    { invitation, pseudo } → the passkey's creation options and a
 //                                    challenge row holding the pending sign-up (5 minutes)
 //   POST /api/auth/signup/verify     { response } → the account, its passkey, the friendship with
@@ -46,7 +48,7 @@ import {
   storeChallenge,
   takeChallenge,
 } from "./challenge.ts";
-import { createSession } from "./session.ts";
+import { createSession, hasCookie, sessionUser } from "./session.ts";
 import { rpFor } from "./webauthn.ts";
 
 /** The bootstrap code is ours: compared in constant time on SHA-256 digests (T-04-11). */
@@ -62,8 +64,11 @@ async function noAccountYet(meter: Meter): Promise<boolean> {
 
 type InvitationRow = { expires_at: number; used_at: number | null; inviter: string | null };
 
-/** What a code opens: an invitation's state, or the bootstrap; resolves without a D1 read when malformed. */
-async function stateOf(
+/**
+ * What a code opens: an invitation link's state, or the bootstrap; resolves without a D1 read when
+ * malformed. Only links (kind 'link'): a friend code is never an invitation (plan 04-05).
+ */
+export async function stateOf(
   code: string,
   env: Env,
   meter: Meter,
@@ -81,7 +86,7 @@ async function stateOf(
       .prepare(
         `SELECT i.expires_at, i.used_at, i.inviter_id, u.pseudo AS inviter
            FROM invitations i LEFT JOIN users u ON u.id = i.inviter_id
-          WHERE i.code_hash = ?`,
+          WHERE i.code_hash = ? AND i.kind = 'link'`,
       )
       .bind(hash),
   );
@@ -97,15 +102,41 @@ async function stateOf(
   };
 }
 
-/** GET /api/invitations/:code. */
+/**
+ * GET /api/invitations/:code. A valid link opened by a signed-in caller (plan 04-05) is « own » for
+ * its author and « friend » when its inviter is already a friend; the session is read only then.
+ */
 export async function invitationRoute(
-  code: string,
+  request: Request,
   env: Env,
+  url: URL,
   meter: Meter,
   now: number,
+  code: string,
 ): Promise<Response> {
-  const { hash: _hash, inviterId: _inviterId, ...state } = await stateOf(code, env, meter, now);
+  const { hash: _hash, inviterId, ...state } = await stateOf(code, env, meter, now);
+  if (state.state === "ok" && typeof inviterId === "string" && hasCookie(request, url, env)) {
+    const user = await sessionUser(request, url, env, meter, now);
+    if (user !== null) {
+      const expiresAt = state.expiresAt ?? now;
+      if (user.id === inviterId)
+        return json({ state: "own", inviter: state.inviter, expiresAt }, 200);
+      if (await areFriends(meter, user.id, inviterId)) {
+        return json({ state: "friend", inviter: state.inviter, expiresAt }, 200);
+      }
+    }
+  }
   return json(state, 200);
+}
+
+/** Whether `friendId` is in `userId`'s friends (one D1 read on the friendship's primary key). */
+export async function areFriends(meter: Meter, userId: string, friendId: string): Promise<boolean> {
+  const row = await meter.first(
+    meter
+      .prepare("SELECT 1 AS one FROM friendships WHERE user_id = ? AND friend_id = ?")
+      .bind(userId, friendId),
+  );
+  return row !== null;
 }
 
 /** What the challenge row keeps between the two calls of a sign-up (our own JSON, checked anyway). */

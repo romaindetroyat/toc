@@ -83,7 +83,7 @@ describe("POST /api/invitations", () => {
       (await post("/api/invitations", "{}", { jar: zoe.jar, contentType: "text/plain" })).status,
     ).toBe(415);
     expect((await post("/api/invitations", { x: 1 }, { jar: zoe.jar })).status).toBe(400);
-    expect(await rows("SELECT * FROM invitations")).toHaveLength(0);
+    expect(await rows("SELECT * FROM invitations WHERE inviter_id IS NOT NULL")).toHaveLength(0);
   });
 
   it("the 11th pending link is refused (409 limit); used and expired links do not count", async () => {
@@ -236,7 +236,9 @@ describe("POST /api/invitations/:code/accept", () => {
     const response = await post(`/api/invitations/${link.code}/accept`, {}, { jar: yann.jar });
     expect(response.status).toBe(200);
     console.log(`accept link: x-toc-d1 ${response.headers.get("x-toc-d1")}`);
-    const body = (await response.json()) as { friend: { id: string; pseudo: string; since: number } };
+    const body = (await response.json()) as {
+      friend: { id: string; pseudo: string; since: number };
+    };
     expect(body).toEqual({ friend: { id: zoe.id, pseudo: "Zoé", since: body.friend.since } });
     expect(body.friend.since).toBeGreaterThanOrEqual(before);
     expect(await friendRows()).toEqual([`${yann.id}>${zoe.id}`, `${zoe.id}>${yann.id}`].sort());
