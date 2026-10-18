@@ -7,5 +7,7 @@ declare namespace Cloudflare {
     /** Plan 04-01: the two account secrets, with fixed test-only values (vitest.config.ts). */
     TOC_PEPPER?: string;
     TOC_BOOTSTRAP?: string;
+    /** Plan 04-07: a test-only VAPID pair, generated when vitest.config.ts loads. */
+    VAPID_PRIVATE_KEY?: string;
   }
 }

@@ -84,6 +84,11 @@ declare global {
     TOC_PEPPER?: string;
     /** Secret: the one-time code of the first account, accepted while no account exists (D-03). */
     TOC_BOOTSTRAP?: string;
+    /**
+     * Secret (plan 04-07): the VAPID pair of Web Push, `d.x.y` (tools/vapid-keys.mjs); the public key
+     * is derived from it (push.ts vapidOf). Without it no push is sent.
+     */
+    VAPID_PRIVATE_KEY?: string;
   }
 }
 

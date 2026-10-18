@@ -405,6 +405,7 @@ export class GameRoom extends DurableObject<Env> {
           own: notice.own,
           resumed: notice.resumed,
           key: notice.key,
+          account: notice.account,
         }),
       ),
     );

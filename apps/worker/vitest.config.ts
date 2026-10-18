@@ -10,6 +10,15 @@ import { defineConfig } from "vitest/config";
 // 0002, the accounts.
 const migrations = await readD1Migrations(fileURLToPath(new URL("./migrations", import.meta.url)));
 
+// Plan 04-07: a TEST-ONLY VAPID pair, made each time the config loads (Node WebCrypto), never written
+// to disk; the format of the VAPID_PRIVATE_KEY secret, d.x.y (tools/vapid-keys.mjs).
+const vapidPair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+  "sign",
+  "verify",
+])) as CryptoKeyPair;
+const vapidJwk = await crypto.subtle.exportKey("jwk", vapidPair.privateKey);
+const testVapid = `${vapidJwk.d}.${vapidJwk.x}.${vapidJwk.y}`;
+
 export default defineConfig({
   plugins: [
     cloudflareTest({
@@ -22,6 +31,7 @@ export default defineConfig({
           TEST_MIGRATIONS: migrations,
           TOC_PEPPER: "workerd-test-only-pepper-not-a-secret",
           TOC_BOOTSTRAP: "WorkerdTestBootstrap00",
+          VAPID_PRIVATE_KEY: testVapid,
         },
         d1Databases: { DB: "toc-games-test" },
       },

@@ -70,6 +70,7 @@ export async function inviteRoute(
       table: id,
       from: user.pseudo,
       key: `${user.id}:${id}`,
+      account: friendId,
       now,
     });
   } catch (error) {

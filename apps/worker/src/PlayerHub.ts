@@ -24,8 +24,18 @@
 //   notify            { kind, table, from, own?, resumed?, key, now? }: the same invite (key = sender
 //                     and table) within INVITE_DEDUPE_MS, or the same turn key (table and pause) within
 //                     TURN_KEEP_MS, answers dup and sends nothing; else the notice frame goes to every
-//                     present socket ("notice"), or nobody is present ("away": plan 04-07 sends the
-//                     push then). Each kept key is one row of `sent`, pruned on every notify.
+//                     present socket ("notice"), or nobody is present: the push (plan 04-07, below)
+//                     goes to each of the account's subscriptions ("push"), or there is none to
+//                     send ("away"). Each kept key is one row of `sent`, pruned on every notify.
+//
+// Web Push (plan 04-07, D-08; 04-RESEARCH Pattern 7, Pitfalls 1 and 10): when nobody is present, the
+// hub reads the account's subscriptions from D1 (one query, at most MAX_SUBSCRIPTIONS rows), builds
+// one encrypted message per subscription (push.ts) and delivers each through `deliver` (fetch; the
+// tests replace it on the instance). 201 is fine; 404 and 410 delete the subscription; 429 keeps it
+// and nothing is retried; 403 (a refused VAPID key) is logged once per instance. The authorization
+// is reused per push service for at most JWT_REUSE_MS, in memory (signed again after an eviction).
+// No VAPID secret: logged once, nothing sent, "away". The browser never decides: the service worker
+// shows every push it receives (Apple revokes the permission otherwise).
 //
 // Times come from the caller (`now`, Date.now() by default) and are compared on each call: no timer
 // function and no alarm (a lock ends by itself when its time has passed). The tables are created on
@@ -38,10 +48,20 @@ import {
   NOTICE_FROM_MAX,
   type NoticeFrame,
   type NoticeKind,
+  type PushNotice,
   parseHubClientFrame,
+  pushPayload,
 } from "@toc/protocol";
 import { sameMac } from "./auth/backup.ts";
 import { ACCOUNT_HEADER } from "./GameRoom.ts";
+import {
+  buildPush,
+  isPushEndpoint,
+  JWT_REUSE_MS,
+  type StoredSubscription,
+  type Vapid,
+  vapidOf,
+} from "./push.ts";
 
 /** A visible socket with no sign of life for longer than this is away (the app pings every 20 s). */
 export const HUB_SILENCE_MS = 45_000;
@@ -61,11 +81,22 @@ export type NotifyInput = {
   resumed?: boolean;
   /** The dedupe key: `${sender}:${table}` for an invite, `${table}:${pause}` for a turn. */
   key: string;
+  /**
+   * The hub's own account id (the name it was reached by), for its push subscriptions; the callers
+   * pass it, the runtime's ctx.id.name otherwise. A different id than the hub's sends no push.
+   */
+  account?: string;
   now?: number;
 };
 
-/** notice: shown in the open app; away: nobody present (a push, 04-07); dup: already sent. */
-export type NotifyAnswer = "notice" | "away" | "dup";
+/**
+ * notice: shown in the open app; push: nobody present, sent to the account's subscriptions (plan
+ * 04-07); away: nobody present and nothing sent (no subscription, no VAPID secret); dup: already sent.
+ */
+export type NotifyAnswer = "notice" | "push" | "away" | "dup";
+
+/** The most subscriptions an account keeps (plan 04-07): one push per subscription and notice. */
+export const MAX_SUBSCRIPTIONS = 10;
 
 function seenOf(ws: WebSocket): Seen {
   const value = ws.deserializeAttachment() as Partial<Seen> | null;
@@ -99,6 +130,11 @@ type Attempts = { failures: number; lockedUntil: number; level: number };
 export class PlayerHub extends DurableObject<Env> {
   /** The tables exist in this instance's SQLite (checked once per instance). */
   private ready = false;
+  /** The VAPID authorization per push-service origin and when it was signed (plan 04-07). */
+  private signed = new Map<string, { authorization: string; at: number }>();
+  /** Logged once per instance: no VAPID secret; a 403 from a push service. */
+  private toldNoVapid = false;
+  private toldRefused = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -300,7 +336,7 @@ export class PlayerHub extends DurableObject<Env> {
     sql.exec("INSERT INTO sent (kind, key, at) VALUES (?, ?, ?)", input.kind, input.key, now);
 
     const sockets = this.present(now);
-    if (sockets.length === 0) return "away";
+    if (sockets.length === 0) return this.push(input, now);
     const frame: NoticeFrame = {
       t: "notice",
       kind: input.kind,
@@ -319,5 +355,109 @@ export class PlayerHub extends DurableObject<Env> {
       }
     }
     return "notice";
+  }
+
+  /**
+   * Sends the push of a notice to every subscription of the account (nobody present). "push" when at
+   * least one message went out, else "away".
+   */
+  private async push(input: NotifyInput, now: number): Promise<NotifyAnswer> {
+    const account = this.ctx.id.name ?? input.account;
+    if (account === undefined || (input.account !== undefined && input.account !== account)) {
+      return "away";
+    }
+    const vapid = vapidOf(this.env.VAPID_PRIVATE_KEY);
+    if (vapid === null) {
+      if (!this.toldNoVapid) {
+        this.toldNoVapid = true;
+        console.warn("push: no VAPID secret (VAPID_PRIVATE_KEY), no notification is sent");
+      }
+      return "away";
+    }
+    const db = this.env.DB;
+    if (db === undefined) return "away";
+    const testMode = this.env.TOC_TEST_MODE === "1";
+    const found = await db
+      .prepare("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? LIMIT ?")
+      .bind(account, MAX_SUBSCRIPTIONS)
+      .all<StoredSubscription>();
+    // A row that is not a push service's endpoint is never fetched (T-04-53).
+    const subscriptions = found.results.filter((sub) => isPushEndpoint(sub.endpoint, testMode));
+    if (subscriptions.length === 0) return "away";
+    const notice: PushNotice =
+      input.kind === "invite"
+        ? { kind: "invite", from: input.from }
+        : {
+            kind: "turn",
+            from: input.from,
+            ...(input.own === undefined ? {} : { own: input.own }),
+            ...(input.resumed === undefined ? {} : { resumed: input.resumed }),
+          };
+    const payload = pushPayload({ ...notice, table: input.table });
+    await Promise.all(
+      subscriptions.map((sub) => this.sendOne(db, account, sub, payload, vapid, now)),
+    );
+    return "push";
+  }
+
+  /** One push: built, delivered, and the subscription dropped when the push service says it is gone. */
+  private async sendOne(
+    db: D1Database,
+    account: string,
+    sub: StoredSubscription,
+    payload: ReturnType<typeof pushPayload>,
+    vapid: Vapid,
+    now: number,
+  ): Promise<void> {
+    let status: number;
+    let origin = "";
+    try {
+      origin = new URL(sub.endpoint).origin;
+      const cached = this.signed.get(origin);
+      const reuse =
+        cached !== undefined && now >= cached.at && now - cached.at < JWT_REUSE_MS
+          ? cached.authorization
+          : undefined;
+      const built = await buildPush(sub, payload, vapid, this.env.ORIGIN, reuse);
+      if (reuse === undefined && built.headers.authorization !== undefined) {
+        this.signed.set(origin, { authorization: built.headers.authorization, at: now });
+      }
+      const response = await this.deliver(sub.endpoint, {
+        method: "POST",
+        headers: built.headers,
+        body: built.body,
+      });
+      status = response.status;
+    } catch (error) {
+      console.warn("push: not delivered", error instanceof Error ? error.message : error);
+      return;
+    }
+    if (status === 404 || status === 410) {
+      await db
+        .prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?")
+        .bind(sub.endpoint, account)
+        .run();
+      return;
+    }
+    if (status === 403) {
+      // A refused key (BadJwtToken, VapidPkHashMismatch): signed again next time.
+      this.signed.delete(origin);
+      if (!this.toldRefused) {
+        this.toldRefused = true;
+        console.warn(`push: 403 from ${origin}, the VAPID key or its JWT was refused`);
+      }
+    }
+    // 429 and any other answer: kept, never retried (the next notice tries again).
+  }
+
+  /**
+   * Sends one push request (fetch). Checks the endpoint again, so even a direct call can only reach
+   * a push service (T-04-53). The workerd tests replace it on the instance.
+   */
+  async deliver(endpoint: string, init: RequestInit): Promise<Response> {
+    if (!isPushEndpoint(endpoint, this.env.TOC_TEST_MODE === "1")) {
+      throw new Error("push: not a push service endpoint");
+    }
+    return fetch(endpoint, init);
   }
 }

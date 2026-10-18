@@ -80,7 +80,7 @@ export async function decryptPush(subscriber: TestSubscriber, body: Uint8Array):
   );
   const shared = new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: "ECDH", public: serverKey } as EcdhKeyDeriveParams,
+      { name: "ECDH", public: serverKey } as unknown as SubtleCryptoDeriveKeyAlgorithm,
       subscriber.privateKey,
       256,
     ),
