@@ -1,6 +1,7 @@
 <script lang="ts">
   import { COLORS, type Color } from "@toc/engine";
   import { CLOSE_GONE, isTableId } from "@toc/protocol";
+  import { account } from "../account/store.svelte.ts";
   import { unlock } from "../audio/engine.ts";
   import type { ControllerFactory } from "../game/session.svelte.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
@@ -36,6 +37,13 @@
   let device = $state(loadDevice(storage));
   let connection = $state.raw<TableConnection | null>(null);
 
+  // Plan 04-04: signed in, the table is played under the pseudo, without the first-name prompt (the
+  // server names an account's person by its pseudo anyway); a guest keeps the phase-2 path. Strings,
+  // so that GET /api/me confirming the same account opens no new connection; a sign-in or a sign-out
+  // does (the next upgrade carries the cookie, or not).
+  const accountId = $derived(account.current?.id ?? null);
+  const playName = $derived(account.current?.pseudo ?? device.name);
+
   const valid = $derived(isTableId(id));
 
   // No network when the link is opened: the « Pas de connexion » notice, « Réessayer » tries again.
@@ -52,7 +60,7 @@
   let gone = $state(false);
 
   $effect(() => {
-    if (!valid || device.name !== null) return;
+    if (!valid || playName !== null) return;
     let live = true;
     void tableSummary(id).then((result) => {
       if (!live) return;
@@ -65,7 +73,7 @@
   });
 
   $effect(() => {
-    const name = device.name;
+    const name = playName;
     // « Réessayer » opens a new connection.
     void attempt;
     if (!valid || name === null || offline) return;
@@ -155,11 +163,11 @@
   const creatorName = $derived(info?.creatorName ?? "");
 
   // The first welcome adds the table to « Mes parties en cours » on this device, and a change of this
-  // device's seat updates it (D-06).
+  // device's seat updates it (D-06); signed in, the entry is tagged with the account (plan 04-04).
   const seatNow = $derived(you === null ? undefined : you.seat);
   $effect(() => {
     if (seatNow === undefined) return;
-    rememberTable(storage, id, seatNow, Date.now());
+    rememberTable(storage, id, seatNow, Date.now(), accountId ?? undefined);
   });
 
   /** What the screen shows now. */
@@ -167,7 +175,7 @@
     if (!valid || closeCode === CLOSE_GONE || gone || health === "gone") {
       return "introuvable" as const;
     }
-    if (device.name === null) return "prenom" as const;
+    if (playName === null) return "prenom" as const;
     if (offline) return "horsligne" as const;
     if (ended !== null) return ended;
     if (connection === null || you === null || info === null) return "connexion" as const;
@@ -261,14 +269,14 @@
       onanswer={(accept) => answer(asked.seat, accept)}
     />
   {/if}
-{:else if screenState === "salle" && info !== null && you !== null && connection !== null && device.name !== null}
+{:else if screenState === "salle" && info !== null && you !== null && connection !== null && playName !== null}
   <WaitingRoom
     {id}
     link={tableLink}
     {connection}
     table={info}
     {you}
-    myName={device.name}
+    myName={playName}
     onleave={leave}
     onhome={home}
   />

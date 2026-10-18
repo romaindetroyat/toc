@@ -1,7 +1,7 @@
 // The account calls of the page (plans 04-01 to 04-03, ACCT-01, ACCT-02, D-02, D-12): the state of
 // an invitation link, the sign-up (options, the passkey, verify), GET /api/me; since 04-02 the login
 // (usernameless), the logout, adding and removing a passkey and a new backup code (step-up); since
-// 04-03 the recovery with the backup code (« Retrouver mon compte »). fetch, the online flag and the
+// 04-03 the recovery with the backup code (« Retrouver mon compte »); since 04-04 the account's tables. fetch, the online flag and the
 // passkey ceremony are passed in, so the rules run under Node with fakes (net/api.ts pattern). Every
 // answer is untrusted and read with the shared schemas of @toc/protocol. The session is an HttpOnly
 // cookie the browser keeps and sends by itself: no token ever reaches this code.
@@ -11,12 +11,15 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 import {
+  type AccountTable,
   type CreationOptions,
   type InvitationState,
   isInvitationCode,
+  isTableId,
   type MeAccount,
   normalizeBackupCode,
   type PasskeyInfo,
+  parseAccountTables,
   parseAddPasskeyAnswer,
   parseBackupCodeAnswer,
   parseCreationOptions,
@@ -464,4 +467,47 @@ export async function recoverVerify(
     return { ok: false, reason: "already-here" };
   }
   return { ok: false, reason: "server" };
+}
+
+// --- Plan 04-04: the account's tables (« Mes parties en cours » on every device, ACCT-02) ---
+
+/**
+ * GET /api/me/tables: the account's tables, newest first; null when signed out, offline, failing or
+ * answered out of shape (the device's own list is shown alone then).
+ */
+export async function myTables(api: ApiDeps = browserApi): Promise<AccountTable[] | null> {
+  if (!api.online()) return null;
+  let response: Response;
+  try {
+    response = await api.fetch("/api/me/tables", {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return null;
+  }
+  if (response.status !== 200) return null;
+  return parseAccountTables(await bodyOf(response));
+}
+
+/** « Retirer de la liste » for the account: DELETE /api/me/tables/<id> (every device forgets it). */
+export async function forgetMyTable(id: string, api: ApiDeps = browserApi): Promise<AccountResult> {
+  if (!isTableId(id)) return { ok: false, reason: "unknown" };
+  if (!api.online()) return { ok: false, reason: "offline" };
+  let response: Response;
+  try {
+    response = await api.fetch(`/api/me/tables/${id}`, {
+      method: "DELETE",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, reason: "offline" };
+  }
+  if (response.status === 204) return { ok: true };
+  return {
+    ok: false,
+    reason: refusal({ status: response.status, body: await bodyOf(response) }, {}),
+  };
 }
