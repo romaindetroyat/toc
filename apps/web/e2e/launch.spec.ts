@@ -94,7 +94,8 @@ test("lancement: JSON abîmé, valeurs hors limites ou stockage qui lève, aucun
     `Storage.prototype.getItem = () => { throw new Error("SecurityError"); };
      Storage.prototype.setItem = () => { throw new Error("QuotaExceededError"); };`,
   ]) {
-    const context = await browser.newContext();
+    // A new context does not inherit the config's `use`: no service worker here either (plan 04-08).
+    const context = await browser.newContext({ serviceWorkers: "block" });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));

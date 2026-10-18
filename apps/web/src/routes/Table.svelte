@@ -13,6 +13,7 @@
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import { BANNER_MS, closeNotice } from "../net/plate.ts";
   import { createRemoteGame } from "../net/remoteGame.ts";
+  import { applyUpdateOrReload } from "../pwa/update.svelte.ts";
   import { forgetTable, rememberTable } from "../net/tables.ts";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import Notice from "../ui/Notice.svelte";
@@ -300,7 +301,7 @@
     kind="version"
     heading={copy.version.heading}
     body={copy.version.body}
-    primary={{ label: copy.version.reload, run: () => location.reload() }}
+    primary={{ label: copy.version.reload, run: () => void applyUpdateOrReload() }}
   />
 {:else if screenState === "horsligne"}
   <Notice

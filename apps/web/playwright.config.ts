@@ -19,6 +19,9 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:4173",
     launchOptions: { executablePath, args: ["--no-sandbox"] },
+    // Plan 04-08 (04-RESEARCH Pitfall 8): no service worker in these suites, so a precache never serves
+    // an old build between runs; playwright.pwa.config.ts is the one suite that allows them.
+    serviceWorkers: "block",
   },
   projects: [
     // Romain's « paysage obligatoire » (2026-10-14): the phone is played held sideways, so the phone

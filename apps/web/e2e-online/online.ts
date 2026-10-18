@@ -45,11 +45,23 @@ export async function createTable(
   return id;
 }
 
-/** The project's device settings, for a new browser context (its own storage, so its own device). */
+/**
+ * The project's device settings, for a new browser context (its own storage, so its own device).
+ * browser.newContext does not inherit the config's `use`: service workers stay blocked here too
+ * (plan 04-08, Pitfall 8).
+ */
 export function deviceOptions(testInfo: TestInfo): BrowserContextOptions {
   const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, baseURL } =
     testInfo.project.use;
-  return { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, baseURL };
+  return {
+    viewport,
+    userAgent,
+    deviceScaleFactor,
+    isMobile,
+    hasTouch,
+    baseURL,
+    serviceWorkers: "block",
+  };
 }
 
 export const seatTile = (page: Page, couleur: string) =>

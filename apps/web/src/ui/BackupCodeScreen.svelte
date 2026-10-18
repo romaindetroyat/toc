@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatBackupCode } from "@toc/protocol";
   import { compte } from "../i18n/fr/compte.ts";
+  import { holdUpdates } from "../pwa/update.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Icon from "./Icon.svelte";
   import { showToast } from "./toast.svelte.ts";
@@ -29,6 +30,9 @@
   let heading = $state<HTMLHeadingElement | null>(null);
   let keptButton = $state<HTMLButtonElement | null>(null);
   let confirming = $state(false);
+
+  // Plan 04-08: no « Mettre à jour » while the code is on screen (it would be lost).
+  $effect(() => holdUpdates());
 
   // The focus lands on the heading when the screen appears.
   $effect(() => {
