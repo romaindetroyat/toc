@@ -9,6 +9,13 @@ const catalogue = import.meta.glob<string>("./fr/**/*.ts", {
   eager: true,
 });
 
+// Plan 04-07: the push texts are built by the Worker from packages/protocol (one shared module).
+const pushCatalogue = import.meta.glob<string>("../../../../packages/protocol/src/push-fr.ts", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
 const NNBSP = " ";
 const NBSP = " ";
 
@@ -141,6 +148,25 @@ describe("apps/web/src/i18n/fr", () => {
 
   it("contains catalogue files with string literals to check", () => {
     expect(files.length).toBeGreaterThan(0);
+    const total = files.reduce((n, [, text]) => n + stringLiterals(text).length, 0);
+    expect(total).toBeGreaterThan(0);
+  });
+
+  for (const [file, text] of files) {
+    it(`${file} uses French typography`, () => {
+      const found = stringLiterals(text).flatMap((literal) =>
+        typographyProblems(literal).map((problem) => `${problem}: ${JSON.stringify(literal)}`),
+      );
+      expect(found).toEqual([]);
+    });
+  }
+});
+
+describe("packages/protocol/src/push-fr.ts", () => {
+  const files = Object.entries(pushCatalogue);
+
+  it("is read, with string literals to check", () => {
+    expect(files.length).toBe(1);
     const total = files.reduce((n, [, text]) => n + stringLiterals(text).length, 0);
     expect(total).toBeGreaterThan(0);
   });
