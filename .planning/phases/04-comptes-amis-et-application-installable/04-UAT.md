@@ -126,7 +126,7 @@ result: pending
 ### 21. La mise en ligne
 expected: |
   Faite par l’orchestrateur le 2026-10-18, avant la recette. Rien à faire pour toi, sauf vérifier que tout marche.
-  - Version en ligne : la branche claude/phase-4-comptes au commit e50938b (jusqu’au plan 04-11), à https://toc.romaindetroyat.workers.dev. Le plan 04-12 ajoute une correction (un petit message affiché juste avant l’ouverture du plateau pouvait, sur un téléphone tenu en largeur, faire perdre un coup à l’écran : le cavalier restait en place). Elle n’est en ligne qu’après une nouvelle mise en ligne par l’orchestrateur (sans migration ni secret nouveau). Version à noter ici après ce déploiement : à compléter.
+  - Version en ligne : la branche claude/phase-4-comptes au commit e50938b (jusqu’au plan 04-11), à https://toc.romaindetroyat.workers.dev. Le plan 04-12 ajoute une correction (un petit message affiché juste avant l’ouverture du plateau pouvait, sur un téléphone tenu en largeur, faire perdre un coup à l’écran : le cavalier restait en place). Elle n’est en ligne qu’après une nouvelle mise en ligne par l’orchestrateur (sans migration ni secret nouveau). Mise en ligne faite le 2026-10-18 : la version en ligne est le commit 66839e3 (correction comprise), vérifiée par smoke-online --read-only.
   - Secrets posés (les noms seulement, jamais les valeurs) : TOC_PEPPER, TOC_BOOTSTRAP, VAPID_PRIVATE_KEY.
   - Base D1 : la migration 0002 (les comptes) est appliquée sur la base en ligne.
   - Durable Objects : la migration v2 (PlayerHub, l’objet de chaque compte) est en ligne ; v1 est inchangée.
