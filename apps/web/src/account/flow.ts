@@ -19,6 +19,7 @@ import type { IconName } from "../ui/icons.ts";
 import type {
   AccountFailure,
   InvitationView,
+  InviteFriendResult,
   RecoverFailure,
   RecoverVerifyFailure,
   SignUpFailure,
@@ -574,4 +575,63 @@ export function friendCodeResult(
     default:
       return { kind: "line", line: copy.failed };
   }
+}
+
+// --- Plan 04-11: « Inviter à la table », the « Mes amis » tab (04-UI-SPEC « In the waiting room ») ---
+
+export type InviteTab = "amis" | "lien";
+
+/** The tab the sheet opens on: « Mes amis » when the player has at least one friend. */
+export function inviteTabDefault(friendsCount: number): InviteTab {
+  return friendsCount >= 1 ? "amis" : "lien";
+}
+
+/** « Invitation envoyée » lasts as long as the hub's dedupe window (plan 04-06, INVITE_DEDUPE_MS). */
+export const INVITE_SENT_MS = 10 * 60_000;
+
+/** A row's last answer: none yet (null), the request on its way, or the server's. */
+export type InviteAnswer = InviteFriendResult | "sending" | null;
+
+export type InviteRowView = {
+  state: "invite" | "sending" | "sent" | "here";
+  /** The toast the answer shows once. */
+  toast?: string;
+  /** The friend is no longer one: the row goes. */
+  leave?: boolean;
+};
+
+/**
+ * A friend row of the invite variant: « Inviter », « Envoi… », « Invitation envoyée » until
+ * sentAt + 10 minutes, « Déjà à la table »; a refusal goes back to « Inviter » with its toast.
+ */
+export function inviteRowState(
+  answer: InviteAnswer,
+  sentAt: number | null,
+  now: number,
+  pseudo: string,
+): InviteRowView {
+  if (answer === null) return { state: "invite" };
+  if (answer === "sending") return { state: "sending" };
+  if (answer.ok) {
+    if (answer.state === "here") return { state: "here" };
+    return sentAt !== null && now < sentAt + INVITE_SENT_MS
+      ? { state: "sent" }
+      : { state: "invite" };
+  }
+  switch (answer.reason) {
+    case "not-friend":
+      return { state: "invite", leave: true, toast: amis.table.notFriend(pseudo) };
+    case "rate":
+      return { state: "invite", toast: amis.table.rate };
+    default:
+      return { state: "invite", toast: amis.table.failed };
+  }
+}
+
+/**
+ * A friend already at the table: an account's person is named by its pseudo (plan 04-04), so a
+ * pseudo among the table's names (seated or not) is there. Exact match: pseudos are unique.
+ */
+export function inviteHere(pseudo: string, names: readonly (string | null)[]): boolean {
+  return names.includes(pseudo);
 }

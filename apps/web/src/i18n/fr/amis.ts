@@ -102,4 +102,38 @@ export const amis = {
     noNetwork: "Pas de connexion.",
     createFailed: "Le code n’a pas pu être créé. Réessaie dans un instant.",
   },
+  /**
+   * Plan 04-11: « Inviter à la table » for a signed-in player (04-UI-SPEC « In the waiting room »): the
+   * two tabs, the friend rows of the invite variant and their answers.
+   */
+  table: {
+    /** The segmented control's accessible name. */
+    tabs: "Inviter avec",
+    friends: "Mes amis",
+    link: "Lien et QR code",
+    invite: "Inviter",
+    inviteName: (pseudo: string) => `Inviter ${pseudo} à la table`,
+    sending: "Envoi…",
+    sent: "Invitation envoyée",
+    here: "Déjà à la table",
+    empty: "Pas encore d’amis sur TOC. Partage plutôt le lien de la table.",
+    loading: "Chargement de tes amis…",
+    error: "Impossible de charger tes amis.",
+    retry: "Réessayer",
+    notFriend: (pseudo: string) => `${pseudo} n’est plus dans tes amis.`,
+    rate: "Doucement : attends un peu avant d’inviter de nouveau.",
+    failed: "L’invitation n’est pas partie. Vérifie le réseau, puis réessaie.",
+  },
+  /**
+   * Plan 04-11: the in-app card (04-UI-SPEC « In-app card »): a friend's invitation, a table that
+   * waits for this player.
+   */
+  card: {
+    invite: (pseudo: string) => `${pseudo} t’invite à sa table.`,
+    turn: (creator: string) => `La table de ${creator} t’attend : c’est ton tour.`,
+    turnOwn: "Ta table t’attend : c’est ton tour.",
+    later: "Plus tard",
+    join: "Rejoindre",
+    back: "Revenir à la table",
+  },
 } as const;

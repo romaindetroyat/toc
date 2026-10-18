@@ -1,6 +1,7 @@
 <script lang="ts">
   import { COLORS, type Color, PARTNER } from "@toc/engine";
   import type { TablePublic, You } from "@toc/protocol";
+  import { account } from "../account/store.svelte.ts";
   import { unlock } from "../audio/engine.ts";
   import { bots } from "../i18n/fr/bots.ts";
   import { seats } from "../i18n/fr/seats.ts";
@@ -195,6 +196,22 @@
     unlock();
     inviteOpen = true;
   }
+
+  // Plan 04-11 (D-07): a signed-in person invites friends from the sheet's « Mes amis » tab; the
+  // names at the table tell which friend is already there. Guests get the 02 sheet unchanged.
+  const friendsAt = $derived(
+    account.current === null
+      ? null
+      : {
+          table: id,
+          names: [
+            ...COLORS.map((color) =>
+              table.seats[color].kind === "human" ? table.seats[color].name : null,
+            ),
+            ...table.unseated,
+          ],
+        },
+  );
 
   // Right after the creation the sheet opens by itself, once, for the creator (D-02); the table takes
   // the creator's last « Avance rapide » on this device (plan 02-10b).
@@ -415,7 +432,13 @@
 {/if}
 
 {#if inviteOpen}
-  <InviteSheet url={link} name={myName} onclose={() => (inviteOpen = false)} opener={inviteButton} />
+  <InviteSheet
+    url={link}
+    name={myName}
+    onclose={() => (inviteOpen = false)}
+    opener={inviteButton}
+    {friendsAt}
+  />
 {/if}
 
 {#if confirmStart}
