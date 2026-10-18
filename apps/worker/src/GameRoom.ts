@@ -36,6 +36,12 @@
 // the object hashes the device, guest and account ids, then @toc/table's resolveWho picks the person
 // (rules 1-4) on the table as it is after that await. A step that links a person or moves a linked
 // person's seat writes table_members after the commit (members.ts), best effort.
+//
+// « C’est ton tour » (plan 04-07, 04-RESEARCH Pattern 10): a step whose result carries notices (the
+// alarm's tick at a notice's time, or « Reprendre la partie » without them) gives each one to that
+// account's PlayerHub after the commit, awaited with the D1 writes; the hub shows it in the open app or
+// sends the push. Best effort: a failure is logged and dropped, never retried. The GameRoom never
+// fetches a push service itself.
 
 import { DurableObject } from "cloudflare:workers";
 import type { Rng } from "@toc/engine";
@@ -64,6 +70,7 @@ import {
   summary,
   type Table,
   type TestOptions,
+  type TurnNotice,
 } from "@toc/table";
 import { writeMembers } from "./members.ts";
 import { writeGame } from "./record.ts";
@@ -362,6 +369,9 @@ export class GameRoom extends DurableObject<Env> {
     if (result.members !== undefined && result.members.length > 0) {
       writes.push(this.members(result.table.tableId, result.members, now));
     }
+    if (result.notify !== undefined && result.notify.length > 0) {
+      writes.push(this.notify(result.table.tableId, result.notify));
+    }
     if (writes.length === 0) return;
     return writes.length === 1 ? writes[0] : Promise.all(writes).then(() => undefined);
   }
@@ -377,6 +387,29 @@ export class GameRoom extends DurableObject<Env> {
     if (outcome === "skipped" && !this.toldNoDatabase) {
       this.toldNoDatabase = true;
       console.log("table members: no D1 binding (DB), the account's tables are not kept");
+    }
+  }
+
+  /**
+   * Gives each « C’est ton tour » notice to its account's PlayerHub (plan 04-07): the hub sends the
+   * notice frame to the open app, or the push when the app is closed. Best effort: a failure is
+   * logged once for the step and dropped (no retry; the next pause gives a new notice).
+   */
+  private async notify(tableId: string, notices: readonly TurnNotice[]): Promise<void> {
+    const sent = await Promise.allSettled(
+      notices.map((notice) =>
+        this.env.PLAYER_HUB.getByName(notice.account).notify({
+          kind: "turn",
+          table: tableId,
+          from: notice.from,
+          own: notice.own,
+          resumed: notice.resumed,
+          key: notice.key,
+        }),
+      ),
+    );
+    if (sent.some((each) => each.status === "rejected")) {
+      console.warn("turn notice: a PlayerHub did not answer, dropped");
     }
   }
 

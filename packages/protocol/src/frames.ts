@@ -434,6 +434,8 @@ export type CreateTestOptions = {
   levels?: Partial<Record<Color, Level>>;
   /** The pause's minute, shortened for the end-to-end tests (plan 02-06), 500 ms to 60 s. */
   pauseMs?: number;
+  /** « C’est ton tour » sooner than 30 s (plan 04-07), 100 ms to 2 minutes. */
+  notifyMs?: number;
   /**
    * The game starts from this position instead of a deal (plan 02-09: a near-end table for the end
    * plank and the rematch): a scenario's `before` block, at most MAX_BEFORE_CHARS characters.
@@ -486,6 +488,7 @@ const createTestSchema = z.strictObject({
     }),
   ),
   pauseMs: z.optional(z.int().check(z.minimum(500), z.maximum(60_000))),
+  notifyMs: z.optional(z.int().check(z.minimum(100), z.maximum(120_000))),
   before: z.optional(beforeSchema),
 });
 

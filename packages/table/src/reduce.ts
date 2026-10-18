@@ -13,6 +13,9 @@
 //
 // Plan 04-04: a hello may carry the socket's account (accounts.ts); every result lists the
 // table_members rows its change calls for (`members`).
+//
+// Plan 04-07: after every command the « C’est ton tour » schedule follows the pause's missing list
+// (notify.ts settleNotify); the alarm's tick gives the due notices (`notify`).
 
 import { BOT_NAMES, type BotLevel, parseBotLevel } from "@toc/bots";
 import {
@@ -54,6 +57,7 @@ import {
 import { FALLBACK_LEVEL, scheduleBot, stillDue, thinkTick } from "./bots.ts";
 import { canChat, keepMessage, overRate } from "./chat.ts";
 import { chatFrame, eventsFrameFor, tableFrame, tablePublic, welcomeFor } from "./frames.ts";
+import { settleNotify, type TurnNotice } from "./notify.ts";
 import {
   applyChoice,
   hostOf,
@@ -128,6 +132,12 @@ export type Reduced = {
    * a linked person who became linked, sat, stood, was moved or left. Absent when empty; never sent.
    */
   members?: Member[];
+  /**
+   * The « C’est ton tour » notices to give to the accounts' PlayerHubs after the commit (plan 04-07,
+   * notify.ts): a due one at the alarm's tick, or at once when a saved game is resumed without them.
+   * Absent when empty; never sent to the table.
+   */
+  notify?: TurnNotice[];
 };
 
 const unchanged = (table: Table): Reduced => ({ table, out: [], log: [] });
@@ -682,6 +692,10 @@ export function reduce(table: Table, command: Command, ctx: Ctx): Reduced {
 function settle(table: Table, command: Command, ctx: Ctx): Reduced {
   let result = route(table, command, ctx);
   if (result.purge === true) return result;
+  // « C’est ton tour » (plan 04-07): the schedule follows the missing seats; the tick sends.
+  const told = settleNotify(table, result.table, ctx.now, command.t === "tick", copyTable);
+  if (told.table !== result.table) result = { ...result, table: told.table };
+  if (told.notify.length > 0) result = { ...result, notify: told.notify };
   if (result.table !== table && (command.t === "hello" || command.t === "client")) {
     result.table.lastActivity = ctx.now;
   }

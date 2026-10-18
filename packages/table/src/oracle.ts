@@ -129,6 +129,7 @@ const FORBIDDEN_KEYS = new Set([
   "people",
   "creator",
   "deadlines",
+  "notifyAt",
   "message",
   "stack",
 ]);

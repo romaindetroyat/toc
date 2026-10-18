@@ -24,6 +24,7 @@ export {
   tablePublic,
   welcomeFor,
 } from "./frames.ts";
+export { NOTIFY_AFTER_MS, notifyMsOf, settleNotify, type TurnNotice } from "./notify.ts";
 export {
   applyChoice,
   HANDOVER_LEVEL,
