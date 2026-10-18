@@ -1,8 +1,9 @@
 // Test helpers for the workerd tests: create a table through the router, open real hibernatable
 // sockets on it, send frames and wait for the frames the table sends back.
 
-import { SELF } from "cloudflare:test";
-import type { ClientFrame, ServerFrame } from "@toc/protocol";
+import { env, SELF } from "cloudflare:test";
+import { type ClientFrame, type ServerFrame, toBase64Url } from "@toc/protocol";
+import { type SoftAuthenticator, softAuthenticator } from "./authenticator.ts";
 
 export const ORIGIN = "https://toc.test";
 
@@ -164,6 +165,17 @@ export async function post(
   return response;
 }
 
+/** A DELETE as the app sends it (the page's Origin, no body), keeping the cookie (plan 04-02). */
+export async function del(path: string, options: CallOptions = {}): Promise<Response> {
+  const headers: Record<string, string> = {};
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, { method: "DELETE", headers });
+  keep(options.jar, response);
+  return response;
+}
+
 /** A GET with the jar's cookie, keeping what the answer sets. */
 export async function get(path: string, jar?: Jar): Promise<Response> {
   const headers: Record<string, string> = {};
@@ -190,3 +202,92 @@ export const NEAR_END = {
   hands: { bleu: ["5S"] },
   turn: "bleu",
 };
+
+// --- Accounts (plans 04-01 and 04-02) ---
+
+/** The tests' D1 database. */
+export function accountDb(): D1Database {
+  if (env.DB === undefined) throw new Error("no D1 binding in the tests");
+  return env.DB;
+}
+
+export const ACCOUNT_TABLES = [
+  "table_members",
+  "push_subscriptions",
+  "friendships",
+  "sessions",
+  "challenges",
+  "invitations",
+  "passkeys",
+  "users",
+];
+
+/** Every account table emptied (a test's beforeEach). */
+export async function resetAccounts(): Promise<void> {
+  const db = accountDb();
+  await db.batch(ACCOUNT_TABLES.map((table) => db.prepare(`DELETE FROM ${table}`)));
+}
+
+export type Row = Record<string, unknown>;
+
+/** The rows of a query on the tests' D1. */
+export async function rows(sql: string, ...values: unknown[]): Promise<Row[]> {
+  return (
+    await accountDb()
+      .prepare(sql)
+      .bind(...values)
+      .all<Row>()
+  ).results;
+}
+
+export async function sha256Url(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return toBase64Url(new Uint8Array(digest));
+}
+
+export const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+export const MAC_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+
+/** A person with an account: their passkey, its WebAuthn user handle, their id and pseudo. */
+export type Person = {
+  id: string;
+  pseudo: string;
+  passkey: SoftAuthenticator;
+  /** The account's WebAuthn user handle (what a discoverable passkey answers as userHandle). */
+  handle: string;
+};
+
+/** A new account through a test invitation, signed in on `jar` (its first device). */
+export async function signUpPerson(pseudo: string, jar: Jar = newJar()): Promise<Person> {
+  const minted = await post("/api/test/invitation", {});
+  const { code } = (await minted.json()) as { code: string };
+  const opened = await post("/api/auth/signup/options", { invitation: code, pseudo }, { jar });
+  if (opened.status !== 200) throw new Error(`signup options: ${opened.status}`);
+  const options = (await opened.json()) as { challenge: string; user: { id: string } };
+  const passkey = await softAuthenticator("toc.test", ORIGIN);
+  const verified = await post(
+    "/api/auth/signup/verify",
+    { response: await passkey.create(options.challenge) },
+    { jar, userAgent: IPHONE_UA },
+  );
+  if (verified.status !== 201) throw new Error(`signup verify: ${verified.status}`);
+  const body = (await verified.json()) as { me: { id: string; pseudo: string } };
+  return { id: body.me.id, pseudo: body.me.pseudo, passkey, handle: options.user.id };
+}
+
+/** The usernameless login: options, the passkey's assertion, verify. Answers both responses. */
+export async function logIn(
+  passkey: SoftAuthenticator,
+  handle: string,
+  jar: Jar = newJar(),
+  userAgent = MAC_UA,
+): Promise<{ options: Response; verify: Response; assertion: Record<string, unknown> }> {
+  const options = await post("/api/auth/login/options", {}, { jar });
+  if (options.status !== 200) throw new Error(`login options: ${options.status}`);
+  const { challenge } = (await options.clone().json()) as { challenge: string };
+  const assertion = await passkey.get(challenge, handle);
+  const verify = await post("/api/auth/login/verify", { response: assertion }, { jar, userAgent });
+  return { options, verify, assertion };
+}

@@ -4,9 +4,11 @@ import {
   BACKUP_CODE_LENGTH,
   CROCKFORD,
   deviceLabel,
+  EmptyBody,
   formatBackupCode,
   INVITE_TTL_MS,
   isInvitationCode,
+  LoginVerifyBody,
   MAX_API_BODY,
   newBackupCode,
   normalizeBackupCode,
@@ -14,7 +16,9 @@ import {
   PSEUDO_MAX,
   PSEUDO_MIN,
   parseInvitationState,
+  parseLoginAnswer,
   parseMeAccount,
+  parseRequestOptions,
   parseSignupAnswer,
   pseudoKey,
   SignupOptionsBody,
@@ -244,5 +248,87 @@ describe("account API answers", () => {
     expect(parseSignupAnswer(answer)).toEqual(answer);
     expect(parseSignupAnswer({ me, backupCode: "short" })).toBeNull();
     expect(parseSignupAnswer({ backupCode: answer.backupCode })).toBeNull();
+  });
+});
+
+// --- Plan 04-02: login, logout ---
+
+const ASSERTION = {
+  id: "AAAAAAAAAAAAAAAAAAAAAA",
+  rawId: "AAAAAAAAAAAAAAAAAAAAAA",
+  type: "public-key",
+  response: {
+    clientDataJSON: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+    authenticatorData: "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+    signature: "MEUCIQ",
+    userHandle: "dXNlcg",
+  },
+  clientExtensionResults: {},
+  authenticatorAttachment: "cross-platform",
+};
+
+describe("login and logout bodies (plan 04-02)", () => {
+  it("logout and the login options take an empty object, nothing else", () => {
+    expect(EmptyBody.safeParse({}).success).toBe(true);
+    expect(EmptyBody.safeParse({ a: 1 }).success).toBe(false);
+    expect(EmptyBody.safeParse(null).success).toBe(false);
+    expect(EmptyBody.safeParse([]).success).toBe(false);
+  });
+
+  it("the login verify body takes an authentication response, strict and length-capped", () => {
+    expect(LoginVerifyBody.safeParse({ response: ASSERTION }).success).toBe(true);
+    const { userHandle: _handle, ...noHandle } = ASSERTION.response;
+    expect(
+      LoginVerifyBody.safeParse({ response: { ...ASSERTION, response: noHandle } }).success,
+    ).toBe(true);
+    const { authenticatorAttachment: _attachment, ...noAttachment } = ASSERTION;
+    expect(LoginVerifyBody.safeParse({ response: noAttachment }).success).toBe(true);
+    const bad = [
+      { ...ASSERTION, type: "password" },
+      { ...ASSERTION, extra: true },
+      { ...ASSERTION, id: "A".repeat(2000) },
+      { ...ASSERTION, rawId: "not base64url!" },
+      { ...ASSERTION, response: { ...ASSERTION.response, signature: "A".repeat(3000) } },
+      { ...ASSERTION, response: { ...ASSERTION.response, authenticatorData: "A".repeat(5000) } },
+      { ...ASSERTION, response: { ...ASSERTION.response, userHandle: "A".repeat(200) } },
+      { ...ASSERTION, response: { ...ASSERTION.response, other: "x" } },
+      { ...ASSERTION, response: { ...ASSERTION.response, signature: undefined } },
+      { ...ASSERTION, authenticatorAttachment: "elsewhere" },
+      REGISTRATION,
+    ];
+    for (const response of bad) {
+      expect(
+        LoginVerifyBody.safeParse({ response }).success,
+        JSON.stringify(response).slice(0, 80),
+      ).toBe(false);
+    }
+    expect(LoginVerifyBody.safeParse({ response: ASSERTION, more: 1 }).success).toBe(false);
+  });
+
+  it("reads the authentication options and the login answer", () => {
+    const options = {
+      challenge: "Y2hhbGxlbmdl",
+      rpId: "toc.test",
+      userVerification: "preferred",
+      timeout: 120000,
+    };
+    expect(parseRequestOptions(options)).toEqual(options);
+    expect(
+      parseRequestOptions({ ...options, allowCredentials: [{ id: "AAAA", type: "public-key" }] }),
+    ).toMatchObject({ allowCredentials: [{ id: "AAAA", type: "public-key" }] });
+    expect(parseRequestOptions({ rpId: "toc.test" })).toBeNull();
+    expect(parseRequestOptions("<html>")).toBeNull();
+
+    const me = {
+      id: "u".repeat(22),
+      pseudo: "Zoé",
+      createdAt: 1,
+      passkeys: [],
+      hasBackupCode: true,
+      backupAt: 1,
+    };
+    expect(parseLoginAnswer({ me })).toEqual({ me });
+    expect(parseLoginAnswer({ me: { ...me, pseudo: 1 } })).toBeNull();
+    expect(parseLoginAnswer(me)).toBeNull();
   });
 });

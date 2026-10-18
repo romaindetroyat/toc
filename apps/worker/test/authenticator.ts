@@ -44,8 +44,15 @@ export type SoftAuthenticator = {
   id: string;
   /** navigator.credentials.create(): a RegistrationResponseJSON for this challenge. */
   create(challenge: string, options?: { origin?: string }): Promise<Record<string, unknown>>;
-  /** navigator.credentials.get(): an AuthenticationResponseJSON for this challenge. */
-  get(challenge: string, userHandle: string): Promise<Record<string, unknown>>;
+  /**
+   * navigator.credentials.get(): an AuthenticationResponseJSON for this challenge. The signature
+   * counter goes up by one each time, unless `counter` is given (a synced passkey reports 0).
+   */
+  get(
+    challenge: string,
+    userHandle: string,
+    options?: { counter?: number },
+  ): Promise<Record<string, unknown>>;
 };
 
 /** A new passkey for `rpID`, answering as the page at `origin`. */
@@ -105,13 +112,23 @@ export async function softAuthenticator(rpID: string, origin: string): Promise<S
         },
       };
     },
-    async get(challenge, userHandle) {
+    async get(challenge, userHandle, options = {}) {
       counter++;
+      const reported = options.counter ?? counter;
       const clientDataJSON = enc(
         JSON.stringify({ type: "webauthn.get", challenge, origin, crossOrigin: false }),
       );
       // Flags 0x05: user present, user verified.
-      const authData = cat(rpIdHash, u8(0x05, 0, 0, 0, counter));
+      const authData = cat(
+        rpIdHash,
+        u8(
+          0x05,
+          (reported >>> 24) & 255,
+          (reported >>> 16) & 255,
+          (reported >>> 8) & 255,
+          reported & 255,
+        ),
+      );
       const signed = cat(authData, await sha256(clientDataJSON));
       const raw = new Uint8Array(
         await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, signed),
