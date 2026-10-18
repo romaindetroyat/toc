@@ -6,7 +6,11 @@
 //   GET  /api/invitations/:code      → the state of an invitation link (or the bootstrap code)
 //   POST /api/auth/signup/options    → a passkey's creation options for { invitation, pseudo }
 //   POST /api/auth/signup/verify     → the account, its session cookie and its backup code
-//   GET  /api/me                     → the signed-in account, or 401
+//   GET  /api/me                     → the signed-in account, or 401 (renews a session seen > 7 days ago)
+// Plan 04-02:
+//   POST /api/auth/login/options     → usernameless authentication options (nothing written)
+//   POST /api/auth/login/verify      → a new session on this device and the account
+//   POST /api/auth/logout            → this device's session ends, 204
 //   POST /api/test/invitation        → TOC_TEST_MODE only: an invitation for the browser tests
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
@@ -15,6 +19,7 @@
 
 import { isTableId, parseCreateTestOptions, toBase64Url } from "@toc/protocol";
 import type { TestOptions } from "@toc/table";
+import { loginOptions, loginVerify, logout } from "./auth/login.ts";
 import { invitationRoute, mintInvitation, signupOptions, signupVerify } from "./auth/signup.ts";
 import { Meter } from "./db.ts";
 import { GameRoom } from "./GameRoom.ts";
@@ -89,7 +94,21 @@ async function summaryRoute(request: Request, env: Env, id: string): Promise<Res
   return found === null ? json({ error: "not-found" }, 404) : json(found, 200);
 }
 
-/** The account routes (plan 04-01), or null for a path that is not one of them. */
+type Post = (request: Request, env: Env, url: URL, meter: Meter, now: number) => Promise<Response>;
+
+/** The POST routes of the accounts (plans 04-01, 04-02), each behind writeAllowed and readJson. */
+const POSTS = new Map<string, Post>([
+  ["/api/auth/signup/options", signupOptions],
+  ["/api/auth/signup/verify", signupVerify],
+  [
+    "/api/auth/login/options",
+    (request, env, url, _meter, now) => loginOptions(request, env, url, now),
+  ],
+  ["/api/auth/login/verify", loginVerify],
+  ["/api/auth/logout", (request, env, url, meter) => logout(request, env, url, meter)],
+]);
+
+/** The account routes (plans 04-01, 04-02), or null for a path that is not one of them. */
 async function accountRoute(
   request: Request,
   env: Env,
@@ -107,15 +126,13 @@ async function accountRoute(
     if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
     return meRoute(request, env, url, meter, now);
   }
-  const write =
-    path === "/api/auth/signup/options" ||
-    path === "/api/auth/signup/verify" ||
-    (path === "/api/test/invitation" && env.TOC_TEST_MODE === "1");
-  if (!write) return null;
+  const post = POSTS.get(path);
+  const test = path === "/api/test/invitation" && env.TOC_TEST_MODE === "1";
+  if (post === undefined && !test) return null;
   if (request.method !== "POST") return notAllowed("POST");
+  // Every write: our own non-null Origin first (403), then the route's readJson (415, 413, 400).
   if (!writeAllowed(request, url)) return json({ error: "origin" }, 403);
-  if (path === "/api/auth/signup/options") return signupOptions(request, env, url, meter, now);
-  if (path === "/api/auth/signup/verify") return signupVerify(request, env, url, meter, now);
+  if (post !== undefined) return post(request, env, url, meter, now);
   return mintInvitation(request, meter, now);
 }
 

@@ -155,6 +155,26 @@ const registrationResponse = z.strictObject({
 
 export type RegistrationResponse = z.infer<typeof registrationResponse>;
 
+/**
+ * What @simplewebauthn/browser's startAuthentication sends back (plan 04-02): shape and lengths only.
+ * userHandle is the account's WebAuthn handle (32 bytes, 43 characters; the spec allows 64 bytes).
+ */
+const authenticationResponse = z.strictObject({
+  id: base64url(1024),
+  rawId: base64url(1024),
+  type: z.literal("public-key"),
+  response: z.strictObject({
+    clientDataJSON: base64url(2048),
+    authenticatorData: base64url(4096),
+    signature: base64url(2048),
+    userHandle: z.optional(base64url(128)),
+  }),
+  clientExtensionResults: z.record(z.string().check(z.maxLength(64)), z.unknown()),
+  authenticatorAttachment: z.optional(z.enum(["platform", "cross-platform"])),
+});
+
+export type AuthenticationResponse = z.infer<typeof authenticationResponse>;
+
 /** POST /api/auth/signup/options: the invitation (or bootstrap) code and the pseudo typed. */
 export const SignupOptionsBody = z.strictObject({
   invitation: z.string().check(z.maxLength(64)),
@@ -163,6 +183,12 @@ export const SignupOptionsBody = z.strictObject({
 
 /** POST /api/auth/signup/verify: the passkey's registration response. */
 export const SignupVerifyBody = z.strictObject({ response: registrationResponse });
+
+/** POST /api/auth/login/options and /api/auth/logout (plan 04-02): an empty JSON object. */
+export const EmptyBody = z.strictObject({});
+
+/** POST /api/auth/login/verify (plan 04-02): the passkey's authentication response. */
+export const LoginVerifyBody = z.strictObject({ response: authenticationResponse });
 
 /** POST /api/test/invitation (TOC_TEST_MODE only): a fresh invitation, or a used or expired one. */
 export const TestInvitationBody = z.strictObject({
@@ -230,6 +256,22 @@ const creationOptions = z.looseObject({
 
 export type CreationOptions = z.infer<typeof creationOptions>;
 
+/** The request options of a passkey assertion, as the page hands them to startAuthentication. */
+const requestOptions = z.looseObject({
+  challenge: z.string(),
+  rpId: z.optional(z.string()),
+  allowCredentials: z.optional(
+    z.array(z.looseObject({ id: z.string(), type: z.literal("public-key") })),
+  ),
+});
+
+export type RequestOptions = z.infer<typeof requestOptions>;
+
+const loginAnswer = z.object({ me: meAccount });
+
+/** POST /api/auth/login/verify (plan 04-02): the account now signed in on this device. */
+export type LoginAnswer = z.infer<typeof loginAnswer>;
+
 const read =
   <T>(schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } }) =>
   (data: unknown): T | null => {
@@ -241,3 +283,5 @@ export const parseMeAccount = read<MeAccount>(meAccount);
 export const parseInvitationState = read<InvitationState>(invitationState);
 export const parseSignupAnswer = read<SignupAnswer>(signupAnswer);
 export const parseCreationOptions = read<CreationOptions>(creationOptions);
+export const parseRequestOptions = read<RequestOptions>(requestOptions);
+export const parseLoginAnswer = read<LoginAnswer>(loginAnswer);

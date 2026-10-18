@@ -6,15 +6,22 @@
 // (wrangler dev on localhost for Playwright) is it `toc_session` without Secure.
 //   createSession(…)   the INSERT for the caller's batch, and the Set-Cookie value
 //   sessionUser(…)     the account of the request's cookie, or null (unknown, expired, malformed)
-//   clearCookie(…)     the Set-Cookie that expires it (an answer 401 to a dead session)
-// The sliding refresh (seen_at, a new expiry) comes with plan 04-02.
+//   clearCookie(…)     the Set-Cookie that expires it (an answer 401 to a dead session, a logout)
+//   refresh(…)         the sliding session (plan 04-02, Pattern 4): a session last seen more than
+//                      REFRESH_AFTER_MS ago gets seen_at = now, 400 days more and its cookie again;
+//                      at most one row written per device per week, so a player who opens the game
+//                      once a year never signs in again (ACCT-02)
+//   endSession(…)      the logout: this device's row goes (its push subscription with it, cascade)
 
 import { isDeviceToken } from "@toc/protocol";
 import type { Meter } from "../db.ts";
 import { randomUrl, sha256Url } from "../http.ts";
 
 export const SESSION_DAYS = 400;
-const SESSION_MS = SESSION_DAYS * 24 * 3600 * 1000;
+/** A session lives 400 days after it was last refreshed (the longest a browser keeps a cookie). */
+export const SESSION_TTL_MS = SESSION_DAYS * 24 * 3600 * 1000;
+/** A session seen more recently than this is not refreshed (no write). */
+export const REFRESH_AFTER_MS = 7 * 24 * 3600 * 1000;
 const MAX_AGE = SESSION_DAYS * 24 * 3600;
 
 /** The cookie's name: `__Host-` everywhere but test-mode plain http (Pitfall 12). */
@@ -75,7 +82,7 @@ export async function createSession(
       `INSERT INTO sessions (id_hash, user_id, passkey_id, created_at, seen_at, expires_at, auth_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(hash, userId, passkeyId, now, now, now + SESSION_MS, now);
+    .bind(hash, userId, passkeyId, now, now, now + SESSION_TTL_MS, now);
   return { statement, cookie: sessionCookie(token, url, env), hash };
 }
 
@@ -86,6 +93,7 @@ export type SessionUser = {
   sessionHash: string;
   passkeyId: string | null;
   authAt: number;
+  seenAt: number;
   hasBackupCode: boolean;
   backupAt: number | null;
 };
@@ -94,6 +102,7 @@ type SessionRow = {
   id_hash: string;
   passkey_id: string | null;
   auth_at: number;
+  seen_at: number;
   id: string;
   pseudo: string;
   created_at: number;
@@ -114,7 +123,7 @@ export async function sessionUser(
   const row = await meter.first<SessionRow>(
     meter
       .prepare(
-        `SELECT s.id_hash, s.passkey_id, s.auth_at, u.id, u.pseudo, u.created_at,
+        `SELECT s.id_hash, s.passkey_id, s.auth_at, s.seen_at, u.id, u.pseudo, u.created_at,
                 u.backup_mac IS NOT NULL AS has_backup, u.backup_at
            FROM sessions s JOIN users u ON u.id = s.user_id
           WHERE s.id_hash = ? AND s.expires_at > ?`,
@@ -129,7 +138,46 @@ export async function sessionUser(
     sessionHash: row.id_hash,
     passkeyId: row.passkey_id,
     authAt: row.auth_at,
+    seenAt: row.seen_at,
     hasBackupCode: row.has_backup === 1,
     backupAt: row.backup_at,
   };
+}
+
+/**
+ * The sliding refresh of the request's session (`user` from sessionUser): when it was last seen more
+ * than REFRESH_AFTER_MS ago, one UPDATE (seen_at = now, expires_at = now + SESSION_TTL_MS) and the
+ * Set-Cookie that renews the same token for 400 days; otherwise null and nothing written.
+ */
+export async function refresh(
+  meter: Meter,
+  request: Request,
+  url: URL,
+  env: Env,
+  user: SessionUser,
+  now: number,
+): Promise<string | null> {
+  if (now - user.seenAt <= REFRESH_AFTER_MS) return null;
+  const token = readToken(request, url, env);
+  if (token === null) return null;
+  await meter.run(
+    meter
+      .prepare("UPDATE sessions SET seen_at = ?, expires_at = ? WHERE id_hash = ?")
+      .bind(now, now + SESSION_TTL_MS, user.sessionHash),
+  );
+  return sessionCookie(token, url, env);
+}
+
+/** The logout: the request's session row goes (its push subscriptions with it, ON DELETE CASCADE). */
+export async function endSession(
+  meter: Meter,
+  request: Request,
+  url: URL,
+  env: Env,
+): Promise<void> {
+  const token = readToken(request, url, env);
+  if (token === null) return;
+  await meter.run(
+    meter.prepare("DELETE FROM sessions WHERE id_hash = ?").bind(await sha256Url(token)),
+  );
 }

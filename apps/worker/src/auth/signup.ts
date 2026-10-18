@@ -22,7 +22,7 @@
 // backup code (an HMAC under TOC_PEPPER only), the bootstrap code (a secret, never in a config).
 
 import { generateRegistrationOptions, verifyRegistrationResponse } from "@simplewebauthn/server";
-import { decodeClientDataJSON, isoBase64URL } from "@simplewebauthn/server/helpers";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import {
   deviceLabel,
   INVITE_TTL_MS,
@@ -39,28 +39,15 @@ import {
 import type { Meter } from "../db.ts";
 import { json, randomUrl, readJson, sha256Url } from "../http.ts";
 import { macOf, sameSecret } from "./backup.ts";
+import {
+  CEREMONY_TIMEOUT_MS,
+  challengeOf,
+  pepperOf,
+  storeChallenge,
+  takeChallenge,
+} from "./challenge.ts";
 import { createSession } from "./session.ts";
 import { rpFor } from "./webauthn.ts";
-
-const CHALLENGE_MS = 5 * 60_000;
-/** How long the system dialog may stay up (the challenge lives longer). */
-const CEREMONY_TIMEOUT_MS = 120_000;
-const SWEEP_EVERY_MS = 3600_000;
-
-let lastSweep = 0;
-let configLogged = false;
-
-/** The pepper secret, or the 503 answer when it is missing (logged once per isolate, never its value). */
-function pepperOf(env: Env): string | Response {
-  if (env.TOC_PEPPER !== undefined && env.TOC_PEPPER !== "") return env.TOC_PEPPER;
-  if (!configLogged) {
-    configLogged = true;
-    console.error(
-      "TOC_PEPPER is not set: sign-up is closed until `wrangler secret put TOC_PEPPER`",
-    );
-  }
-  return json({ error: "config" }, 503);
-}
 
 /** The bootstrap code is ours: compared in constant time on SHA-256 digests (T-04-11). */
 async function isBootstrap(code: string, env: Env): Promise<boolean> {
@@ -166,13 +153,6 @@ function readPending(text: string | null): Pending | null {
   };
 }
 
-/** At most once an hour per isolate: the expired challenges go (no cron, Pattern 9). */
-async function sweep(meter: Meter, now: number): Promise<void> {
-  if (now - lastSweep < SWEEP_EVERY_MS) return;
-  lastSweep = now;
-  await meter.run(meter.prepare("DELETE FROM challenges WHERE expires_at < ?").bind(now));
-}
-
 /** POST /api/auth/signup/options (the router has checked the Origin). */
 export async function signupOptions(
   request: Request,
@@ -220,14 +200,15 @@ export async function signupOptions(
     userId: randomUrl(16),
     handle: isoBase64URL.fromBuffer(handle),
   };
-  await sweep(meter, now);
-  await meter.run(
-    meter
-      .prepare(
-        `INSERT INTO challenges (challenge, purpose, user_id, pending, expires_at)
-         VALUES (?, 'register', NULL, ?, ?)`,
-      )
-      .bind(options.challenge, JSON.stringify(pending), now + CHALLENGE_MS),
+  await storeChallenge(
+    meter,
+    {
+      challenge: options.challenge,
+      purpose: "register",
+      userId: null,
+      pending: JSON.stringify(pending),
+    },
+    now,
   );
   return json(options, 200);
 }
@@ -258,26 +239,13 @@ export async function signupVerify(
   if (!read.ok) return read.response;
   const response = read.body.response;
 
-  let challenge: string;
-  try {
-    challenge = decodeClientDataJSON(response.response.clientDataJSON).challenge;
-  } catch {
-    return json({ error: "body" }, 400);
-  }
-  if (typeof challenge !== "string" || challenge.length === 0 || challenge.length > 128) {
-    return json({ error: "body" }, 400);
-  }
+  const challenge = challengeOf(response.response.clientDataJSON);
+  if (challenge === null) return json({ error: "body" }, 400);
 
   // Single use: the row goes now, whatever comes next.
-  const taken = await meter.first<{ pending: string | null }>(
-    meter
-      .prepare(
-        `DELETE FROM challenges WHERE challenge = ? AND purpose = 'register' AND expires_at > ?
-         RETURNING pending`,
-      )
-      .bind(challenge, now),
+  const pending = readPending(
+    (await takeChallenge(meter, challenge, "register", null, now)) ?? null,
   );
-  const pending = readPending(taken?.pending ?? null);
   if (pending === null) return json({ error: "expired" }, 400);
 
   const rp = rpFor(url, env);
