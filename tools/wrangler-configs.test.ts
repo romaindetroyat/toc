@@ -132,6 +132,33 @@ describe("wrangler configs", () => {
       expect(config.vars?.TOC_TEST_MODE).toBeUndefined();
     }
   });
+
+  // Plan 04-01, D-10: the passkeys' RP ID and origin come from the config only, never from the
+  // request's Host, and both deploys must agree or a passkey made through one would fail the other.
+  it("declares the same RP_ID and ORIGIN in both files, the origin on the RP ID's host (D-10)", () => {
+    for (const config of [upload, embedded]) {
+      expect(config.vars).toEqual({
+        RP_ID: "toc.romaindetroyat.workers.dev",
+        ORIGIN: "https://toc.romaindetroyat.workers.dev",
+      });
+      const origin = new URL(String(config.vars?.ORIGIN));
+      expect(origin.protocol).toBe("https:");
+      expect(origin.host).toBe(config.vars?.RP_ID);
+      expect(origin.origin).toBe(config.vars?.ORIGIN);
+    }
+    expect(embedded.vars).toEqual(upload.vars);
+  });
+
+  it("names no secret in a deploy config (T-04-22, T-04-26)", () => {
+    for (const file of ["wrangler.jsonc", "wrangler.embarque.jsonc"]) {
+      const config = read(file);
+      for (const secret of ["TOC_TEST_MODE", "TOC_PEPPER", "TOC_BOOTSTRAP", "VAPID_PRIVATE_KEY"]) {
+        expect(config.vars?.[secret], `${file}: ${secret}`).toBeUndefined();
+      }
+      const text = readFileSync(join(ROOT, file), "utf8");
+      expect(text).not.toMatch(/"(TOC_PEPPER|TOC_BOOTSTRAP|VAPID_PRIVATE_KEY)"\s*:/);
+    }
+  });
 });
 
 describe("tools/check-bundle.mjs", () => {

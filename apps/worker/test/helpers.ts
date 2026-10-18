@@ -120,6 +120,59 @@ export async function connect(
   };
 }
 
+/**
+ * A browser's cookie for the account routes (plan 04-01): the `name=value` of the last Set-Cookie,
+ * dropped when the server expires it (Max-Age=0). One jar per simulated browser.
+ */
+export type Jar = { cookie: string | null };
+
+export const newJar = (): Jar => ({ cookie: null });
+
+function keep(jar: Jar | undefined, response: Response): void {
+  const set = response.headers.get("set-cookie");
+  if (jar === undefined || set === null) return;
+  jar.cookie = /;\s*Max-Age=0\b/i.test(set) ? null : (set.split(";")[0] ?? null);
+}
+
+export type CallOptions = {
+  /** The Origin header: the test origin by default, null for none. */
+  origin?: string | null;
+  jar?: Jar;
+  contentType?: string;
+  userAgent?: string;
+};
+
+/** A JSON POST as the app sends it (the page's Origin, application/json), keeping the cookie. */
+export async function post(
+  path: string,
+  body: unknown,
+  options: CallOptions = {},
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    "content-type": options.contentType ?? "application/json",
+  };
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  if (options.userAgent) headers["User-Agent"] = options.userAgent;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, {
+    method: "POST",
+    headers,
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+  keep(options.jar, response);
+  return response;
+}
+
+/** A GET with the jar's cookie, keeping what the answer sets. */
+export async function get(path: string, jar?: Jar): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (jar?.cookie) headers.Cookie = jar.cookie;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, { headers });
+  keep(jar, response);
+  return response;
+}
+
 /** A device token: 43 base64url characters. */
 export function token(letter: string): string {
   return letter.repeat(43);
