@@ -8,8 +8,9 @@ export default defineConfig(({ mode }) => ({
     // The installable app (plan 04-08, D-09, 04-RESEARCH Pattern 8): our own service worker src/sw.ts,
     // built into dist/sw.js with the precache list injected. The update waits for the player
     // (registerType prompt, no automatic skipWaiting); src/pwa/update.svelte.ts registers it, and the
-    // manifest stays public/manifest.webmanifest. The bench and the debug chunks are not precached,
-    // nor the iOS splash images (iOS reads them when the app is added, not offline).
+    // manifest stays public/manifest.webmanifest. The bench and the geometry overlay are not
+    // precached, nor the iOS splash images (iOS reads them when the app is added, not offline). The
+    // debug parameters' chunk is (it exists in debug builds only, whose game loads it at every start).
     VitePWA({
       strategies: "injectManifest",
       srcDir: "src",
@@ -19,7 +20,7 @@ export default defineConfig(({ mode }) => ({
       manifest: false,
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2,ico,webmanifest}"],
-        globIgnores: ["**/Bench-*", "**/DebugGeometry-*", "**/debugParams-*", "splash/**"],
+        globIgnores: ["**/Bench-*", "**/DebugGeometry-*", "splash/**"],
       },
       devOptions: { enabled: false },
     }),
