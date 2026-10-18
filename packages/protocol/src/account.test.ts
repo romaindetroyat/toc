@@ -38,11 +38,13 @@ import {
   parseRecoverRefusal,
   parseRequestOptions,
   parseSignupAnswer,
+  parseTableInviteAnswer,
   pseudoKey,
   RecoverBody,
   RecoverVerifyBody,
   SignupOptionsBody,
   SignupVerifyBody,
+  TableInviteBody,
 } from "./account.ts";
 
 // The account rules every side shares (plan 04-01, D-02, D-04, 04-RESEARCH Patterns 3 and 5): the
@@ -545,5 +547,23 @@ describe("friend codes (plan 04-05)", () => {
     expect(parseFriendCodeAnswer(answer)).toEqual(answer);
     expect(parseFriendCodeAnswer({ ...answer, code: "TOC-K7QM-2XRA" })).toBeNull();
     expect(parseFriendCodeAnswer({ code: "K7QM2XRA" })).toBeNull();
+  });
+});
+
+describe("the table invite (plan 04-06)", () => {
+  it("the body is { friendId }, an opaque id, and nothing else", () => {
+    const friendId = "u".repeat(22);
+    expect(TableInviteBody.safeParse({ friendId }).success).toBe(true);
+    expect(TableInviteBody.safeParse({ friendId: "u".repeat(23) }).success).toBe(false);
+    expect(TableInviteBody.safeParse({ friendId: "../../x/yyyyyyyyyyyyyyy" }).success).toBe(false);
+    expect(TableInviteBody.safeParse({ friendId, table: "x" }).success).toBe(false);
+    expect(TableInviteBody.safeParse({}).success).toBe(false);
+  });
+
+  it("the answer is sent or here", () => {
+    expect(parseTableInviteAnswer({ state: "sent" })).toEqual({ state: "sent" });
+    expect(parseTableInviteAnswer({ state: "here" })).toEqual({ state: "here" });
+    expect(parseTableInviteAnswer({ state: "away" })).toBeNull();
+    expect(parseTableInviteAnswer({})).toBeNull();
   });
 });
