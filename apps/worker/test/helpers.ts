@@ -302,3 +302,46 @@ export async function logIn(
   const verify = await post("/api/auth/login/verify", { response: assertion }, { jar, userAgent });
   return { options, verify, assertion };
 }
+
+// --- The account at the table (plan 04-04) ---
+
+export type UpgradeOptions = {
+  /** The browser's cookie jar: its session cookie rides the upgrade. */
+  jar?: Jar;
+  /** The Origin header: the test origin by default, null for none. */
+  origin?: string | null;
+  /** Any other header the client sends (a forged x-toc-account, for instance). */
+  headers?: Record<string, string>;
+};
+
+function upgradeHeaders(options: UpgradeOptions): Record<string, string> {
+  const headers: Record<string, string> = { ...options.headers };
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  return headers;
+}
+
+/** The raw answer to a table upgrade, as a browser with this jar and Origin sends it. */
+export async function upgrade(id: string, options: UpgradeOptions = {}): Promise<Response> {
+  return SELF.fetch(`${ORIGIN}/ws/table/${id}`, {
+    headers: { Upgrade: "websocket", ...upgradeHeaders(options) },
+  });
+}
+
+/** A table socket opened by a browser with this jar (its session cookie) and our Origin. */
+export async function connectAs(id: string, options: UpgradeOptions = {}): Promise<Client> {
+  return connect(id, upgradeHeaders(options));
+}
+
+/** Waits (wall time) until a query on the tests' D1 answers `count` rows; answers them. */
+export async function untilRows(count: number, sql: string, ...values: unknown[]): Promise<Row[]> {
+  const deadline = Date.now() + 30_000;
+  let found: Row[] = [];
+  while (Date.now() < deadline) {
+    found = await rows(sql, ...values);
+    if (found.length === count) return found;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`expected ${count} rows, found ${found.length}: ${sql}`);
+}
