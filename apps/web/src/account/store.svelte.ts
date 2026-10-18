@@ -5,6 +5,7 @@
 // or an error. The session itself is the HttpOnly cookie, out of this code's reach. Plan 04-02:
 // signedIn(me) after a login, signedOut() after « Se déconnecter » (pass it as logOut's `forget`).
 
+import { type ApiDeps, browserApi } from "../net/api.ts";
 import { me } from "./api.ts";
 import {
   type AccountStorage,
@@ -13,7 +14,33 @@ import {
   writeCachedAccount,
 } from "./cache.ts";
 
-export const account = $state<{ current: CachedAccount | null }>({ current: null });
+export const account = $state<{
+  current: CachedAccount | null;
+  /**
+   * Plan 04-08: false when the last GET /api/me failed on the network (no answer at all), the home's
+   * offline strip; a 404 or a non-JSON answer (the local preview, no Worker) is an answer.
+   */
+  reachable: boolean;
+}>({ current: null, reachable: true });
+
+/** browserApi, noting whether the request got no answer at all. */
+function watched(): { deps: ApiDeps; threw: () => boolean } {
+  let threw = false;
+  return {
+    deps: {
+      online: browserApi.online,
+      fetch: async (input, init) => {
+        try {
+          return await browserApi.fetch(input, init);
+        } catch (error) {
+          threw = true;
+          throw error;
+        }
+      },
+    },
+    threw: () => threw,
+  };
+}
 
 function storage(): AccountStorage | null {
   try {
@@ -31,11 +58,17 @@ export function startAccount(): void {
   started = true;
   account.current = readCachedAccount(storage());
   void refreshAccount();
+  // Back online (plan 04-08, 04-UI-SPEC « Offline »): the account is asked again, the strip goes.
+  if (typeof window !== "undefined") {
+    window.addEventListener("online", () => void refreshAccount());
+  }
 }
 
 /** GET /api/me again (after a sign-up, a return online). */
 export async function refreshAccount(): Promise<void> {
-  const answer = await me();
+  const call = watched();
+  const answer = await me(call.deps);
+  account.reachable = !call.threw();
   if (answer === "offline") return;
   if (answer === null) {
     account.current = null;

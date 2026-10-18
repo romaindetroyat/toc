@@ -1,6 +1,3 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { DEVICES, splashName } from "../../../../tools/build-icons.mjs";
 
@@ -9,12 +6,24 @@ import { DEVICES, splashName } from "../../../../tools/build-icons.mjs";
 // apple-touch-startup-image per screen size. tools/build-icons.mjs draws them (the logo centred on the
 // walnut, no text) for its DEVICES list, held sideways; index.html links each one, in that order.
 
-const WEB = fileURLToPath(new URL("../..", import.meta.url));
-const SPLASH = join(WEB, "public/splash");
-const html = readFileSync(join(WEB, "index.html"), "utf8");
+const raw = import.meta.glob<string>(["../../index.html", "../../public/manifest.webmanifest"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+const html = raw["../../index.html"] ?? "";
+const manifestText = raw["../../public/manifest.webmanifest"] ?? "{}";
+/** The PNGs of public/splash, as data URLs (base64). */
+const pngs = import.meta.glob<string>("../../public/splash/*", {
+  query: "?inline",
+  import: "default",
+  eager: true,
+});
+const splashFiles = Object.fromEntries(
+  Object.entries(pngs).map(([path, url]) => [path.replace("../../public/splash/", ""), url]),
+);
 
-type Device = { name: string; width: number; height: number; ratio: number };
-const devices = DEVICES as readonly Device[];
+const devices = DEVICES;
 
 /** Every <link rel="apple-touch-startup-image"> of index.html: its media query and its file. */
 const links = [...html.matchAll(/<link\s+rel="apple-touch-startup-image"\s+([^>]*)\/?>/g)].map(
@@ -27,11 +36,14 @@ const links = [...html.matchAll(/<link\s+rel="apple-touch-startup-image"\s+([^>]
   },
 );
 
-/** The width and height written in a PNG's header. */
-function pngSize(file: string): { width: number; height: number } {
-  const bytes = readFileSync(file);
-  expect(bytes.subarray(1, 4).toString("latin1")).toBe("PNG");
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+/** The width and height written in a PNG's header (a base64 data URL). */
+function pngSize(dataUrl: string): { width: number; height: number } {
+  const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1, dataUrl.indexOf(",") + 41));
+  const byte = (i: number) => binary.charCodeAt(i);
+  const u32 = (i: number) =>
+    ((byte(i) << 24) | (byte(i + 1) << 16) | (byte(i + 2) << 8) | byte(i + 3)) >>> 0;
+  expect(binary.slice(1, 4)).toBe("PNG");
+  return { width: u32(16), height: u32(20) };
 }
 
 describe("iOS splash images", () => {
@@ -58,8 +70,8 @@ describe("iOS splash images", () => {
   });
 
   it("every linked file exists, and every file of public/splash is linked once", () => {
-    expect(existsSync(SPLASH)).toBe(true);
-    const files = readdirSync(SPLASH).sort();
+    const files = Object.keys(splashFiles).sort();
+    expect(files.length).toBeGreaterThan(0);
     const linked = links.map((l) => l.href.replace(/^\/splash\//, "")).sort();
     expect(files).toEqual(linked);
     expect(new Set(linked).size).toBe(linked.length);
@@ -67,7 +79,7 @@ describe("iOS splash images", () => {
 
   it("each image is the device's screen in pixels, held sideways", () => {
     for (const d of devices) {
-      expect(pngSize(join(SPLASH, splashName(d)))).toEqual({
+      expect(pngSize(splashFiles[splashName(d)] ?? "")).toEqual({
         width: d.height * d.ratio,
         height: d.width * d.ratio,
       });
@@ -83,7 +95,7 @@ describe("iOS splash images", () => {
 });
 
 describe("manifest.webmanifest (D-09)", () => {
-  const manifest = JSON.parse(readFileSync(join(WEB, "public/manifest.webmanifest"), "utf8"));
+  const manifest = JSON.parse(manifestText);
 
   it("adds the landscape orientation, an id and the games category", () => {
     expect(manifest.orientation).toBe("landscape");

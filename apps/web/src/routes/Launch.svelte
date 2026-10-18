@@ -9,6 +9,7 @@
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import type { BotLevels } from "../settings/settings.ts";
   import ColorTile from "../ui/ColorTile.svelte";
+  import HomeStrip from "../ui/HomeStrip.svelte";
   import SettingsSheet from "../ui/SettingsSheet.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import StrengthPicker from "../ui/StrengthPicker.svelte";
@@ -97,6 +98,9 @@
     <h1 class="t-display">{launch.title}</h1>
     <p class="tagline">{launch.tagline}</p>
   </header>
+  <!-- Plan 04-08 (APP-02): « Nouvelle version disponible » may show here, after the header; the
+       offline and install strips stay on the home. -->
+  <HomeStrip kinds={["update"]} margin={compact ? "0 0 var(--space-sm)" : undefined} />
 {/snippet}
 
 <main class="launch" data-layout={layout}>

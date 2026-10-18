@@ -26,7 +26,8 @@ const SUBSETS = ["latin", "latin-ext"];
 
 /**
  * Exactly the icons of UI-SPEC « Design System » (phase 1, then the six of 02-UI-SPEC), then those of
- * 04-UI-SPEC as their screens come (plan 04-01: user, triangle-alert; copy was there).
+ * 04-UI-SPEC as their screens come (plan 04-01: user, triangle-alert; copy was there; plan 04-08:
+ * refresh-cw, download, share, square-plus for the home strip and « Installer TOC »).
  */
 const ICON_NAMES = [
   "settings",
@@ -49,6 +50,10 @@ const ICON_NAMES = [
   "crown",
   "user",
   "triangle-alert",
+  "refresh-cw",
+  "download",
+  "share",
+  "square-plus",
 ];
 
 mkdirSync(fontsOut, { recursive: true });

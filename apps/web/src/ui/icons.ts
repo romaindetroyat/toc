@@ -448,6 +448,96 @@ export const ICONS = {
       },
     },
   ],
+  "refresh-cw": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 3v5h-5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8 16H3v5",
+      },
+    },
+  ],
+  download: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 15V3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m7 10 5 5 5-5",
+      },
+    },
+  ],
+  share: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 2v13",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m16 6-4-4-4 4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8",
+      },
+    },
+  ],
+  "square-plus": [
+    {
+      tag: "rect",
+      attrs: {
+        width: "18",
+        height: "18",
+        x: "3",
+        y: "3",
+        rx: "2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8 12h8",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 8v8",
+      },
+    },
+  ],
 } as const;
 
 export type IconName = keyof typeof ICONS;

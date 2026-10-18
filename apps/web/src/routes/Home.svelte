@@ -7,6 +7,7 @@
   import { browserApi, createTable } from "../net/api.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
+  import HomeStrip from "../ui/HomeStrip.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import SmallTile from "../ui/SmallTile.svelte";
@@ -23,6 +24,8 @@
   // is decorative (alt=""): the heading already says « TOC ».
   // Plan 04-01: signed in, the small tile « Mon compte » (the pseudo under it) takes the place of the
   // name line (04-UI-SPEC « Small tiles »); the guest home is unchanged.
+  // Plan 04-08: the home strip (offline > update > install), at the bottom of the right column on the
+  // computer and in two columns, right after the header in one column and in portrait.
 
   const storage = pageStorage();
   let device = $state(loadDevice(storage));
@@ -126,6 +129,9 @@
       </div>
     </header>
   {/if}
+  {#if layout === "portrait"}
+    <HomeStrip />
+  {/if}
 
   <div class="columns">
     <section class="choices">
@@ -134,6 +140,9 @@
           <img class="logo" src={logo} alt="" width="34" height="34" data-home-logo />
           <h1 class="t-display title">{accueil.home.title}</h1>
         </header>
+      {/if}
+      {#if layout === "one"}
+        <HomeStrip margin="0 0 var(--space-sm)" />
       {/if}
       <div class="tiles">
         <ChoiceTile
@@ -194,6 +203,9 @@
       <div class="list">
         <TableList {storage} />
       </div>
+      {#if layout === "computer" || layout === "two"}
+        <HomeStrip margin={layout === "computer" ? "var(--space-md) 0 0" : "var(--space-sm) 0 0"} />
+      {/if}
     </section>
   </div>
 </main>
