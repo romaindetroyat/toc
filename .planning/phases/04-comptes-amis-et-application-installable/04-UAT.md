@@ -3,7 +3,7 @@ status: testing
 phase: 04-comptes-amis-et-application-installable
 source: [04-CONTEXT.md, 04-UI-SPEC.md, 04-12-SUMMARY.md]
 started: 2026-10-18T14:40:00Z
-updated: 2026-10-18T17:38:48Z
+updated: 2026-10-19T14:19:00Z
 ---
 
 ## Current Test
@@ -312,12 +312,23 @@ result: pass — 2026-10-18, Romain a créé son compte dans l’application ins
 expected: Le champ « J’ai une invitation » est dans la fenêtre « Se connecter », sous « Pas encore de compte ? », sur tous les appareils (pas seulement sur iPhone), avec la phrase « Sur iPhone, ouvre ton lien d’invitation dans Safari, ou colle-le ici dans l’application. » juste dessous. La fenêtre « Installer TOC » ne change pas. Sur un téléphone tenu en largeur, il faut faire défiler la fenêtre pour voir le champ (la clé d’accès reste en haut). Ça te va, ou préfères-tu ce champ ailleurs (par exemple en haut de la fenêtre, ou dans « Installer TOC ») ?
 result: pending
 
+### 62. Le cheval protégé sur son 18 : seulement celui qui vient de sortir (G18)
+expected: |
+  Ajouté par le plan 04-14, après ta décision du 2026-10-19 (« Cette règle ne s'applique qu'aux chevaux qui sortent juste de leur camp »). À faire après la prochaine mise en ligne, dans une partie contre l’ordinateur (ou entre proches).
+  1. Sors un cheval avec un As ou un Roi : il est sur ton 18 (ton losange). Laisse-le là quelques tours : aucun cheval ne peut le dépasser, s’arrêter sur lui ni l’échanger avec le Valet : ce coup n’est pas proposé (une carte qui ne peut rien faire d’autre est grisée, avec « Un cheval protégé sur sa case de sortie bloque le passage. »). Tes autres chevaux ne le dépassent pas non plus.
+  2. Fais-le avancer : il n’est plus protégé.
+  3. Un cheval qui revient sur son 18 après un tour de plus (ou parce que la case visée de sa maison était prise) est un cheval ordinaire : un adversaire peut le dépasser, le manger en s’arrêtant dessus, le manger au passage avec un 7, et le Valet peut l’échanger. Pareil pour un cheval que le Valet a posé sur son 18, et pour un cheval revenu sur son 18 en reculant de 4.
+  4. Ton propre cheval sur ton 18, protégé ou ordinaire, t’empêche toujours d’en sortir un second (« Garde le blocage »).
+  5. Une partie en ligne commencée avant la mise en ligne reprend normalement : un cheval qui était sur son 18 au départ y reste protégé tant qu’il ne bouge pas.
+  Les cas sont dessinés dans RULES.md, R-12.9 et R-12.11 à R-12.13.
+result: pending
+
 ## Summary
 
-total: 61
-passed: 0
+total: 62
+passed: 2
 issues: 0
-pending: 61
+pending: 60
 skipped: 0
 blocked: 0
 
