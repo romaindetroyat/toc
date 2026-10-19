@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { table as copy } from "../i18n/fr/table.ts";
 import {
   forgetTable,
+  linkTables,
   loadTables,
   MAX_TABLES,
+  mergeTables,
   rememberTable,
   restoreTable,
   rowStatus,
@@ -13,6 +15,7 @@ import {
   TABLES_KEY,
   type TableEntry,
   timeAgo,
+  visibleTables,
 } from "./tables.ts";
 
 /** An in-memory storage, optionally throwing like private browsing. */
@@ -226,5 +229,105 @@ describe("timeAgo(then, now)", () => {
     expect(timeAgo(now - 3 * 24 * 3_600_000, now)).toBe("il y a 3 jours");
     // A clock a little ahead of the server's never reads « dans … ».
     expect(timeAgo(now + 30_000, now)).toBe("maintenant");
+  });
+});
+
+// --- Plan 04-04: entries tagged with the account, the account's tables merged in ---
+
+const LEA = "l".repeat(22);
+const PAUL = "p".repeat(22);
+
+describe("the account's tag (plan 04-04)", () => {
+  it("validEntry keeps a well-formed account id and drops any other value (the entry stays)", () => {
+    const entries = loadTables(
+      memory([
+        { id: id(1), seat: "bleu", joinedAt: 5, account: LEA },
+        { id: id(2), seat: null, joinedAt: 4, account: "trop-court" },
+        { id: id(3), seat: null, joinedAt: 3, account: 42 },
+        { id: id(4), seat: "vert", joinedAt: 2 },
+      ]),
+    );
+    expect(entries).toEqual([
+      { id: id(1), seat: "bleu", joinedAt: 5, account: LEA },
+      { id: id(2), seat: null, joinedAt: 4 },
+      { id: id(3), seat: null, joinedAt: 3 },
+      { id: id(4), seat: "vert", joinedAt: 2 },
+    ]);
+  });
+
+  it("rememberTable tags the entry with the account of the welcome's socket", () => {
+    const storage = memory();
+    rememberTable(storage, id(1), null, 10, LEA);
+    expect(loadTables(storage)).toEqual([{ id: id(1), seat: null, joinedAt: 10, account: LEA }]);
+    // A guest entry signed in at its seat: same seat, now tagged; the join time stays.
+    rememberTable(storage, id(2), "bleu", 20);
+    rememberTable(storage, id(2), "bleu", 30, LEA);
+    expect(loadTables(storage)[0]).toEqual({ id: id(2), seat: "bleu", joinedAt: 20, account: LEA });
+    // Another account signed in on this device takes the entry over.
+    rememberTable(storage, id(2), null, 40, PAUL);
+    expect(loadTables(storage)[0]).toEqual({ id: id(2), seat: null, joinedAt: 20, account: PAUL });
+  });
+
+  it("a guest welcome never changes an entry tagged with an account (rule 4: the seat stays theirs)", () => {
+    const storage = memory([{ id: id(1), seat: "bleu", joinedAt: 5, account: LEA }]);
+    rememberTable(storage, id(1), null, 50);
+    expect(loadTables(storage)).toEqual([{ id: id(1), seat: "bleu", joinedAt: 5, account: LEA }]);
+  });
+
+  it("visibleTables: signed out, only untagged entries; signed in, untagged and one's own", () => {
+    const entries: TableEntry[] = [
+      { id: id(1), seat: "bleu", joinedAt: 5, account: LEA },
+      { id: id(2), seat: null, joinedAt: 4, account: PAUL },
+      { id: id(3), seat: "vert", joinedAt: 3 },
+    ];
+    expect(visibleTables(entries, null).map((entry) => entry.id)).toEqual([id(3)]);
+    expect(visibleTables(entries, LEA).map((entry) => entry.id)).toEqual([id(1), id(3)]);
+    expect(visibleTables(entries, PAUL).map((entry) => entry.id)).toEqual([id(2), id(3)]);
+  });
+
+  it("mergeTables: one list, the device's seat wins, newest first, at most MAX_TABLES", () => {
+    const device: TableEntry[] = [
+      { id: id(1), seat: "bleu", joinedAt: 50 },
+      { id: id(2), seat: null, joinedAt: 40, account: PAUL },
+      { id: id(3), seat: "rouge", joinedAt: 30, account: LEA },
+    ];
+    const account = [
+      { tableId: id(3), seat: "jaune" as const, joinedAt: 35 },
+      { tableId: id(4), seat: "vert" as const, joinedAt: 45 },
+      { tableId: id(1), seat: null, joinedAt: 10 },
+    ];
+    expect(mergeTables(device, account, LEA)).toEqual([
+      { id: id(1), seat: "bleu", joinedAt: 50, account: LEA },
+      { id: id(4), seat: "vert", joinedAt: 45, account: LEA },
+      { id: id(3), seat: "rouge", joinedAt: 30, account: LEA },
+    ]);
+    const many = Array.from({ length: 30 }, (_, n) => ({
+      tableId: id(100 + n),
+      seat: null,
+      joinedAt: n,
+    }));
+    const merged = mergeTables([], many, LEA);
+    expect(merged).toHaveLength(MAX_TABLES);
+    expect(merged[0]?.id).toBe(id(129));
+    // A malformed row from the server is skipped.
+    expect(mergeTables([], [{ tableId: "../x", seat: null, joinedAt: 1 }], LEA)).toEqual([]);
+  });
+
+  it("linkTables: at sign-in this device's guest entries pass to the account, others stay (plan 04-09)", () => {
+    const storage = memory([
+      { id: id(1), seat: "bleu", joinedAt: 5 },
+      { id: id(2), seat: null, joinedAt: 4, account: PAUL },
+      { id: id(3), seat: "vert", joinedAt: 3 },
+    ]);
+    expect(linkTables(storage, LEA)).toBe(2);
+    expect(loadTables(storage)).toEqual([
+      { id: id(1), seat: "bleu", joinedAt: 5, account: LEA },
+      { id: id(2), seat: null, joinedAt: 4, account: PAUL },
+      { id: id(3), seat: "vert", joinedAt: 3, account: LEA },
+    ]);
+    // Nothing left to link; a malformed account id links nothing; a throwing storage is no error.
+    expect(linkTables(storage, LEA)).toBe(0);
+    expect(linkTables(memory([{ id: id(1), seat: null, joinedAt: 1 }]), "court")).toBe(0);
+    expect(linkTables(memory(undefined, true), LEA)).toBe(0);
   });
 });

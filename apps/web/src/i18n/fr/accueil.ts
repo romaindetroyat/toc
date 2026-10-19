@@ -11,11 +11,16 @@ export const accueil = {
     online: {
       label: "Créer une table en ligne",
       sub: "Invite tes proches avec un lien",
+      /** Plan 04-09: the same tile's sub line when signed in. */
+      subSignedIn: "Invite tes amis ou partage un lien",
     },
     /** The name line, before the stored first name. */
     nameLabel: "Ton prénom :",
     change: "Changer",
     changeLabel: "Changer de prénom",
+    /** Plan 04-09: the small tile that took the name line's place (04-UI-SPEC « Small tiles »). */
+    nameTile: "Ton prénom",
+    nameTileLabel: (name: string) => `Changer de prénom (${name})`,
     listHeading: "Mes parties en cours",
     emptyHeading: "Aucune partie en cours",
     emptyBody: "Crée une table en ligne, ou ouvre le lien qu’un proche t’a envoyé.",

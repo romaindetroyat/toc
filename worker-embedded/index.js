@@ -1,9 +1,11 @@
 // Worker serving the built app from files bundled into the script (see wrangler.embarque.jsonc).
-// The table server (apps/worker: /api/*, /ws/*, the GameRoom Durable Object) answers first.
-import { GameRoom, handleRequest } from "../apps/worker/src/index.ts";
+// The table server (apps/worker: /api/*, /ws/*, the GameRoom Durable Object) answers first. Both
+// Durable Object classes are exported here too: GameRoom (migration v1) and PlayerHub, one per account
+// (migration v2, plan 04-03); tools/check-bundle.mjs checks the dry run defines both.
+import { GameRoom, handleRequest, PlayerHub } from "../apps/worker/src/index.ts";
 import files from "./manifest.js";
 
-export { GameRoom };
+export { GameRoom, PlayerHub };
 
 const TYPES = {
   html: "text/html; charset=utf-8",

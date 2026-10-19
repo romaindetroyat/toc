@@ -1,8 +1,10 @@
 // Test helpers for the workerd tests: create a table through the router, open real hibernatable
 // sockets on it, send frames and wait for the frames the table sends back.
 
-import { SELF } from "cloudflare:test";
-import type { ClientFrame, ServerFrame } from "@toc/protocol";
+import { env, SELF } from "cloudflare:test";
+import { type ClientFrame, type ServerFrame, toBase64Url } from "@toc/protocol";
+import { GameRoom } from "../src/GameRoom.ts";
+import { type SoftAuthenticator, softAuthenticator } from "./authenticator.ts";
 
 export const ORIGIN = "https://toc.test";
 
@@ -120,6 +122,70 @@ export async function connect(
   };
 }
 
+/**
+ * A browser's cookie for the account routes (plan 04-01): the `name=value` of the last Set-Cookie,
+ * dropped when the server expires it (Max-Age=0). One jar per simulated browser.
+ */
+export type Jar = { cookie: string | null };
+
+export const newJar = (): Jar => ({ cookie: null });
+
+function keep(jar: Jar | undefined, response: Response): void {
+  const set = response.headers.get("set-cookie");
+  if (jar === undefined || set === null) return;
+  jar.cookie = /;\s*Max-Age=0\b/i.test(set) ? null : (set.split(";")[0] ?? null);
+}
+
+export type CallOptions = {
+  /** The Origin header: the test origin by default, null for none. */
+  origin?: string | null;
+  jar?: Jar;
+  contentType?: string;
+  userAgent?: string;
+};
+
+/** A JSON POST as the app sends it (the page's Origin, application/json), keeping the cookie. */
+export async function post(
+  path: string,
+  body: unknown,
+  options: CallOptions = {},
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    "content-type": options.contentType ?? "application/json",
+  };
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  if (options.userAgent) headers["User-Agent"] = options.userAgent;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, {
+    method: "POST",
+    headers,
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+  keep(options.jar, response);
+  return response;
+}
+
+/** A DELETE as the app sends it (the page's Origin, no body), keeping the cookie (plan 04-02). */
+export async function del(path: string, options: CallOptions = {}): Promise<Response> {
+  const headers: Record<string, string> = {};
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, { method: "DELETE", headers });
+  keep(options.jar, response);
+  return response;
+}
+
+/** A GET with the jar's cookie, keeping what the answer sets. */
+export async function get(path: string, jar?: Jar): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (jar?.cookie) headers.Cookie = jar.cookie;
+  const response = await SELF.fetch(`${ORIGIN}${path}`, { headers });
+  keep(jar, response);
+  return response;
+}
+
 /** A device token: 43 base64url characters. */
 export function token(letter: string): string {
   return letter.repeat(43);
@@ -137,3 +203,284 @@ export const NEAR_END = {
   hands: { bleu: ["5S"] },
   turn: "bleu",
 };
+
+// --- Accounts (plans 04-01 and 04-02) ---
+
+/** The tests' D1 database. */
+export function accountDb(): D1Database {
+  if (env.DB === undefined) throw new Error("no D1 binding in the tests");
+  return env.DB;
+}
+
+export const ACCOUNT_TABLES = [
+  "table_members",
+  "push_subscriptions",
+  "friendships",
+  "sessions",
+  "challenges",
+  "invitations",
+  "passkeys",
+  "users",
+];
+
+/** Every account table emptied (a test's beforeEach). */
+export async function resetAccounts(): Promise<void> {
+  const db = accountDb();
+  await db.batch(ACCOUNT_TABLES.map((table) => db.prepare(`DELETE FROM ${table}`)));
+}
+
+export type Row = Record<string, unknown>;
+
+/** The rows of a query on the tests' D1. */
+export async function rows(sql: string, ...values: unknown[]): Promise<Row[]> {
+  return (
+    await accountDb()
+      .prepare(sql)
+      .bind(...values)
+      .all<Row>()
+  ).results;
+}
+
+export async function sha256Url(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return toBase64Url(new Uint8Array(digest));
+}
+
+export const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+export const MAC_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+
+/** A person with an account: their passkey, its WebAuthn user handle, their id and pseudo. */
+export type Person = {
+  id: string;
+  pseudo: string;
+  passkey: SoftAuthenticator;
+  /** The account's WebAuthn user handle (what a discoverable passkey answers as userHandle). */
+  handle: string;
+  /** The backup code shown at the sign-up. */
+  backupCode: string;
+};
+
+/** A new account through a test invitation, signed in on `jar` (its first device). */
+export async function signUpPerson(pseudo: string, jar: Jar = newJar()): Promise<Person> {
+  const minted = await post("/api/test/invitation", {});
+  const { code } = (await minted.json()) as { code: string };
+  return signUpWith(code, pseudo, jar);
+}
+
+/** A new account through the invitation `code` (a player's link, plan 04-05), signed in on `jar`. */
+export async function signUpWith(
+  code: string,
+  pseudo: string,
+  jar: Jar = newJar(),
+): Promise<Person> {
+  const opened = await post("/api/auth/signup/options", { invitation: code, pseudo }, { jar });
+  if (opened.status !== 200) throw new Error(`signup options: ${opened.status}`);
+  const options = (await opened.json()) as { challenge: string; user: { id: string } };
+  const passkey = await softAuthenticator("toc.test", ORIGIN);
+  const verified = await post(
+    "/api/auth/signup/verify",
+    { response: await passkey.create(options.challenge) },
+    { jar, userAgent: IPHONE_UA },
+  );
+  if (verified.status !== 201) throw new Error(`signup verify: ${verified.status}`);
+  const body = (await verified.json()) as {
+    me: { id: string; pseudo: string };
+    backupCode: string;
+  };
+  return {
+    id: body.me.id,
+    pseudo: body.me.pseudo,
+    passkey,
+    handle: options.user.id,
+    backupCode: body.backupCode,
+  };
+}
+
+/** The usernameless login: options, the passkey's assertion, verify. Answers both responses. */
+export async function logIn(
+  passkey: SoftAuthenticator,
+  handle: string,
+  jar: Jar = newJar(),
+  userAgent = MAC_UA,
+): Promise<{ options: Response; verify: Response; assertion: Record<string, unknown> }> {
+  const options = await post("/api/auth/login/options", {}, { jar });
+  if (options.status !== 200) throw new Error(`login options: ${options.status}`);
+  const { challenge } = (await options.clone().json()) as { challenge: string };
+  const assertion = await passkey.get(challenge, handle);
+  const verify = await post("/api/auth/login/verify", { response: assertion }, { jar, userAgent });
+  return { options, verify, assertion };
+}
+
+// --- The account at the table (plan 04-04) ---
+
+export type UpgradeOptions = {
+  /** The browser's cookie jar: its session cookie rides the upgrade. */
+  jar?: Jar;
+  /** The Origin header: the test origin by default, null for none. */
+  origin?: string | null;
+  /** Any other header the client sends (a forged x-toc-account, for instance). */
+  headers?: Record<string, string>;
+};
+
+function upgradeHeaders(options: UpgradeOptions): Record<string, string> {
+  const headers: Record<string, string> = { ...options.headers };
+  const origin = options.origin === undefined ? ORIGIN : options.origin;
+  if (origin !== null) headers.Origin = origin;
+  if (options.jar?.cookie) headers.Cookie = options.jar.cookie;
+  return headers;
+}
+
+/** The raw answer to a table upgrade, as a browser with this jar and Origin sends it. */
+export async function upgrade(id: string, options: UpgradeOptions = {}): Promise<Response> {
+  return SELF.fetch(`${ORIGIN}/ws/table/${id}`, {
+    headers: { Upgrade: "websocket", ...upgradeHeaders(options) },
+  });
+}
+
+/** A table socket opened by a browser with this jar (its session cookie) and our Origin. */
+export async function connectAs(id: string, options: UpgradeOptions = {}): Promise<Client> {
+  return connect(id, upgradeHeaders(options));
+}
+
+// --- Friends (plan 04-05) ---
+
+export type CreatedLink = { id: string; code: string; expiresAt: number };
+
+/** POST /api/invitations as the signed-in browser `jar`: its new link (throws unless 201). */
+export async function createLink(jar: Jar): Promise<CreatedLink> {
+  const response = await post("/api/invitations", {}, { jar });
+  if (response.status !== 201) throw new Error(`create link: ${response.status}`);
+  return (await response.json()) as CreatedLink;
+}
+
+/** Waits (wall time) until a query on the tests' D1 answers `count` rows; answers them. */
+export async function untilRows(count: number, sql: string, ...values: unknown[]): Promise<Row[]> {
+  const deadline = Date.now() + 30_000;
+  let found: Row[] = [];
+  while (Date.now() < deadline) {
+    found = await rows(sql, ...values);
+    if (found.length === count) return found;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`expected ${count} rows, found ${found.length}: ${sql}`);
+}
+
+// --- The app's own socket to its PlayerHub (plan 04-06) ---
+
+/** The raw answer to GET /ws/me, as a browser with this jar and Origin sends it. */
+export async function hubUpgrade(
+  options: UpgradeOptions & { upgrade?: boolean } = {},
+): Promise<Response> {
+  const headers = upgradeHeaders(options);
+  if (options.upgrade !== false) headers.Upgrade = "websocket";
+  return SELF.fetch(`${ORIGIN}/ws/me`, { headers });
+}
+
+export type HubClient = {
+  ws: WebSocket;
+  /** Every text frame received (pongs apart), parsed, in order. */
+  frames: Record<string, unknown>[];
+  send(frame: Record<string, unknown> | string): void;
+  /** The next frame not yet taken (wall time, 10 s), or throws. */
+  next(): Promise<Record<string, unknown>>;
+  /** A pong after a ping, in wall time (5 s), or throws. */
+  ping(): Promise<void>;
+  closed: Promise<{ code: number }>;
+};
+
+/** A hub socket opened by a browser with this jar (its session cookie) and our Origin. */
+export async function openHub(options: UpgradeOptions = {}): Promise<HubClient> {
+  const response = await hubUpgrade(options);
+  const ws = response.webSocket;
+  if (ws === null || ws === undefined) throw new Error(`no hub socket: ${response.status}`);
+  ws.accept();
+  const frames: Record<string, unknown>[] = [];
+  let cursor = 0;
+  let pongs = 0;
+  let wake: (() => void) | null = null;
+  ws.addEventListener("message", (event) => {
+    const text = typeof event.data === "string" ? event.data : "";
+    if (text === "pong") pongs++;
+    else frames.push(JSON.parse(text) as Record<string, unknown>);
+    wake?.();
+  });
+  const closed = new Promise<{ code: number }>((resolve) => {
+    ws.addEventListener("close", (event) => {
+      resolve({ code: event.code });
+      wake?.();
+    });
+  });
+  const waitFor = async <T>(take: () => T | undefined, ms: number, what: string): Promise<T> => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const taken = take();
+      if (taken !== undefined) return taken;
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+        setTimeout(resolve, 5);
+      });
+      wake = null;
+    }
+    throw new Error(`no ${what}`);
+  };
+  return {
+    ws,
+    frames,
+    send(frame) {
+      ws.send(typeof frame === "string" ? frame : JSON.stringify(frame));
+    },
+    next: () =>
+      waitFor(() => (cursor < frames.length ? frames[cursor++] : undefined), 10_000, "frame"),
+    async ping() {
+      const before = pongs;
+      ws.send("ping");
+      await waitFor(() => (pongs > before ? true : undefined), 5_000, "pong");
+    },
+    closed,
+  };
+}
+
+// --- Production's alarm delivery (debug slow-online-bots; pace.test.ts, plan 04-07 turn.test.ts) ---
+
+/**
+ * Production runs an alarm with Date.now() exactly at its scheduledTime, where workerd runs it a few
+ * ms later, and production drops an alarm its own handler leaves at that time (no write, nothing
+ * scheduled) until its rescan about a minute later. This runs every GameRoom alarm that way until the
+ * returned function is called: Date.now() reads scheduledTime during the handler, and an alarm the
+ * handler leaves at scheduledTime (after production's clamp to that Date.now()) is deleted.
+ */
+export function deliverAsProduction(): () => void {
+  const alarm = GameRoom.prototype.alarm;
+  GameRoom.prototype.alarm = async function (this: GameRoom, info?: AlarmInvocationInfo) {
+    if (info === undefined) return alarm.call(this, info);
+    const fired = info.scheduledTime;
+    const storage = (this as unknown as { ctx: DurableObjectState }).ctx.storage;
+    const { setAlarm, deleteAlarm } = storage;
+    // The alarm the handler leaves, as production stores it: whole ms, never before its Date.now().
+    let left: number | null = fired;
+    storage.setAlarm = (time, options) => {
+      left = Math.max(Math.trunc(Number(time)), fired);
+      return setAlarm.call(storage, time, options);
+    };
+    storage.deleteAlarm = (options) => {
+      left = null;
+      return deleteAlarm.call(storage, options);
+    };
+    const now = Date.now;
+    Date.now = () => fired;
+    try {
+      await alarm.call(this, info);
+    } finally {
+      Date.now = now;
+      storage.setAlarm = setAlarm;
+      storage.deleteAlarm = deleteAlarm;
+    }
+    // Left at its own time: production does not schedule it again.
+    if (left === fired) await deleteAlarm.call(storage);
+  };
+  return () => {
+    GameRoom.prototype.alarm = alarm;
+  };
+}

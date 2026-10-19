@@ -18,10 +18,21 @@
     { "type": "Text", "globs": ["**/apps/web/dist/*.js", "**/*.html", "**/*.css", "**/*.svg", "**/*.webmanifest"], "fallthrough": false },
     { "type": "Data", "globs": ["**/*.png", "**/*.webp", "**/*.woff2", "**/*.ico", "**/*.mp3", "**/*.m4a", "**/*.ogg", "**/*.wav"], "fallthrough": false }
   ],
+  // Les clés d'accès (passkeys) : l'identifiant du site (RP ID) et son origine, identiques dans les deux
+  // fichiers (D-10). Les secrets (TOC_PEPPER, TOC_BOOTSTRAP) ne sont jamais ici : wrangler secret put.
+  "vars": { "RP_ID": "toc.romaindetroyat.workers.dev", "ORIGIN": "https://toc.romaindetroyat.workers.dev" },
+  // GameRoom : une table en ligne. PlayerHub : un objet par compte (plan 04-03). La migration v1 ne
+  // change jamais ; v2 crée PlayerHub. Les deux blocs sont identiques dans les deux fichiers.
   "durable_objects": {
-    "bindings": [{ "name": "GAME_ROOM", "class_name": "GameRoom" }]
+    "bindings": [
+      { "name": "GAME_ROOM", "class_name": "GameRoom" },
+      { "name": "PLAYER_HUB", "class_name": "PlayerHub" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["PlayerHub"] }
+  ],
   "d1_databases": [
     { "binding": "DB", "database_name": "toc", "database_id": "a5700309-470a-469c-a76a-d3e0c5774335", "migrations_dir": "apps/worker/migrations" }
   ]

@@ -97,8 +97,8 @@ describe("apply rejects what legalActions does not list (T-01-09)", () => {
   it("does not mutate a frozen input when the move is legal", () => {
     const s = deepFreeze(state());
     const out = apply(s, "bleu", { t: "move", card: "3S", pawn: "bleu0" });
-    expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: 8 });
-    expect(s.pawns.bleu0).toEqual({ zone: "ring", progress: 5 });
+    expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: 8, justOut: false });
+    expect(s.pawns.bleu0).toEqual({ zone: "ring", progress: 5, justOut: false });
   });
 });
 
@@ -289,7 +289,7 @@ describe("probes RULE-05 / RULE-06", () => {
     expect(legalActions(other, "bleu")).toContainEqual({ t: "exit", card: "13H", pawn: "bleu0" });
     const out = apply(other, "bleu", { t: "exit", card: "13H", pawn: "bleu0" });
     expect(out.state.pawns.jaune0).toEqual({ zone: "stable" });
-    expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: 0 });
+    expect(out.state.pawns.bleu0).toEqual({ zone: "ring", progress: 0, justOut: true });
   });
 
   it("empty stable: the As and the Roi only advance", () => {

@@ -52,7 +52,7 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const result = applyPlan(state, "bleu", CARD, plan(["bleu0", 7]));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 17 });
+    expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 17, justOut: false });
     expect(result.pawns.jaune0).toEqual({ zone: "stable" });
     expect(kinds(result.events)).toEqual(["pawnMoved", "pawnCaptured", "pawnSentHome"]);
     const capture = result.events.find((e) => e.t === "pawnCaptured");
@@ -67,9 +67,9 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const b = applyPlan(state, "bleu", CARD, plan(["bleu0", 2], ["bleu1", 2], ["bleu2", 3]));
     expect(b.ok).toBe(true);
     if (b.ok) {
-      expect(b.pawns.bleu0).toEqual({ zone: "ring", progress: 7 });
-      expect(b.pawns.bleu1).toEqual({ zone: "ring", progress: 22 });
-      expect(b.pawns.bleu2).toEqual({ zone: "ring", progress: 33 });
+      expect(b.pawns.bleu0).toEqual({ zone: "ring", progress: 7, justOut: false });
+      expect(b.pawns.bleu1).toEqual({ zone: "ring", progress: 22, justOut: false });
+      expect(b.pawns.bleu2).toEqual({ zone: "ring", progress: 33, justOut: false });
     }
   });
 
@@ -103,8 +103,8 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const good = applyPlan(state, "bleu", CARD, plan(["bleu1", 4], ["bleu0", 3]));
     expect(good.ok).toBe(true);
     if (good.ok) {
-      expect(good.pawns.bleu0).toEqual({ zone: "ring", progress: 8 });
-      expect(good.pawns.bleu1).toEqual({ zone: "ring", progress: 12 });
+      expect(good.pawns.bleu0).toEqual({ zone: "ring", progress: 8, justOut: false });
+      expect(good.pawns.bleu1).toEqual({ zone: "ring", progress: 12, justOut: false });
     }
     const reversed = applyPlan(state, "bleu", CARD, plan(["bleu0", 3], ["bleu1", 4]));
     expect(reversed).toEqual({ ok: false, reason: "own-pawn" });
@@ -120,8 +120,8 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const result = applyPlan(state, "bleu", CARD, plan(["bleu0", 3], ["bleu1", 4]));
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 13 });
-      expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 10 });
+      expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 13, justOut: false });
+      expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 10, justOut: false });
       expect(result.pawns.jaune0).toEqual({ zone: "stable" });
       expect(kinds(result.events)).toEqual([
         "pawnMoved",
@@ -143,8 +143,8 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.captured).toEqual([]);
-      expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 8 });
-      expect(result.pawns.rouge0).toEqual({ zone: "ring", progress: 45 });
+      expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 8, justOut: false });
+      expect(result.pawns.rouge0).toEqual({ zone: "ring", progress: 45, justOut: false });
       expect(result.events.some((e) => e.t === "pawnCaptured")).toBe(false);
     }
   });
@@ -210,7 +210,7 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     const off = bleuOnly([{ p: 5 }, { p: 10 }, "S", "S"], { SEVEN_SAME_PAWN_TWICE: false });
     const ok = applyPlan(on, "bleu", CARD, entries);
     expect(ok.ok).toBe(true);
-    if (ok.ok) expect(ok.pawns.bleu0).toEqual({ zone: "ring", progress: 9 });
+    if (ok.ok) expect(ok.pawns.bleu0).toEqual({ zone: "ring", progress: 9, justOut: false });
     expect(applyPlan(off, "bleu", CARD, entries).ok).toBe(false);
   });
 
@@ -227,7 +227,7 @@ describe("applyPlan: one ordered plan of micro-moves", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(kinds(result.events)).toEqual(["pawnEnteredHome", "playerFinished", "pawnMoved"]);
-      expect(result.pawns.rouge0).toEqual({ zone: "ring", progress: 15 });
+      expect(result.pawns.rouge0).toEqual({ zone: "ring", progress: 15, justOut: false });
     }
     const stay = playState(
       {
@@ -562,10 +562,10 @@ describe("previewPlan: the first steps of a 7, for the splitter", () => {
       "pawnSentHome",
       "pawnMoved",
     ]);
-    expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 14 });
-    expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 31 });
+    expect(result.pawns.bleu0).toEqual({ zone: "ring", progress: 14, justOut: false });
+    expect(result.pawns.bleu1).toEqual({ zone: "ring", progress: 31, justOut: false });
     // The input is untouched.
-    expect(state.pawns.bleu0).toEqual({ zone: "ring", progress: 10 });
+    expect(state.pawns.bleu0).toEqual({ zone: "ring", progress: 10, justOut: false });
   });
 
   it("shows the capture in transit of a micro-move that is not the whole 7", () => {

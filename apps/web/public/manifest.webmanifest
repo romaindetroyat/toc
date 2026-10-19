@@ -7,6 +7,9 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "landscape",
+  "id": "/",
+  "categories": ["games"],
   "background_color": "#2B1D12",
   "theme_color": "#2B1D12",
   "icons": [

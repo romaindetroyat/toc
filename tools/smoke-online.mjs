@@ -1,9 +1,11 @@
-// Smoke run of the online tables against a running Worker (plan 02-10): the deployed site, or a local
-// `wrangler dev`.
+// Smoke run of the online tables, the accounts and the installable app against a running Worker
+// (plans 02-10 and 04-12): the deployed site, or a local `wrangler dev`.
 //
-//   node tools/smoke-online.mjs [base-url] [--turns N] [--level 1-5] [--verbose]
+//   node tools/smoke-online.mjs [base-url] [--turns N] [--level 1-5] [--read-only] [--verbose]
 //
 // --verbose prints every frame the socket receives, with the time since the start.
+// --read-only skips the two steps that create something (POST /api/tables and the WebSocket game that
+// follows it): every other step only reads, and the login options are stateless (nothing written).
 // Through the agent proxy, run it with NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt
 // (/root/.ccr/README.md). base-url defaults to https://toc.romaindetroyat.workers.dev.
 //
@@ -12,6 +14,15 @@
 //   POST /api/tables           → 201 { id } with a 22-character id
 //   GET  /api/tables/<id>      → 200, status « lobby »
 //   GET  /api/tables/<unknown> → 404
+//   GET  /api/me (no cookie)   → 401 (plan 04-01: signed out)
+//   GET  /api/push/key         → 200 { key } of 87 characters (the 65-byte VAPID public key); a 503
+//                                « push-off » (no VAPID_PRIVATE_KEY secret yet) is reported, not failed
+//   GET  /api/invitations/<random code> → 200 { state: "unknown" } (nothing written)
+//   POST /api/auth/login/options with the site's Origin → 200, rpId = the site's host (nothing written)
+//   GET  /sw.js                → 200 JavaScript, a cache-control that makes the browser revalidate it
+//                                (no-cache on the deployed embedded Worker; max-age=0 with
+//                                must-revalidate from the static assets of a local `wrangler dev`)
+//   GET  /manifest.webmanifest → 200, orientation « landscape », lang « fr »
 // WebSocket steps (best effort): hello with a random device token → welcome; sit bleu; the three other
 // seats at Champion (level 5, or --level); start; pass a card and play N turns (default 3) with randomLegal on the
 // page's own view while the Champions play; then « stop » (the table is saved, 30 days) and close.
@@ -30,8 +41,9 @@ const { PROTOCOL_VERSION, parseServerFrame, toBase64Url } = await load(
 );
 const { randomLegal } = await load("packages/bots/src/index.ts");
 
-const args = process.argv.slice(2).filter((arg) => arg !== "--verbose");
+const args = process.argv.slice(2).filter((arg) => arg !== "--verbose" && arg !== "--read-only");
 const verbose = process.argv.includes("--verbose");
+const readOnly = process.argv.includes("--read-only");
 const t0 = Date.now();
 /** The value after `--name`, or `fallback`; its index is skipped when looking for the base URL. */
 const taken = new Set();
@@ -49,7 +61,7 @@ const base = (
 ).replace(/\/$/, "");
 if (!Number.isInteger(turns) || turns < 0 || !Number.isInteger(level) || level < 1 || level > 5) {
   console.error(
-    "usage: node tools/smoke-online.mjs [base-url] [--turns N] [--level 1-5] [--verbose]",
+    "usage: node tools/smoke-online.mjs [base-url] [--turns N] [--level 1-5] [--read-only] [--verbose]",
   );
   process.exit(2);
 }
@@ -60,14 +72,19 @@ function report(ok, step, detail) {
   console.log(`${ok ? "ok  " : "FAIL"} ${step}${detail ? ` — ${detail}` : ""}`);
 }
 
-async function http(method, path, body) {
+async function http(method, path, body, headers = {}) {
   const response = await fetch(`${base}${path}`, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
+    headers: body === undefined ? headers : { "content-type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  return { status: response.status, text, type: response.headers.get("content-type") ?? "" };
+  return {
+    status: response.status,
+    text,
+    type: response.headers.get("content-type") ?? "",
+    cache: response.headers.get("cache-control") ?? "",
+  };
 }
 
 function json(text) {
@@ -89,10 +106,19 @@ try {
     `${home.status} ${home.type}`,
   );
 
-  const created = await http("POST", "/api/tables", {});
-  id = json(created.text)?.id ?? null;
-  const goodId = typeof id === "string" && /^[A-Za-z0-9_-]{22}$/.test(id);
-  report(created.status === 201 && goodId, "POST /api/tables", `${created.status} ${created.text}`);
+  let goodId = false;
+  if (readOnly) {
+    console.log("skip POST /api/tables and the WebSocket game — --read-only");
+  } else {
+    const created = await http("POST", "/api/tables", {});
+    id = json(created.text)?.id ?? null;
+    goodId = typeof id === "string" && /^[A-Za-z0-9_-]{22}$/.test(id);
+    report(
+      created.status === 201 && goodId,
+      "POST /api/tables",
+      `${created.status} ${created.text}`,
+    );
+  }
 
   if (goodId) {
     const summary = await http("GET", `/api/tables/${id}`);
@@ -108,6 +134,66 @@ try {
   const unknown = toBase64Url(new Uint8Array(randomBytes(16)));
   const missing = await http("GET", `/api/tables/${unknown}`);
   report(missing.status === 404, "GET /api/tables/<unknown>", `${missing.status} ${missing.text}`);
+} catch (error) {
+  report(false, "HTTP", String(error?.cause ?? error));
+}
+
+// --- Accounts, push and the installable app (plan 04-12), HTTP, each must pass ---
+try {
+  const me = await http("GET", "/api/me");
+  report(me.status === 401, "GET /api/me (no cookie)", `${me.status} ${me.text}`);
+
+  const push = await http("GET", "/api/push/key");
+  const key = json(push.text)?.key;
+  if (push.status === 503 && json(push.text)?.error === "push-off") {
+    console.log(
+      "push-off GET /api/push/key — 503: no VAPID_PRIVATE_KEY secret yet (not counted as a failure)",
+    );
+  } else {
+    report(
+      push.status === 200 && typeof key === "string" && /^[A-Za-z0-9_-]{87}$/.test(key),
+      "GET /api/push/key",
+      `${push.status} key of ${typeof key === "string" ? key.length : 0} characters`,
+    );
+  }
+
+  // A well-formed invitation code nobody made (and not the bootstrap code): unknown, nothing written.
+  const code = toBase64Url(new Uint8Array(randomBytes(16)));
+  const invitation = await http("GET", `/api/invitations/${code}`);
+  const state = json(invitation.text)?.state;
+  report(
+    invitation.status === 200 && state === "unknown",
+    "GET /api/invitations/<random code>",
+    `${invitation.status} state ${state}`,
+  );
+
+  // The passkey sign-in options: stateless (a signed challenge, no D1 row), with the site's RP ID.
+  const login = await http("POST", "/api/auth/login/options", {}, { Origin: base });
+  const rpId = json(login.text)?.rpId;
+  const host = new URL(base).hostname;
+  report(
+    login.status === 200 && rpId === host,
+    "POST /api/auth/login/options",
+    `${login.status} rpId ${rpId} (site ${host})`,
+  );
+
+  const sw = await http("GET", "/sw.js");
+  const revalidates =
+    /\bno-cache\b/.test(sw.cache) ||
+    (/\bmax-age=0\b/.test(sw.cache) && /\bmust-revalidate\b/.test(sw.cache));
+  report(
+    sw.status === 200 && /javascript/.test(sw.type) && revalidates,
+    "GET /sw.js",
+    `${sw.status} ${sw.type}, cache-control « ${sw.cache} »`,
+  );
+
+  const manifest = await http("GET", "/manifest.webmanifest");
+  const app = json(manifest.text);
+  report(
+    manifest.status === 200 && app?.orientation === "landscape" && app?.lang === "fr",
+    "GET /manifest.webmanifest",
+    `${manifest.status} ${manifest.type}, orientation ${app?.orientation}, lang ${app?.lang}`,
+  );
 } catch (error) {
   report(false, "HTTP", String(error?.cause ?? error));
 }

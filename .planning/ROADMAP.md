@@ -297,13 +297,51 @@ Plans:
 **Depends on**: Phase 3
 **Requirements**: ACCT-01, ACCT-02, ACCT-03, ACCT-04, ACCT-05, APP-01, APP-02, APP-03
 **Success Criteria** (what must be TRUE):
-  1. Un joueur crée un compte avec son pseudo grâce à un code reçu par e-mail, puis se connecte par passkey. En cas de besoin, il récupère son compte par e-mail. Il reste connecté entre les visites, y compris dans l'application installée ouverte à froid.
+  1. Un joueur crée un compte avec son pseudo grâce à une invitation, puis se connecte par passkey. En cas de besoin, il récupère son compte avec son code de secours (pas d'e-mail, choix de Romain). Il reste connecté entre les visites, y compris dans l'application installée ouverte à froid.
   2. Un joueur ajoute un ami avec un code ou un lien d'invitation, et il voit sa liste d'amis.
   3. Un joueur crée une table, invite des amis, répartit les places et les équipes, et règle la force de l'ordinateur pour chaque place libre. Il peut aussi lancer directement une partie solo contre trois joueurs gérés par l'ordinateur.
   4. Le jeu s'installe comme application sur téléphone et sur ordinateur, avec une icône et un écran de démarrage. Une nouvelle version ne recharge jamais une partie en cours : le joueur est invité à mettre à jour.
   5. Le joueur reçoit une notification quand c'est son tour ou qu'on l'invite à une table, y compris sur iPhone quand l'application est installée.
 
-**Plans**: TBD
+**Plans:** 12/12 plans executed (the plans run one after the other on the main tree; each runs only the specs it touches; 04-01 starts by installing the six packages Romain approved on 2026-10-18; no plan runs a remote command: 04-12 runs everything, writes 04-UAT.md and the deploy steps the orchestrator runs (remote D1 migration 0002, secrets, deploy with the PlayerHub migration v2), then stops for Romain's checks on his iPhone and an Android phone)
+
+Plans:
+**Wave 1**
+- [x] 04-01-PLAN.md — Traceur : les six outils installés, et le premier compte de bout en bout (invitation, pseudo, clé d'accès, code de secours, toujours connecté après un rechargement)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 04-02-PLAN.md — Se connecter avec sa clé d'accès, se déconnecter, ajouter ou retirer une clé, refaire son code de secours
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 04-03-PLAN.md — Un Durable Object par compte (PlayerHub, migration v2), et retrouver son compte avec le code de secours
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 04-04-PLAN.md — Le compte à la table : la place de l'appareil passe au compte, et « Mes parties en cours » sur tous les appareils
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 04-05-PLAN.md — Les amis : liens d'invitation (une fois, 7 jours), codes amis et la liste
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 04-06-PLAN.md — L'application ouverte : la présence, « Inviter un ami » à la table, et la carte dans l'application
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 04-07-PLAN.md — « C'est ton tour » et les notifications quand l'application est fermée (Web Push)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 04-08-PLAN.md — L'application installable : service worker, écran de démarrage, mise à jour sans recharger une partie, hors ligne
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 04-09-PLAN.md — Écrans : l'accueil avec le compte, « Se connecter », l'invitation complète et « Retrouver mon compte »
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 04-10-PLAN.md — Écrans : « Mon compte » et « Mes amis »
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 04-11-PLAN.md — Écrans : inviter un ami depuis la salle d'attente, la carte dans l'application, et la place d'un compte
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 04-12-PLAN.md — Vérification finale, le parcours entre navigateurs, le budget de l'offre gratuite, les étapes de mise en ligne (orchestrateur) et la recette sur iPhone et Android
+
 **UI hint**: yes
 
 ### Phase 5: Suivi, apprentissage et finition
@@ -332,5 +370,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
 | 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
-| 4. Comptes, amis et application installable | 0/TBD | Not started | - |
+| 4. Comptes, amis et application installable | 12/12 | In Progress | - |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |

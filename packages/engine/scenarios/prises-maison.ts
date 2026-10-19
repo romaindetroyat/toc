@@ -245,19 +245,26 @@ export const r12: Scenario[] = [
   {
     id: "R-12.9",
     rule: "R-12",
-    title: "Un pion revenu sur sa sortie après un tour de plus est protégé aussi",
+    title:
+      "Un pion revenu sur sa sortie après un tour de plus est un pion ordinaire : on le dépasse, on le mange, on l’échange",
     before: {
-      pawns: { bleu: [{ p: 72 }, "S", "S", "S"], rouge: [{ p: 34 }, "S", "S", "S"] },
-      hands: { rouge: ["3S"] },
-      turn: "rouge",
+      pawns: { bleu: [{ p: 16 }, "S", "S", "S"], jaune: [{ p: 72 }, "S", "S", "S"] },
+      hands: { bleu: ["2S", "3S", "11S"] },
+      turn: "bleu",
     },
-    action: { t: "move", card: "3S", pawn: "rouge0" },
+    action: { t: "move", card: "2S", pawn: "bleu0" },
     expect: {
-      legal: false,
-      reason: "blocked-protected",
-      playable: { "3S": false },
+      legal: true,
+      captured: ["jaune0"],
+      legalInclude: [
+        { t: "move", card: "3S", pawn: "bleu0" },
+        { t: "swap", card: "11S", pawn: "bleu0", target: "jaune0" },
+      ],
+      after: {
+        pawns: { bleu: [{ p: 18 }, "S", "S", "S"], jaune: ["S", "S", "S", "S"] },
+      },
     },
-    flags: ["G3"],
+    flags: ["G18"],
   },
   {
     id: "R-12.10",
@@ -274,6 +281,78 @@ export const r12: Scenario[] = [
       legalExclude: [{ t: "seven", card: "7S", plan: [{ pawn: "bleu1", steps: 7 }] }],
     },
     flags: ["G4"],
+  },
+  {
+    id: "R-12.11",
+    rule: "R-12",
+    title: "Un pion placé sur sa sortie par le Valet est un pion ordinaire : on le mange",
+    before: {
+      pawns: {
+        bleu: [{ p: 18 }, "S", "S", "S"],
+        jaune: [{ p: 30 }, { p: 40 }, "S", "S"],
+        rouge: [{ p: 51 }, "S", "S", "S"],
+      },
+      hands: { bleu: ["11S"], jaune: ["2H"], rouge: ["3D"], vert: ["2C"] },
+      turn: "bleu",
+    },
+    script: [
+      { seat: "bleu", action: { t: "swap", card: "11S", pawn: "bleu0", target: "jaune0" } },
+      { seat: "jaune", action: { t: "move", card: "2H", pawn: "jaune1" } },
+      { seat: "rouge", action: { t: "move", card: "3D", pawn: "rouge0" } },
+    ],
+    expect: {
+      captured: ["jaune0"],
+      after: {
+        pawns: {
+          bleu: [{ p: 48 }, "S", "S", "S"],
+          jaune: ["S", { p: 42 }, "S", "S"],
+          rouge: [{ p: 54 }, "S", "S", "S"],
+        },
+      },
+      turn: "vert",
+    },
+    flags: ["G18"],
+  },
+  {
+    id: "R-12.12",
+    rule: "R-12",
+    title: "Un pion revenu sur sa sortie en reculant de 4 est un pion ordinaire : on le dépasse",
+    before: {
+      pawns: { vert: [{ p: 4 }, "S", "S", "S"], bleu: [{ p: 50 }, "S", "S", "S"] },
+      hands: { vert: ["4C"], bleu: ["6S"], jaune: ["2H"], rouge: ["2D"] },
+      turn: "vert",
+    },
+    script: [
+      { seat: "vert", action: { t: "move", card: "4C", pawn: "vert0" } },
+      { seat: "bleu", action: { t: "move", card: "6S", pawn: "bleu0" } },
+    ],
+    expect: {
+      captured: [],
+      after: {
+        pawns: { vert: [{ p: 0 }, "S", "S", "S"], bleu: [{ p: 56 }, "S", "S", "S"] },
+      },
+      turn: "jaune",
+    },
+    flags: ["G18"],
+  },
+  {
+    id: "R-12.13",
+    rule: "R-12",
+    title: "Mon pion ordinaire revenu sur ma sortie m’empêche aussi d’en sortir un second",
+    before: {
+      pawns: { jaune: [{ p: 72 }, "S", "S", "S"] },
+      hands: { jaune: ["13S"] },
+      turn: "jaune",
+    },
+    expect: {
+      legalInclude: [{ t: "move", card: "13S", pawn: "jaune0" }],
+      legalExclude: [
+        { t: "exit", card: "13S", pawn: "jaune1" },
+        { t: "exit", card: "13S", pawn: "jaune2" },
+        { t: "exit", card: "13S", pawn: "jaune3" },
+      ],
+    },
+    flags: ["G18", "Q15"],
   },
 ];
 

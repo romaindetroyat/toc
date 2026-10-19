@@ -412,6 +412,309 @@ export const ICONS = {
       },
     },
   ],
+  user: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",
+      },
+    },
+    {
+      tag: "circle",
+      attrs: {
+        cx: "12",
+        cy: "7",
+        r: "4",
+      },
+    },
+  ],
+  "triangle-alert": [
+    {
+      tag: "path",
+      attrs: {
+        d: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 9v4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 17h.01",
+      },
+    },
+  ],
+  "refresh-cw": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 3v5h-5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8 16H3v5",
+      },
+    },
+  ],
+  download: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 15V3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m7 10 5 5 5-5",
+      },
+    },
+  ],
+  share: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 2v13",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m16 6-4-4-4 4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8",
+      },
+    },
+  ],
+  "square-plus": [
+    {
+      tag: "rect",
+      attrs: {
+        width: "18",
+        height: "18",
+        x: "3",
+        y: "3",
+        rx: "2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8 12h8",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 8v8",
+      },
+    },
+  ],
+  "log-in": [
+    {
+      tag: "path",
+      attrs: {
+        d: "m10 17 5-5-5-5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M15 12H3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4",
+      },
+    },
+  ],
+  "key-round": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z",
+      },
+    },
+    {
+      tag: "circle",
+      attrs: {
+        cx: "16.5",
+        cy: "7.5",
+        r: ".5",
+        fill: "currentColor",
+      },
+    },
+  ],
+  handshake: [
+    {
+      tag: "path",
+      attrs: {
+        d: "m11 17 2 2a1 1 0 1 0 3-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m21 3 1 11h-2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 4h8",
+      },
+    },
+  ],
+  "log-out": [
+    {
+      tag: "path",
+      attrs: {
+        d: "m16 17 5-5-5-5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M21 12H9",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4",
+      },
+    },
+  ],
+  bell: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M10.268 21a2 2 0 0 0 3.464 0",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+      },
+    },
+  ],
+  "bell-off": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M10.268 21a2 2 0 0 0 3.464 0",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "m2 2 20 20",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05",
+      },
+    },
+  ],
+  link: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
+      },
+    },
+  ],
+  "user-plus": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+      },
+    },
+    {
+      tag: "circle",
+      attrs: {
+        cx: "9",
+        cy: "7",
+        r: "4",
+      },
+    },
+    {
+      tag: "line",
+      attrs: {
+        x1: "19",
+        x2: "19",
+        y1: "8",
+        y2: "14",
+      },
+    },
+    {
+      tag: "line",
+      attrs: {
+        x1: "22",
+        x2: "16",
+        y1: "11",
+        y2: "11",
+      },
+    },
+  ],
 } as const;
 
 export type IconName = keyof typeof ICONS;

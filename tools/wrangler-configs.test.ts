@@ -1,10 +1,10 @@
 // The two deploy configs (wrangler.jsonc with the assets upload, wrangler.embarque.jsonc with the assets
-// embedded in the script) deploy the same Worker « toc »: they must declare the same Durable Object,
-// the same migrations and the same compatibility date, or one deploy would drop the GameRoom class
-// (02-RESEARCH Pitfall 8). Neither may switch on the test-only shortcuts (T-02-07, Pitfall 11).
+// embedded in the script) deploy the same Worker « toc »: they must declare the same Durable Objects
+// (GameRoom, and PlayerHub since plan 04-03), the same migrations and the same compatibility date, or
+// one deploy would drop a class (02-RESEARCH Pitfall 8, 04-RESEARCH Pitfall 11). Neither may switch on the test-only shortcuts (T-02-07, Pitfall 11).
 
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,13 +75,31 @@ describe("wrangler configs", () => {
     });
   });
 
-  it("declares the GameRoom Durable Object and its SQLite migration in both files", () => {
+  // Plan 04-03 (Pitfall 11, T-04-38): PlayerHub, one Durable Object per account, comes with the
+  // migration v2 appended after v1. v1 never changes: it created GameRoom in production, and editing,
+  // reordering or removing it would make the next deploy fail or drop the tables.
+  it("declares GameRoom and PlayerHub with their SQLite migrations v1 and v2 in both files", () => {
     for (const config of [upload, embedded]) {
       expect(config.name).toBe("toc");
       expect(config.durable_objects).toEqual({
-        bindings: [{ name: "GAME_ROOM", class_name: "GameRoom" }],
+        bindings: [
+          { name: "GAME_ROOM", class_name: "GameRoom" },
+          { name: "PLAYER_HUB", class_name: "PlayerHub" },
+        ],
       });
-      expect(config.migrations).toEqual([{ tag: "v1", new_sqlite_classes: ["GameRoom"] }]);
+      expect(config.migrations).toEqual([
+        { tag: "v1", new_sqlite_classes: ["GameRoom"] },
+        { tag: "v2", new_sqlite_classes: ["PlayerHub"] },
+      ]);
+    }
+  });
+
+  it("keeps migration v1 first and byte for byte as deployed", () => {
+    for (const file of ["wrangler.jsonc", "wrangler.embarque.jsonc"]) {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      const v1 = '{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }';
+      expect(text, file).toContain(v1);
+      expect(text.indexOf(v1), file).toBeLessThan(text.indexOf('"tag": "v2"'));
     }
   });
 
@@ -132,6 +150,87 @@ describe("wrangler configs", () => {
       expect(config.vars?.TOC_TEST_MODE).toBeUndefined();
     }
   });
+
+  // Plan 04-01, D-10: the passkeys' RP ID and origin come from the config only, never from the
+  // request's Host, and both deploys must agree or a passkey made through one would fail the other.
+  it("declares the same RP_ID and ORIGIN in both files, the origin on the RP ID's host (D-10)", () => {
+    for (const config of [upload, embedded]) {
+      expect(config.vars).toEqual({
+        RP_ID: "toc.romaindetroyat.workers.dev",
+        ORIGIN: "https://toc.romaindetroyat.workers.dev",
+      });
+      const origin = new URL(String(config.vars?.ORIGIN));
+      expect(origin.protocol).toBe("https:");
+      expect(origin.host).toBe(config.vars?.RP_ID);
+      expect(origin.origin).toBe(config.vars?.ORIGIN);
+    }
+    expect(embedded.vars).toEqual(upload.vars);
+  });
+
+  // Plan 04-08: the embedded entry serves the service worker and the manifest of the web build. Its
+  // source runs here with the server and the file list replaced by stubs: /sw.js as JavaScript and
+  // /manifest.webmanifest as a manifest, both revalidated on every load (no-cache: a new service
+  // worker is found at once), while the hashed /assets/ files are immutable. The worker sits at the
+  // root, so its default scope is the whole origin and no Service-Worker-Allowed header is needed.
+  it("serves /sw.js and /manifest.webmanifest with their types and no-cache (plan 04-08)", async () => {
+    const source = readFileSync(join(ROOT, "worker-embedded/index.js"), "utf8");
+    const imports = [...source.matchAll(/^import .*;$/gm)].map((m) => m[0]);
+    expect(imports).toHaveLength(2);
+    const stubbed = source
+      .replace(
+        imports[0] ?? "",
+        "class GameRoom {}\nclass PlayerHub {}\nconst handleRequest = async () => null;",
+      )
+      .replace(
+        imports[1] ?? "",
+        'const files = { "/index.html": "<html></html>", "/sw.js": "self", ' +
+          '"/manifest.webmanifest": "{}", "/assets/index-abc.js": "app" };',
+      );
+    const dir = mkdtempSync(join(tmpdir(), "toc-entry-"));
+    const file = join(dir, "entry.mjs");
+    writeFileSync(file, stubbed);
+    const entry = (await import(file)) as {
+      default: { fetch: (request: Request, env: unknown) => Promise<Response> };
+    };
+    const get = (path: string) => entry.default.fetch(new Request(`https://toc.test${path}`), {});
+    const sw = await get("/sw.js");
+    expect(sw.status).toBe(200);
+    expect(sw.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+    expect(sw.headers.get("cache-control")).toBe("no-cache");
+    expect(await sw.text()).toBe("self");
+    const manifest = await get("/manifest.webmanifest");
+    expect(manifest.headers.get("content-type")).toBe("application/manifest+json");
+    expect(manifest.headers.get("cache-control")).toBe("no-cache");
+    const root = await get("/");
+    expect(root.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(root.headers.get("cache-control")).toBe("no-cache");
+    const hashed = await get("/assets/index-abc.js");
+    expect(hashed.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    // A missing file with a dot is a 404, never the app (a stale /sw-old.js must not get index.html).
+    expect((await get("/sw-old.js")).status).toBe(404);
+    rmSync(dir, { recursive: true });
+  });
+
+  // When the web build is there, it carries the service worker at its root (not under /assets/, so it
+  // is revalidated) and the build-embedded-worker tool picks it up with every other file.
+  it.runIf(existsSync(join(ROOT, "apps/web/dist/index.html")))(
+    "the web build has /sw.js and /manifest.webmanifest at its root (plan 04-08)",
+    () => {
+      expect(existsSync(join(ROOT, "apps/web/dist/sw.js"))).toBe(true);
+      expect(existsSync(join(ROOT, "apps/web/dist/manifest.webmanifest"))).toBe(true);
+    },
+  );
+
+  it("names no secret in a deploy config (T-04-22, T-04-26)", () => {
+    for (const file of ["wrangler.jsonc", "wrangler.embarque.jsonc"]) {
+      const config = read(file);
+      for (const secret of ["TOC_TEST_MODE", "TOC_PEPPER", "TOC_BOOTSTRAP", "VAPID_PRIVATE_KEY"]) {
+        expect(config.vars?.[secret], `${file}: ${secret}`).toBeUndefined();
+      }
+      const text = readFileSync(join(ROOT, file), "utf8");
+      expect(text).not.toMatch(/"(TOC_PEPPER|TOC_BOOTSTRAP|VAPID_PRIVATE_KEY)"\s*:/);
+    }
+  });
 });
 
 describe("tools/check-bundle.mjs", () => {
@@ -163,7 +262,8 @@ describe("tools/check-bundle.mjs", () => {
       'import { DurableObject } from "cloudflare:workers";',
       ...imports.map((file, i) => `import m${i} from "./${file}";`),
       "var GameRoom = class extends DurableObject {};",
-      "export { GameRoom };",
+      "var PlayerHub = class extends DurableObject {};",
+      "export { GameRoom, PlayerHub };",
     ].join("\n");
 
   it("passes when every separate module is a file of the web build", () => {
@@ -200,10 +300,47 @@ describe("tools/check-bundle.mjs", () => {
   it("refuses an entry without the GameRoom class, and a directory that is not a dry run", () => {
     const f = fixture();
     writeFileSync(join(f.out, "index.js"), "export default {};");
-    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the GameRoom class"]);
+    expect(bundleProblems(f.out, f.dist)).toEqual([
+      "index.js does not define the GameRoom class",
+      "index.js does not define the PlayerHub class",
+    ]);
     expect(bundleProblems(f.dist, f.dist)).toEqual([
       `${f.dist}: no index.js (not a dry-run output)`,
     ]);
+    rmSync(f.dir, { recursive: true });
+  });
+
+  // Plan 04-03 (Pitfall 11): a bundle without PlayerHub would deploy migration v2 for a class the
+  // script does not export, and the deploy would fail (or the hub's binding would answer nothing).
+  it("refuses an entry defining GameRoom but not PlayerHub, and passes with both", () => {
+    const f = fixture();
+    const room =
+      'import { DurableObject } from "cloudflare:workers";\nvar GameRoom = class extends DurableObject {};';
+    writeFileSync(join(f.out, "index.js"), `${room}\nexport { GameRoom };`);
+    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the PlayerHub class"]);
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObject {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
+    // esbuild renames the base class imported by a second module (seen in the real dry run).
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObject2 {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
+    // A class extending something else is not a Durable Object.
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nvar PlayerHub = class extends DurableObjectish {};\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual(["index.js does not define the PlayerHub class"]);
+    // esbuild may also keep the class syntax.
+    writeFileSync(
+      join(f.out, "index.js"),
+      `${room}\nclass PlayerHub extends DurableObject {}\nexport { GameRoom, PlayerHub };`,
+    );
+    expect(bundleProblems(f.out, f.dist)).toEqual([]);
     rmSync(f.dir, { recursive: true });
   });
 });

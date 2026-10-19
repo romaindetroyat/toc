@@ -87,9 +87,18 @@ export function swapEnds(board: Board, a: PawnId, b: PawnId): SwapEnds {
   const colorB = pawnColor(b);
   const cellA = ringIndex(colorA, pa.progress);
   const cellB = ringIndex(colorB, pb.progress);
+  // G18: a knight the Valet places on its own losange is an ordinary knight there.
   return {
-    aEnd: { zone: "ring", progress: progressAfterSwap(board, colorA, pa.progress, cellB) },
-    bEnd: { zone: "ring", progress: progressAfterSwap(board, colorB, pb.progress, cellA) },
+    aEnd: {
+      zone: "ring",
+      progress: progressAfterSwap(board, colorA, pa.progress, cellB),
+      justOut: false,
+    },
+    bEnd: {
+      zone: "ring",
+      progress: progressAfterSwap(board, colorB, pb.progress, cellA),
+      justOut: false,
+    },
   };
 }
 

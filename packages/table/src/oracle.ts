@@ -13,9 +13,11 @@
 //   reshuffled in the same batch and that card already sits in another seat's new hand);
 // - frameProblems checks the shape: only the reader's hand in handDealt, only the reader's card in
 //   cardsExchanged, no key of a GameState, no person id, codes-only errors, and a view that is exactly
-//   viewFor(state, reader).
+//   viewFor(state, reader). personSecrets lists the texts of a table's people that no frame may
+//   contain (their ids, and since plan 04-04 their accounts), for the `forbidden` argument.
 
 import { COLORS, type Color, type GameState, PARTNER, viewFor } from "@toc/engine";
+import type { Table } from "./table.ts";
 
 /** A card id (`${Rank}${Suit}`) anywhere in a text. */
 export const CARD_PATTERN = /\b(?:1[0-3]|[1-9])[SHDC]\b/g;
@@ -123,9 +125,11 @@ const FORBIDDEN_KEYS = new Set([
   "botRng",
   "who",
   "token",
+  "account",
   "people",
   "creator",
   "deadlines",
+  "notifyAt",
   "message",
   "stack",
 ]);
@@ -259,6 +263,20 @@ export function structuralProblems(
     if (!isRecord(you) || (you.seat ?? null) !== seat) problems.push("welcome names another seat");
   }
   return problems;
+}
+
+/**
+ * The texts no frame may contain for `table`'s people: each person's id (`who`, a token hash) and
+ * the account a person is linked to (plan 04-04). Pass them as frameProblems' `forbidden`.
+ */
+export function personSecrets(table: Table): string[] {
+  const secrets: string[] = [];
+  for (const person of table.people) {
+    secrets.push(person.who);
+    const account = person.account ?? null;
+    if (account !== null) secrets.push(account);
+  }
+  return secrets;
 }
 
 /** JSON with sorted keys: two values are deep-equal when these texts are equal. */

@@ -9,7 +9,8 @@
 // Wrangler writes each separate module as `<sha1 of its content>-<file name>` next to `index.js`. A
 // module passes when its content hash matches a file of the web build with the same name. The entry
 // must import only those modules and `cloudflare:` built-ins (everything else inlined) and must define
-// the GameRoom class. Exit 0 when all of that holds; exit 1 listing the offending paths otherwise.
+// both Durable Object classes, GameRoom and PlayerHub (plan 04-03, 04-RESEARCH Pitfall 11), one message
+// per missing class. Exit 0 when all of that holds; exit 1 listing the offending paths otherwise.
 
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -26,6 +27,12 @@ function filesUnder(dir) {
 }
 
 const sha1 = (path) => createHash("sha1").update(readFileSync(path)).digest("hex");
+
+/**
+ * The Durable Object classes both configs declare: GameRoom (migration v1) and PlayerHub (v2, plan
+ * 04-03). A bundle missing one would deploy a migration or a binding for a class it does not export.
+ */
+const DURABLE_OBJECTS = ["GameRoom", "PlayerHub"];
 
 /** Files of the dry-run output that are not modules: the entry, its source map, wrangler's note. */
 const NOT_MODULES = new Set(["index.js", "index.js.map", "README.md"]);
@@ -76,9 +83,14 @@ export function bundleProblems(outdir, dist) {
       problems.push(`index.js imports ${specifier}: everything but the web build must be inlined`);
     }
   }
-  // esbuild writes the class as `var GameRoom = class extends DurableObject`.
-  const gameRoom = /\b(?:class\s+GameRoom|GameRoom\s*=\s*class)\s+extends\s+DurableObject\b/;
-  if (!gameRoom.test(entry)) problems.push("index.js does not define the GameRoom class");
+  // esbuild writes a class as `var GameRoom = class extends DurableObject` (or keeps `class X`), and
+  // renames the base of the second module importing it: `class extends DurableObject2`.
+  for (const name of DURABLE_OBJECTS) {
+    const defined = new RegExp(
+      `\\b(?:class\\s+${name}|${name}\\s*=\\s*class)\\s+extends\\s+DurableObject\\d*\\b`,
+    );
+    if (!defined.test(entry)) problems.push(`index.js does not define the ${name} class`);
+  }
   return problems;
 }
 

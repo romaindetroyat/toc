@@ -1,12 +1,16 @@
 <script lang="ts">
+  import { homeTiles, type TileKind } from "../account/flow.ts";
+  import { account, openSignIn } from "../account/store.svelte.ts";
   import logo from "../assets/logo/logo-128.webp";
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
   import { browserApi, createTable } from "../net/api.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
+  import HomeStrip from "../ui/HomeStrip.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
+  import SmallTile from "../ui/SmallTile.svelte";
   import { markNewTable } from "../ui/InviteSheet.svelte";
   import TableList from "../ui/TableList.svelte";
   import { screen } from "../ui/screen.svelte.ts";
@@ -18,6 +22,11 @@
   // Romain's logo (2026-10-17, plan 02-04b) sits before « TOC »: as high as the title row in the
   // compact layouts (34, no change to the fit), 64 beside the title and the tagline elsewhere. It
   // is decorative (alt=""): the heading already says « TOC ».
+  // Plan 04-01: signed in, the small tile « Mon compte » (the pseudo under it) takes the place of the
+  // name line (04-UI-SPEC « Small tiles »). Plan 04-09: the whole row of small tiles, for guests too
+  // (« Ton prénom », « Se connecter »), and « Mes parties en cours » merged with the account's tables.
+  // Plan 04-08: the home strip (offline > update > install), at the bottom of the right column on the
+  // computer and in two columns, right after the header in one column and in portrait.
 
   const storage = pageStorage();
   let device = $state(loadDevice(storage));
@@ -86,9 +95,18 @@
     createError = null;
   }
 
-  // « Changer » opens the sheet « Changer de prénom », prefilled; the focus returns to « Changer ».
+  // The small tiles (plan 04-09, 04-UI-SPEC « Small tiles »): « Ton prénom » opens the sheet
+  // « Changer de prénom », prefilled, and the focus returns to the tile; « Se connecter » opens the
+  // sign-in sheet; « Mes amis » and « Mon compte » are links.
+  const tiles = $derived(homeTiles({ account: account.current, firstName: device.name }));
+  const tileElements = $state<Partial<Record<TileKind, HTMLElement | null>>>({});
   let changing = $state(false);
-  let changeButton = $state<HTMLButtonElement | null>(null);
+
+  function openTile(kind: TileKind) {
+    unlock();
+    if (kind === "prenom") changing = true;
+    else if (kind === "connexion") openSignIn(tileElements.connexion ?? null);
+  }
 
   function rename(name: string) {
     const saved = saveName(storage, name);
@@ -109,7 +127,7 @@
   />
 {:else}
 <main class="home" data-layout={layout} data-home>
-  <!-- DOM order = keyboard order: the gear, tile 1, tile 2, « Changer », the list. -->
+  <!-- DOM order = keyboard order: the gear, tile 1, tile 2, the small tiles, the list, the strip. -->
   <div class="gear" data-settings-slot><SettingsButton /></div>
 
   {#if !compact}
@@ -121,6 +139,9 @@
       </div>
     </header>
   {/if}
+  {#if layout === "portrait"}
+    <HomeStrip />
+  {/if}
 
   <div class="columns">
     <section class="choices">
@@ -129,6 +150,9 @@
           <img class="logo" src={logo} alt="" width="34" height="34" data-home-logo />
           <h1 class="t-display title">{accueil.home.title}</h1>
         </header>
+      {/if}
+      {#if layout === "one"}
+        <HomeStrip margin="0 0 var(--space-sm)" />
       {/if}
       <div class="tiles">
         <ChoiceTile
@@ -144,32 +168,29 @@
           picture="users"
           label={creating ? accueil.name.busy : accueil.home.online.label}
           busy={creating}
-          sub={accueil.home.online.sub}
+          sub={account.current === null ? accueil.home.online.sub : accueil.home.online.subSignedIn}
           onclick={create}
           compact={layout !== "computer"}
         />
       </div>
-      {#if device.name !== null}
-        <p class="name-line" data-name-line>
-          <span class="name-text">
-            {accueil.home.nameLabel}
-            <strong title={device.name}>{device.name}</strong>
-          </span>
-          <button
-            type="button"
-            class="btn btn-text"
-            aria-label={accueil.home.changeLabel}
-            aria-haspopup="dialog"
-            bind:this={changeButton}
-            onclick={() => {
-              unlock();
-              changing = true;
-            }}
-          >
-            {accueil.home.change}
-          </button>
-        </p>
-      {/if}
+      <!-- Plan 04-09: the small tiles where the 02 name line was (« Ton prénom » and « Se connecter »
+           for a guest, « Mes amis » and « Mon compte » signed in); they swap without motion. -->
+      <div class="small-tiles" data-small-tiles>
+        {#each tiles as small (small.kind)}
+          <SmallTile
+            kind={small.kind}
+            icon={small.icon}
+            label={small.label}
+            sub={small.sub}
+            name={small.name}
+            href={small.href}
+            wide={layout === "computer"}
+            fill={layout === "one" || layout === "portrait"}
+            bind:element={tileElements[small.kind]}
+            onclick={small.href === undefined ? () => openTile(small.kind) : undefined}
+          />
+        {/each}
+      </div>
     </section>
 
     <section class="tables" aria-labelledby="tables-heading">
@@ -177,6 +198,9 @@
       <div class="list">
         <TableList {storage} />
       </div>
+      {#if layout === "computer" || layout === "two"}
+        <HomeStrip margin={layout === "computer" ? "var(--space-md) 0 0" : "var(--space-sm) 0 0"} />
+      {/if}
     </section>
   </div>
 </main>
@@ -186,7 +210,7 @@
   <NamePrompt
     initial={device.name}
     onsubmit={rename}
-    sheet={{ onclose: () => (changing = false), opener: changeButton }}
+    sheet={{ onclose: () => (changing = false), opener: tileElements.prenom ?? null }}
   />
 {/if}
 
@@ -245,23 +269,16 @@
     flex-direction: column;
   }
 
-  .name-line {
+  /* The row of small tiles (136 or 152 wide, 48 high), 8 apart (16 on the computer). */
+  .small-tiles {
     display: flex;
-    align-items: center;
     gap: var(--space-sm);
-    min-height: var(--touch);
-    margin: 0;
+    margin-top: var(--space-sm);
   }
 
-  .name-text {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .name-line .btn-text {
-    flex: none;
+  .home[data-layout="computer"] .small-tiles {
+    gap: var(--space-md);
+    margin-top: var(--space-md);
   }
 
   .tables {
@@ -276,7 +293,7 @@
   }
 
   /* Computer (BAR_QUERY): the header centred, two columns centred as a group 24 apart: the tiles and
-     the name line (320) at the left, the list (480) at the right, scrolling inside its column. */
+     the small tiles (320) at the left, the list (480) at the right, scrolling inside its column. */
   .home[data-layout="computer"] {
     gap: var(--space-xl);
     padding-block: calc(var(--space-xl) + env(safe-area-inset-top, 0px))
@@ -298,10 +315,6 @@
     gap: var(--space-md);
   }
 
-  .home[data-layout="computer"] .name-line {
-    margin-top: var(--space-md);
-  }
-
   /* The list column takes the height of the tiles' column (contain: size keeps its content out of the
      row's sizing) and its list scrolls inside. */
   .home[data-layout="computer"] .tables,
@@ -320,7 +333,7 @@
     overflow-y: auto;
   }
 
-  /* Phone held sideways from 640 wide: two columns, the left 280 (TOC, the tiles, the name line), the
+  /* Phone held sideways from 640 wide: two columns, the left 280 (TOC, the tiles, the small tiles), the
      right at most 480; no tagline; vertically centred. */
   .home[data-layout="two"] {
     padding-block: calc(12px + env(safe-area-inset-top, 0px))
@@ -352,10 +365,6 @@
     gap: var(--space-sm);
   }
 
-  .home[data-layout="two"] .name-line {
-    margin-top: var(--space-sm);
-  }
-
   /* Phone held sideways under 640 wide: one column, the page scrolls; the two tiles side by side. */
   .home[data-layout="one"] {
     justify-content: flex-start;
@@ -381,10 +390,6 @@
     min-width: 0;
   }
 
-  .home[data-layout="one"] .name-line {
-    margin-top: var(--space-sm);
-  }
-
   .home[data-layout="one"] .tables {
     margin-top: var(--space-md);
   }
@@ -405,10 +410,6 @@
 
   .home[data-layout="portrait"] .tiles {
     gap: var(--space-sm);
-  }
-
-  .home[data-layout="portrait"] .name-line {
-    margin-top: var(--space-sm);
   }
 
   .home[data-layout="portrait"] .tables {

@@ -29,6 +29,11 @@ export const reglages = {
   tableFastHelper:
     "Pour toute la table : les ordinateurs jouent presque aussitôt et les coups vont plus vite.",
   tableFastOthers: (host: string) => `Seul le chef de table, ${host}, peut la changer.`,
+  /** Plan 04-08: while installing TOC is possible (the browser's prompt, or « Installer TOC »). */
+  install: "Installer l’application",
+  /** Plan 04-08: in a game or at a table, when a new version waits (APP-02). */
+  updateReady:
+    "Une nouvelle version est prête : elle s’installera quand tu reviendras à l’accueil.",
   /** The gear's accessible name while the table is fast. */
   openLabelFast: "Réglages (avance rapide pour toute la table)",
 } as const;

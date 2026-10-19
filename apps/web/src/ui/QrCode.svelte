@@ -8,9 +8,10 @@
   // cream, crisp edges, whole-pixel modules of at least 4 px in a box of at most 196 px when it can.
   // While the chunk loads the box is the cream square with its caption; if it fails, the caption says
   // so and the link buttons beside it still work.
-  type Props = { url: string };
+  // Plan 04-10: `label` names the code for another link (« Code QR du lien d’invitation »).
+  type Props = { url: string; label?: string };
 
-  let { url }: Props = $props();
+  let { url, label = copy.invite.qrLabel }: Props = $props();
 
   const QUIET = 4;
   const MAX_BOX = 196;
@@ -58,7 +59,7 @@
     {#if status === "ready"}
       <svg
         role="img"
-        aria-label={copy.invite.qrLabel}
+        aria-label={label}
         viewBox={`0 0 ${side} ${side}`}
         width={box}
         height={box}

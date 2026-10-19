@@ -52,26 +52,26 @@ describe("G1 SWAP_PROGRESS", () => {
 
   it("position: each pawn takes the progress of its new cell (R-09.8)", () => {
     expect(swapEnds(b("position"), "bleu0", "jaune0")).toEqual({
-      aEnd: { zone: "ring", progress: 38 },
-      bEnd: { zone: "ring", progress: 62 },
+      aEnd: { zone: "ring", progress: 38, justOut: false },
+      bEnd: { zone: "ring", progress: 62, justOut: false },
     });
   });
 
   it("keep: each pawn keeps the laps already done (R-09.9)", () => {
     expect(swapEnds(b("keep"), "bleu0", "jaune0")).toEqual({
-      aEnd: { zone: "ring", progress: 110 },
-      bEnd: { zone: "ring", progress: 62 },
+      aEnd: { zone: "ring", progress: 110, justOut: false },
+      bEnd: { zone: "ring", progress: 62, justOut: false },
     });
   });
 
   it("position gives the default numbers of R-09.1 and R-09.2", () => {
     expect(swapEnds(board({ bleu0: { p: 10 }, jaune0: { p: 20 } }), "bleu0", "jaune0")).toEqual({
-      aEnd: { zone: "ring", progress: 38 },
-      bEnd: { zone: "ring", progress: 64 },
+      aEnd: { zone: "ring", progress: 38, justOut: false },
+      bEnd: { zone: "ring", progress: 64, justOut: false },
     });
     expect(swapEnds(board({ bleu0: { p: 10 }, rouge0: { p: 12 } }), "bleu0", "rouge0")).toEqual({
-      aEnd: { zone: "ring", progress: 48 },
-      bEnd: { zone: "ring", progress: 46 },
+      aEnd: { zone: "ring", progress: 48, justOut: false },
+      bEnd: { zone: "ring", progress: 46, justOut: false },
     });
   });
 });
@@ -89,7 +89,7 @@ describe("G2 HOME_JUMP_BLOCKED (read only when HOME_JUMP_ALLOWED is false)", () 
     const end = movesForCard(state("continue"), "bleu", "8S").find(
       (c) => c.action.t === "move" && c.action.pawn === "bleu0",
     )?.walk?.end;
-    expect(end).toEqual({ zone: "ring", progress: 74 });
+    expect(end).toEqual({ zone: "ring", progress: 74, justOut: false });
   });
 
   it("illegal: the move is forbidden", () => {
@@ -124,7 +124,11 @@ describe("G17 HOME_JUMP_ALLOWED", () => {
   });
 
   it("false: G2 and D-03 « sans sauter » come back", () => {
-    expect(endOf(entering(false), "8S", "bleu0")).toEqual({ zone: "ring", progress: 74 });
+    expect(endOf(entering(false), "8S", "bleu0")).toEqual({
+      zone: "ring",
+      progress: 74,
+      justOut: false,
+    });
     expect(actions(inside(false), "bleu", "2S")).not.toContainEqual({
       t: "move",
       card: "2S",
@@ -133,17 +137,21 @@ describe("G17 HOME_JUMP_ALLOWED", () => {
   });
 });
 
-describe("G3 PROTECTED_AFTER_EXTRA_LAP", () => {
-  const state = (value: boolean) =>
+describe("G3 PROTECTED_AFTER_EXTRA_LAP (read only when G18 is off)", () => {
+  const state = (value: boolean, exitOnly = false) =>
     playState(
       { bleu: [{ p: 72 }, "S", "S", "S"], rouge: [{ p: 34 }, "S", "S", "S"] },
       { rouge: ["3S"] },
       "rouge",
-      { PROTECTED_AFTER_EXTRA_LAP: value },
+      { PROTECTED_AFTER_EXTRA_LAP: value, EXIT_ONLY_PROTECTION: exitOnly },
     );
   const move: Action = { t: "move", card: "3S", pawn: "rouge0" };
 
-  it("true: the pawn back on its exit after a lap blocks the passage (R-12.9)", () => {
+  it("G18 on: the pawn back on its exit after a lap is ordinary, whatever G3 says (R-12.9)", () => {
+    expect(actions(state(true, true), "rouge", "3S")).toContainEqual(move);
+  });
+
+  it("true: the pawn back on its exit after a lap blocks the passage (the rule of 2026-10-13)", () => {
     expect(actions(state(true), "rouge", "3S")).not.toContainEqual(move);
   });
 
@@ -309,7 +317,7 @@ describe("G14 ENTRY_WITHOUT_FULL_LAP", () => {
   it("false: the full lap is required, the pawn goes on round the ring (rule of 2026-10-13)", () => {
     const [candidate] = movesForCard(state(false), "bleu", "5S");
     expect(candidate?.action).toEqual({ t: "move", card: "5S", pawn: "bleu0" });
-    expect(candidate?.walk?.end).toEqual({ zone: "ring", progress: 1 });
+    expect(candidate?.walk?.end).toEqual({ zone: "ring", progress: 1, justOut: false });
   });
 
   it("true: from -4, the 3 and the 6 enter home slots 0 and 3, the 4 goes back to -8", () => {
@@ -321,7 +329,7 @@ describe("G14 ENTRY_WITHOUT_FULL_LAP", () => {
       )[0]?.walk?.end;
     expect(at("3S")).toEqual({ zone: "home", slot: 0 });
     expect(at("6S")).toEqual({ zone: "home", slot: 3 });
-    expect(at("4S")).toEqual({ zone: "ring", progress: -8 });
+    expect(at("4S")).toEqual({ zone: "ring", progress: -8, justOut: false });
   });
 
   it("entry stays mandatory at the default: the only move of bleu0 with the 3 ends in home slot 0", () => {
@@ -351,7 +359,7 @@ describe("G15 SEVEN_EATS_PASSED_PARTNER", () => {
   it("false (default): the 7 passes the partner's pawn without eating it (R-10.6)", () => {
     const r = seven(45, false);
     expect(r.ok && r.captured).toEqual([]);
-    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 45 });
+    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 45, justOut: false });
   });
 
   it("true: the rule of 2026-10-13 (Q23), the passed partner's pawn is eaten", () => {
@@ -385,7 +393,7 @@ describe("G15 SEVEN_EATS_PASSED_PARTNER", () => {
       const r = finished(true, g15);
       expect(r.ok).toBe(true);
       expect(r.ok && r.captured).toEqual([]);
-      expect(r.ok && r.pawns.rouge1).toEqual({ zone: "ring", progress: 14 });
+      expect(r.ok && r.pawns.rouge1).toEqual({ zone: "ring", progress: 14, justOut: false });
     }
   });
 
@@ -393,7 +401,7 @@ describe("G15 SEVEN_EATS_PASSED_PARTNER", () => {
     const r = finished(false, false);
     expect(r.ok).toBe(true);
     expect(r.ok && r.captured).toEqual([]);
-    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 17 });
+    expect(r.ok && r.pawns.rouge0).toEqual({ zone: "ring", progress: 17, justOut: false });
   });
 
   it("finished player, G7 false and SEVEN_EATS_PASSED_PARTNER true: rouge1 is eaten (old rule)", () => {
@@ -435,8 +443,8 @@ describe("G16 KNIGHT_MUST_ENTER", () => {
       return r.ok ? r.pawns.bleu0 : r.reason;
     });
     expect(ends).toEqual([
-      { zone: "ring", progress: 75 },
-      { zone: "ring", progress: 70 },
+      { zone: "ring", progress: 75, justOut: false },
+      { zone: "ring", progress: 70, justOut: false },
     ]);
     expect(nextSteps(state(false), "bleu", "7S", []).bleu0).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });

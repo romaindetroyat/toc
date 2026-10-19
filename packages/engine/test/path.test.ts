@@ -44,13 +44,13 @@ describe("home entry (D-01, D-02, D-03)", () => {
   it("a count that overshoots the home does not enter: the pawn goes round again (D-01)", () => {
     const b = board({ bleu0: { p: 66 } });
     const r = walk(b, "bleu0", 9, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 75 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 75, justOut: false });
   });
 
   it("stopping exactly on the entry square is not entering", () => {
     const b = board({ bleu0: { p: 66 } });
     const r = walk(b, "bleu0", 4, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 70 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 70, justOut: false });
   });
 
   it("from the entry square the next count enters the home", () => {
@@ -62,7 +62,7 @@ describe("home entry (D-01, D-02, D-03)", () => {
   it("an occupied target slot sends the pawn round again", () => {
     const b = board({ bleu0: { p: 66 }, bleu1: { h: 1 } });
     const r = walk(b, "bleu0", 6, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72, justOut: false });
   });
 
   it("a home pawn in the way is jumped: 8 steps from 66 over slot 0 land in slot 3 (G17)", () => {
@@ -88,13 +88,13 @@ describe("home entry (D-01, D-02, D-03)", () => {
   it("jumping does not open an occupied target: the pawn goes round again (G17, D-01)", () => {
     const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 }, bleu2: { h: 2 } });
     const r = walk(b, "bleu0", 7, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 73 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 73, justOut: false });
   });
 
   it("HOME_JUMP_ALLOWED false, G2 continue: a home pawn in the way sends the pawn round again", () => {
     const b = board({ bleu0: { p: 66 }, bleu1: { h: 0 } }, { HOME_JUMP_ALLOWED: false });
     const r = walk(b, "bleu0", 6, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 72, justOut: false });
   });
 
   it("HOME_JUMP_ALLOWED false, G2 illegal: a home pawn in the way forbids the move", () => {
@@ -140,7 +140,7 @@ describe("entry after backing with the 4 (G14)", () => {
   it("2 steps from -4 stop on the carré 16: standing on it is not entering", () => {
     const b = board({ bleu0: { p: -4 } });
     const r = walk(b, "bleu0", 2, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2, justOut: false });
   });
 
   it("3 steps from -4 cross the carré 16 and enter home slot 0", () => {
@@ -170,11 +170,11 @@ describe("entry after backing with the 4 (G14)", () => {
     const b = board({ bleu0: { p: -4 } });
     expect(walk(b, "bleu0", 7, 1, alone("bleu0"))).toMatchObject({
       ok: true,
-      end: { zone: "ring", progress: 3 },
+      end: { zone: "ring", progress: 3, justOut: false },
     });
     expect(walk(b, "bleu0", 10, 1, alone("bleu0"))).toMatchObject({
       ok: true,
-      end: { zone: "ring", progress: 6 },
+      end: { zone: "ring", progress: 6, justOut: false },
     });
   });
 
@@ -191,7 +191,7 @@ describe("entry after backing with the 4 (G14)", () => {
   it("HOME_JUMP_ALLOWED false: G2 continue goes on round the ring, illegal forbids the move", () => {
     const cont = board({ bleu0: { p: -4 }, bleu1: { h: 0 } }, { HOME_JUMP_ALLOWED: false });
     const r = walk(cont, "bleu0", 5, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1, justOut: false });
     const ill = board(
       { bleu0: { p: -4 }, bleu1: { h: 0 } },
       { HOME_JUMP_ALLOWED: false, HOME_JUMP_BLOCKED: "illegal" },
@@ -202,25 +202,25 @@ describe("entry after backing with the 4 (G14)", () => {
   it("the 4 never enters, even with home pawns to jump (D-04, G17)", () => {
     const b = board({ bleu0: { p: 2 }, bleu1: { h: 0 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2, justOut: false });
   });
 
   it("the 4 from -4 still goes backward, to -8: the 4 never enters the home", () => {
     const b = board({ bleu0: { p: -4 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -8 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -8, justOut: false });
   });
 
   it("backing 4 from progress 2 stops on the carré 16 and never enters", () => {
     const b = board({ bleu0: { p: 2 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -2, justOut: false });
   });
 
   it("with ENTRY_WITHOUT_FULL_LAP false, -2 playing 3 stays on the ring (rule of 2026-10-13)", () => {
     const b = board({ bleu0: { p: -2 } }, { ENTRY_WITHOUT_FULL_LAP: false });
     const r = walk(b, "bleu0", 3, 1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 1, justOut: false });
   });
 });
 
@@ -277,14 +277,14 @@ describe("the backward 4 (RULE-08, D-04)", () => {
   it("from the exit gives progress -4 and stands on the cell before the exit", () => {
     const b = board({ bleu0: { p: 0 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -4 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: -4, justOut: false });
     expect(r.ok && r.path[3]).toEqual(ring(68));
   });
 
   it("never ends in the home, even right after the entry square", () => {
     const b = board({ bleu0: { p: 73 } });
     const r = walk(b, "bleu0", 4, -1, alone("bleu0"));
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 69 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 69, justOut: false });
   });
 
   it("a pawn in the stable cannot move backward", () => {
@@ -320,7 +320,7 @@ describe("landing, captures and passing (RULE-12, G11)", () => {
     const b = board({ bleu0: { p: 5 }, jaune0: { p: 62 } });
     const r = walk(b, "bleu0", 3, 1, { capturePassed: false, ownIds: bleuAll });
     expect(r.ok && r.captures).toEqual([{ victim: "jaune0", atStep: 2 }]);
-    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 8 });
+    expect(r.ok && r.end).toEqual({ zone: "ring", progress: 8, justOut: false });
   });
 
   it("ordinary cards pass over pawns without capturing them", () => {
@@ -355,15 +355,17 @@ describe("landing, captures and passing (RULE-12, G11)", () => {
   it("a pawn of the colour of the exit standing on its exit is protected at progress 0", () => {
     const b = board({ bleu0: { p: 0 }, bleu1: { p: 72 }, jaune0: { p: -18 } });
     expect(isProtected("bleu0", b.pawns.bleu0, b.rules)).toBe(true);
-    expect(isProtected("bleu1", b.pawns.bleu1, b.rules)).toBe(true);
+    // G18: back on its exit after a lap, it is an ordinary pawn.
+    expect(isProtected("bleu1", b.pawns.bleu1, b.rules)).toBe(false);
     // jaune0 stands on cell 0 (bleu's exit) but that is not jaune's exit.
     expect(isProtected("jaune0", b.pawns.jaune0, b.rules)).toBe(false);
   });
 
-  it("an extra lap on the exit is protected only if PROTECTED_AFTER_EXTRA_LAP", () => {
-    const off = board({ bleu1: { p: 72 } }, { PROTECTED_AFTER_EXTRA_LAP: false });
+  it("with G18 off, an extra lap on the exit is protected only if PROTECTED_AFTER_EXTRA_LAP", () => {
+    const old = { EXIT_ONLY_PROTECTION: false };
+    const off = board({ bleu1: { p: 72 } }, { ...old, PROTECTED_AFTER_EXTRA_LAP: false });
     expect(isProtected("bleu1", off.pawns.bleu1, off.rules)).toBe(false);
-    const on = board({ bleu1: { p: 72 } });
+    const on = board({ bleu1: { p: 72 } }, old);
     expect(isProtected("bleu1", on.pawns.bleu1, on.rules)).toBe(true);
   });
 

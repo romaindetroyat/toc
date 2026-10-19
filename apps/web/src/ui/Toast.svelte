@@ -17,29 +17,26 @@
    */
   let place = $state<{ x: number; y: number; width: number; top: boolean } | null>(null);
 
-  function measure() {
+  /** Where the toast stands now, or null for its place at the bottom of the screen. */
+  function placeNow(): { x: number; y: number; width: number; top: boolean } | null {
     // While a plate is up over the board (plan 02-06), the toast stands at the top of the board
     // (board top + 8) in every mode, so it never covers the plate.
     const plated = document.querySelector("[data-plate]") !== null;
     const top = plated ? document.querySelector("main.game [data-board]") : null;
     if (top !== null) {
       const box = top.getBoundingClientRect();
-      place = {
+      return {
         x: box.left + box.width / 2,
         y: box.top + 8,
         width: Math.min(480, box.width * 0.75),
         top: true,
       };
-      return;
     }
     const board = document.querySelector('main.game[data-chrome="compact"] [data-board]');
-    if (board === null) {
-      place = null;
-      return;
-    }
+    if (board === null) return null;
     const box = board.getBoundingClientRect();
     const felt = board.querySelector("[data-felt-button]")?.getBoundingClientRect();
-    place = {
+    return {
       x: felt ? felt.left + felt.width / 2 : box.left + box.width / 2,
       y: felt ? felt.top + felt.height / 2 : box.top + box.height / 2,
       width: Math.min(480, box.width * 0.75),
@@ -47,18 +44,29 @@
     };
   }
 
+  /**
+   * Measures and keeps the place; answers whether it is over the board. Plan 04-12: it never reads
+   * `place`, so the effect below does not depend on the place it writes (a new object each time).
+   * Before, the effect read `place` after writing it: once the board appeared under a message, every
+   * run invalidated itself, Svelte stopped the loop (effect_update_depth_exceeded) and the game's
+   * update of that moment was lost.
+   */
+  function measure(): boolean {
+    const next = placeNow();
+    place = next;
+    return next !== null;
+  }
+
   // A message may come before the game screen is laid out (the sound's failure at the first tap): the
   // board is looked for again on the next frames, for up to two seconds, then on every resize.
   $effect(() => {
     if (!toast.current) return;
-    measure();
     let frames = 120;
     let frame = 0;
     const again = () => {
-      measure();
-      if (place === null && --frames > 0) frame = requestAnimationFrame(again);
+      if (!measure() && --frames > 0) frame = requestAnimationFrame(again);
     };
-    if (place === null) frame = requestAnimationFrame(again);
+    if (!measure()) frame = requestAnimationFrame(again);
     return () => cancelAnimationFrame(frame);
   });
 </script>

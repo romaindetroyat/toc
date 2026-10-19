@@ -4,10 +4,14 @@
   import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
   import { reglages } from "../i18n/fr/reglages.ts";
+  import { canInstall, install, promptInstall } from "../pwa/install.svelte.ts";
+  import { inGameUpdateLine } from "../pwa/rules.ts";
+  import { currentPlace, pwaUpdate } from "../pwa/update.svelte.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreditsSheet from "./CreditsSheet.svelte";
+  import InstallSheet from "./InstallSheet.svelte";
   import Sheet from "./Sheet.svelte";
   import ShortcutsSheet from "./ShortcutsSheet.svelte";
   import Switch from "./Switch.svelte";
@@ -107,6 +111,19 @@
 
   // « Son » off dims « Bruitages ».
   const muted = $derived(!settings.sound);
+
+  // Plan 04-08: « Installer l’application » while installing is possible (the browser's prompt, or
+  // « Installer TOC » on iPhone and iPad); in a game or at a table, the line that says a new version
+  // waits for the home (APP-02).
+  const installable = $derived(canInstall());
+  const updateLine = $derived(pwaUpdate.needRefresh && inGameUpdateLine(currentPlace()));
+  let installOpen = $state(false);
+  let installButton = $state<HTMLButtonElement | null>(null);
+
+  function startInstall() {
+    if (install.prompt !== null) void promptInstall();
+    else installOpen = true;
+  }
 </script>
 
 <Sheet title={reglages.title} {onclose} {opener} closeLabel={reglages.close}>
@@ -142,6 +159,9 @@
       checked={settings.reduceMotion}
       onchange={(reduceMotion) => updateSettings({ reduceMotion })}
     />
+    {#if updateLine}
+      <p class="update-line" data-update-line>{reglages.updateReady}</p>
+    {/if}
 
     <nav class="links">
       {#if !online}
@@ -157,6 +177,18 @@
       >
         {reglages.credits}
       </button>
+      {#if installable}
+        <button
+          type="button"
+          class="btn btn-text"
+          data-install-app
+          aria-haspopup={install.prompt === null ? "dialog" : undefined}
+          bind:this={installButton}
+          onclick={startInstall}
+        >
+          {reglages.install}
+        </button>
+      {/if}
       {#if onabandon || inGame}
         <!-- In a game, on a computer only: the same help as the « ? » key (plan 01-28). -->
         <button
@@ -237,6 +269,10 @@
   <CreditsSheet onclose={() => (creditsOpen = false)} opener={creditsButton} />
 {/if}
 
+{#if installOpen}
+  <InstallSheet onclose={() => (installOpen = false)} opener={installButton} />
+{/if}
+
 {#if shortcutsOpen}
   <ShortcutsSheet onclose={() => (shortcutsOpen = false)} opener={shortcutsButton} {online} />
 {/if}
@@ -261,6 +297,14 @@
   .abandon,
   .leave {
     align-self: flex-start;
+  }
+
+  /* The update line: Label, muted, under the switches (04-UI-SPEC « Update »). */
+  .update-line {
+    margin: 0;
+    color: var(--creme-attenuee);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
   }
 
   .links {

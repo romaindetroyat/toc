@@ -47,10 +47,14 @@ export function suitOf(id: CardId): Suit {
  * A pawn is in its stable, on the ring, or in its home.
  * `progress` is signed (negative after a backward 4 from the exit) and unbounded:
  * a pawn that misses its home entry keeps lapping (D-01).
+ * `justOut` (G18, RULES.md R-12): true when the knight came out of its stable onto its own losange and
+ * has not moved since, the only knight protected there; false after any move or swap. The engine
+ * always writes it; a pawn saved before G18 has none and is read with the default of
+ * defaultJustOut (protected iff on its own losange at progress 0), which upgradeState writes out.
  */
 export type Pawn =
   | { zone: "stable" }
-  | { zone: "ring"; progress: number }
+  | { zone: "ring"; progress: number; justOut?: boolean }
   | { zone: "home"; slot: 0 | 1 | 2 | 3 };
 
 /** `exchange`: the four seats choose a card to give; `play`: turn by turn; `won`: game over. */

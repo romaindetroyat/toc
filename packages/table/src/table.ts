@@ -2,10 +2,18 @@
 // snapshot). Pure, no I/O: the clock and the seeds come from the reducer's context.
 //
 // A person is known by `who`, the SHA-256 of the table id and the device token, computed by the
-// Durable Object: the token itself never reaches the table, and `who` never leaves the server.
+// Durable Object: the token itself never reaches the table, and `who` never leaves the server. Plan
+// 04-04 adds the account a person is linked to (accounts.ts), server-only too.
 
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
-import { COLORS, type Color, type GameState, type Rng, type Scenario } from "@toc/engine";
+import {
+  COLORS,
+  type Color,
+  type GameState,
+  type Rng,
+  type Scenario,
+  upgradeState,
+} from "@toc/engine";
 import type { ChatEntry } from "@toc/protocol";
 import type { GameRecord } from "./record.ts";
 
@@ -15,6 +23,11 @@ export type Person = {
   seat: Color | null;
   /** The person has an open socket on the table. */
   online: boolean;
+  /**
+   * The account the person is linked to (plan 04-04, D-05), or null for a guest. Server-only: never
+   * put in a frame. Absent in a snapshot from before plan 04-04 (copyTable sets null).
+   */
+  account: string | null;
 };
 
 export type Seat =
@@ -51,6 +64,8 @@ export type TestOptions = {
    * end plank and the rematch). A rematch always deals a real game.
    */
   before?: Scenario["before"];
+  /** « C’est ton tour » sooner than NOTIFY_AFTER_MS, for the tests (plan 04-07, notify.ts). */
+  notifyMs?: number;
 };
 
 /**
@@ -131,7 +146,8 @@ export type Table = {
    * must next be ticked (decide, a slice, or play) for `seq`; when the pause's minute is over; when
    * the silent sockets are next swept (presence.ts); when the 30 idle days may be over (expire: not
    * moved by each activity, re-armed when it fires early, plan 02-07); when the pending game records
-   * go to D1 again (d1Retry, `attempt` the tries so far, plan 02-09, record.ts).
+   * go to D1 again (d1Retry, `attempt` the tries so far, plan 02-09, record.ts); when the next
+   * « C’est ton tour » is due (notify, the earliest of notifyAt, plan 04-07, notify.ts).
    */
   deadlines: {
     bot?: { at: number; seq: number };
@@ -139,7 +155,14 @@ export type Table = {
     sweep?: { at: number };
     expire?: { at: number };
     d1Retry?: { at: number; attempt: number };
+    notify?: { at: number };
   };
+  /**
+   * Server-only (plan 04-07, notify.ts): per missing seat whose person has an account, when they are
+   * told « C’est ton tour », or null once told for this absence. Absent in a snapshot from before
+   * plan 04-07 (copyTable sets {}). Never put in a frame.
+   */
+  notifyAt: Partial<Record<Color, number | null>>;
   /**
    * Server-only: the records of finished games not yet written to D1 (plan 02-09, record.ts), at
    * most one per game number. Never put in a frame.
@@ -201,6 +224,7 @@ export function createTable(options: {
     records: [],
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: { expire: { at: options.now + EXPIRY_MS } },
+    notifyAt: {},
     reclaims: {},
     pause: null,
     thinking: null,
@@ -230,6 +254,24 @@ export function copyTable(table: Table): Table {
   copy.endedAt ??= null;
   // Before plan 02-10b a table had no « Avance rapide ».
   copy.fast ??= false;
+  // Before plan 04-04 nobody was linked to an account.
+  for (const person of copy.people) person.account ??= null;
+  // Before plan 04-07 nobody was told « C’est ton tour ».
+  copy.notifyAt ??= {};
+  // Before plan 04-14 (G18) a game had no EXIT_ONLY_PROTECTION switch and no flag on its knights: the
+  // missing switches take DEFAULT_RULES, a knight on its own losange at progress 0 is the one just out.
+  if (copy.game !== null) {
+    const beforeG18 = copy.game.rules.EXIT_ONLY_PROTECTION === undefined;
+    copy.game = upgradeState(copy.game);
+    // A computer's decision (or search) made under the old protection may not be legal any more (a
+    // knight back on its 18 no longer blocks, so a 7 may now have to bring a knight home): it decides
+    // again, from the start, under G18.
+    if (beforeG18 && copy.thinking !== null) {
+      copy.thinking.thought = null;
+      copy.thinking.checkpoint = null;
+      copy.thinking.playAt = null;
+    }
+  }
   if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }
@@ -240,8 +282,8 @@ export function personOf(table: Table, who: string): Person | undefined {
 
 /** The earliest deadline of the table, or null: the Durable Object arms its one alarm at it. */
 export function nextDeadline(table: Table): number | null {
-  const { bot, pauseChoice, sweep, expire, d1Retry } = table.deadlines;
-  const times = [bot?.at, pauseChoice?.at, sweep?.at, expire?.at, d1Retry?.at].filter(
+  const { bot, pauseChoice, sweep, expire, d1Retry, notify } = table.deadlines;
+  const times = [bot?.at, pauseChoice?.at, sweep?.at, expire?.at, d1Retry?.at, notify?.at].filter(
     (at): at is number => at !== undefined,
   );
   return times.length === 0 ? null : Math.min(...times);

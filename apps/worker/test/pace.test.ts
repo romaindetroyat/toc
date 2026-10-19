@@ -18,9 +18,8 @@ import type { ServerFrame } from "@toc/protocol";
 import type { Table } from "@toc/table";
 import { afterEach, describe, expect, it } from "vitest";
 import { eventsDuration } from "../../../packages/board/src/motion.ts";
-import { GameRoom } from "../src/GameRoom.ts";
 import { load } from "../src/storage.ts";
-import { type Client, connect, createTable, token } from "./helpers.ts";
+import { type Client, connect, createTable, deliverAsProduction, token } from "./helpers.ts";
 
 /** A computer's turn: its think time (at most CHOICE_CEILING_MS) plus a second for the alarms. */
 const TURN_MS = CHOICE_CEILING_MS + 1_000;
@@ -75,43 +74,6 @@ function viewAt(client: Client, seq: number): PlayerView | null {
   return null;
 }
 
-/**
- * Runs every alarm the way production does (see the header) until the returned function is called.
- */
-function deliverAsProduction(): () => void {
-  const alarm = GameRoom.prototype.alarm;
-  GameRoom.prototype.alarm = async function (this: GameRoom, info?: AlarmInvocationInfo) {
-    if (info === undefined) return alarm.call(this, info);
-    const fired = info.scheduledTime;
-    const storage = (this as unknown as { ctx: DurableObjectState }).ctx.storage;
-    const { setAlarm, deleteAlarm } = storage;
-    // The alarm the handler leaves, as production stores it: whole ms, never before its Date.now().
-    let left: number | null = fired;
-    storage.setAlarm = (time, options) => {
-      left = Math.max(Math.trunc(Number(time)), fired);
-      return setAlarm.call(storage, time, options);
-    };
-    storage.deleteAlarm = (options) => {
-      left = null;
-      return deleteAlarm.call(storage, options);
-    };
-    const now = Date.now;
-    Date.now = () => fired;
-    try {
-      await alarm.call(this, info);
-    } finally {
-      Date.now = now;
-      storage.setAlarm = setAlarm;
-      storage.deleteAlarm = deleteAlarm;
-    }
-    // Left at its own time: production does not schedule it again.
-    if (left === fired) await deleteAlarm.call(storage);
-  };
-  return () => {
-    GameRoom.prototype.alarm = alarm;
-  };
-}
-
 let restore: (() => void) | null = null;
 afterEach(() => {
   restore?.();
@@ -137,9 +99,9 @@ async function play(
   const ana = await connect(id);
   const bea = await connect(id);
   const people: Record<string, Client> = { bleu: ana, jaune: bea };
-  ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+  ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
   await ana.next("welcome");
-  bea.send({ t: "hello", v: 5, token: token("b"), name: "Bea" });
+  bea.send({ t: "hello", v: 6, token: token("b"), name: "Bea" });
   await bea.next("welcome");
   ana.send({ t: "sit", seat: "bleu" });
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");
