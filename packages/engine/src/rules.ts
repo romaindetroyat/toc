@@ -18,7 +18,7 @@
 // Numbering follows RULES.md: G1-G13 are the gaps, Q7 and Q22 the two questions listed with them.
 // G14 and G15 record the changes Romain made on 2026-10-14 during the phase acceptance test; later
 // changes continue the numbering (G16, 2026-10-15, his third acceptance test; G17, the same day, his
-// fourth).
+// fourth; G18, 2026-10-19, after a game in the installed app).
 // Pure, no I/O, no import: Node 22 can load this file directly (erasable syntax only).
 
 /**
@@ -38,7 +38,8 @@ export const HOME_JUMP_BLOCKED: "continue" | "illegal" = "continue";
 
 /**
  * G3 — A pawn stopping on its own exit square after an extra lap is protected like on its first pass
- * (RULES.md R-12; validated 2026-10-13). true: protection depends on square and colour, not on the lap.
+ * (RULES.md R-12; validated 2026-10-13, replaced by G18 on 2026-10-19). true: protection depends on
+ * square and colour, not on the lap. Read only when EXIT_ONLY_PROTECTION is false.
  */
 export const PROTECTED_AFTER_EXTRA_LAP: boolean = true;
 
@@ -153,6 +154,22 @@ export const KNIGHT_MUST_ENTER: boolean = true;
 export const HOME_JUMP_ALLOWED: boolean = true;
 
 /**
+ * G18 — Only the knight just out of its stable is protected on its losange (RULES.md R-12, « Décisions
+ * de Romain »; decided by Romain on 2026-10-19; replaces G3). His words: « Quand un joueur se place sur
+ * son propre 18 après avoir loupé l'entrée dans son écurie, il n'est pas bloquant et il reste
+ * échangeable. Cette règle ne s'applique qu'aux chevaux qui sortent juste de leur camp, ok ? »; for a
+ * knight arriving on its 18 by a Valet swap or a 4 backwards, « Ordinaire aussi (Recommandé) »; for a
+ * knight just out that stays there, « Oui, tant qu'il ne bouge pas (Recommandé) »; and for his own
+ * ordinary knight on the 18 and a second exit, « Garde le blocage ».
+ * true: a knight is protected on its own losange only when it came out of its stable there (an As or a
+ * Roi) and has not moved since (Pawn.justOut); after an extra lap or a missed entry, a Valet swap or a
+ * 4 backwards it is an ordinary knight, passed, eaten and swapped. Its own knight on the losange,
+ * protected or not, still makes a second exit impossible (R-12, Q15).
+ * false: the rule of 2026-10-13, protection by square and colour (progress 0, and every lap under G3).
+ */
+export const EXIT_ONLY_PROTECTION: boolean = true;
+
+/**
  * G13 — A player with no card left is skipped until the next deal and the turn passes to the next player
  * (RULES.md R-05, R-14, scenarios R-05.3 and R-14.4; validated 2026-10-13). true: skipped.
  * Descriptive: the only value implemented (nextHolder in apply.ts always skips), nothing reads it.
@@ -197,6 +214,7 @@ export type RuleSet = {
   SEVEN_EATS_PASSED_PARTNER: boolean;
   KNIGHT_MUST_ENTER: boolean;
   HOME_JUMP_ALLOWED: boolean;
+  EXIT_ONLY_PROTECTION: boolean;
   EMPTY_HAND_SKIPPED: true;
   EXCHANGE_KEEPS_HAND_SIZE: true;
   PAUSE_IN_ALL_PHASES: true;
@@ -221,6 +239,7 @@ export const DEFAULT_RULES: Readonly<RuleSet> = {
   SEVEN_EATS_PASSED_PARTNER,
   KNIGHT_MUST_ENTER,
   HOME_JUMP_ALLOWED,
+  EXIT_ONLY_PROTECTION,
   EMPTY_HAND_SKIPPED,
   EXCHANGE_KEEPS_HAND_SIZE,
   PAUSE_IN_ALL_PHASES,

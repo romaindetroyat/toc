@@ -106,10 +106,10 @@ describe("leak oracle on the real frames of a whole game", () => {
     const anaJar = newJar();
     const account = await signUpPerson(`Ana${Math.floor(Math.random() * 1e6)}`, anaJar);
     const ana = await connectAs(id, { jar: anaJar });
-    ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+    ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
     await ana.next("welcome");
     let ben = await connect(id);
-    ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+    ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
     await ben.next("welcome");
     readers.push({ name: "ana", client: ana, seat: "bleu", seatedFrom: ana.raw.length });
     ana.send({ t: "sit", seat: "bleu" });
@@ -207,7 +207,7 @@ describe("leak oracle on the real frames of a whole game", () => {
         // Ben comes back: a new socket, hello with the same device token.
         ben = await connect(id);
         readers.push({ name: `ben#${reconnects + 2}`, client: ben, seat: "jaune", seatedFrom: 0 });
-        ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+        ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
         const welcome = await ben.next("welcome");
         expect(welcome.you).toEqual({ seat: "jaune", host: false });
         const at = (await readTable(id)).seq;

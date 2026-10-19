@@ -5,7 +5,8 @@
 //   steps left to its carré 16), a knight out of the stable a little more;
 // - manger: no term of its own, an eaten knight loses its value;
 // - se protéger: a ring knight within an opponent's reach is worth less (the risk term, 03-RESEARCH
-//   Pattern 3); a knight protected on its own exit is safe;
+//   Pattern 3); a knight protected on its own exit is safe (the engine's isProtected: under G18 only the
+//   knight just out of its stable, never one back there after a lap, a swap or a 4);
 // - aider le partenaire: the partner's knights count exactly like the seat's own (a finished player
 //   plays them, R-15), so eating the partner costs what losing one's own knight costs.
 // The candidates of the play phase are scored as evaluate(after) + handBonus(the cards kept, after): a
@@ -136,8 +137,8 @@ function threatsOn(
 
 /**
  * The board as `team` sees it: the sum of its eight knights minus the sum of the eight opponents, each
- * ring knight less its risk (value × min(RISK_CAP, RISK_PER_THREAT × threats)). Protection reads the
- * rules in force (G3).
+ * ring knight less its risk (value × min(RISK_CAP, RISK_PER_THREAT × threats)). Protection is the
+ * engine's isProtected on the rules in force (G18, G3 when G18 is off).
  */
 export function evaluate(pawns: Record<PawnId, Pawn>, rules: RuleSet, team: Team): number {
   const cells: number[] = [];

@@ -4,7 +4,7 @@
 // Every function is synchronous: a commit's statements run with no await between them, so the runtime
 // submits them as one atomic batch.
 
-import type { LogEntry, Table } from "@toc/table";
+import { copyTable, type LogEntry, type Table } from "@toc/table";
 
 export function createSchema(sql: SqlStorage): void {
   sql.exec(
@@ -35,10 +35,15 @@ export function hasTable(sql: SqlStorage): boolean {
   );
 }
 
+/**
+ * The stored table, brought up to date by copyTable (a snapshot written by an older version gets the
+ * fields and rule switches it lacks, plan 04-14: the G18 flag on its knights), so every frame built
+ * from the cached snapshot reads the same table as the reducer.
+ */
 export function load(sql: SqlStorage): Table | null {
   if (!hasTable(sql)) return null;
   const row = sql.exec("SELECT table_json FROM snapshot WHERE id = 1").toArray()[0];
-  return row === undefined ? null : (JSON.parse(String(row.table_json)) as Table);
+  return row === undefined ? null : copyTable(JSON.parse(String(row.table_json)) as Table);
 }
 
 /**

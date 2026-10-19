@@ -42,7 +42,7 @@ const MEMBERS = "SELECT user_id, table_id, seat FROM table_members ORDER BY user
 
 /** A socket's hello, and the welcome that answers it. */
 async function hello(client: Client, letter: string, name: string) {
-  client.send({ t: "hello", v: 5, token: token(letter), name });
+  client.send({ t: "hello", v: 6, token: token(letter), name });
   return client.next("welcome");
 }
 

@@ -56,7 +56,7 @@ async function befriend(a: Account, b: Account): Promise<void> {
 /** `who` at table `id` with their account (a hello on a socket carrying their cookie). */
 async function atTable(id: string, who: Account, letter: string): Promise<Client> {
   const client = await connectAs(id, { jar: who.jar });
-  client.send({ t: "hello", v: 5, token: token(letter), name: who.pseudo });
+  client.send({ t: "hello", v: 6, token: token(letter), name: who.pseudo });
   await client.next("welcome");
   return client;
 }

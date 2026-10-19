@@ -99,9 +99,9 @@ async function play(
   const ana = await connect(id);
   const bea = await connect(id);
   const people: Record<string, Client> = { bleu: ana, jaune: bea };
-  ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+  ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
   await ana.next("welcome");
-  bea.send({ t: "hello", v: 5, token: token("b"), name: "Bea" });
+  bea.send({ t: "hello", v: 6, token: token("b"), name: "Bea" });
   await bea.next("welcome");
   ana.send({ t: "sit", seat: "bleu" });
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");

@@ -5,10 +5,11 @@
 
 import { FULL_DECK, sortHand } from "./deck.ts";
 import type { GameEvent } from "./events.ts";
+import { defaultJustOut } from "./path.ts";
 import { type Rng, shuffle } from "./rng.ts";
 import { DEFAULT_RULES, type RuleSet } from "./rules.ts";
 import { COLORS, type Color, nextColor, PARTNER, type PawnId } from "./topology.ts";
-import type { CardId, GameConfig, GameState, Pawn } from "./types.ts";
+import type { CardId, GameConfig, GameState, Pawn, PlayerView } from "./types.ts";
 
 /** Cards per seat at each deal of the cycle: 5, then 4, then 4 (52 = 4 x 13). */
 export const DEAL_SIZES = [5, 4, 4] as const;
@@ -203,4 +204,23 @@ export function endDeal(state: GameState): { state: GameState; events: GameEvent
 
   const dealt = dealHands({ ...base, discard, dealIndex: (state.dealIndex + 1) as 1 | 2 });
   return { state: dealt.state, events: dealt.events };
+}
+
+/**
+ * A game saved by an older version (a Durable Object snapshot, plan 04-14), made explicit for the
+ * engine of now, without touching the input: every rule switch missing from its `rules` takes the
+ * validated value of DEFAULT_RULES (a game saved before G18 plays G18 from now on), and every ring
+ * pawn without the G18 flag gets defaultJustOut (protected iff on its own losange at progress 0, the
+ * knight just out, which was the most common protected case). An up-to-date state comes out equal.
+ */
+export function upgradeState<T extends GameState | PlayerView>(saved: T): T {
+  const pawns = {} as Record<PawnId, Pawn>;
+  for (const id of Object.keys(saved.pawns) as PawnId[]) {
+    const pawn = saved.pawns[id];
+    pawns[id] =
+      pawn.zone === "ring" && typeof pawn.justOut !== "boolean"
+        ? { zone: "ring", progress: pawn.progress, justOut: defaultJustOut(pawn.progress) }
+        : { ...pawn };
+  }
+  return { ...saved, pawns, rules: { ...DEFAULT_RULES, ...saved.rules } };
 }

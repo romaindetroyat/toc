@@ -298,8 +298,13 @@ function boardKey(pawns: Pawns): string {
   let key = "";
   for (const id of ALL_PAWNS) {
     const pawn = pawns[id];
+    // G18: a knight just out of its stable is protected, another one at the same progress is not.
     key +=
-      pawn.zone === "stable" ? "s," : pawn.zone === "home" ? `h${pawn.slot},` : `${pawn.progress},`;
+      pawn.zone === "stable"
+        ? "s,"
+        : pawn.zone === "home"
+          ? `h${pawn.slot},`
+          : `${pawn.progress}${pawn.justOut === true ? "!" : ""},`;
   }
   return key;
 }

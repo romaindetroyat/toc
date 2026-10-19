@@ -245,19 +245,26 @@ export const r12: Scenario[] = [
   {
     id: "R-12.9",
     rule: "R-12",
-    title: "Un pion revenu sur sa sortie après un tour de plus est protégé aussi",
+    title:
+      "Un pion revenu sur sa sortie après un tour de plus est un pion ordinaire : on le dépasse, on le mange, on l’échange",
     before: {
-      pawns: { bleu: [{ p: 72 }, "S", "S", "S"], rouge: [{ p: 34 }, "S", "S", "S"] },
-      hands: { rouge: ["3S"] },
-      turn: "rouge",
+      pawns: { bleu: [{ p: 16 }, "S", "S", "S"], jaune: [{ p: 72 }, "S", "S", "S"] },
+      hands: { bleu: ["2S", "3S", "11S"] },
+      turn: "bleu",
     },
-    action: { t: "move", card: "3S", pawn: "rouge0" },
+    action: { t: "move", card: "2S", pawn: "bleu0" },
     expect: {
-      legal: false,
-      reason: "blocked-protected",
-      playable: { "3S": false },
+      legal: true,
+      captured: ["jaune0"],
+      legalInclude: [
+        { t: "move", card: "3S", pawn: "bleu0" },
+        { t: "swap", card: "11S", pawn: "bleu0", target: "jaune0" },
+      ],
+      after: {
+        pawns: { bleu: [{ p: 18 }, "S", "S", "S"], jaune: ["S", "S", "S", "S"] },
+      },
     },
-    flags: ["G3"],
+    flags: ["G18"],
   },
   {
     id: "R-12.10",

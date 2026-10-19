@@ -35,8 +35,11 @@ import { DEVICE_TOKEN_RE, normalizeName } from "./names.ts";
  * 5 (plan 02-10b): the table's « Avance rapide » (TablePublic.fast, the speed frame); a page of
  * version 4 would strip the flag and animate at the normal speed while the table plays at the fast
  * pace (the computers no longer wait for its animations), so its moves would lag ever further behind.
+ * 6 (plan 04-14, G18): a view's ring knights carry `justOut`, the only knight protected on its own
+ * losange; a page of version 5 would read every knight on its 18 as protected (progress 0, or any lap)
+ * and hide the moves that pass, eat or swap an ordinary one.
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** The longest client frame, in characters, checked before JSON.parse (T-02-05). */
 export const MAX_FRAME_CHARS = 4096;

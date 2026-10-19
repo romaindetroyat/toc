@@ -75,7 +75,7 @@ describe("sevenOutcomes: unit cases", () => {
     expect(outcomes.some(({ pawns }) => pawns.bleu0.zone === "home")).toBe(true);
     const still = outcomes.find(({ pawns }) => pawns.bleu0.zone === "ring");
     expect(still?.plan).toEqual([{ pawn: "bleu1", steps: 7 }]);
-    expect(still?.pawns.bleu1).toEqual({ zone: "ring", progress: 17 });
+    expect(still?.pawns.bleu1).toEqual({ zone: "ring", progress: 17, justOut: false });
   });
 
   it("does not modify the board", () => {

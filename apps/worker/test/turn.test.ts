@@ -93,10 +93,10 @@ async function startedTable(): Promise<{
   const ben = await account("Ben");
   const id = await createTable({ pace: "zero", notifyMs: NOTIFY_MS });
   const anaTable = await connectAs(id, { jar: ana.jar });
-  anaTable.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+  anaTable.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
   await anaTable.next("welcome");
   const benTable = await connectAs(id, { jar: ben.jar });
-  benTable.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+  benTable.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
   await benTable.next("welcome");
   anaTable.send({ t: "sit", seat: "bleu" });
   await anaTable.next("welcome", (frame) => frame.you.seat === "bleu");
@@ -159,7 +159,7 @@ describe("« C’est ton tour » under production's alarm delivery", () => {
     benTable.ws.close(1000, "bye");
     await untilTable(id, (table) => table.notifyAt.jaune !== undefined);
     const again = await connectAs(id, { jar: ben.jar });
-    again.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+    again.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
     await again.next("welcome");
     const back = await untilTable(id, (table) => table.status === "playing");
     expect(back.notifyAt).toEqual({});

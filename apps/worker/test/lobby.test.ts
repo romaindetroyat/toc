@@ -14,13 +14,13 @@ describe("the waiting room", () => {
     const stub = stubOf(id);
 
     const ana = await connect(id);
-    ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+    ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
     expect(await ana.next("welcome")).toMatchObject({ you: { seat: null, host: true } });
     const ben = await connect(id);
-    ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+    ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
     await ben.next("welcome");
     const clo = await connect(id);
-    clo.send({ t: "hello", v: 5, token: token("c"), name: "Clo" });
+    clo.send({ t: "hello", v: 6, token: token("c"), name: "Clo" });
     await clo.next("welcome");
     expect(
       (await ana.next("table", (frame) => frame.table.unseated.includes("Clo"))).table.unseated,
@@ -63,7 +63,7 @@ describe("the waiting room", () => {
 
     // A fourth device after the start: no seat, no view.
     const dan = await connect(id);
-    dan.send({ t: "hello", v: 5, token: token("d"), name: "Dan" });
+    dan.send({ t: "hello", v: 6, token: token("d"), name: "Dan" });
     expect(await dan.next("welcome")).toMatchObject({
       you: { seat: null, host: false },
       view: null,

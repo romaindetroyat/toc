@@ -107,7 +107,7 @@ describe("scoreCandidates (the team evaluation, D-08)", () => {
     const view = playView({ bleu: [{ p: 1 }, { p: 30 }, "S", "S"] }, ["4H", "2S"]);
     const top = best(view);
     expect(top?.action).toEqual({ t: "move", card: "4H", pawn: "bleu0" });
-    expect(top?.pawns.bleu0).toEqual({ zone: "ring", progress: -3 });
+    expect(top?.pawns.bleu0).toEqual({ zone: "ring", progress: -3, justOut: false });
   });
 
   it("aider le partenaire: a move that eats the partner's knight is never ranked first", () => {

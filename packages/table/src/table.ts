@@ -6,7 +6,14 @@
 // 04-04 adds the account a person is linked to (accounts.ts), server-only too.
 
 import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought } from "@toc/bots";
-import { COLORS, type Color, type GameState, type Rng, type Scenario } from "@toc/engine";
+import {
+  COLORS,
+  type Color,
+  type GameState,
+  type Rng,
+  type Scenario,
+  upgradeState,
+} from "@toc/engine";
 import type { ChatEntry } from "@toc/protocol";
 import type { GameRecord } from "./record.ts";
 
@@ -251,6 +258,9 @@ export function copyTable(table: Table): Table {
   for (const person of copy.people) person.account ??= null;
   // Before plan 04-07 nobody was told « C’est ton tour ».
   copy.notifyAt ??= {};
+  // Before plan 04-14 (G18) a game had no EXIT_ONLY_PROTECTION switch and no flag on its knights: the
+  // missing switches take DEFAULT_RULES, a knight on its own losange at progress 0 is the one just out.
+  if (copy.game !== null) copy.game = upgradeState(copy.game);
   if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }

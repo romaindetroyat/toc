@@ -3,6 +3,7 @@
 // Conventions are documented on the Scenario type (types.ts).
 
 import { FULL_DECK } from "./deck.ts";
+import { defaultJustOut } from "./path.ts";
 import { type Rng, shuffle } from "./rng.ts";
 import { DEFAULT_RULES } from "./rules.ts";
 import { startGame } from "./state.ts";
@@ -15,7 +16,9 @@ function perColor<T>(make: (color: Color) => T): Record<Color, T> {
 
 function pawnOf(spec: PawnSpec): Pawn {
   if (spec === "S") return { zone: "stable" };
-  if ("p" in spec) return { zone: "ring", progress: spec.p };
+  // G18: a fixture's knight at progress 0 is the knight just out of its stable (the default of a saved
+  // pawn); any other ring position, an extra lap included, is ordinary.
+  if ("p" in spec) return { zone: "ring", progress: spec.p, justOut: defaultJustOut(spec.p) };
   return { zone: "home", slot: spec.h };
 }
 

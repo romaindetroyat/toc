@@ -45,9 +45,9 @@ describe("ordinary cards, judged card by card (G16)", () => {
         (c) => c.action.t === "move" && c.action.pawn === "bleu0",
       )?.walk?.end;
     expect(end("2S")).toEqual({ zone: "home", slot: 1 });
-    expect(end("9S")).toEqual({ zone: "ring", progress: 79 });
+    expect(end("9S")).toEqual({ zone: "ring", progress: 79, justOut: false });
     const after = apply(state, "bleu", { t: "move", card: "9S", pawn: "bleu0" });
-    expect(after.state.pawns.bleu0).toEqual({ zone: "ring", progress: 79 });
+    expect(after.state.pawns.bleu0).toEqual({ zone: "ring", progress: 79, justOut: false });
   });
 });
 
@@ -77,7 +77,7 @@ describe("the 7 brings home the knight it can bring home, or leaves it (G16)", (
     const r = applyPlan(nearHome(), "bleu", "7S", plan(["bleu0", 2], ["bleu1", 1], ["bleu0", 4]));
     expect(r.ok).toBe(true);
     expect(r.ok && r.pawns.bleu0).toEqual({ zone: "home", slot: 3 });
-    expect(r.ok && r.pawns.bleu1).toEqual({ zone: "ring", progress: 11 });
+    expect(r.ok && r.pawns.bleu1).toEqual({ zone: "ring", progress: 11, justOut: false });
   });
 
   it("nextSteps offers bleu0 1 to 6 steps, never 7 (G16)", () => {
@@ -101,7 +101,7 @@ describe("the 7 brings home the knight it can bring home, or leaves it (G16)", (
   it("previewPlan shows the unfinished [bleu0 2]: G16 judges the finished plan only (G16)", () => {
     const r = previewPlan(nearHome(), "bleu", "7S", plan(["bleu0", 2]));
     expect(r.ok).toBe(true);
-    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "ring", progress: 70 });
+    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "ring", progress: 70, justOut: false });
   });
 
   it("bleu0 alone on its carré 16: the 7 cannot bring it home, it goes round to 77 (G16)", () => {
@@ -109,7 +109,7 @@ describe("the 7 brings home the knight it can bring home, or leaves it (G16)", (
     expect(sevenMustEnter(state, "bleu")).toEqual([]);
     expect(sevenPlans(state, "bleu", "7S").map(key)).toEqual([key(plan(["bleu0", 7]))]);
     const r = applyPlan(state, "bleu", "7S", plan(["bleu0", 7]));
-    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "ring", progress: 77 });
+    expect(r.ok && r.pawns.bleu0).toEqual({ zone: "ring", progress: 77, justOut: false });
   });
 });
 
