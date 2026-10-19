@@ -260,7 +260,18 @@ export function copyTable(table: Table): Table {
   copy.notifyAt ??= {};
   // Before plan 04-14 (G18) a game had no EXIT_ONLY_PROTECTION switch and no flag on its knights: the
   // missing switches take DEFAULT_RULES, a knight on its own losange at progress 0 is the one just out.
-  if (copy.game !== null) copy.game = upgradeState(copy.game);
+  if (copy.game !== null) {
+    const beforeG18 = copy.game.rules.EXIT_ONLY_PROTECTION === undefined;
+    copy.game = upgradeState(copy.game);
+    // A computer's decision (or search) made under the old protection may not be legal any more (a
+    // knight back on its 18 no longer blocks, so a 7 may now have to bring a knight home): it decides
+    // again, from the start, under G18.
+    if (beforeG18 && copy.thinking !== null) {
+      copy.thinking.thought = null;
+      copy.thinking.checkpoint = null;
+      copy.thinking.playAt = null;
+    }
+  }
   if (copy.status === "playing" && copy.game?.phase === "won") copy.status = "finished";
   return copy;
 }
