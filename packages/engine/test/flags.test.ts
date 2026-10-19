@@ -133,17 +133,21 @@ describe("G17 HOME_JUMP_ALLOWED", () => {
   });
 });
 
-describe("G3 PROTECTED_AFTER_EXTRA_LAP", () => {
-  const state = (value: boolean) =>
+describe("G3 PROTECTED_AFTER_EXTRA_LAP (read only when G18 is off)", () => {
+  const state = (value: boolean, exitOnly = false) =>
     playState(
       { bleu: [{ p: 72 }, "S", "S", "S"], rouge: [{ p: 34 }, "S", "S", "S"] },
       { rouge: ["3S"] },
       "rouge",
-      { PROTECTED_AFTER_EXTRA_LAP: value },
+      { PROTECTED_AFTER_EXTRA_LAP: value, EXIT_ONLY_PROTECTION: exitOnly },
     );
   const move: Action = { t: "move", card: "3S", pawn: "rouge0" };
 
-  it("true: the pawn back on its exit after a lap blocks the passage (R-12.9)", () => {
+  it("G18 on: the pawn back on its exit after a lap is ordinary, whatever G3 says (R-12.9)", () => {
+    expect(actions(state(true, true), "rouge", "3S")).toContainEqual(move);
+  });
+
+  it("true: the pawn back on its exit after a lap blocks the passage (the rule of 2026-10-13)", () => {
     expect(actions(state(true), "rouge", "3S")).not.toContainEqual(move);
   });
 

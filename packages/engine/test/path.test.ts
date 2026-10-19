@@ -355,15 +355,17 @@ describe("landing, captures and passing (RULE-12, G11)", () => {
   it("a pawn of the colour of the exit standing on its exit is protected at progress 0", () => {
     const b = board({ bleu0: { p: 0 }, bleu1: { p: 72 }, jaune0: { p: -18 } });
     expect(isProtected("bleu0", b.pawns.bleu0, b.rules)).toBe(true);
-    expect(isProtected("bleu1", b.pawns.bleu1, b.rules)).toBe(true);
+    // G18: back on its exit after a lap, it is an ordinary pawn.
+    expect(isProtected("bleu1", b.pawns.bleu1, b.rules)).toBe(false);
     // jaune0 stands on cell 0 (bleu's exit) but that is not jaune's exit.
     expect(isProtected("jaune0", b.pawns.jaune0, b.rules)).toBe(false);
   });
 
-  it("an extra lap on the exit is protected only if PROTECTED_AFTER_EXTRA_LAP", () => {
-    const off = board({ bleu1: { p: 72 } }, { PROTECTED_AFTER_EXTRA_LAP: false });
+  it("with G18 off, an extra lap on the exit is protected only if PROTECTED_AFTER_EXTRA_LAP", () => {
+    const old = { EXIT_ONLY_PROTECTION: false };
+    const off = board({ bleu1: { p: 72 } }, { ...old, PROTECTED_AFTER_EXTRA_LAP: false });
     expect(isProtected("bleu1", off.pawns.bleu1, off.rules)).toBe(false);
-    const on = board({ bleu1: { p: 72 } });
+    const on = board({ bleu1: { p: 72 } }, old);
     expect(isProtected("bleu1", on.pawns.bleu1, on.rules)).toBe(true);
   });
 
