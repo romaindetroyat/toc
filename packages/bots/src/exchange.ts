@@ -36,6 +36,7 @@ import {
   applyPlan,
   type Board,
   type CardId,
+  COLORS,
   type Color,
   controlledPawns,
   movesForCard,
@@ -129,7 +130,7 @@ export type DealGives = {
   scores: GiveScore[];
   /** The rng after the imagined hands were drawn. */
   rng: Rng;
-  /** Play-outs computed (the memo's misses): the work of the decision. */
+  /** Boards expanded by the play-outs (a rank's moves from a board, computed once): the work. */
   units: number;
 };
 
@@ -143,8 +144,18 @@ function ranksKey(hand: readonly CardId[]): string {
 
 const isExitCard = (card: CardId): boolean => rankOf(card) === 1 || rankOf(card) === 13;
 
-/** A board met in the play-outs of one decision, with its evaluation for the bot's team. */
-type Node = { pawns: Record<PawnId, Pawn>; key: string; value: number };
+/**
+ * A board met in the play-outs of one decision: its evaluation for the bot's team, the boards each
+ * mover's rank leads to from it (computed once), and the end of each play-out already run from it (the
+ * greedy play-out depends only on the board, the mover and the ranks left, so every play-out that
+ * reaches this board with the same cards left ends the same way).
+ */
+type Node = {
+  pawns: Record<PawnId, Pawn>;
+  value: number;
+  next: Map<number, Node[]>;
+  ends: Map<string, Node>;
+};
 
 /** The boards of a card other than the 7, one per candidate in the engine's order. */
 function movesAfter(board: Board, mover: Color, card: CardId): Record<PawnId, Pawn>[] {
@@ -168,65 +179,69 @@ function sevenAlone(board: Board, mover: Color, card: CardId): Record<PawnId, Pa
   return out;
 }
 
-/**
- * The boards of one decision's play-outs: every board met is evaluated once, and the boards each rank
- * leads to from it, for each mover, are computed once (movesAfter, sevenAlone).
- */
+/** The boards of one decision's play-outs, each evaluated once (pawnsKey). */
 type Boards = {
   node(pawns: Record<PawnId, Pawn>): Node;
   after(from: Node, mover: Color, card: CardId): Node[];
+  /** Board expansions so far: the work of the decision. */
+  expanded(): number;
 };
 
 function newBoards(rules: RuleSet, team: Team): Boards {
   const nodes = new Map<string, Node>();
-  const children = new Map<string, Node[]>();
+  let expansions = 0;
   const node = (pawns: Record<PawnId, Pawn>): Node => {
     const key = pawnsKey(pawns);
     let found = nodes.get(key);
     if (found === undefined) {
-      found = { pawns, key, value: evaluate(pawns, rules, team) };
+      found = { pawns, value: evaluate(pawns, rules, team), next: new Map(), ends: new Map() };
       nodes.set(key, found);
     }
     return found;
   };
   const after = (from: Node, mover: Color, card: CardId): Node[] => {
     const rank = rankOf(card);
-    const key = `${mover}|${rank}|${from.key}`;
-    let found = children.get(key);
+    const key = COLORS.indexOf(mover) * 16 + rank;
+    let found = from.next.get(key);
     if (found === undefined) {
+      expansions++;
       const board: Board = { pawns: from.pawns, rules };
       const boards = rank === 7 ? sevenAlone(board, mover, card) : movesAfter(board, mover, card);
       found = boards.map(node);
-      children.set(key, found);
+      from.next.set(key, found);
     }
     return found;
   };
-  return { node, after };
+  return { node, after, expanded: () => expansions };
 }
 
 /**
- * `mover` plays `hand` alone from `start`, one card per turn, each turn the move with the best
- * evaluate + handBonus of the cards kept (ties to the first, hand order then the engine's order), until
- * the hand is played or has no legal move (laid down, R-14). Returns the gain of the evaluation for the
- * team from `start` to the last board.
+ * `mover` plays `cards` (sorted by rank) alone from `at`, one card per turn, each turn the move with
+ * the best evaluate + handBonus of the cards kept (ties to the lower rank, then the engine's order),
+ * until the hand is played or has no legal move (laid down, R-14). Returns the last board.
  */
-function playOut(boards: Boards, start: Node, mover: Color, hand: readonly CardId[]): number {
-  let at = start;
-  let cards = hand.slice();
-  while (cards.length > 0) {
-    let best: { score: number; node: Node; index: number } | null = null;
-    for (const { card, index } of firstOfEachRank(cards)) {
-      const kept = [...cards.slice(0, index), ...cards.slice(index + 1)];
-      for (const node of boards.after(at, mover, card)) {
-        const score = node.value + handBonus(kept, node.pawns, mover);
-        if (best === null || score > best.score) best = { score, node, index };
-      }
+function playOut(boards: Boards, at: Node, mover: Color, cards: readonly CardId[]): Node {
+  if (cards.length === 0) return at;
+  const key = `${mover}|${ranksKey(cards)}`;
+  const known = at.ends.get(key);
+  if (known !== undefined) return known;
+  let best: { score: number; node: Node; index: number } | null = null;
+  for (const { card, index } of firstOfEachRank(cards)) {
+    const kept = [...cards.slice(0, index), ...cards.slice(index + 1)];
+    for (const node of boards.after(at, mover, card)) {
+      const score = node.value + handBonus(kept, node.pawns, mover);
+      if (best === null || score > best.score) best = { score, node, index };
     }
-    if (best === null) break;
-    at = best.node;
-    cards = [...cards.slice(0, best.index), ...cards.slice(best.index + 1)];
   }
-  return at.value - start.value;
+  const end =
+    best === null
+      ? at
+      : playOut(boards, best.node, mover, [
+          ...cards.slice(0, best.index),
+          ...cards.slice(best.index + 1),
+        ]);
+  at.ends.set(key, end);
+  return end;
 }
 
 /** The number of ways to choose `k` among `n` (as a float; 0 outside 0 ≤ k ≤ n). */
@@ -288,17 +303,9 @@ export function dealGiveScores(
   const sums = gives.map(() => 0);
   const boards = newBoards(view.rules, team);
   const start = boards.node(view.pawns);
-  const memo = new Map<string, number>();
-  let units = 0;
   const value = (mover: Color, hand: readonly CardId[]): number => {
-    const key = `${mover}|${ranksKey(hand)}`;
-    let gain = memo.get(key);
-    if (gain === undefined) {
-      gain = playOut(boards, start, mover, hand);
-      memo.set(key, gain);
-      units++;
-    }
-    return gain;
+    const sorted = [...hand].sort((x, y) => rankOf(x) - rankOf(y));
+    return playOut(boards, start, mover, sorted).value - start.value;
   };
 
   let r: Rng = [rng[0], rng[1], rng[2], rng[3]];
@@ -343,6 +350,6 @@ export function dealGiveScores(
   return {
     scores: gives.map(({ card }, g) => ({ card, score: sums[g] as number })),
     rng: r,
-    units,
+    units: boards.expanded(),
   };
 }
