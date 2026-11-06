@@ -113,14 +113,16 @@ export function giveScores(view: PlayerView, seat: Color): GiveScore[] {
  * Imagined partner hands of one deal give, shared out among the strata by weight (at least one each).
  * The strata answer the question Romain raised (does the partner already hold an exit card? does it
  * pass one back?) by exact weights, not by the luck of a few draws; the hands only average out the
- * other cards. Calibrated on 2026-11-06 (plan 04-15, 04-15-SUMMARY), `node tools/bench-bots.mjs
- * --exchange --level 5` on the 40 exchange decisions, this machine (level-4 play decision for scale:
- * p95 11.8 ms, max 18.1 ms; the old board give: p95 3.3 ms, max 24.7 ms):
- * - 8 hands: p95 7.3 ms, max 10.7 ms; 16 hands: p95 9.4 ms, max 15.5 ms; 24 hands: p95 12.4 to
- *   15.0 ms, max 17.3 ms; 32 hands: p95 15.5 to 17.9 ms, max 32.5 ms;
- * - the lone exit card at the start of the game (exchange.test.ts), 200 seeds, level 5: the As kept
- *   196 times and the Roi 193 at 16 hands (margin 12, spread 6.3), 200 and 199 at 24; every case with
- *   a wider margin kept or given 50 times out of 50 at 16.
+ * other cards. Calibrated on 2026-11-06 (plan 04-15, 04-15-SUMMARY), this machine, one thread:
+ * - `node tools/bench-bots.mjs --exchange --level 5` (the 40 bench exchanges; the level-4 play decision
+ *   for scale: p95 11.8 ms, max 18.1 ms; the board give: p95 3.3 ms, max 24.7 ms): 16 hands p95
+ *   10.3 ms, max 14.3 ms (before the play-out memo: 8 hands p95 7.3 ms, 16 hands 9.4 ms, 24 hands
+ *   12.4 to 15.0 ms, 32 hands 15.5 to 17.9 ms);
+ * - 800 exchanges of level-4 games, warmed up: 16 hands p50 3.9 ms, p95 11.3 ms, max 25.8 ms; the
+ *   board give on the same positions p95 2.8 ms, max 32.7 ms;
+ * - the lone exit card at the start of the game (exchange.test.ts), 200 seeds, level 5: the As and the
+ *   Roi each kept 193 times at 16 hands (margin 11.5, spread 6.3); every case with a wider margin kept
+ *   or given 50 times out of 50.
  * 16 keeps the give inside the cost of a level-4 play decision, decided in one alarm tick online.
  */
 export const DEAL_HANDS = 16;

@@ -30,6 +30,8 @@ export type TeamStats = {
   units: number;
   /** The duration of each decision, in the unit of the injected clock; [] without one. */
   ms: number[];
+  /** The same for the exchange decisions only (plan 04-15), also counted in `ms`. */
+  giveMs: number[];
 };
 
 export type GameResult = { winner: Team; actions: number; perTeam: Record<Team, TeamStats> };
@@ -116,8 +118,8 @@ export function playGame(options: PlayGameOptions): GameResult {
   let state = newGame({ firstDealer: COLORS[(dealSeed[0] >>> 0) % 4] as Color }, dealSeed);
   const streams = seatStreams(botSeed);
   const perTeam: Record<Team, TeamStats> = {
-    "bleu-rouge": { decisions: 0, units: 0, ms: [] },
-    "jaune-vert": { decisions: 0, units: 0, ms: [] },
+    "bleu-rouge": { decisions: 0, units: 0, ms: [], giveMs: [] },
+    "jaune-vert": { decisions: 0, units: 0, ms: [], giveMs: [] },
   };
   let actions = 0;
   while (state.phase !== "won") {
@@ -138,7 +140,11 @@ export function playGame(options: PlayGameOptions): GameResult {
       phase === "exchange" && level !== 1 && method !== undefined
         ? chooseGive(view, seat, level, streams[seat], method)
         : chooseAction(view, seat, level, streams[seat], budgets?.[team]);
-    if (time !== undefined && started !== undefined) perTeam[team].ms.push(time() - started);
+    if (time !== undefined && started !== undefined) {
+      const spent = time() - started;
+      perTeam[team].ms.push(spent);
+      if (phase === "exchange") perTeam[team].giveMs.push(spent);
+    }
     streams[seat] = thought.rng;
     perTeam[team].decisions++;
     perTeam[team].units += thought.units;

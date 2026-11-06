@@ -15,12 +15,13 @@ import {
   newGame,
   type PlayerView,
   type Rng,
+  rankOf,
   teamOf,
   viewFor,
 } from "@toc/engine";
 import { candidatesFor } from "./candidates.ts";
 import type { BotLevel } from "./levels.ts";
-import { chooseAction } from "./thinker.ts";
+import { chooseAction, chooseGive, type Thought } from "./thinker.ts";
 
 export type BenchPosition = { label: string; view: PlayerView; seat: Color };
 
@@ -47,6 +48,51 @@ const BENCH_GAMES: readonly { seed: Rng; levels: readonly [BotLevel, BotLevel] }
 ];
 /** A game that has not ended after this many actions stops being searched. */
 const GAME_CAP = 3000;
+/** Exchange decisions in the exchange bench (plan 04-15). */
+export const BENCH_EXCHANGES = 40;
+/** One exchange decision in this many is taken (spreads them over the games). */
+const EXCHANGE_STRIDE = 3;
+
+/**
+ * One action of a bench game. The exchanges keep the board give of plan 03-02 at every level, so the
+ * games, and the positions found in them, are the ones calibrated before plan 04-15.
+ */
+function benchThought(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thought {
+  if (view.phase === "exchange") return chooseGive(view, seat, level, rng, "board");
+  return chooseAction(view, seat, level, rng);
+}
+
+/**
+ * The exchange bench (plan 04-15): BENCH_EXCHANGES exchange decisions with at least two distinct
+ * ranks in hand, met in the same games as benchPositions, for tools/bench-bots.mjs --exchange.
+ */
+export function benchExchanges(): BenchPosition[] {
+  const out: BenchPosition[] = [];
+  let met = 0;
+  for (const [g, game] of BENCH_GAMES.entries()) {
+    if (out.length >= BENCH_EXCHANGES) break;
+    let state = newGame({ firstDealer: COLORS[g % 4] as Color }, game.seed);
+    let rng: Rng = [game.seed[3], game.seed[1], game.seed[2], game.seed[0]];
+    for (let i = 0; i < GAME_CAP && state.phase !== "won" && out.length < BENCH_EXCHANGES; i++) {
+      const seat =
+        state.phase === "exchange"
+          ? (COLORS.find((color) => state.given[color] === null) ?? state.turn)
+          : state.turn;
+      const view = viewFor(state, seat);
+      if (state.phase === "exchange" && new Set(view.hand.map(rankOf)).size >= 2) {
+        met++;
+        if (met % EXCHANGE_STRIDE === 0) {
+          out.push({ label: `partie ${g + 1}, action ${i}, ${seat}, échange`, view, seat });
+        }
+      }
+      const level = game.levels[teamOf(seat) === "bleu-rouge" ? 0 : 1];
+      const thought = benchThought(view, seat, level, rng);
+      rng = thought.rng;
+      state = apply(state, seat, thought.action).state;
+    }
+  }
+  return out;
+}
 
 /**
  * The bench positions, always the same: BENCH_SEVENS hard 7s and BENCH_OTHERS ordinary choices, in the
@@ -81,7 +127,7 @@ export function benchPositions(): BenchPosition[] {
         }
       }
       const level = game.levels[teamOf(seat) === "bleu-rouge" ? 0 : 1];
-      const thought = chooseAction(view, seat, level, rng);
+      const thought = benchThought(view, seat, level, rng);
       rng = thought.rng;
       state = apply(state, seat, thought.action).state;
     }

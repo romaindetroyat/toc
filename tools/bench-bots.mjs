@@ -1,6 +1,6 @@
 // Decision time of the computer levels on the fixed bench positions (03-RESEARCH Pitfall 1, BOT-05).
 //
-//   node tools/bench-bots.mjs [--level N] [--repeat 3] [--check] [--slice N]
+//   node tools/bench-bots.mjs [--level N] [--repeat 3] [--check] [--slice N] [--exchange]
 //
 // For each level (default 2 to 5), chooseAction runs on every position of benchPositions() with the
 // real budget of levels.ts, `--repeat` times (each repeat with its own fixed rng), after one warm-up
@@ -13,6 +13,9 @@
 // (JSON round trip, as through SQLite), steps N units and takes its checkpoint. Prints ms per slice
 // p50 / p95 / max (resume and checkpoint included) and the slices per decision, and checks that every
 // sliced decision equals the one-go decision (exit 1 otherwise).
+// --exchange (plan 04-15): the same measure on the exchange bench (benchExchanges, 40 exchange
+// decisions of the same games) instead of the play bench: each level gives through its own method
+// (levels.ts GIVE_METHOD), every exchange decides in one go (one alarm on the online table).
 // Exit codes: 0 OK, 1 check failed, 2 bad arguments.
 // The engine and the bots are TypeScript files imported directly by Node (type stripping).
 
@@ -29,7 +32,9 @@ const CHECK_MAX_MS = 600;
 
 function usage(message) {
   console.error(`bench-bots: ${message}`);
-  console.error("usage: node tools/bench-bots.mjs [--level N] [--repeat 3] [--check] [--slice N]");
+  console.error(
+    "usage: node tools/bench-bots.mjs [--level N] [--repeat 3] [--check] [--slice N] [--exchange]",
+  );
   process.exit(2);
 }
 
@@ -39,10 +44,13 @@ function parseArgs() {
   let repeat = 3;
   let check = false;
   let slice = null;
+  let exchange = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--check") {
       check = true;
+    } else if (arg === "--exchange") {
+      exchange = true;
     } else if (arg === "--slice") {
       const n = Number(args[i + 1]);
       i++;
@@ -64,7 +72,8 @@ function parseArgs() {
   }
   if (check && !levels.includes(5)) usage("--check measures level 5");
   if (slice !== null && (levels.length !== 1 || levels[0] !== 5)) usage("--slice needs --level 5");
-  return { levels, repeat, check, slice };
+  if (exchange && (check || slice !== null)) usage("--exchange goes without --check and --slice");
+  return { levels, repeat, check, slice, exchange };
 }
 
 function percentile(sorted, q) {
@@ -118,12 +127,14 @@ function slicedRun(bots, positions, repeat, slice) {
 }
 
 async function main() {
-  const { levels, repeat, check, slice } = parseArgs();
+  const { levels, repeat, check, slice, exchange } = parseArgs();
   const bots = await load("packages/bots/src/index.ts");
-  const { benchPositions, chooseAction, CHAMPION_BUDGET } = bots;
-  const positions = benchPositions();
+  const { benchExchanges, benchPositions, chooseAction, CHAMPION_BUDGET, GIVE_METHOD } = bots;
+  const positions = exchange ? benchExchanges() : benchPositions();
   console.log(
-    `bench: ${positions.length} positions, repeat ${repeat}, level 5 budget ${CHAMPION_BUDGET.plies} units`,
+    exchange
+      ? `bench: ${positions.length} exchange decisions, repeat ${repeat}, gives ${levels.map((l) => `${l} ${GIVE_METHOD[l]}`).join(", ")}`
+      : `bench: ${positions.length} positions, repeat ${repeat}, level 5 budget ${CHAMPION_BUDGET.plies} units`,
   );
   if (slice !== null) process.exit(slicedRun(bots, positions, repeat, slice) ? 0 : 1);
   let failed = false;
