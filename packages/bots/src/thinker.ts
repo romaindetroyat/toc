@@ -8,8 +8,9 @@
 //   chance of a uniform pick, otherwise a softmax of temperature T over the scores (T 0: the best
 //   score, ties to the first);
 // - exchange phase: level 1 gives like randomLegal; levels 2 and 3 score each card on the board for the
-//   partner (exchange.ts giveScores, D-09), levels 4 and 5 over the deal for both hands (exchange.ts
-//   dealGiveScores, plan 04-15), and pick through the same noise, level 5 taking the best.
+//   partner (exchange.ts giveScores, D-09); levels 4 and 5 first decide over the deal whether an As or a
+//   Roi goes (exchange.ts dealGives, plan 04-15), then score that family on the board the same way; all
+//   pick through the same noise, level 5 taking the best.
 // - level 5 in the play phase: the search over imagined deals (search.ts, D-04), anytime: each step
 //   runs more of its budget (levels.ts CHAMPION_BUDGET by default) and result() is valid at any moment.
 // Work is counted in units (Budget), never in time, so the same inputs give the same move on every
@@ -20,7 +21,7 @@
 import { type Action, type Color, next, type PlayerView, type Rng } from "@toc/engine";
 import { candidatesFor } from "./candidates.ts";
 import { scoreOf } from "./evaluate.ts";
-import { dealGiveScores, type GiveScore, giveScores } from "./exchange.ts";
+import { dealGives, type GiveScore, giveScores } from "./exchange.ts";
 import {
   type BotLevel,
   type Budget,
@@ -114,8 +115,9 @@ function gapOf(scores: readonly number[]): number {
 
 /**
  * The exchange card of a level from 2 to 5 by `method` (levels.ts GIVE_METHOD by default): the board
- * give (giveScores, one unit per card) or the deal give (dealGiveScores, its play-outs as units, its rng
- * drawn first), then the noise of the level. Exported for the ladder's give-against-give runs (match.ts).
+ * give (giveScores, one unit per card) or the deal give (dealGives: the family decided over the deal, its
+ * board expansions as units, its rng drawn first), then the noise of the level among the cards left.
+ * Exported for the ladder's give-against-give runs (match.ts).
  */
 export function chooseGive(
   view: PlayerView,
@@ -128,7 +130,7 @@ export function chooseGive(
   let units: number;
   let r: Rng;
   if (method === "deal") {
-    const dealt = dealGiveScores(view, seat, rng);
+    const dealt = dealGives(view, seat, rng);
     gives = dealt.scores;
     units = dealt.units;
     r = dealt.rng;

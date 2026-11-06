@@ -17,7 +17,7 @@ import {
   viewFor,
 } from "@toc/engine";
 import { describe, expect, it } from "vitest";
-import { dealGiveScores, giveScores } from "./exchange.ts";
+import { dealGiveScores, dealGives, giveScores } from "./exchange.ts";
 import type { BotLevel } from "./levels.ts";
 import { chooseAction, chooseGive } from "./thinker.ts";
 
@@ -221,5 +221,46 @@ describe("which levels weigh the deal", () => {
     const start = exchangeView({}, ["1S", "9S", "6D", "3C", "8S"], plainPartner(5));
     const first = [...giveScores(start, "bleu")].sort((a, b) => b.score - a.score)[0];
     expect(first?.card).toBe("1S");
+  });
+});
+
+describe("dealGives: the deal decides whether an As or a Roi goes, the board picks within", () => {
+  it("Romain's case: only the other cards may go, with their board scores", () => {
+    const view = exchangeView(
+      { bleu: ALL_STABLE, rouge: TWO_OUT },
+      ["1S", "9S", "6D", "3C", "8S"],
+      plainPartner(5),
+    );
+    const board = giveScores(view, "bleu");
+    const { scores } = dealGives(view, "bleu", [1, 2, 3, 4]);
+    expect(scores).toEqual(board.filter((s) => !isExit(s.card)));
+  });
+
+  it("own knights out, the partner's four in the stable: only the exit cards may go", () => {
+    const view = exchangeView({ bleu: TWO_OUT }, ["1S", "13D", "9S", "3C"], plainPartner(4));
+    const board = giveScores(view, "bleu");
+    const { scores } = dealGives(view, "bleu", [1, 2, 3, 4]);
+    expect(scores).toEqual(board.filter((s) => isExit(s.card)));
+  });
+
+  it("a hand without an As or a Roi, or with nothing else: the board give alone, the rng untouched", () => {
+    const pawns: Pawns = { bleu: TWO_OUT, rouge: [{ p: 1 }, "S", "S", "S"] };
+    for (const hand of [
+      ["4H", "6S", "9D", "10C"],
+      ["1S", "13D", "1H", "13C"],
+    ] as CardId[][]) {
+      const view = exchangeView(pawns, hand, plainPartner(4));
+      const rng: Rng = [4, 3, 2, 1];
+      expect(dealGives(view, "bleu", rng)).toEqual({
+        scores: giveScores(view, "bleu"),
+        rng,
+        units: giveScores(view, "bleu").length,
+      });
+      for (const level of STRONG) {
+        expect(chooseAction(view, "bleu", level, rng)).toEqual(
+          chooseGive(view, "bleu", level, rng, "board"),
+        );
+      }
+    }
   });
 });

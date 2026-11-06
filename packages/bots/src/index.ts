@@ -20,6 +20,7 @@ export {
   DEAL_HANDS,
   type DealGives,
   dealGiveScores,
+  dealGives,
   GIVE_OWN_LOSS,
   type GiveScore,
   giveScores,

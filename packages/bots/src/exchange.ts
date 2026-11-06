@@ -9,7 +9,7 @@
 // A card with no move gains nothing. movesForCard follows controlledPawns, so a partner who has finished
 // is credited with moving the bot's own knights (R-15).
 //
-// The deal give (plan 04-15, Pur-sang and Champion). Romain, 2026-11-06: « en mode intelligent, le
+// The deal give (plan 04-15, Pur-sang and Champion; a refinement of D-09). Romain, 2026-11-06: « en mode intelligent, le
 // partenaire ordinateur ne donne pas forcément systématiquement un as ou un roi s'il n'en a qu'un et
 // qu'il faut qu'il sorte ses pions... Il doit pouvoir moduler ça en fonction de la stratégie. » The board
 // give sees one move: it cannot tell that a lone As unlocks the bot's whole deal, that the partner may
@@ -25,7 +25,9 @@
 //   out alone on the current board (playOut): one card per turn, the best evaluate + handBonus of the
 //   cards kept, the engine's movesForCard and, for the 7, one knight walking the whole 7 (applyPlan);
 //   a hand with no legal move is laid down (R-14), the rest of it lost;
-// - the score of c is the weighted mean, over the imagined hands, of the two play-outs' team gains.
+// - the score of c is the weighted mean, over the imagined hands, of the two play-outs' team gains;
+// - dealGives keeps the deal's answer to one question, does an As or a Roi go or stay, and lets the board
+//   give pick the card within that family (the ladder runs below dealGives).
 // A lone As or Roi with four knights in the stable is the bot's whole deal: given away, its other cards
 // are laid down. The same card gives the partner much only when its imagined hands lack one.
 // The play-outs ignore the other seats' moves: they value hands, they never decide a move. Every
@@ -128,7 +130,10 @@ export function giveScores(view: PlayerView, seat: Color): GiveScore[] {
 export const DEAL_HANDS = 16;
 
 export type DealGives = {
-  /** One score per rank, first card of each rank in hand order, like giveScores. */
+  /**
+   * dealGiveScores: one deal score per rank, first card of each rank in hand order, like giveScores;
+   * dealGives: the board scores of the family that may go, in the same order.
+   */
   scores: GiveScore[];
   /** The rng after the imagined hands were drawn. */
   rng: Rng;
@@ -353,5 +358,41 @@ export function dealGiveScores(
     scores: gives.map(({ card }, g) => ({ card, score: sums[g] as number })),
     rng: r,
     units: boards.expanded(),
+  };
+}
+
+/**
+ * The deal give of levels 4 and 5 (plan 04-15). The deal decides the one question the board cannot see,
+ * whether an exit card (As or Roi) goes or stays: the best deal score of the exit cards against the best
+ * of the others. The board give (giveScores) then orders the cards of that family, as it did for every
+ * card before: the play-outs value whole hands well, but walk the 7 with one knight and ignore the
+ * opponents, so among ordinary cards they are no better a guide than one move on the board. Measured
+ * on 2026-11-06 with tools/ladder.mjs (04-15-SUMMARY), seed 1, against the board give at the same level:
+ * - Pur-sang: 2099 / 4000, p̂ 52.5 %, Wilson 95 % [50.9 %, 54.0 %] (every card by its deal score:
+ *   2091 / 4000, 52.3 %, [50.7 %, 53.8 %]);
+ * - Champion: 527 / 1000, p̂ 52.7 %, Wilson 95 % [49.6 %, 55.8 %] (every card by its deal score:
+ *   484 / 1000, 48.4 %, [45.3 %, 51.5 %]).
+ * A hand with no exit card, or nothing else, has no such question: the board give alone, no play-out.
+ * Returns the family's board scores in hand order (first card of each rank), the rng after the
+ * imagined hands (unchanged without them) and the work: board expansions plus one unit per card scored.
+ */
+export function dealGives(view: PlayerView, seat: Color, rng: Rng): DealGives {
+  const board = giveScores(view, seat);
+  const exitsInHand = board.filter((give) => isExitCard(give.card));
+  if (exitsInHand.length === 0 || exitsInHand.length === board.length) {
+    return { scores: board, rng: [rng[0], rng[1], rng[2], rng[3]], units: board.length };
+  }
+  const dealt = dealGiveScores(view, seat, rng);
+  let exitBest = Number.NEGATIVE_INFINITY;
+  let otherBest = Number.NEGATIVE_INFINITY;
+  for (const give of dealt.scores) {
+    if (isExitCard(give.card)) exitBest = Math.max(exitBest, give.score);
+    else otherBest = Math.max(otherBest, give.score);
+  }
+  const giveExit = exitBest > otherBest;
+  return {
+    scores: board.filter((give) => isExitCard(give.card) === giveExit),
+    rng: dealt.rng,
+    units: dealt.units + board.length,
   };
 }
