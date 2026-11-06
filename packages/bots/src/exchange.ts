@@ -23,7 +23,7 @@
 // - for each card c and each imagined hand, the bot's hand after the exchange (its cards less c, plus
 //   the passed card) and the partner's (its imagined cards less the passed one, plus c) are each played
 //   out alone on the current board (playOut): one card per turn, the best evaluate + handBonus of the
-//   cards kept, the engine's movesForCard and, for the 7, one knight walking the whole 7 (applyPlan);
+//   cards kept, the engine's movesForCard and, for the 7, one knight walking the whole 7 (engine walk);
 //   a hand with no legal move is laid down (R-14), the rest of it lost;
 // - the score of c is the weighted mean, over the imagined hands, of the two play-outs' team gains;
 // - dealGives keeps the deal's answer to one question, does an As or a Roi go or stay, and lets the board
@@ -35,13 +35,13 @@
 // Pure, no I/O, erasable syntax only.
 
 import {
-  applyPlan,
   type Board,
   type CardId,
   COLORS,
   type Color,
   controlledPawns,
   movesForCard,
+  ownPawns,
   PARTNER,
   type Pawn,
   type PawnId,
@@ -55,6 +55,7 @@ import {
   shuffle,
   type Team,
   teamOf,
+  walk,
 } from "@toc/engine";
 import { pawnsKey } from "./candidates.ts";
 import { evaluate, handBonus } from "./evaluate.ts";
@@ -149,6 +150,9 @@ function ranksKey(hand: readonly CardId[]): string {
     .join(",");
 }
 
+/** The steps of a 7 walked by one knight. */
+const SEVEN_STEPS = 7;
+
 const isExitCard = (card: CardId): boolean => rankOf(card) === 1 || rankOf(card) === 13;
 
 /**
@@ -172,16 +176,22 @@ function movesAfter(board: Board, mover: Color, card: CardId): Record<PawnId, Pa
 }
 
 /**
- * The 7 of a play-out: one controlled knight walks the whole 7, each plan checked by the engine's
- * applyPlan (G15, G16 included). A play-out values a hand; the splits of the 7 are the play decision's
- * (sevenOutcomes, candidates.ts), and enumerating them on every board met would cost a hard 7 per turn.
+ * The 7 of a play-out: one controlled ring knight walks the whole 7, as one micro-move of seven.ts (the
+ * engine's walk, eating the opponents it passes, G15; the mover's own knights neither landed on nor
+ * eaten). A play-out only values a hand: the splits of the 7 and G16's duty to enter are the play
+ * decision's (sevenOutcomes, candidates.ts). Checking them on every board met would cost a hard 7 per
+ * turn (applyPlan runs G16's search on each new board: up to 150 ms for one give).
  */
-function sevenAlone(board: Board, mover: Color, card: CardId): Record<PawnId, Pawn>[] {
+function sevenAlone(board: Board, mover: Color): Record<PawnId, Pawn>[] {
   const out: Record<PawnId, Pawn>[] = [];
+  const own = ownPawns(board, mover);
   for (const pawn of controlledPawns(board, mover)) {
     if (board.pawns[pawn].zone !== "ring") continue;
-    const result = applyPlan(board, mover, card, [{ pawn, steps: 7 }]);
-    if (result.ok) out.push(result.pawns);
+    const walked = walk(board, pawn, SEVEN_STEPS, 1, { capturePassed: true, ownIds: own });
+    if (!walked.ok) continue;
+    const pawns = { ...board.pawns, [pawn]: walked.end };
+    for (const { victim } of walked.captures) pawns[victim] = { zone: "stable" };
+    out.push(pawns);
   }
   return out;
 }
@@ -213,7 +223,7 @@ function newBoards(rules: RuleSet, team: Team): Boards {
     if (found === undefined) {
       expansions++;
       const board: Board = { pawns: from.pawns, rules };
-      const boards = rank === 7 ? sevenAlone(board, mover, card) : movesAfter(board, mover, card);
+      const boards = rank === 7 ? sevenAlone(board, mover) : movesAfter(board, mover, card);
       found = boards.map(node);
       from.next.set(key, found);
     }
