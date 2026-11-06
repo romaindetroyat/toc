@@ -116,10 +116,22 @@
   // The page behind does not scroll while the sheet is open.
   $effect(() => lockScroll());
 
+  // The dialog element, kept for onDestroy (the binding may already be cleared when it runs).
+  let mounted: HTMLElement | undefined;
+  $effect(() => {
+    if (dialog) mounted = dialog;
+  });
+
+  // On close the focus goes back to the opener, but only if nothing else holds it (plan 04-16): the
+  // sheet is torn down at the end of its slide-out, and a sheet or a confirmation opened meanwhile
+  // has its focus where it belongs (its safe answer). While the sheet slides out it is inert, so the
+  // focus it held has fallen back to the body.
   onDestroy(() => {
     open.splice(open.indexOf(me), 1);
     const target = opener ?? openedFrom;
-    if (target?.isConnected) target.focus({ preventScroll: true });
+    const active = document.activeElement;
+    const free = active === null || active === document.body || (mounted?.contains(active) ?? false);
+    if (free && target?.isConnected) target.focus({ preventScroll: true });
   });
 
   function onWindowKeydown(event: KeyboardEvent) {

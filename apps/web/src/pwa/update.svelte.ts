@@ -4,6 +4,12 @@
 //
 // - `pwaUpdate.needRefresh` turns true when a new worker is waiting.
 // - `applyUpdate()` posts SKIP_WAITING; the page reloads once the new worker controls it.
+// - Only the tab that asked reloads (plan 04-16). The new worker takes over every open TOC tab of the
+//   browser at once; the library would then reload them all, a solo game in another tab included
+//   (it is not saved). Every other tab keeps running on its old code and keeps offering the update
+//   where rules.ts allows it, never in a game; « Mettre à jour » there just reloads, since the new
+//   version already controls it. A tab outside a game is not reloaded either: the player did not
+//   ask there, and may be in the middle of something (a friend code typed, the solo setup).
 // - `applyUpdateOrReload()` is the 4002 notice's « Recharger la page »: a waiting worker, else a new
 //   one found now, else a plain reload.
 // - New versions are looked for when the app comes back to the foreground, never on a timer.
@@ -21,6 +27,11 @@ export const pwaUpdate = $state({
   dismissed: false,
   /** « Mettre à jour » was pressed; the page reloads when the new worker takes over. */
   busy: false,
+  /**
+   * The new version already controls this page (another tab applied it): the page still runs the old
+   * code, and a reload is all that « Mettre à jour » needs.
+   */
+  takenOver: false,
   /** Screens that must never be reloaded under the player (the backup code), counted. */
   holds: 0,
 });
@@ -52,6 +63,15 @@ export function startUpdates(): void {
         pwaUpdate.needRefresh = true;
         for (const wake of waiters) wake();
         waiters = [];
+      },
+      // The new worker took over this page. The library's default would reload every tab here.
+      onNeedReload() {
+        if (pwaUpdate.busy) {
+          location.reload();
+          return;
+        }
+        pwaUpdate.takenOver = true;
+        pwaUpdate.needRefresh = true;
       },
       onRegisteredSW(_url, found) {
         registration = found;
@@ -101,12 +121,28 @@ export function holdUpdates(): () => void {
   };
 }
 
+/**
+ * Brings this page to the new version: SKIP_WAITING to the waiting worker (the reload follows on the
+ * controller change, onNeedReload), or, with no worker waiting (another tab already applied it, the
+ * new version controls this page), a reload at once.
+ */
+async function bringNewVersion(): Promise<void> {
+  pwaUpdate.busy = true;
+  const waiting = registration?.waiting ?? null;
+  // Nothing waits (the registration is known, or the new worker already took this page over): the
+  // newest version controls the page, SKIP_WAITING would go nowhere and nothing would reload.
+  if (waiting === null && (registration !== undefined || pwaUpdate.takenOver)) {
+    location.reload();
+    return;
+  }
+  await updateSW?.(true);
+}
+
 /** « Mettre à jour »: SKIP_WAITING, then the reload on the controller change. Refused in a game. */
 export async function applyUpdate(): Promise<void> {
   if (updateSW === null || !pwaUpdate.needRefresh) return;
   if (!canPromptUpdate(currentPlace())) return;
-  pwaUpdate.busy = true;
-  await updateSW(true);
+  await bringNewVersion();
 }
 
 /** Waits until a new worker is waiting, or `ms` went by; true when one is. */
@@ -138,10 +174,7 @@ export async function applyUpdateOrReload(): Promise<void> {
       const installing = registration.installing !== null || registration.waiting !== null;
       return installing ? waitForWaiting(INSTALL_WAIT_MS) : pwaUpdate.needRefresh;
     },
-    apply: async () => {
-      pwaUpdate.busy = true;
-      await updateSW?.(true);
-    },
+    apply: bringNewVersion,
     reload: () => location.reload(),
   });
 }
