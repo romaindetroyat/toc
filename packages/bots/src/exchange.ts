@@ -117,16 +117,17 @@ export function giveScores(view: PlayerView, seat: Color): GiveScore[] {
  * The strata answer the question Romain raised (does the partner already hold an exit card? does it
  * pass one back?) by exact weights, not by the luck of a few draws; the hands only average out the
  * other cards. Calibrated on 2026-11-06 (plan 04-15, 04-15-SUMMARY), this machine, one thread:
- * - `node tools/bench-bots.mjs --exchange --level 5` (the 40 bench exchanges; the level-4 play decision
- *   for scale: p95 11.8 ms, max 18.1 ms; the board give: p95 3.3 ms, max 24.7 ms): 16 hands p95
- *   10.3 ms, max 14.3 ms (before the play-out memo: 8 hands p95 7.3 ms, 16 hands 9.4 ms, 24 hands
- *   12.4 to 15.0 ms, 32 hands 15.5 to 17.9 ms);
- * - 800 exchanges of level-4 games, warmed up: 16 hands p50 3.9 ms, p95 11.3 ms, max 25.8 ms; the
- *   board give on the same positions p95 2.8 ms, max 32.7 ms;
- * - the lone exit card at the start of the game (exchange.test.ts), 200 seeds, level 5: the As and the
- *   Roi each kept 193 times at 16 hands (margin 11.5, spread 6.3); every case with a wider margin kept
- *   or given 50 times out of 50.
- * 16 keeps the give inside the cost of a level-4 play decision, decided in one alarm tick online.
+ * - the hands, on every deal score (`node tools/bench-bots.mjs --exchange --level 5`, the 40 bench
+ *   exchanges, before the memo and the walked 7): 8 hands p95 7.3 ms, 16 hands 9.4 ms, 24 hands 12.4
+ *   to 15.0 ms, 32 hands 15.5 to 17.9 ms; the lone exit card at the start of the game
+ *   (exchange.test.ts), 200 seeds, level 5: the As and the Roi each kept 193 times at 16 hands (margin
+ *   11.5, spread 6.3); every case with a wider margin kept or given 50 times out of 50;
+ * - the final give (dealGives, 16 hands): the bench exchanges p50 1.9 ms, p95 7.0 ms, max 21.9 ms
+ *   (the board give: p95 2.8 ms, max 25.5 ms); 772 exchanges of level-4 games, warmed up: p50 2.3 ms,
+ *   p95 10.5 ms, max 40.2 ms (the board give on the same positions: p95 3.2 ms, max 36.6 ms); 2543
+ *   gives met in play: p95 10.3 ms, p99 17.3 ms, max 49.0 ms. The level-4 play decision, for scale:
+ *   p95 10.8 ms, max 14.6 ms on its bench.
+ * 16 keeps the give near the cost of a level-4 play decision, decided in one alarm tick online.
  */
 export const DEAL_HANDS = 16;
 
@@ -377,11 +378,13 @@ export function dealGiveScores(
  * of the others. The board give (giveScores) then orders the cards of that family, as it did for every
  * card before: the play-outs value whole hands well, but walk the 7 with one knight and ignore the
  * opponents, so among ordinary cards they are no better a guide than one move on the board. Measured
- * on 2026-11-06 with tools/ladder.mjs (04-15-SUMMARY), seed 1, against the board give at the same level:
- * - Pur-sang: 2099 / 4000, p̂ 52.5 %, Wilson 95 % [50.9 %, 54.0 %] (every card by its deal score:
- *   2091 / 4000, 52.3 %, [50.7 %, 53.8 %]);
- * - Champion: 527 / 1000, p̂ 52.7 %, Wilson 95 % [49.6 %, 55.8 %] (every card by its deal score:
- *   484 / 1000, 48.4 %, [45.3 %, 51.5 %]).
+ * on 2026-11-06 with tools/ladder.mjs (04-15-SUMMARY), against the board give at the same level
+ * (`--give-a deal --give-b board --min 0 --lower 0`), this code:
+ * - Pur-sang, seed 1: 2091 / 4000, p̂ 52.3 %, Wilson 95 % [50.7 %, 53.8 %]; seed 2: 2095 / 4000,
+ *   52.4 %, [50.8 %, 53.9 %];
+ * - Champion, seed 1: 531 / 1000, p̂ 53.1 %, Wilson 95 % [50.0 %, 56.2 %] (pairs 2–0 128, 0–2 97).
+ * Every card by its deal score instead (the first version, seed 1): Pur-sang 52.3 %, Champion
+ * 484 / 1000, 48.4 %, [45.3 %, 51.5 %], so only the exit question is left to the deal.
  * A hand with no exit card, or nothing else, has no such question: the board give alone, no play-out.
  * Returns the family's board scores in hand order (first card of each rank), the rng after the
  * imagined hands (unchanged without them) and the work: board expansions plus one unit per card scored.

@@ -108,7 +108,14 @@ export const CHAMPION_BUDGET: Readonly<Budget> = {
  */
 export type GiveMethod = "board" | "deal";
 
-/** Level 1 gives like randomLegal and never reads this. */
+/**
+ * Level 1 gives like randomLegal and never reads this. Ladder re-run on 2026-11-06 with this table
+ * (plan 04-15, seed 1, 400 games, `node tools/ladder.mjs --a N --b N-1`), every step above the bar:
+ * - 5 → 4: 300 / 400, p̂ 75.0 %, Wilson 95 % [70.5 %, 79.0 %] (both on the board give, same seeds:
+ *   333 / 400, 83.3 %, [79.3 %, 86.6 %]: the new give helps Pur-sang too, so the top step narrows);
+ * - 4 → 3: 269 / 400, p̂ 67.3 %, [62.5 %, 71.7 %];
+ * - 3 → 2: 393 / 400, p̂ 98.3 %, [96.4 %, 99.1 %]; 2 → 1: 371 / 400, p̂ 92.8 %, [89.8 %, 94.9 %].
+ */
 export const GIVE_METHOD: Readonly<Record<BotLevel, GiveMethod>> = {
   1: "board",
   2: "board",
