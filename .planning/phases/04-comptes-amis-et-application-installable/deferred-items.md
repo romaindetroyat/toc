@@ -1,0 +1,10 @@
+# Phase 4: deferred items
+
+Out-of-scope findings logged during plan execution (not fixed by the plan that met them).
+
+## 04-15 (2026-11-06)
+
+- **A closing sheet can take the focus from the next one (web UI, pre-existing).** `apps/web/e2e-online/amis.spec.ts:197` (« retirer un ami des deux côtés ; un lien désactivé ; un lien fait ailleurs »), line 251, `expect(disable.getByRole("button", { name: "Garder le lien" })).toBeFocused()`, sometimes fails on the phone project when another spec runs in parallel: the button is there but not focused.
+  - Cause, read in `apps/web/src/ui/Sheet.svelte`: the test closes « Inviter un proche » with Échap and at once opens « Désactiver ce lien ? ». The invite sheet slides out; when it is torn down, its `onDestroy` gives the focus back to its opener (« Inviter un proche ») unconditionally. If the confirmation is already open, that steals its focus; the confirmation's `onWindowFocusin` then puts the focus on its dialog, not on its safe answer. A person who opens a second sheet within the slide-out time sees the same.
+  - Measured: 3 runs of the full online suite with plan 04-15's give: the first two failed on this test only (107 passed), the third passed (108); 1 run with levels 4 and 5 switched back to the board give, passed (108); `amis.spec.ts` alone 10 of 10; the two specs side by side (`amis-table.spec.ts` with `amis.spec.ts`, phone, 2 workers): with the new give 1 failure in 3 runs, with the board give 2 failures in 12 runs (that batch printed the counts only, not the failing test's name). The race exists with either give; how often it shows depends on the load of the parallel spec (which plays an online Champion).
+  - Possible fix (not made: web code, outside 04-15): in `Sheet.svelte`'s `onDestroy`, give the focus back only when nothing else holds it (`document.activeElement` is the body or inside this dialog), so a sheet opened meanwhile keeps its focus, and a sheet closed from another sheet (« Crédits et licences » in « Réglages ») still gives it back. A unit or e2e test: open a confirmation during the slide-out of a sheet and check its safe answer keeps the focus.
