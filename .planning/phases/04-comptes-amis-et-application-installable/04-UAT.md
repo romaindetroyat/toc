@@ -3,7 +3,7 @@ status: testing
 phase: 04-comptes-amis-et-application-installable
 source: [04-CONTEXT.md, 04-UI-SPEC.md, 04-12-SUMMARY.md]
 started: 2026-10-18T14:40:00Z
-updated: 2026-10-19T14:19:00Z
+updated: 2026-11-06T16:00:00Z
 ---
 
 ## Current Test
@@ -323,12 +323,22 @@ expected: |
   Les cas sont dessinés dans RULES.md, R-12.9 et R-12.11 à R-12.13.
 result: pending
 
+### 63. Le partenaire ordinateur garde son seul As ou Roi quand il en a besoin
+expected: |
+  Ajouté par le plan 04-15, après ta remarque du 2026-11-06 (« en mode intelligent, le partenaire ordinateur ne donne pas forcément systématiquement un as ou un roi s'il n'en a qu'un et qu'il faut qu'il sorte ses pions... »). À faire après la prochaine mise en ligne, dans une partie solo, ton partenaire en Pur-sang ou en Champion (les Trotteur et Galopeur gardent l’ancienne façon de choisir, ils doivent faire plus d’erreurs).
+  1. En début de partie, quand tous les chevaux sont à l’écurie, regarde la carte que ton partenaire te donne à chaque donne : il ne te donne presque plus son As ou son Roi. Ce n’est plus systématique : il le garde quand c’est sa seule carte pour sortir ses chevaux (il pourrait encore le donner de temps en temps, quand les deux choix se valent presque).
+  2. Quand il a déjà des chevaux sortis et que les tiens sont tous à l’écurie, il te donne encore un As ou un Roi : c’est là que ça t’aide vraiment.
+  3. Quand il a deux cartes pour sortir (deux As, deux Rois, ou un de chaque) et que tu n’as rien de sorti, il peut t’en donner une et garder l’autre.
+  4. Le reste du jeu ne change pas : il rentre toujours ses chevaux en priorité dans sa maison, pour ne pas se faire échanger ou manger.
+  Dis si les choix te paraissent justes, ou s’il garde trop (ou pas assez) ses As et ses Rois.
+result: pending
+
 ## Summary
 
-total: 62
+total: 63
 passed: 2
 issues: 0
-pending: 60
+pending: 61
 skipped: 0
 blocked: 0
 
