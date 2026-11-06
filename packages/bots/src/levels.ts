@@ -93,3 +93,24 @@ export const CHAMPION_WORLDS = 10;
 export const CHAMPION_BUDGET: Readonly<Budget> = {
   plies: CHAMPION_KEEP * CHAMPION_WORLDS * (1 + CHAMPION_PLIES),
 };
+
+/**
+ * How a level chooses its exchange card (plan 04-15, a refinement of phase 3 D-09):
+ * - "board": exchange.ts giveScores, the best one-move gain of each card on the current board for the
+ *   partner less GIVE_OWN_LOSS times the bot's own (D-09, levels 2 and 3, which make more mistakes, D-05);
+ * - "deal": exchange.ts dealGiveScores, what the two hands can do over the deal with and without each
+ *   card, the partner's hand imagined from the unseen cards (Pur-sang and Champion). Romain, 2026-11-06:
+ *   « en mode intelligent, le partenaire ordinateur ne donne pas forcément systématiquement un as ou un
+ *   roi s'il n'en a qu'un et qu'il faut qu'il sorte ses pions... Il doit pouvoir moduler ça en fonction
+ *   de la stratégie. »
+ */
+export type GiveMethod = "board" | "deal";
+
+/** Level 1 gives like randomLegal and never reads this. */
+export const GIVE_METHOD: Readonly<Record<BotLevel, GiveMethod>> = {
+  1: "board",
+  2: "board",
+  3: "board",
+  4: "deal",
+  5: "deal",
+};

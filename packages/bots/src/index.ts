@@ -1,9 +1,11 @@
 export {
+  BENCH_EXCHANGES,
   BENCH_MIN_CANDIDATES,
   BENCH_OTHERS,
   BENCH_SEVEN_OUTCOMES,
   BENCH_SEVENS,
   type BenchPosition,
+  benchExchanges,
   benchPositions,
 } from "./bench.ts";
 export {
@@ -14,7 +16,14 @@ export {
   type ScoredCandidate,
   scoreCandidates,
 } from "./evaluate.ts";
-export { GIVE_OWN_LOSS, type GiveScore, giveScores } from "./exchange.ts";
+export {
+  DEAL_HANDS,
+  type DealGives,
+  dealGiveScores,
+  GIVE_OWN_LOSS,
+  type GiveScore,
+  giveScores,
+} from "./exchange.ts";
 export {
   BOT_LEVELS,
   type BotLevel,
@@ -24,6 +33,8 @@ export {
   CHAMPION_PLIES,
   CHAMPION_WORLDS,
   DEFAULT_BOT_LEVEL,
+  GIVE_METHOD,
+  type GiveMethod,
   LEVEL_PARAMS,
   type LevelParams,
   parseBotLevel,
@@ -58,6 +69,7 @@ export { randomLegal } from "./randomLegal.ts";
 export type { SearchCheckpoint } from "./search.ts";
 export {
   chooseAction,
+  chooseGive,
   createThinker,
   type Thinker,
   type ThinkerCheckpoint,

@@ -87,13 +87,18 @@ describe("a lone exit card the bot needs is kept (Romain, 2026-11-06)", () => {
   }
 
   for (const exit of ["1S", "13S"] as CardId[]) {
+    // Every knight in its stable: keeping it is worth about 12 more than the best other give, give or
+    // take what the partner's imagined cards can do (a 4 makes the As a home entry). « Pas
+    // systématiquement »: the old give handed it over every time, the new one almost never.
     it(`${exit} with 4 other cards at the start of the game (every knight in its stable)`, () => {
       const hand = [exit, ...REST.slice(0, 4)];
       const view = exchangeView({}, hand, plainPartner(5));
       for (const level of STRONG) {
-        for (let s = 1; s <= 4; s++) {
-          expect(giveOf(view, level, [s, s * 3, s * 5, s * 7])).not.toBe(exit);
+        let kept = 0;
+        for (let s = 1; s <= 40; s++) {
+          if (giveOf(view, level, [s, s * 3 + 1, s * 5 + 2, s * 7 + 3]) !== exit) kept++;
         }
+        expect(kept).toBeGreaterThanOrEqual(36);
       }
     });
   }
@@ -181,7 +186,7 @@ describe("dealGiveScores reads the view only (D-10, BOT-04)", () => {
 
   it("does not modify the view", () => {
     const view = exchangeView(pawns, hand, plainPartner(5));
-    const copy = structuredClone(view);
+    const copy = JSON.parse(JSON.stringify(view)) as PlayerView;
     dealGiveScores(view, "bleu", [1, 2, 3, 4]);
     expect(view).toEqual(copy);
   });

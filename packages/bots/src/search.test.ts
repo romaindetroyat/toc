@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import { candidatesFor } from "./candidates.ts";
 import { determinize } from "./determinize.ts";
 import { scoreCandidates } from "./evaluate.ts";
-import { giveScores } from "./exchange.ts";
+import { dealGiveScores } from "./exchange.ts";
 import { hiddenCounts, partnerHolds, unknownCards } from "./knowledge.ts";
 import { CHAMPION_BUDGET } from "./levels.ts";
 import { playGame } from "./match.ts";
@@ -235,14 +235,15 @@ describe("level 5: the search over imagined deals", () => {
     });
   });
 
-  it("takes the best exchange card, without searching", () => {
+  it("takes the best exchange card over the deal (plan 04-15), without searching", () => {
     for (const { state, seat } of sampleStates(40).filter((s) => s.state.phase === "exchange")) {
       const view = viewFor(state, seat);
-      const scores = giveScores(view, seat);
-      const top = [...scores].sort((a, b) => b.score - a.score)[0];
+      const { scores, units } = dealGiveScores(view, seat, [1, 2, 3, 4]);
+      const best = Math.max(...scores.map((s) => s.score));
+      const top = scores.find((s) => s.score === best);
       const thought = chooseAction(view, seat, 5, [1, 2, 3, 4]);
       expect(thought.action).toEqual({ t: "give", card: top?.card });
-      expect(thought.units).toBe(scores.length);
+      expect(thought.units).toBe(units);
     }
   });
 
