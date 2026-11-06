@@ -225,6 +225,104 @@ test("une nouvelle version attend la fin de la partie, puis « Mettre à jour »
   }
 });
 
+/** How the page's document was loaded: « navigate » for a first load, « reload » after a reload. */
+const navigationType = (page: Page) =>
+  page.evaluate(
+    () => (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming).type,
+  );
+const markDocument = (page: Page) =>
+  page.evaluate(() => {
+    (window as Window & { __sameDocument?: boolean }).__sameDocument = true;
+  });
+/** The page still shows the document marked by markDocument (a reload in progress counts as no). */
+const sameDocument = (page: Page) =>
+  page
+    .evaluate(() => (window as Window & { __sameDocument?: boolean }).__sameDocument ?? false)
+    .catch(() => false);
+
+test("« Mettre à jour » dans un onglet ne recharge pas la partie d’un autre onglet (APP-02)", async ({
+  context,
+}) => {
+  test.setTimeout(90_000);
+  const copy = await serveCopy();
+  try {
+    // Two tabs of one browser: the home in one, then a solo game opened in another (a first load).
+    const home = await context.newPage();
+    await home.goto(`${copy.origin}/#/`);
+    await controlled(home);
+    const game = await context.newPage();
+    await game.goto(`${copy.origin}/#/partie`);
+    await expect
+      .poll(() => game.evaluate(() => navigator.serviceWorker.controller !== null))
+      .toBe(true);
+    await expect(game.locator("[data-board]")).toHaveClass(/loaded/);
+    await markDocument(game);
+    await markDocument(home);
+    expect(await navigationType(game)).toBe("navigate");
+
+    // A new build, seen by both tabs when they come back to the foreground.
+    const sw = join(copy.root, "sw.js");
+    writeFileSync(
+      sw,
+      `${readFileSync(sw, "utf8")}\n;self.addEventListener("message", (e) => { if (e.data === "VERSION?") e.ports[0]?.postMessage("v2"); });\n`,
+    );
+    for (const page of [home, game]) {
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    }
+    await expect
+      .poll(() =>
+        home.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return registration?.waiting !== null && registration?.waiting !== undefined;
+        }),
+      )
+      .toBe(true);
+    const strip = home.locator('[data-home-strip="update"]');
+    await expect(strip).toBeVisible();
+    await expect(game.locator("[data-home-strip]")).toHaveCount(0);
+
+    // The home applies it: only the home reloads, into the new version.
+    await strip.getByRole("button", { name: "Mettre à jour" }).click();
+    await expect.poll(() => sameDocument(home)).toBe(false);
+    await expect.poll(() => workerVersion(home).catch(() => "reloading")).toBe("v2");
+    await expect(home.locator('[data-home-strip="update"]')).toHaveCount(0);
+
+    // The game in the other tab keeps its document and its board, long after the controller change.
+    await game.waitForTimeout(3000);
+    expect(await sameDocument(game)).toBe(true);
+    expect(await navigationType(game)).toBe("navigate");
+    await expect(game).toHaveURL(/#\/partie$/);
+    await expect(game.locator("[data-board]")).toHaveClass(/loaded/);
+    await expect(game.locator("[data-hand] [data-card]").first()).toBeVisible();
+    await expect(game.locator("[data-home-strip]")).toHaveCount(0);
+    // « Réglages » still says the new version installs back on the home.
+    await game
+      .getByRole("button", { name: /^Réglages/ })
+      .first()
+      .click();
+    await expect(game.locator("[data-update-line]")).toHaveText(
+      "Une nouvelle version est prête : elle s’installera quand tu reviendras à l’accueil.",
+    );
+    await game.keyboard.press("Escape");
+    expect(await sameDocument(game)).toBe(true);
+
+    // Back on the home, that tab offers the update too, and « Mettre à jour » reloads it.
+    await game.evaluate(() => {
+      location.hash = "#/";
+    });
+    const gameStrip = game.locator('[data-home-strip="update"]');
+    await expect(gameStrip).toBeVisible();
+    expect(await sameDocument(game)).toBe(true);
+    await gameStrip.getByRole("button", { name: "Mettre à jour" }).click();
+    await expect.poll(() => sameDocument(game)).toBe(false);
+    await expect.poll(() => workerVersion(game).catch(() => "reloading")).toBe("v2");
+    await expect(game.locator('[data-home-strip="update"]')).toHaveCount(0);
+  } finally {
+    copy.server.close();
+    rmSync(copy.root, { recursive: true, force: true });
+  }
+});
+
 /** A CDP session with the ServiceWorker domain on, and the id of this origin's registration. */
 async function serviceWorkerDomain(
   context: BrowserContext,
