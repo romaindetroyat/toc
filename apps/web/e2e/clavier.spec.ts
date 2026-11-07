@@ -722,3 +722,272 @@ test.describe("les touches se voient sur ordinateur", () => {
     await expect(settings.getByRole("button", { name: "Raccourcis clavier" })).toHaveCount(0);
   });
 });
+
+// --- Plan 05-10 (05-UI-SPEC « Keyboard (additions) », « The audit » focus row): the phase's new
+// screens with the keyboard alone. Every new control shows the amber ring when Tab reaches it, Tab
+// follows the DOM order each contract lists, Échap closes the top sheet and gives the focus back.
+
+/** The amber ring of :focus-visible (app.css): 3 px solid --ambre. */
+async function expectRing(locator: ReturnType<Page["locator"]>, what: string) {
+  await expect(locator, what).toBeFocused();
+  const ring = await locator.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
+  });
+  expect(ring, `${what}: the amber ring`).toEqual({
+    style: "solid",
+    width: "3px",
+    color: "rgb(255, 176, 46)",
+  });
+}
+
+/** Tab once, then the focused element must be `locator`, with its ring. */
+async function tabTo(page: Page, locator: ReturnType<Page["locator"]>, what: string) {
+  await page.keyboard.press("Tab");
+  await expectRing(locator, what);
+}
+
+/** A signed-in account and « Mes résultats » answered by the test (the local suite has no Worker). */
+async function serveAccount(page: Page) {
+  const me = {
+    id: "u".repeat(22),
+    pseudo: "Zoé",
+    createdAt: 1_792_000_000_000,
+    passkeys: [
+      {
+        id: "AAAA",
+        label: "iPhone",
+        createdAt: 1_792_000_000_000,
+        lastUsedAt: null,
+        backedUp: true,
+        current: true,
+      },
+    ],
+    hasBackupCode: true,
+    backupAt: 1_792_000_000_000,
+  };
+  const seat = (
+    colour: string,
+    kind: string,
+    name: string,
+    home: number,
+    level: number | null = null,
+  ) => ({
+    colour,
+    kind,
+    name,
+    level,
+    handedOver: false,
+    captured: 1,
+    lost: 1,
+    home,
+  });
+  const at = (day: number) => new Date(2026, 10, day, 21, 14).getTime();
+  const games = [1, 2].map((n) => ({
+    id: `${"Q".repeat(43)}:${n}`,
+    kind: "online",
+    startedAt: at(n) - 40 * 60_000,
+    endedAt: at(n),
+    winner: "bleu-rouge",
+    mine: "bleu",
+    seats: [
+      seat("bleu", "me", "Zoé", 4),
+      seat("jaune", "account", "Paul", 3),
+      seat("rouge", "account", "Marie", 4),
+      seat("vert", "bot", "Ourasi", 2, 4),
+    ],
+    deals: 6,
+    creator: "Zoé",
+    ranked: true,
+  }));
+  const block = { games: 6, wins: 4, captured: 9, lost: 7, home: 30, partners: [], levels: [] };
+  await page.route("**/api/me", (route) => route.fulfill({ json: me }));
+  await page.route("**/api/me/results", (route) => route.fulfill({ json: { games, next: null } }));
+  await page.route("**/api/me/stats", (route) =>
+    route.fulfill({ json: { all: block, online: block, solo: { ...block, games: 0, wins: 0 } } }),
+  );
+  await page.route("**/api/me/ranking", (route) =>
+    route.fulfill({
+      json: {
+        friends: 2,
+        ranked: [
+          { rank: 1, pseudo: "Marie", games: 12, wins: 8, me: false },
+          { rank: 2, pseudo: "Zoé", games: 9, wins: 5, me: true },
+        ],
+        unranked: [{ pseudo: "Paul", games: 3, me: false }],
+      },
+    }),
+  );
+}
+
+test.describe("au clavier sur les écrans de la phase 5", () => {
+  test.skip(({ isMobile }) => isMobile, "the keyboard: the desktop project");
+
+  test("l’accueil : la roue, les deux choix, les petites tuiles, puis « Règles » et « Apprendre »", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("main[data-home]")).toBeVisible();
+    await tabTo(page, page.getByRole("button", { name: "Réglages", exact: true }), "la roue");
+    await tabTo(page, page.locator('[data-home-choice="ordinateur"]'), "Jouer contre l’ordinateur");
+    await tabTo(page, page.locator('[data-home-choice="table"]'), "Créer une table en ligne");
+    await tabTo(page, page.locator('[data-small-tile="connexion"]'), "Se connecter");
+    await tabTo(page, page.locator('[data-small-tile="regles"]'), "Règles");
+    await tabTo(page, page.locator('[data-small-tile="apprendre"]'), "Apprendre");
+
+    // « Règles » opens the sheet; Échap closes it and gives the focus back to the tile.
+    await page.locator('[data-small-tile="regles"]').focus();
+    await page.keyboard.press("Enter");
+    const rules = page.getByRole("dialog", { name: "Règles du TOC" });
+    await expect(rules).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(rules).toHaveCount(0);
+    await expectRing(page.locator('[data-small-tile="regles"]'), "Règles, après Échap");
+  });
+
+  test("« Apprendre à jouer » : « Accueil », le bouton principal, les règles, puis les huit leçons", async ({
+    page,
+  }) => {
+    await page.goto("/#/apprendre");
+    const lessons = page.locator("main[data-lessons-page]");
+    await expect(lessons).toBeVisible();
+    // The h1 has the focus when the page opens (04 rule); « Accueil » is just before it.
+    await expect(lessons.getByRole("heading", { level: 1 })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expectRing(lessons.getByRole("link", { name: "Accueil" }), "Accueil");
+    await tabTo(page, lessons.locator("[data-lessons-primary]"), "Commencer");
+    await tabTo(page, lessons.getByRole("button", { name: "Règles du jeu" }), "Règles du jeu");
+    for (let n = 1; n <= 8; n++) {
+      await tabTo(page, lessons.locator(`[data-lesson="${n}"]`), `leçon ${n}`);
+    }
+    // « Règles du jeu » opens the rules over the page; Échap gives the focus back.
+    await lessons.getByRole("button", { name: "Règles du jeu" }).focus();
+    await page.keyboard.press("Enter");
+    const rules = page.getByRole("dialog", { name: "Règles du TOC" });
+    await expect(rules).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(rules).toHaveCount(0);
+    await expectRing(
+      lessons.getByRole("button", { name: "Règles du jeu" }),
+      "Règles du jeu, après Échap",
+    );
+  });
+
+  test("une leçon : Entrée presse « Suivant », la pastille ouvre « Les leçons », Échap y revient", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.goto("/#/apprendre/1?vitesse=test");
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    const next = page.getByRole("button", { name: /^Suivant/ });
+    await expect(next).toBeFocused();
+    const band = page.locator("[data-guide-band]");
+    const first = await band.textContent();
+    await page.keyboard.press("Enter");
+    await expect(band).not.toHaveText(first ?? "");
+
+    const pill = page.getByRole("button", { name: /^Leçon 1 sur 8 : / });
+    await pill.focus();
+    await expectRing(pill, "la pastille de la leçon");
+    await page.keyboard.press("Enter");
+    const sheet = page.getByRole("dialog", { name: "Les leçons" });
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expectRing(pill, "la pastille, après Échap");
+  });
+
+  test("« Règles » : les flèches, Début et Fin choisissent l’onglet, l’anneau le suit", async ({
+    page,
+  }) => {
+    await openPosition(page, ACE);
+    await page.keyboard.press("r");
+    const rules = page.getByRole("dialog", { name: "Règles du TOC" });
+    await expect(rules).toBeVisible();
+    const selected = rules.locator('[role="tab"][aria-selected="true"]');
+    await expect(selected).toHaveAttribute("data-rules-tab", "cartes");
+    await selected.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(selected).toHaveAttribute("data-rules-tab", "donne");
+    await expectRing(rules.locator('[data-rules-tab="donne"]'), "Une donne");
+    await page.keyboard.press("End");
+    await expect(selected).toHaveAttribute("data-rules-tab", "regles-maison");
+    await expectRing(rules.locator('[data-rules-tab="regles-maison"]'), "Règles de la maison");
+    await page.keyboard.press("Home");
+    await expect(selected).toHaveAttribute("data-rules-tab", "but");
+    await expectRing(rules.locator('[data-rules-tab="but"]'), "Le but");
+    await page.keyboard.press("ArrowUp");
+    await expect(selected).toHaveAttribute("data-rules-tab", "regles-maison");
+  });
+
+  test("Échap ferme la feuille du dessus : « Règles » sur « Réglages », puis « Réglages »", async ({
+    page,
+  }) => {
+    await openPosition(page, ACE);
+    const gear = page.getByRole("button", { name: "Réglages", exact: true });
+    await gear.focus();
+    await page.keyboard.press("Enter");
+    const settings = page.getByRole("dialog", { name: "Réglages" });
+    await expect(settings).toBeVisible();
+    const open = settings.getByRole("button", { name: "Règles du jeu" });
+    await open.focus();
+    await page.keyboard.press("Enter");
+    const rules = page.getByRole("dialog", { name: "Règles du TOC" });
+    await expect(rules).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(rules).toHaveCount(0);
+    await expect(settings).toBeVisible();
+    await expectRing(open, "« Règles du jeu » dans « Réglages »");
+    await page.keyboard.press("Escape");
+    await expect(settings).toHaveCount(0);
+    await expectRing(gear, "la roue");
+  });
+
+  test("« Mes résultats » : « Accueil », les trois onglets, les parties ; la fiche et « Le classement » rendent le focus", async ({
+    page,
+  }) => {
+    await serveAccount(page);
+    await page.goto("/");
+    await page.goto("/#/resultats");
+    const rows = page.locator("[data-game-row]");
+    await expect(rows).toHaveCount(2);
+    // The h1 has the focus when the page opens (04 rule); « Accueil » is just before it.
+    await expect(page.getByRole("heading", { level: 1, name: "Mes résultats" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expectRing(page.locator("main").getByRole("link", { name: "Accueil" }), "Accueil");
+    await page.getByRole("heading", { level: 1, name: "Mes résultats" }).focus();
+    await tabTo(page, page.locator('[data-results-tab="historique"]'), "Historique");
+    await tabTo(page, page.locator('[data-results-tab="chiffres"]'), "Mes chiffres");
+    await tabTo(page, page.locator('[data-results-tab="classement"]'), "Classement");
+    await tabTo(page, rows.nth(0), "la première partie");
+    await tabTo(page, rows.nth(1), "la deuxième partie");
+
+    // A row opens its sheet; Échap gives the focus back to the row.
+    await page.keyboard.press("Enter");
+    const sheet = page.locator("[data-game-sheet]");
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expectRing(rows.nth(1), "la partie, après Échap");
+
+    // « Mes chiffres » with Entrée: the focus goes to the panel's heading.
+    await page.locator('[data-results-tab="chiffres"]').focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('[data-results-panel="chiffres"]')).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Mes chiffres" })).toBeFocused();
+
+    // « Classement », then « Comment ça marche ? » and back.
+    await page.locator('[data-results-tab="classement"]').focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("[data-rank-row]").first()).toBeVisible();
+    const how = page.getByRole("button", { name: "Comment ça marche ?" });
+    await how.focus();
+    await expectRing(how, "Comment ça marche ?");
+    await page.keyboard.press("Enter");
+    const ranking = page.getByRole("dialog", { name: "Le classement" });
+    await expect(ranking).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(ranking).toHaveCount(0);
+    await expectRing(how, "Comment ça marche ?, après Échap");
+  });
+});
