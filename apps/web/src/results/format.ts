@@ -9,7 +9,13 @@
 // Galopeur ». Dates in French with Intl.
 
 import { type Color, PARTNER, type Team, teamOf } from "@toc/engine";
-import type { HistoryGame, HistorySeat, StatsBlock } from "@toc/protocol";
+import {
+  type HistoryGame,
+  type HistorySeat,
+  RANKING_THRESHOLD,
+  type RankingAnswer,
+  type StatsBlock,
+} from "@toc/protocol";
 import { bots } from "../i18n/fr/bots.ts";
 import { resultats } from "../i18n/fr/resultats.ts";
 
@@ -259,4 +265,37 @@ export function partnerName(partner: StatsBlock["partners"][number]): string {
     return resultats.stats.partners.bot(partner.level === null ? "" : levelName(partner.level));
   }
   return partner.name ?? "";
+}
+
+// --- Plan 05-09: « Classement » (05-UI-SPEC Panel 3, D-13) ---
+
+type RankedRow = RankingAnswer["ranked"][number];
+type UnrankedRow = RankingAnswer["unranked"][number];
+
+const rankCopy = resultats.ranking;
+
+/** « 1er », « 2e », « 11e ». */
+export const rankName = (rank: number): string => rankCopy.rank(rank);
+
+/** A ranked row's line 2: « 12 parties · 8 victoires ». */
+export const rankedLine = (games: number, wins: number): string => rankCopy.line(games, wins);
+
+/** A ranked row's accessible name: « 2e, Marie, 67 %, 12 parties, 8 victoires », « toi » for oneself. */
+export function rankLabel(row: RankedRow): string {
+  return rankCopy.label(
+    rankName(row.rank),
+    row.me ? rankCopy.me : row.pseudo,
+    rate(row.wins, row.games),
+    row.games,
+    row.wins,
+  );
+}
+
+/** « 1 partie sur 5 », « 3 parties sur 5 ». */
+export const unrankedLine = (games: number): string =>
+  rankCopy.unranked.count(games, RANKING_THRESHOLD);
+
+/** An unranked row's accessible name: « Marie, 1 partie sur 5 », « toi, … » for oneself. */
+export function unrankedLabel(row: UnrankedRow): string {
+  return rankCopy.unranked.label(row.me ? rankCopy.me : row.pseudo, unrankedLine(row.games));
 }

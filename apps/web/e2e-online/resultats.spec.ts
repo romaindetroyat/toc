@@ -332,6 +332,8 @@ test("« Mes chiffres » : le filtre, les trois nombres, les chevaux, les parten
   // At 640 x 360 the tiles hold « 100 % » without overflow, and nothing scrolls sideways.
   await page.getByRole("radio", { name: "Toutes" }).click();
   await page.setViewportSize({ width: 640, height: 360 });
+  // The two-column layout follows the resize: measure once it is there.
+  await expect(page.locator('main[data-layout="two"]')).toBeVisible();
   await expect(tile(page, "reussite")).toHaveText(/^100\s%$/);
   const fit = await page.evaluate(() => {
     const tiles = [...document.querySelectorAll("[data-number-tile]")];

@@ -8,6 +8,7 @@
   import Page from "../ui/Page.svelte";
   import { pageLayout } from "../ui/pageLayout.svelte.ts";
   import ResultsNav, { type ResultsTab, tabOf } from "../ui/ResultsNav.svelte";
+  import RankingPanel from "../ui/RankingPanel.svelte";
   import StatsPanel from "../ui/StatsPanel.svelte";
 
   // « Mes résultats » at #/resultats (plans 05-01 and 05-09, HIST-02..04; 05-UI-SPEC « Mes
@@ -109,6 +110,8 @@
             <HistoryList onsignedout={signedOutHere} onoffline={offline} {announce} />
           {:else if tab === "chiffres"}
             <StatsPanel onsignedout={signedOutHere} onoffline={offline} {announce} />
+          {:else}
+            <RankingPanel onsignedout={signedOutHere} onoffline={offline} />
           {/if}
         {/key}
       </section>

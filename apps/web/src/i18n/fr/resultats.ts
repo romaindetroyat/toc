@@ -86,6 +86,53 @@ export const resultats = {
       filter: "Aucune partie de ce genre pour l’instant.",
     },
   },
+  /** Plan 05-09: « Classement » (05-UI-SPEC Panel 3, D-13). */
+  ranking: {
+    loading: "Chargement du classement…",
+    error: "Impossible de charger le classement.",
+    intro:
+      "Entre toi et tes amis, sur les parties en ligne jouées avec au moins un autre joueur qui a un compte.",
+    me: "toi",
+    /** « 1er », « 2e ». */
+    rank: (n: number) => (n === 1 ? "1er" : `${n}e`),
+    /** « 12 parties · 8 victoires ». */
+    line: (games: number, wins: number) =>
+      `${games} ${games >= 2 ? "parties" : "partie"} · ${wins} ${wins >= 2 ? "victoires" : "victoire"}`,
+    /** The row's accessible name: « 2e, Marie, 67 %, 12 parties, 8 victoires ». */
+    label: (rank: string, name: string, rate: string, games: number, wins: number) =>
+      `${rank}, ${name}, ${rate}, ${games} ${games >= 2 ? "parties" : "partie"}, ${wins} ${wins >= 2 ? "victoires" : "victoire"}`,
+    unranked: {
+      heading: "Pas encore au classement",
+      line: "Il faut 5 parties pour entrer au classement.",
+      /** « 1 partie sur 5 ». */
+      count: (n: number, of: number) => `${n} ${n >= 2 ? "parties" : "partie"} sur ${of}`,
+      /** « Marie, 1 partie sur 5 ». */
+      label: (name: string, count: string) => `${name}, ${count}`,
+    },
+    noFriend: {
+      heading: "Pas encore d’amis sur TOC",
+      body: "Invite un proche pour vous mesurer entre amis.",
+      friends: "Mes amis",
+    },
+    nobody: {
+      heading: "Personne n’est encore au classement",
+      body: "Jouez ensemble en ligne : chacun y entre après 5 parties.",
+      create: "Créer une table en ligne",
+      creating: "Création de la table…",
+      offline: "Pas de connexion : la table en ligne a besoin d’Internet.",
+      failed: "La table n’a pas pu être créée. Réessaie dans un instant.",
+    },
+    how: "Comment ça marche ?",
+    sheet: {
+      title: "Le classement",
+      paragraphs: [
+        "Le classement compte les parties en ligne terminées où au moins deux joueurs ont un compte, partenaires ou adversaires. Les parties contre l’ordinateur seul n’y comptent pas.",
+        "Chacun compte toutes ses parties classées, pas seulement celles jouées avec toi. On entre au classement après 5 parties.",
+        "On classe au pourcentage de victoires. À égalité, le plus de victoires passe devant, puis le plus de parties.",
+      ],
+      close: "Fermer",
+    },
+  },
   /** Plan 05-09: the detail sheet of a game (05-UI-SPEC « Game detail sheet »). */
   sheet: {
     /** « Partie du samedi 24 octobre ». */
