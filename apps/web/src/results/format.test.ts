@@ -6,8 +6,12 @@ import {
   gameKey,
   gamesCount,
   groupByMonth,
+  levelName,
   monthHeading,
   nameOf,
+  partnerLine,
+  partnerName,
+  rate,
   rowOf,
   seatTags,
   sheetOf,
@@ -306,5 +310,37 @@ describe("gameKey", () => {
     expect(gameKey(game())).toBe(`${"A".repeat(43)}:1`);
     const uuid = "0f8e2c4a-1b2c-4d3e-8f90-123456789abc";
     expect(gameKey(game({ kind: "solo", id: `solo:${"u".repeat(22)}:${uuid}` }))).toBe(uuid);
+  });
+});
+
+// --- Plan 05-09 Task 2: « Mes chiffres » (05-UI-SPEC Panel 2, « Typography ») ---
+
+describe("the figures' wording", () => {
+  it("a rate in French with Intl (U+202F before %), « – » without a game", () => {
+    expect(rate(2, 3)).toBe(`67${NNBSP}%`);
+    expect(rate(1, 1)).toBe(`100${NNBSP}%`);
+    expect(rate(0, 4)).toBe(`0${NNBSP}%`);
+    expect(rate(5, 8)).toBe(`63${NNBSP}%`);
+    expect(rate(0, 0)).toBe("–");
+  });
+
+  it("a partner's or a level's line, singular for one", () => {
+    expect(partnerLine(3, 2)).toBe(`3 parties · 2 victoires · 67${NNBSP}%`);
+    expect(partnerLine(1, 1)).toBe(`1 partie · 1 victoire · 100${NNBSP}%`);
+    expect(partnerLine(2, 0)).toBe(`2 parties · 0 victoire · 0${NNBSP}%`);
+  });
+
+  it("a partner by its pseudo, the guests together, the computers of a level", () => {
+    expect(partnerName({ kind: "account", name: "Marie", level: null, games: 1, wins: 1 })).toBe(
+      "Marie",
+    );
+    expect(partnerName({ kind: "guests", name: null, level: null, games: 1, wins: 1 })).toBe(
+      "Joueurs sans compte",
+    );
+    expect(partnerName({ kind: "bot", name: null, level: 4, games: 1, wins: 1 })).toBe(
+      "Pur-sang (ordinateur)",
+    );
+    expect(levelName(1)).toBe("Poulain");
+    expect(levelName(5)).toBe("Champion");
   });
 });

@@ -186,6 +186,160 @@ test("l’historique par mois, 20 parties à la fois, la fiche d’une partie et
   await a.context.close();
 });
 
+// --- Plan 05-09 Task 2: « Mes chiffres », the answer of GET /api/me/stats served by the test ---
+
+type Partner = {
+  kind: string;
+  name: string | null;
+  level: number | null;
+  games: number;
+  wins: number;
+};
+
+const statsBlock = (
+  games: number,
+  wins: number,
+  partners: Partner[] = [],
+  levels: { level: number; games: number; wins: number }[] = [],
+) => ({ games, wins, captured: 9, lost: 7, home: 30, partners, levels });
+
+const tile = (page: Page, name: string) => page.locator(`[data-number-tile="${name}"] dd`);
+
+async function openStats(page: Page, answer: unknown): Promise<void> {
+  await page.unroute("**/api/me/stats");
+  await page.route("**/api/me/stats", (route) => route.fulfill({ json: answer }));
+  await page.goto("/");
+  await page.goto("/#/resultats/chiffres");
+}
+
+test("« Mes chiffres » : le filtre, les trois nombres, les chevaux, les partenaires et les forces", async ({
+  page,
+}) => {
+  const pseudos = ["Marie", "Paul", "Lucie", "Hugo", "Inès", "Jules", "Léa", "Noé"];
+  const partners: Partner[] = [
+    ...pseudos.map((name, i) => ({
+      kind: "account",
+      name,
+      level: null,
+      games: 9 - i,
+      wins: i % 2 === 0 ? 2 : 1,
+    })),
+    { kind: "guests", name: null, level: null, games: 1, wins: 1 },
+  ];
+  const answer = {
+    all: statsBlock(12, 8, partners, [
+      { level: 1, games: 2, wins: 1 },
+      { level: 4, games: 3, wins: 2 },
+    ]),
+    online: statsBlock(7, 4, [{ kind: "account", name: "Marie", level: null, games: 7, wins: 4 }]),
+    solo: statsBlock(
+      5,
+      4,
+      [{ kind: "bot", name: null, level: 4, games: 5, wins: 4 }],
+      [{ level: 4, games: 5, wins: 4 }],
+    ),
+  };
+  await openStats(page, answer);
+  await expect(tab(page, "chiffres")).toHaveAttribute("aria-current", "page");
+  const filter = page.getByRole("radiogroup", { name: "Parties comptées" });
+  await expect(filter.getByRole("radio", { name: "Toutes" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  // The three tiles, a definition list read label then number.
+  await expect(page.locator("dl[data-number-tiles] [data-number-tile]")).toHaveCount(3);
+  await expect(tile(page, "parties")).toHaveText("12");
+  await expect(tile(page, "victoires")).toHaveText("8");
+  await expect(tile(page, "reussite")).toHaveText(/^67\s%$/);
+  await expect(page.locator('[data-number-tile="parties"] dt')).toHaveText("Parties");
+  // « Chevaux ».
+  await expect(page.getByRole("heading", { level: 3, name: "Chevaux" })).toBeVisible();
+  await expect(page.locator('[data-knights="captured"]')).toHaveText(/Mangés par toi\s*9/);
+  await expect(page.locator('[data-knights="lost"]')).toHaveText(/Mangés à toi\s*7/);
+  await expect(page.locator('[data-knights="home"]')).toHaveText(/Rentrés par toi\s*30/);
+  // Eight partners, then all nine.
+  const partnerRows = page.locator("[data-partner-row]");
+  await expect(partnerRows).toHaveCount(8);
+  await expect(partnerRows.first()).toHaveText(/Marie\s*9 parties · 2 victoires · 22\s%/);
+  await page.getByRole("button", { name: "Voir tous mes partenaires" }).click();
+  await expect(partnerRows).toHaveCount(9);
+  await expect(partnerRows.last()).toHaveText(
+    /Joueurs sans compte\s*1 partie · 1 victoire · 100\s%/,
+  );
+  await expect(page.getByRole("button", { name: "Voir tous mes partenaires" })).toHaveCount(0);
+  // The levels, in level order, with the intro.
+  await expect(page.getByText("Classé par la force de l’adversaire le plus fort.")).toBeVisible();
+  await expect(page.locator("[data-level-row]")).toHaveText([
+    /Poulain\s*2 parties · 1 victoire · 50\s%/,
+    /Pur-sang\s*3 parties · 2 victoires · 67\s%/,
+  ]);
+
+  // « En ligne »: the figures at once, announced; no levels section.
+  await filter.getByRole("radio", { name: "En ligne" }).click();
+  await expect(tile(page, "parties")).toHaveText("7");
+  await expect(tile(page, "reussite")).toHaveText(/^57\s%$/);
+  await expect(page.locator("[data-results-live]")).toHaveText(/En ligne\s*:\s*7 parties/);
+  await expect(page.locator("[data-level-row]")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Contre l’ordinateur, par force" }),
+  ).toHaveCount(0);
+  await expect(partnerRows).toHaveCount(1);
+  // « Contre l’ordinateur ».
+  await filter.getByRole("radio", { name: "Contre l’ordinateur" }).click();
+  await expect(tile(page, "parties")).toHaveText("5");
+  await expect(partnerRows).toHaveText([
+    /Pur-sang \(ordinateur\)\s*5 parties · 4 victoires · 80\s%/,
+  ]);
+  await expect(page.locator("[data-level-row]")).toHaveCount(1);
+
+  // No game at all.
+  await openStats(page, {
+    all: statsBlock(0, 0),
+    online: statsBlock(0, 0),
+    solo: statsBlock(0, 0),
+  });
+  await expect(page.getByText("Pas encore de chiffres")).toBeVisible();
+  await expect(
+    page.getByText(
+      "Termine une partie, en ligne ou contre l’ordinateur, pour voir tes chiffres ici.",
+    ),
+  ).toBeVisible();
+  // None for a filter.
+  const one = [{ kind: "bot", name: null, level: 2, games: 1, wins: 1 }];
+  await openStats(page, {
+    all: statsBlock(1, 1, one, [{ level: 2, games: 1, wins: 1 }]),
+    online: statsBlock(0, 0),
+    solo: statsBlock(1, 1, one, [{ level: 2, games: 1, wins: 1 }]),
+  });
+  await expect(tile(page, "reussite")).toHaveText(/^100\s%$/);
+  await expect(page.locator("[data-partner-row]")).toHaveText([
+    /Trotteur \(ordinateur\)\s*1 partie · 1 victoire · 100\s%/,
+  ]);
+  await page.getByRole("radio", { name: "En ligne" }).click();
+  await expect(page.getByText("Aucune partie de ce genre pour l’instant.")).toBeVisible();
+  await expect(page.locator("[data-number-tile]")).toHaveCount(0);
+
+  // At 640 x 360 the tiles hold « 100 % » without overflow, and nothing scrolls sideways.
+  await page.getByRole("radio", { name: "Toutes" }).click();
+  await page.setViewportSize({ width: 640, height: 360 });
+  await expect(tile(page, "reussite")).toHaveText(/^100\s%$/);
+  const fit = await page.evaluate(() => {
+    const tiles = [...document.querySelectorAll("[data-number-tile]")];
+    return {
+      overflow: tiles.some(
+        (element) =>
+          element instanceof HTMLElement &&
+          [...element.querySelectorAll("dd, dt")].some(
+            (part) => part instanceof HTMLElement && part.scrollWidth > part.clientWidth,
+          ),
+      ),
+      heights: tiles.map((element) => Math.round(element.getBoundingClientRect().height)),
+      sideways: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+  expect(fit).toEqual({ overflow: false, heights: [72, 72, 72], sideways: false });
+});
+
 test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résultats »", async ({
   browser,
   request,

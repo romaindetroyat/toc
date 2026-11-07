@@ -1,7 +1,7 @@
 import type { HistoryPage } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import type { ApiDeps } from "../net/api.ts";
-import { history } from "./api.ts";
+import { history, stats } from "./api.ts";
 
 // « Mes résultats » from the page (plan 05-01): GET /api/me/results, read with the shared strict
 // schema. fetch and the online flag are fakes.
@@ -145,5 +145,75 @@ describe("history refuses a hostile answer", () => {
         }),
       ),
     ).toBe("error");
+  });
+});
+
+// --- Plan 05-09 Task 2: GET /api/me/stats, read with StatsAnswer (strict) ---
+
+const block = (games: number, wins: number) => ({
+  games,
+  wins,
+  captured: 3,
+  lost: 2,
+  home: 5,
+  partners: [
+    { kind: "account", name: "Marie", level: null, games, wins },
+    { kind: "guests", name: null, level: null, games: 1, wins: 0 },
+    { kind: "bot", name: null, level: 4, games: 1, wins: 1 },
+  ],
+  levels: [{ level: 4, games: 1, wins: 1 }],
+});
+
+const STATS = { all: block(3, 2), online: block(2, 1), solo: block(1, 1) };
+
+describe("stats", () => {
+  it("answers the three blocks as the server sent them, asked without a cache", async () => {
+    const { deps, calls } = fake(() => Response.json(STATS));
+    expect(await stats(deps)).toEqual(STATS);
+    expect(calls[0]?.url).toBe("/api/me/stats");
+    expect(calls[0]?.init?.cache).toBe("no-store");
+  });
+
+  it("signed out, offline, failing or out of shape", async () => {
+    expect(await stats(fake(() => Response.json({}, { status: 401 })).deps)).toBe("signed-out");
+    expect(await stats(fake(() => Response.json(STATS), false).deps)).toBe("offline");
+    expect(
+      await stats(
+        fake(() => {
+          throw new TypeError("network");
+        }).deps,
+      ),
+    ).toBe("offline");
+    expect(await stats(fake(() => new Response("oops", { status: 503 })).deps)).toBe("error");
+    expect(await stats(fake(() => new Response("<html>", { status: 200 })).deps)).toBe("error");
+  });
+
+  it("refuses a hostile answer: an id, more wins than games, a level 9, an extra block", async () => {
+    const hostile = (change: (answer: Record<string, Record<string, unknown>>) => void) => {
+      const answer = JSON.parse(JSON.stringify(STATS)) as Record<string, Record<string, unknown>>;
+      change(answer);
+      return fake(() => Response.json(answer)).deps;
+    };
+    const partner = (answer: Record<string, Record<string, unknown>>) =>
+      ((answer.all as Record<string, unknown>).partners as Record<string, unknown>[])[0] as Record<
+        string,
+        unknown
+      >;
+    expect(await stats(hostile((answer) => (partner(answer).id = "u".repeat(22))))).toBe("error");
+    expect(
+      await stats(hostile((answer) => ((answer.all as Record<string, unknown>).wins = 9))),
+    ).toBe("error");
+    expect(
+      await stats(
+        hostile((answer) => {
+          (
+            (
+              (answer.solo as Record<string, unknown>).levels as Record<string, unknown>[]
+            )[0] as Record<string, unknown>
+          ).level = 9;
+        }),
+      ),
+    ).toBe("error");
+    expect(await stats(hostile((answer) => (answer.debug = {})))).toBe("error");
   });
 });
