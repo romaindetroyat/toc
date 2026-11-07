@@ -385,3 +385,170 @@ for (const viewport of FIT) {
     }
   });
 }
+
+// The fifteen rule figures (05-UI-SPEC « Figures », D-15): drawn live with the galet and the game's
+// knights, « Avant » above « Après » (or « Le coup » for the five without an after), from Bleu's seat.
+const FIGURES: Record<string, { id: string; caption: string; move?: true }[]> = {
+  but: [
+    {
+      id: "R-01.1",
+      caption: "Bleu joue avec Rouge, Jaune avec Vert : les partenaires sont face à face.",
+      move: true,
+    },
+  ],
+  cartes: [
+    { id: "R-07.1", caption: "La Dame avance de 12." },
+    { id: "R-08.1", caption: "Le 4 fait reculer un cheval qui vient de sortir." },
+  ],
+  donne: [
+    {
+      id: "R-04.2",
+      caption: "Quand les quatre ont choisi, les cartes changent de main ensemble.",
+      move: true,
+    },
+    { id: "R-14.2", caption: "Aucune carte jouable : la main est posée face visible.", move: true },
+  ],
+  sortir: [
+    { id: "R-06.1", caption: "L’As sort un cheval, ou avance de 1.", move: true },
+    {
+      id: "R-12.1",
+      caption: "Personne ne dépasse un cheval qui vient de sortir sur son losange.",
+      move: true,
+    },
+  ],
+  sept: [
+    { id: "R-10.2", caption: "Le 7 partagé en 3 + 4 sur deux chevaux." },
+    { id: "R-10.4", caption: "Le 7 mange l’adversaire qu’il dépasse." },
+  ],
+  valet: [
+    { id: "R-09.1", caption: "Le Valet échange un de tes chevaux avec celui d’un adversaire." },
+  ],
+  manger: [{ id: "R-11.1", caption: "S’arrêter sur un adversaire le mange." }],
+  maison: [
+    { id: "R-13.1", caption: "Au compte exact, le cheval entre dans sa maison." },
+    {
+      id: "R-13.5",
+      caption: "Si le compte dépasse le fond de la maison, le cheval refait un tour.",
+    },
+  ],
+  fini: [
+    {
+      id: "R-15.1",
+      caption: "Quand tes quatre chevaux sont rentrés, tu joues ceux de ton partenaire.",
+    },
+  ],
+  "regles-maison": [
+    { id: "R-13.12", caption: "Après avoir reculé de 4, le cheval entre sans refaire le tour." },
+  ],
+};
+
+/** The ids that appear more than once in the page. */
+function duplicateIds(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const seen = new Map<string, number>();
+    for (const el of document.querySelectorAll("[id]")) seen.set(el.id, (seen.get(el.id) ?? 0) + 1);
+    return [...seen].filter(([, n]) => n > 1).map(([id]) => id);
+  });
+}
+
+test.describe("les figures des règles", () => {
+  test("chaque onglet montre ses figures, dessinées sur le galet avec les chevaux du jeu", async ({
+    page,
+  }) => {
+    await openPosition(page, QUEEN);
+    await book(page).click();
+    await expect(sheet(page)).toBeVisible();
+    const panel = page.getByRole("tabpanel");
+    for (const [id] of TABS) {
+      await tab(page, id).click();
+      const expected = FIGURES[id] ?? [];
+      const figures = panel.locator("[data-rule-figure]");
+      await expect(figures, id).toHaveCount(expected.length);
+      for (const [i, want] of expected.entries()) {
+        const figure = figures.nth(i);
+        await expect(figure).toHaveAttribute("data-rule-figure", want.id);
+        await expect(figure.locator("figcaption")).toHaveText(want.caption);
+        const alt = want.move
+          ? `${want.caption} En haut, la position ; en bas, le coup.`
+          : `${want.caption} En haut, avant le coup ; en bas, après.`;
+        await expect(figure.getByRole("img", { name: alt, exact: true })).toHaveCount(1);
+        // Two halves of the galet, each a board of its own, with its knights.
+        await expect(figure.locator("[data-figure-half]")).toHaveCount(2);
+        await expect(figure.locator("[data-figure-half] [data-board-art]")).toHaveCount(2);
+        await expect(
+          figure.locator('[data-figure-half="before"] [data-figure-knight]'),
+        ).toHaveCount(16);
+        // Always from Bleu's seat.
+        await expect(figure.locator("[data-board-art]").first()).toHaveAttribute(
+          "data-bottom",
+          "bleu",
+        );
+        const tags = await figure.locator("[data-figure-tag]").allTextContents();
+        expect(tags).toEqual(want.move ? ["Avant", "Le coup"] : ["Avant", "Après"]);
+        if (want.move) {
+          await expect(figure.locator('[data-figure-half="move"]')).toHaveCount(1);
+        } else {
+          await expect(figure.locator('[data-figure-half="after"]')).toHaveCount(1);
+        }
+        const box = await figure.boundingBox();
+        expect(box?.width ?? 0, want.id).toBeLessThanOrEqual(480.5);
+      }
+      expect(await duplicateIds(page), `${id}: duplicate ids`).toEqual([]);
+    }
+
+    // The positions are the scenarios': the Dame's knight on 15 after, the 7 split on 8 and 24.
+    await tab(page, "cartes").click();
+    const queen = panel.locator('[data-rule-figure="R-07.1"]');
+    await expect(
+      queen.locator('[data-figure-half="before"] [data-figure-knight="bleu0"]'),
+    ).toHaveAttribute("data-place", "ring:3");
+    await expect(
+      queen.locator('[data-figure-half="after"] [data-figure-knight="bleu0"]'),
+    ).toHaveAttribute("data-place", "ring:15");
+    // The 4 of Jaune's knight just out, drawn from Bleu's seat.
+    const back = panel.locator('[data-rule-figure="R-08.1"]');
+    await expect(
+      back.locator('[data-figure-half="after"] [data-figure-knight="jaune0"]'),
+    ).toHaveAttribute("data-place", "ring:14");
+    await tab(page, "sortir").click();
+    // « Le coup »: the knights concerned are ringed.
+    await expect(
+      panel.locator('[data-rule-figure="R-06.1"] [data-figure-half="move"] [data-figure-ring]'),
+    ).toHaveCount(2);
+    // The marks follow the setting, on the figures as on the board.
+    await expect(
+      panel.locator('[data-rule-figure="R-06.1"] [data-figure-knight] [data-knight-mark]').first(),
+    ).toBeAttached();
+    // The game behind keeps its own board and knights.
+    await expect(page.locator("[data-board] [data-pawn]")).toHaveCount(16);
+  });
+});
+
+test.describe("une figure à 480 x 320", () => {
+  test.use({ viewport: { width: 480, height: 320 } });
+  test.skip(({ isMobile }) => isMobile, "explicit viewport: desktop project only");
+
+  test("la figure tient dans le panneau", async ({ page }) => {
+    await openPosition(page, QUEEN);
+    await book(page).click();
+    await tab(page, "sept").click();
+    const figure = page.locator('[data-rule-figure="R-10.2"]');
+    await figure.scrollIntoViewIfNeeded();
+    const fit = await page.evaluate(() => {
+      const panel = document.querySelector('[role="tabpanel"]') as HTMLElement;
+      const one = document.querySelector('[data-rule-figure="R-10.2"]') as HTMLElement;
+      const p = panel.getBoundingClientRect();
+      const f = one.getBoundingClientRect();
+      return {
+        left: f.left - p.left,
+        right: p.right - f.right,
+        width: f.width,
+        sideways: panel.scrollWidth > panel.clientWidth + 1,
+      };
+    });
+    expect(fit.left).toBeGreaterThanOrEqual(-0.5);
+    expect(fit.right).toBeGreaterThanOrEqual(-0.5);
+    expect(fit.width).toBeGreaterThan(200);
+    expect(fit.sideways).toBe(false);
+  });
+});
