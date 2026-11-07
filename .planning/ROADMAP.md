@@ -362,7 +362,7 @@ Plans:
   4. Un nouveau joueur apprend les règles en faisant une partie guidée par un tutoriel interactif.
   5. Toute l'interface est en français. Chaque place se reconnaît autrement que par sa couleur, et les zones tactiles sont assez grandes pour jouer au doigt sur téléphone.
 
-**Plans:** 5/11 plans executed (run one after the other on the main tree: the Playwright suites share the ports 4173, 4174 and 8787; each plan runs only the specs it touches; 05-10 installs @axe-core/playwright 4.14.0, the only package of the phase, approved by Romain (D-10); no plan runs a remote command: 05-01 adds D1 migration 0003, applied locally only; 05-11 runs everything, completes 05-UAT.md and writes the deploy steps the orchestrator runs, remote migration 0003 before the deploy)
+**Plans:** 6/11 plans executed (run one after the other on the main tree: the Playwright suites share the ports 4173, 4174 and 8787; each plan runs only the specs it touches; 05-10 installs @axe-core/playwright 4.14.0, the only package of the phase, approved by Romain (D-10); no plan runs a remote command: 05-01 adds D1 migration 0003, applied locally only; 05-11 runs everything, completes 05-UAT.md and writes the deploy steps the orchestrator runs, remote migration 0003 before the deploy)
 
 Plans:
 **Wave 1**
@@ -375,7 +375,7 @@ Plans:
 - [x] 05-05-PLAN.md — Les chiffres, le classement entre amis et le rapport des parties solo, côté serveur
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 05-06-PLAN.md — Une leçon sur l’écran de jeu, avec le guide qui parle
+- [x] 05-06-PLAN.md — Une leçon sur l’écran de jeu, avec le guide qui parle
 - [ ] 05-07-PLAN.md — Les parties contre l’ordinateur dans « Mes résultats », même sans réseau
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -401,4 +401,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
 | 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
 | 4. Comptes, amis et application installable | 16/16 | Closed, UAT pending | 2026-11-07 |
-| 5. Suivi, apprentissage et finition | 5/11 | In Progress | - |
+| 5. Suivi, apprentissage et finition | 6/11 | In Progress | - |
