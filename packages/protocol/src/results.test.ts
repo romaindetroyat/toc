@@ -1,8 +1,15 @@
 // The answer of GET /api/me/results (plan 05-01): a valid page is read as is; an extra key anywhere, a
-// fifth seat, a level out of 1..5 or a malformed cursor makes the whole answer unreadable.
+// fifth seat, a level out of 1..5 or a malformed cursor makes the whole answer unreadable. Plan 05-05:
+// the answers of GET /api/me/stats and GET /api/me/ranking, and the body of POST /api/me/results/solo.
 
 import { describe, expect, it } from "vitest";
-import { HISTORY_CURSOR_RE, type HistoryPage, parseHistoryPage } from "./index.ts";
+import {
+  HISTORY_CURSOR_RE,
+  type HistoryPage,
+  parseHistoryPage,
+  parseStatsAnswer,
+  type StatsBlock,
+} from "./index.ts";
 
 const seat = (colour: string, kind: string, name: string, level: number | null = null) => ({
   colour,
@@ -98,5 +105,64 @@ describe("HistoryPage", () => {
     ]) {
       expect(HISTORY_CURSOR_RE.test(bad)).toBe(false);
     }
+  });
+});
+
+// --- Plan 05-05: « Mes chiffres » (GET /api/me/stats) ---
+
+const block = (): StatsBlock => ({
+  games: 3,
+  wins: 2,
+  captured: 5,
+  lost: 4,
+  home: 9,
+  partners: [
+    { kind: "account", name: "Bruno", level: null, games: 1, wins: 1 },
+    { kind: "guests", name: null, level: null, games: 1, wins: 0 },
+    { kind: "bot", name: null, level: 3, games: 1, wins: 1 },
+  ],
+  levels: [
+    { level: 4, games: 1, wins: 0 },
+    { level: 5, games: 1, wins: 1 },
+  ],
+});
+
+const empty = (): StatsBlock => ({
+  games: 0,
+  wins: 0,
+  captured: 0,
+  lost: 0,
+  home: 0,
+  partners: [],
+  levels: [],
+});
+
+describe("StatsAnswer", () => {
+  it("reads the three filters at once", () => {
+    const answer = { all: block(), online: empty(), solo: block() };
+    expect(parseStatsAnswer(answer)).toEqual(answer);
+  });
+
+  it("refuses a missing filter, an extra key anywhere and an account id on a partner", () => {
+    expect(parseStatsAnswer({ all: block(), online: empty() })).toBeNull();
+    expect(parseStatsAnswer({ all: block(), online: empty(), solo: empty(), more: 1 })).toBeNull();
+    expect(
+      parseStatsAnswer({ all: { ...block(), rate: 0.6 }, online: empty(), solo: empty() }),
+    ).toBeNull();
+    const withId = block();
+    (withId.partners[0] as Record<string, unknown>).account = "secret-id";
+    expect(parseStatsAnswer({ all: withId, online: empty(), solo: empty() })).toBeNull();
+  });
+
+  it("refuses a level 6, an unknown partner kind and more wins than games", () => {
+    const six = block();
+    (six.levels[0] as { level: number }).level = 6;
+    expect(parseStatsAnswer({ all: six, online: empty(), solo: empty() })).toBeNull();
+    const kind = block();
+    (kind.partners[1] as { kind: string }).kind = "guest";
+    expect(parseStatsAnswer({ all: kind, online: empty(), solo: empty() })).toBeNull();
+    expect(
+      parseStatsAnswer({ all: { ...block(), wins: 4 }, online: empty(), solo: empty() }),
+    ).toBeNull();
   });
 });

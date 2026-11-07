@@ -487,3 +487,102 @@ export function deliverAsProduction(): () => void {
     GameRoom.prototype.alarm = alarm;
   };
 }
+
+// --- Results seeded straight into the tests' D1 (plan 05-05) ---
+
+/** A seat of played.seats as record.ts writes it (the account id is server-only). */
+export type SeededSeat = {
+  colour: "bleu" | "jaune" | "rouge" | "vert";
+  kind: "account" | "guest" | "bot";
+  account?: string | null;
+  name?: string;
+  level?: number | null;
+  handedOver?: boolean;
+  captured?: number;
+  lost?: number;
+  home?: number;
+};
+
+export type SeededGame = {
+  id: string;
+  kind?: "online" | "solo";
+  endedAt: number;
+  winner: "bleu-rouge" | "jaune-vert";
+  seats: SeededSeat[];
+  /** Overrides the ranked flag (else: online with two accounts or more). */
+  ranked?: boolean;
+};
+
+const winnerOf = (colour: SeededSeat["colour"]) =>
+  colour === "bleu" || colour === "rouge" ? "bleu-rouge" : "jaune-vert";
+
+/**
+ * A played row and one game_seats row per account seat whose account exists, as the GameRoom's record
+ * (online) or the solo report (solo) writes them.
+ */
+export async function seedGame(game: SeededGame): Promise<void> {
+  const db = accountDb();
+  const kind = game.kind ?? "online";
+  const seats = game.seats.map((seat) => ({
+    colour: seat.colour,
+    kind: seat.kind,
+    account: seat.account ?? null,
+    name: seat.name ?? "",
+    level: seat.level ?? null,
+    handedOver: seat.handedOver ?? false,
+    captured: seat.captured ?? 0,
+    lost: seat.lost ?? 0,
+    home: seat.home ?? 0,
+  }));
+  const accounts = new Set(seats.flatMap((seat) => (seat.account === null ? [] : [seat.account])));
+  const ranked = game.ranked ?? (kind === "online" && accounts.size >= 2);
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO played (id, kind, started_at, ended_at, winner, seats, deals, creator, accounts)
+         VALUES (?, ?, ?, ?, ?, ?, 5, NULL, ?)`,
+      )
+      .bind(
+        game.id,
+        kind,
+        game.endedAt - 600_000,
+        game.endedAt,
+        game.winner,
+        JSON.stringify(seats),
+        accounts.size,
+      ),
+  ];
+  for (const seat of seats) {
+    if (seat.account === null) continue;
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO game_seats
+             (user_id, ended_at, game_id, colour, won, ranked, solo, captured, lost, home)
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+            WHERE EXISTS (SELECT 1 FROM users WHERE id = ?1)`,
+        )
+        .bind(
+          seat.account,
+          game.endedAt,
+          game.id,
+          seat.colour,
+          winnerOf(seat.colour) === game.winner ? 1 : 0,
+          ranked ? 1 : 0,
+          kind === "solo" ? 1 : 0,
+          seat.captured,
+          seat.lost,
+          seat.home,
+        ),
+    );
+  }
+  await db.batch(statements);
+}
+
+/** The D1 rows a request wrote and read, from its x-toc-d1 header (test mode). */
+export function d1Of(response: Response): { written: number; read: number } {
+  const header = response.headers.get("x-toc-d1") ?? "";
+  const match = /^w=(\d+);r=(\d+)$/.exec(header);
+  if (match === null) throw new Error(`no x-toc-d1 header: ${header}`);
+  return { written: Number(match[1]), read: Number(match[2]) };
+}
