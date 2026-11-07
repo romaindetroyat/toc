@@ -73,3 +73,10 @@ Out of scope: chat, spectators, replays of a game move by move, e-mail, new lang
 
 *Phase: 05-suivi-apprentissage-et-finition*
 *Context gathered: 2026-11-07*
+
+## Addendum (Romain, 2026-11-07, after the UI spec)
+- **D-10:** `@axe-core/playwright` approved as a test-only dev dependency for the APP-05 audit. « Oui (Recommandé) »
+- **D-11:** Shape marks on the knights' bases (round, square, triangle, diamond), shown by default, with a switch in « Réglages » to hide them. « Oui, désactivable »
+- **D-12:** Guests appear as « Prénom (sans compte) », gender-neutral. Supersedes the « (invitée) » example in D-03.
+- **D-13:** Friends ranking: all online games with at least two account holders; you enter after 5 such games; order by win rate, then wins, then games; a « Comment ça marche ? » sheet. « Oui (Recommandé) »
+- The remaining « À confirmer » items in 05-UI-SPEC.md stand as proposed until Romain says otherwise at UAT.
