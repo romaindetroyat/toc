@@ -152,7 +152,11 @@ describe("createGame: set-up", () => {
   it("keeps the random source out of the controller code", () => {
     expect(source).toContain("getRandomValues");
     expect(source).not.toMatch(/Math\.random/);
-    expect(source).not.toMatch(/Date\.now|new Date/);
+    // The one wall clock (05-07) dates the solo result; it never feeds a seed.
+    const wall = "const clock = options.clock ?? (() => Date.now());";
+    expect(source).toContain(wall);
+    expect(source.replace(wall, "")).not.toMatch(/Date\.now|new Date/);
+    expect(source).not.toMatch(/seed[^;\n]*clock\(|clock\(\)[^;\n]*(?:seed|Rng|shuffle)/);
   });
 
   it("takes the scenario's turn seat as the human", () => {
@@ -1031,7 +1035,9 @@ describe("the result of a real solo game, for « Mes résultats » (05-07, D-01)
     for (const colour of COLORS) {
       expect(solo.seats[colour].captured, colour).toBe(tally[colour].captured);
       expect(solo.seats[colour].lost, colour).toBe(tally[colour].lost);
-      const home = [0, 1, 2, 3].filter((i) => view.pawns[`${colour}${i}`].zone === "home").length;
+      const home = ([0, 1, 2, 3] as const).filter(
+        (i) => view.pawns[`${colour}${i}`].zone === "home",
+      ).length;
       expect(solo.seats[colour].home, colour).toBe(home);
       if (teamOf(colour) === solo.winner) expect(solo.seats[colour].home, colour).toBe(4);
     }

@@ -19,6 +19,8 @@ import {
   apply,
   COLORS,
   type Color,
+  emptyTally,
+  foldTally,
   type GameEvent,
   type GameState,
   IllegalActionError,
@@ -30,6 +32,8 @@ import {
   scenarioState,
   shuffle,
   startGame,
+  type Tally,
+  type Team,
   teamOf,
   viewFor,
 } from "@toc/engine";
@@ -73,7 +77,34 @@ export type CreateGameOptions = {
    * refuses is a failure reported through onError. The lists are copied at creation.
    */
   script?: Partial<Record<Color, Action[]>>;
+  /**
+   * The wall clock of the game's start and end, in ms since 1970 (plan 05-07, the solo report).
+   * Default: the system clock. Not the think clock `now`.
+   */
+  clock?: () => number;
+  /** The id of the game's result, made at creation. Default: crypto.randomUUID. */
+  newId?: () => string;
   director: GameDirector;
+};
+
+/**
+ * A real solo game's result (plan 05-07, D-01; 05-RESEARCH Pattern 2), what the browser reports to
+ * « Mes résultats » once it is won: never for a debug position, a lesson or a scripted game. No name:
+ * the player is the signed-in account, the computers are their levels.
+ */
+export type SoloResult = {
+  /** Made at the game's creation (crypto.randomUUID), so every resend names the same game. */
+  id: string;
+  /** Wall clock at creation and at the winning play, in ms since 1970. */
+  startedAt: number;
+  endedAt: number;
+  human: Color;
+  winner: Team;
+  deals: number;
+  /** The three computers' levels; the player's colour has none. */
+  levels: Partial<Record<Color, BotLevel>>;
+  /** Knights each seat ate and lost (folded from every batch), and its knights home at the end. */
+  seats: Record<Color, { captured: number; lost: number; home: number }>;
 };
 
 export type SubmitResult = { ok: true } | { ok: false; error: "illegal" };
@@ -82,6 +113,11 @@ export type GameStats = {
   dealsPlayed: number;
   /** Pawns eaten so far: by the human's team (nous) and by the other team (eux). */
   captured: { nous: number; eux: number };
+  /**
+   * Plan 05-07: the result to report, once a real solo game (a new deal, no scenario, no script) is
+   * won; null before, for a debug position, a lesson or a scripted game, and online.
+   */
+  solo: SoloResult | null;
 };
 
 export type GameController = {
@@ -143,6 +179,13 @@ export function createGame(options: CreateGameOptions): GameController {
   const levels: Partial<Record<Color, BotLevel>> = { ...options.levels };
   const now = options.now ?? (() => performance.now());
   const runner = options.runner ?? syncRunner;
+  const clock = options.clock ?? (() => Date.now());
+  // Plan 05-07: only a game dealt for real is ever reported (05-RESEARCH Pitfall 4).
+  const real = scenario === undefined && options.script === undefined;
+  const resultId = (options.newId ?? (() => crypto.randomUUID()))();
+  const startedAt = clock();
+  let endedAt: number | null = null;
+  let tally: Tally = emptyTally();
   let botRng: Rng = options.botSeed ?? randomSeed();
   const scripts = new Map<Color, Action[]>(
     COLORS.flatMap((c) => {
@@ -217,6 +260,8 @@ export function createGame(options: CreateGameOptions): GameController {
   function play(seat: Color, action: Action): void {
     const result = apply(state, seat, action);
     state = result.state;
+    tally = foldTally(tally, result.events);
+    if (state.phase === "won" && endedAt === null) endedAt = clock();
     if (result.events.length > 0) director.enqueue(result.events);
     notify();
   }
@@ -288,6 +333,33 @@ export function createGame(options: CreateGameOptions): GameController {
     }
   }
 
+  /** The result of a real game once won, else null. */
+  function soloResult(): SoloResult | null {
+    if (!real || endedAt === null || state.phase !== "won" || state.winner === null) return null;
+    const final = state;
+    const others: Partial<Record<Color, BotLevel>> = {};
+    const seats = {} as SoloResult["seats"];
+    for (const colour of COLORS) {
+      if (colour !== human) others[colour] = levels[colour] ?? DEFAULT_BOT_LEVEL;
+      seats[colour] = {
+        captured: tally[colour].captured,
+        lost: tally[colour].lost,
+        home: ([0, 1, 2, 3] as const).filter((i) => final.pawns[`${colour}${i}`].zone === "home")
+          .length,
+      };
+    }
+    return {
+      id: resultId,
+      startedAt,
+      endedAt,
+      human,
+      winner: final.winner as Team,
+      deals: final.dealsPlayed,
+      levels: others,
+      seats,
+    };
+  }
+
   return {
     human,
     names,
@@ -322,6 +394,7 @@ export function createGame(options: CreateGameOptions): GameController {
       return {
         dealsPlayed: state.dealsPlayed,
         captured: { nous: state.captures[us], eux: state.captures[them] },
+        solo: soloResult(),
       };
     },
     thinking: () => thinkingSeat,

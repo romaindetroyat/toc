@@ -202,6 +202,8 @@ export function createRemoteGame(
           nous: current.captures[teamOf(human)],
           eux: current.captures[teamOf(nextColor(human))],
         },
+        // An online game is the server's own record (05-01): the browser never reports it.
+        solo: null,
       };
     },
     thinking: () => table?.thinking ?? null,
