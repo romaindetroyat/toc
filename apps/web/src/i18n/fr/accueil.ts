@@ -37,7 +37,7 @@ export const accueil = {
       // lines in order, « Règles : les cartes, le 7, la maison ».
       rules: {
         label: "Règles",
-        sub: "Les cartes, le 7, la maison",
+        sub: "Cartes, 7, maison",
         name: "Règles : les cartes, le 7, la maison",
       },
       learn: {

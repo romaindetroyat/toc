@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Jouer en ligne entre proches** *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 02-UAT.md)* - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, messages rapides, revanche et reprise
 - [x] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 03-UAT.md)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
 - [x] **Phase 4: Comptes, amis et application installable** *(close le 2026-11-07 : Romain passe à la phase 5 ; vérification 04-VERIFICATION.md, écart corrigé par 04-16 ; essais restants dans 04-UAT.md)* - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
-- [ ] **Phase 5: Suivi, apprentissage et finition** - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
+- [x] **Phase 5: Suivi, apprentissage et finition** *(close le 2026-11-07 à la demande de Romain, « Clôturer, essais notés » ; vérification 05-VERIFICATION.md ; essais restants dans 05-UAT.md)* - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
 
 ## Phase Details
 

@@ -288,7 +288,7 @@ test("accueil : « Règles » et « Apprendre » pour un invité, sans « Mes r�
 
   const rules = linkTile(page, "regles");
   await expect(rules).toContainText("Règles");
-  await expect(rules).toContainText("Les cartes, le 7, la maison");
+  await expect(rules).toContainText("Cartes, 7, maison");
   await expect(rules).toHaveAccessibleName("Règles : les cartes, le 7, la maison");
   await expect(rules).toHaveAttribute("aria-haspopup", "dialog");
   const learn = linkTile(page, "apprendre");

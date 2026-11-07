@@ -37,7 +37,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [x] **PLAY-03** : Avec le 7, le joueur répartit les pas entre ses pions à l'aide d'un assistant pas à pas qui affiche le reste à jouer, puis confirme en une fois.
 - [x] **PLAY-04** : Avec l'As ou le Roi, le joueur choisit entre sortir un pion et avancer.
 - [x] **PLAY-05** : En début de donne, le joueur choisit la carte à passer à son partenaire et voit qui doit encore choisir.
-- [ ] **PLAY-06** : Une aide en français rappelle les règles et l'effet de chaque carte à tout moment.
+- [x] **PLAY-06** : Une aide en français rappelle les règles et l'effet de chaque carte à tout moment.
 - [x] **PLAY-07** : À la fin de la partie, l'équipe gagnante est annoncée et les joueurs peuvent relancer une revanche à la même table.
 
 ### Multijoueur en ligne (NET)
@@ -67,9 +67,9 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 ### Suivi (HIST)
 
 - [x] **HIST-01** : Une partie peut être interrompue puis reprise plus tard dans l'état exact où elle était.
-- [ ] **HIST-02** : Un joueur consulte l'historique de ses parties (date, équipes, résultat).
-- [ ] **HIST-03** : Un joueur consulte ses statistiques et celles de ses équipes (parties, victoires, pions mangés…).
-- [ ] **HIST-04** : Un classement entre amis est affiché.
+- [x] **HIST-02** : Un joueur consulte l'historique de ses parties (date, équipes, résultat).
+- [x] **HIST-03** : Un joueur consulte ses statistiques et celles de ses équipes (parties, victoires, pions mangés…).
+- [x] **HIST-04** : Un classement entre amis est affiché.
 
 ### Rendu et ambiance (FX)
 
@@ -85,8 +85,8 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 - [ ] **APP-01** : Le jeu s'installe comme application (PWA) sur téléphone et ordinateur, avec une icône et un écran de démarrage.
 - [ ] **APP-02** : Une mise à jour du jeu ne recharge jamais une partie en cours ; le joueur est invité à mettre à jour.
 - [ ] **APP-03** : Le joueur reçoit une notification quand c'est son tour ou qu'on l'invite à une table (sur iOS : application installée).
-- [ ] **APP-04** : Un tutoriel interactif fait jouer une partie guidée pour apprendre les règles.
-- [ ] **APP-05** : L'interface est en français et accessible (repères des places pas uniquement par la couleur, zones tactiles assez grandes).
+- [x] **APP-04** : Un tutoriel interactif fait jouer une partie guidée pour apprendre les règles.
+- [x] **APP-05** : L'interface est en français et accessible (repères des places pas uniquement par la couleur, zones tactiles assez grandes).
 
 ## v2 Requirements
 
@@ -140,7 +140,7 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | PLAY-03 | Phase 1 | Complete |
 | PLAY-04 | Phase 1 | Complete |
 | PLAY-05 | Phase 1 | Complete |
-| PLAY-06 | Phase 5 | Pending |
+| PLAY-06 | Phase 5 | Complete |
 | PLAY-07 | Phase 2 | Complete |
 | NET-01 | Phase 2 | Complete |
 | NET-02 | Phase 2 | Complete |
@@ -158,9 +158,9 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | BOT-04 | Phase 3 | Complete |
 | BOT-05 | Phase 3 | Complete |
 | HIST-01 | Phase 2 | Complete |
-| HIST-02 | Phase 5 | Pending |
-| HIST-03 | Phase 5 | Pending |
-| HIST-04 | Phase 5 | Pending |
+| HIST-02 | Phase 5 | Complete |
+| HIST-03 | Phase 5 | Complete |
+| HIST-04 | Phase 5 | Complete |
 | FX-01 | Phase 1 | Complete |
 | FX-02 | Phase 1 | Complete |
 | FX-03 | Phase 1 | Complete |
@@ -170,8 +170,8 @@ Plateau : 72 cases en anneau, sens horaire bleu → jaune → rouge → vert. Ch
 | APP-01 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
 | APP-03 | Phase 4 | Pending |
-| APP-04 | Phase 5 | Pending |
-| APP-05 | Phase 5 | Pending |
+| APP-04 | Phase 5 | Complete |
+| APP-05 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 57 total

@@ -420,7 +420,8 @@ result: pending
 ### 35. À confirmer : pas de classement par équipe de deux
 expected: |
   Point non résolu de l’UI-SPEC : il n’y a pas de classement par équipe de deux. « Avec mes partenaires », dans « Mes chiffres », donne les résultats de chacun avec chaque partenaire. Un classement par paires pourra venir si la famille le demande. Ça te va ?
-result: pending
+result: pass
+note: Romain, 2026-11-07 : « Par partenaire, ça suffit ».
 
 ### 36. À confirmer : « Les parties comptent depuis novembre 2026 »
 expected: |
@@ -465,7 +466,8 @@ result: pending
 ### 44. À confirmer : la tuile « Règles » de l’accueil
 expected: |
   Choix fait (plan 05-08) : la deuxième ligne de la tuile « Règles », « Les cartes, le 7, la maison », est coupée en « Les cartes, le 7, la … » dans la petite tuile de 152 px. Faut-il une ligne plus courte, par exemple « Cartes, 7, maison » ?
-result: pending
+result: pass
+note: Romain, 2026-11-07 : « Cartes, 7, maison » (fait, accueil.ts).
 
 ### 45. À confirmer : les noms courts et longs des boutons
 expected: |
