@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Une vraie partie sur un appareil** *(close le 2026-10-15 à la demande de Romain, « Close, essais restants notés » ; essais restants dans 01-UAT.md)* - Règles validées, moteur, plateau galet, cavaliers animés et bruitages, partie complète contre l'ordinateur
 - [x] **Phase 2: Jouer en ligne entre proches** *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 02-UAT.md)* - Table en temps réel sur plusieurs appareils, serveur qui fait autorité, pause, messages rapides, revanche et reprise
 - [x] **Phase 3: L'ordinateur à la force choisie** *(faite avant la phase 2, choix de Romain le 2026-10-15 : « OK, on passe à la phase 3 »)* *(close le 2026-10-17 à la demande de Romain, « Clôturer, essais notés » ; essais restants dans 03-UAT.md)* - Joueurs gérés par l'ordinateur de niveau 1 à 5, sans triche et à un rythme naturel
-- [ ] **Phase 4: Comptes, amis et application installable** - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
+- [x] **Phase 4: Comptes, amis et application installable** *(close le 2026-11-07 : Romain passe à la phase 5 ; vérification 04-VERIFICATION.md, écart corrigé par 04-16 ; essais restants dans 04-UAT.md)* - Passkeys, amis, tables, partie solo, PWA, mises à jour et notifications
 - [ ] **Phase 5: Suivi, apprentissage et finition** - Historique, statistiques, classement entre amis, aide, tutoriel et accessibilité
 
 ## Phase Details
@@ -375,5 +375,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Une vraie partie sur un appareil | 53/55 (01-52, 01-53 reportés) | Closed, UAT pending | 2026-10-15 |
 | 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
 | 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
-| 4. Comptes, amis et application installable | 16/16 | In Progress | - |
+| 4. Comptes, amis et application installable | 16/16 | Closed, UAT pending | 2026-11-07 |
 | 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
