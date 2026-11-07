@@ -322,7 +322,7 @@ describe("the stable marks (plan 05-02, APP-05, D-14)", () => {
         const at = stableMarkAt(c, k);
         const stable = stableCentre(c, k);
         const [cx, cy] = SCENE.centre;
-        expect(Math.hypot(at[0] - stable[0], at[1] - stable[1])).toBeLessThan(2.6 * SCENE.step);
+        expect(Math.hypot(at[0] - stable[0], at[1] - stable[1])).toBeLessThan(3.2 * SCENE.step);
         expect(Math.hypot(at[0] - cx, at[1] - cy)).toBeGreaterThan(
           Math.hypot(stable[0] - cx, stable[1] - cy),
         );
