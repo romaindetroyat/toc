@@ -428,6 +428,8 @@ test("accueil : au clavier, la rangée de liens après la liste en deux colonnes
   await expect(linkTile(page, "apprendre")).toBeFocused();
 
   await page.setViewportSize({ width: 568, height: 320 });
+  // The row moves once the layout has changed.
+  await expect(home(page)).toHaveAttribute("data-layout", "one");
   await page.locator('[data-small-tile="connexion"]').focus();
   await page.keyboard.press("Tab");
   await expect(linkTile(page, "regles")).toBeFocused();
