@@ -362,7 +362,31 @@ Plans:
   4. Un nouveau joueur apprend les règles en faisant une partie guidée par un tutoriel interactif.
   5. Toute l'interface est en français. Chaque place se reconnaît autrement que par sa couleur, et les zones tactiles sont assez grandes pour jouer au doigt sur téléphone.
 
-**Plans**: TBD
+**Plans:** 11 plans (run one after the other on the main tree: the Playwright suites share the ports 4173, 4174 and 8787; each plan runs only the specs it touches; 05-10 installs @axe-core/playwright 4.14.0, the only package of the phase, approved by Romain (D-10); no plan runs a remote command: 05-01 adds D1 migration 0003, applied locally only; 05-11 runs everything, completes 05-UAT.md and writes the deploy steps the orchestrator runs, remote migration 0003 before the deploy)
+
+Plans:
+**Wave 1**
+- [ ] 05-01-PLAN.md — Traceur : une partie en ligne à deux comptes, écrite dans D1 (migration 0003) et lue dans « Mes résultats »
+- [ ] 05-02-PLAN.md — Les formes des places, sur les chevaux (désactivables dans « Réglages ») et à côté des écuries
+- [ ] 05-03-PLAN.md — Le moteur des leçons : huit situations préparées, rejouées en test jusqu’à « Bravo »
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-04-PLAN.md — La feuille « Règles », à tout moment de la partie, avec ses figures dessinées en direct
+- [ ] 05-05-PLAN.md — Les chiffres, le classement entre amis et le rapport des parties solo, côté serveur
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 05-06-PLAN.md — Une leçon sur l’écran de jeu, avec le guide qui parle
+- [ ] 05-07-PLAN.md — Les parties contre l’ordinateur dans « Mes résultats », même sans réseau
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 05-08-PLAN.md — L’accueil, « Apprendre à jouer » et la première fois
+- [ ] 05-09-PLAN.md — « Mes résultats » en entier : l’historique, mes chiffres et le classement entre amis
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 05-10-PLAN.md — L’audit d’accessibilité de chaque écran, et ses corrections
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 05-11-PLAN.md — Vérification finale, le coût sur l’offre gratuite, la recette de Romain et les étapes de mise en ligne
 **UI hint**: yes
 
 ## Progress
