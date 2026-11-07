@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { KNIGHT, knightScale } from "@toc/board";
+  import { KNIGHT, knightScale, SEAT_MARKS } from "@toc/board";
   import type { Color, PawnId, Place } from "@toc/engine";
   import { board as t } from "../i18n/fr/board.ts";
   import { settings } from "../settings/store.svelte.ts";
@@ -74,6 +74,18 @@
                 <g data-role="rear">
                   <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
                   <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+                  {#if settings.knightMarks}
+                    <!-- The seat's shape on the base (plan 05-02): inside rear, so it hops, squashes
+                         and rears with the knight; symmetric, so the facing mirror keeps it. -->
+                    <use
+                      href={`#knight-mark-${color}`}
+                      x="-55"
+                      y="-186"
+                      width="110"
+                      height="190"
+                      data-knight-mark={SEAT_MARKS[color]}
+                    />
+                  {/if}
                 </g>
               </g>
             </g>

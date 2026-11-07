@@ -14,6 +14,10 @@ export const reglages = {
   sfx: "Bruitages",
   reduceMotion: "Réduire les animations",
   reduceMotionHelper: "Les déplacements sont instantanés, sans bonds, ruades ni effets.",
+  /** Plan 05-02 (D-11, D-14): the seat's shape on each knight, on by default. */
+  knightMarks: "Formes sur les chevaux",
+  knightMarksHelper:
+    "Un rond, un triangle, un carré ou une étoile sur chaque cheval, pour reconnaître les couleurs autrement.",
 
   testSounds: "Tester les sons",
   credits: "Crédits et licences",

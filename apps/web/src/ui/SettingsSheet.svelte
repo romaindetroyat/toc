@@ -17,7 +17,7 @@
   import Switch from "./Switch.svelte";
   import type { TableSpeed } from "./tableSpeed.ts";
 
-  // « Réglages » (UI-SPEC): sound, effects, reduced animations, and the links
+  // « Réglages » (UI-SPEC): sound, effects, reduced animations, the shapes on the knights, and the links
   // to the sound test and the credits. Every change is applied at once and kept (no Save button): the
   // store writes it to localStorage, and the mix below reaches the audio buses.
   type Props = {
@@ -158,6 +158,12 @@
       helper={reglages.reduceMotionHelper}
       checked={settings.reduceMotion}
       onchange={(reduceMotion) => updateSettings({ reduceMotion })}
+    />
+    <Switch
+      label={reglages.knightMarks}
+      helper={reglages.knightMarksHelper}
+      checked={settings.knightMarks}
+      onchange={(knightMarks) => updateSettings({ knightMarks })}
     />
     {#if updateLine}
       <p class="update-line" data-update-line>{reglages.updateReady}</p>

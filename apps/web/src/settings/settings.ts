@@ -29,6 +29,11 @@ export type Settings = {
   lastColor: Color;
   /** The strength of each computer seat, remembered per role (D-03). */
   botLevels: BotLevels;
+  /**
+   * The seat's shape on each knight's base (plan 05-02, D-11, D-14): a round, a triangle, a square
+   * or a star, to tell the colours apart otherwise. On by default; the stable marks always show.
+   */
+  knightMarks: boolean;
 };
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
@@ -39,6 +44,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   tableFast: false,
   lastColor: "bleu",
   botLevels: { partner: DEFAULT_BOT_LEVEL, left: DEFAULT_BOT_LEVEL, right: DEFAULT_BOT_LEVEL },
+  knightMarks: true,
 };
 
 export const STORAGE_KEY = "toc.settings.v1";
@@ -88,6 +94,7 @@ export function parseSettings(raw: unknown, prefersReducedMotion: boolean): Sett
     tableFast: bool(own("tableFast"), DEFAULT_SETTINGS.tableFast),
     lastColor: colour(own("lastColor"), DEFAULT_SETTINGS.lastColor),
     botLevels: levels(own("botLevels")),
+    knightMarks: bool(own("knightMarks"), DEFAULT_SETTINGS.knightMarks),
   };
 }
 
