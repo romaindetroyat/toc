@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
 import { deviceOptions, join, seatTile } from "./online.ts";
 
 // « Accueil » and « Mes parties en cours » against the real Worker and GameRoom (plan 02-04, D-01,
@@ -113,4 +114,52 @@ test("hors ligne, « Créer une table en ligne » ne fait que le dire", async ({
   await expect(page).toHaveURL(/#?\/?$/);
   await expect(page.locator("[data-name-prompt]")).toHaveCount(0);
   await context.setOffline(false);
+});
+
+// Plan 05-08 (05-UI-SPEC « The links row »): signed in, the third tile « Mes résultats ».
+test("avec un compte, la rangée de liens a « Mes résultats », qui ouvre #/resultats", async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  const context = await passkeyContext(browser, testInfo);
+  const page = await context.newPage();
+  await signUp(page, await mintInvitation(request), uniquePseudo("Liens"));
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  const links = page.locator("[data-home-links]");
+  await expect(links.locator("[data-small-tile]")).toHaveCount(3);
+  const kinds = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-small-tile")));
+  expect(kinds).toEqual(["regles", "apprendre", "resultats"]);
+  const results = links.locator('[data-small-tile="resultats"]');
+  await expect(results).toContainText("Mes résultats");
+  await expect(results).toContainText("Parties et classement");
+  await expect(results).toHaveAccessibleName("Mes résultats");
+  // Three tiles of 152 in one row; the list keeps three 64 px rows in sight.
+  const boxes = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  for (const box of boxes) {
+    expect(box.width).toBeCloseTo(152, 0);
+    expect(box.y).toBeCloseTo(boxes[0]?.y ?? 0, 0);
+  }
+  const list = await page.locator("[data-home] .list").evaluate((el) => el.clientHeight);
+  expect(list).toBeGreaterThanOrEqual(192);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
+    0,
+  );
+  // At 640 × 360 two per row: the third on a second row, left-aligned.
+  await page.setViewportSize({ width: 640, height: 360 });
+  const narrow = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  expect(narrow[0]?.width).toBeCloseTo(144, 0);
+  expect(narrow[1]?.y).toBeCloseTo(narrow[0]?.y ?? 0, 0);
+  expect(narrow[2]?.y).toBeCloseTo((narrow[0]?.y ?? 0) + 56, 0);
+  expect(narrow[2]?.x).toBeCloseTo(narrow[0]?.x ?? 0, 0);
+  await results.click();
+  await expect(page).toHaveURL(/#\/resultats$/);
+  await context.close();
 });

@@ -245,3 +245,185 @@ test("accueil : un invité voit « Ton prénom » et « Se connecter », sans ba
   await expect(page.locator("[data-signin-sheet]")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+// --- Plan 05-08 (D-05, D-08; 05-UI-SPEC « The links row »): « Règles », « Apprendre » and, signed in,
+// « Mes résultats », at the bottom of the right column (right after the account tiles in one column).
+
+const links = (page: Page) => page.locator("[data-home-links]");
+const linkTile = (page: Page, kind: string) => links(page).locator(`[data-small-tile="${kind}"]`);
+
+async function withProgress(page: Page, done: number[]) {
+  await page.addInitScript(
+    (value) => {
+      localStorage.setItem("toc.tutorial.v1", value);
+    },
+    JSON.stringify({ offered: true, done }),
+  );
+}
+
+async function withTables(page: Page, count: number) {
+  await page.addInitScript((n) => {
+    const colours = ["bleu", "jaune", "rouge", "vert"];
+    localStorage.setItem(
+      "toc.tables.v1",
+      JSON.stringify(
+        Array.from({ length: n }, (_, i) => ({
+          id: `table${String(i).padStart(17, "0")}`,
+          seat: colours[i % 4],
+          joinedAt: 1_792_000_000_000 - i,
+        })),
+      ),
+    );
+  }, count);
+  await page.route("**/api/tables/*", (route) => route.fulfill({ status: 503, body: "" }));
+}
+
+test("accueil : « Règles » et « Apprendre » pour un invité, sans « Mes résultats »", async ({
+  page,
+}) => {
+  await withName(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  await expect(links(page).locator("[data-small-tile]")).toHaveCount(2);
+  await expect(linkTile(page, "resultats")).toHaveCount(0);
+  await expect(page.locator('[data-small-tile="resultats"]')).toHaveCount(0);
+
+  const rules = linkTile(page, "regles");
+  await expect(rules).toContainText("Règles");
+  await expect(rules).toContainText("Les cartes, le 7, la maison");
+  await expect(rules).toHaveAccessibleName("Règles du jeu");
+  await expect(rules).toHaveAttribute("aria-haspopup", "dialog");
+  const learn = linkTile(page, "apprendre");
+  await expect(learn).toContainText("Apprendre");
+  await expect(learn).toContainText("En 10 minutes");
+  await expect(learn).toHaveAccessibleName("Apprendre à jouer (En 10 minutes)");
+  await expect(learn).toHaveAttribute("href", "#/apprendre");
+
+  // Left-aligned at the width of the three-tile row: 152 each, 8 apart, from the column's left edge.
+  const row = await links(page).boundingBox();
+  const [a, b] = [await rules.boundingBox(), await learn.boundingBox()];
+  expect(a?.width).toBeCloseTo(152, 0);
+  expect(b?.width).toBeCloseTo(152, 0);
+  expect(a?.height).toBeCloseTo(48, 0);
+  expect(a?.x).toBeCloseTo(row?.x ?? 0, 0);
+  expect((a?.x ?? 0) + (a?.width ?? 0) + 8).toBeCloseTo(b?.x ?? 0, 0);
+  expect(a?.y).toBeCloseTo(b?.y ?? 0, 0);
+
+  // « Règles » opens the rules over the home, on « Le but »; the focus comes back to the tile.
+  await rules.click();
+  const sheet = page.getByRole("dialog", { name: "Règles du TOC" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator("[data-rules-sheet]")).toHaveAttribute("data-rules-current", "but");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(rules).toBeFocused();
+
+  // « Apprendre » opens « Apprendre à jouer ».
+  await learn.click();
+  await expect(page).toHaveURL(/#\/apprendre$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Apprendre à jouer" })).toBeVisible();
+});
+
+test("accueil : « Apprendre » dit où on en est", async ({ page }) => {
+  await withProgress(page, [1, 2]);
+  await page.goto("/");
+  await expect(linkTile(page, "apprendre")).toContainText("Leçon 3 sur 8");
+  await expect(linkTile(page, "apprendre")).toHaveAccessibleName(
+    "Apprendre à jouer (Leçon 3 sur 8)",
+  );
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "toc.tutorial.v1",
+      JSON.stringify({ offered: true, done: [1, 2, 3, 4, 5, 6, 7, 8] }),
+    ),
+  );
+  await page.reload();
+  await expect(linkTile(page, "apprendre")).toContainText("Leçons faites");
+});
+
+for (const size of [
+  { width: 844, height: 390, tile: 152, list: 192 },
+  { width: 1280, height: 800, tile: 152, list: 192 },
+  { width: 750, height: 342, tile: 130, list: 192 },
+  { width: 640, height: 360, tile: 144, list: 192 },
+] as const) {
+  test(`accueil : la rangée de liens en bas de la colonne de droite (${size.width} × ${size.height})`, async ({
+    page,
+  }) => {
+    await withName(page);
+    await withTables(page, 20);
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.goto("/");
+    await expect(page.locator("[data-table-row]")).toHaveCount(20);
+    expect(await scroll(page)).toEqual({ sideways: 0, down: 0 });
+    const [rules, learn] = [linkTile(page, "regles"), linkTile(page, "apprendre")];
+    for (const target of [rules, learn]) await expect(target).toBeInViewport({ ratio: 1 });
+    const a = await rules.boundingBox();
+    const b = await learn.boundingBox();
+    expect(a?.width).toBeCloseTo(size.tile, 0);
+    expect(b?.width).toBeCloseTo(size.tile, 0);
+    expect(a?.y).toBeCloseTo(b?.y ?? 0, 0);
+    // Under the list, which shrinks (it keeps three 64 px rows in sight) and is never covered.
+    const list = await page.locator("[data-home] .list").evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, height: box.height };
+    });
+    expect(list.height).toBeGreaterThanOrEqual(size.list);
+    expect(list.bottom).toBeLessThanOrEqual((a?.y ?? 0) - 8 + 0.5);
+    const heading = await page.getByRole("heading", { name: "Mes parties en cours" }).boundingBox();
+    expect(a?.x).toBeCloseTo(heading?.x ?? 0, 0);
+  });
+}
+
+for (const size of [
+  { width: 568, height: 320 },
+  { width: 480, height: 320 },
+  { width: 390, height: 844 },
+] as const) {
+  test(`accueil : en une colonne, la rangée suit les petites tuiles du compte (${size.width} × ${size.height})`, async ({
+    page,
+  }) => {
+    await withName(page);
+    await withTables(page, 3);
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await page.goto("/");
+    expect((await scroll(page)).sideways).toBe(0);
+    const account = await page.locator('[data-small-tile="connexion"]').boundingBox();
+    const rules = await linkTile(page, "regles").boundingBox();
+    const learn = await linkTile(page, "apprendre").boundingBox();
+    const heading = await page.getByRole("heading", { name: "Mes parties en cours" }).boundingBox();
+    // Full-width rows of two, after the account tiles and before the list's heading.
+    expect(rules?.y).toBeGreaterThanOrEqual((account?.y ?? 0) + (account?.height ?? 0) + 7.5);
+    expect((rules?.y ?? 0) + (rules?.height ?? 0)).toBeLessThanOrEqual(heading?.y ?? 0);
+    expect(rules?.width).toBeCloseTo(account?.width ?? 0, 0);
+    expect(learn?.y).toBeCloseTo(rules?.y ?? 0, 0);
+  });
+}
+
+test("accueil : au clavier, la rangée de liens après la liste en deux colonnes, avant elle en une", async ({
+  page,
+}) => {
+  await withName(page);
+  await withTables(page, 1);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  await expect(page.locator("[data-table-row]")).toHaveCount(1);
+  await page.locator('[data-small-tile="connexion"]').focus();
+  // The list's row: its link, then its « Retirer » button.
+  await page.keyboard.press("Tab");
+  await expect(page.locator("[data-table-row]").getByRole("link")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(linkTile(page, "regles")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(linkTile(page, "apprendre")).toBeFocused();
+
+  await page.setViewportSize({ width: 568, height: 320 });
+  await page.locator('[data-small-tile="connexion"]').focus();
+  await page.keyboard.press("Tab");
+  await expect(linkTile(page, "regles")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(linkTile(page, "apprendre")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("[data-table-row]").getByRole("link")).toBeFocused();
+});
