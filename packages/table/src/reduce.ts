@@ -23,6 +23,8 @@ import {
   apply,
   COLORS,
   type Color,
+  emptyTally,
+  foldTally,
   type GameEvent,
   type GameState,
   IllegalActionError,
@@ -177,6 +179,8 @@ function commitPlay(
 ): Reduced {
   next.game = played.state;
   next.seq += 1;
+  // Plan 05-01: who ate whom, for the game's record (server-only).
+  next.tally = foldTally(next.tally, played.events);
   onGameWon(next, now);
   // The game's record, once per game number (plan 02-09): written by the object after the commit.
   const record = next.status === "finished" ? keepRecord(next, now) : null;
@@ -397,6 +401,7 @@ function start(table: Table, who: string, ctx: Ctx): Reduced {
   next.gameNo += 1;
   next.startedAt = ctx.now;
   next.endedAt = null;
+  next.tally = emptyTally();
   // Test mode only (T-02-39): the first game starts from a given position, without a deal.
   const before = next.test?.before;
   if (before !== undefined) {

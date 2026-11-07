@@ -9,9 +9,11 @@ import { type BotLevel, DEFAULT_BOT_LEVEL, type ThinkerCheckpoint, type Thought 
 import {
   COLORS,
   type Color,
+  emptyTally,
   type GameState,
   type Rng,
   type Scenario,
+  type Tally,
   upgradeState,
 } from "@toc/engine";
 import type { ChatEntry } from "@toc/protocol";
@@ -168,6 +170,14 @@ export type Table = {
    * most one per game number. Never put in a frame.
    */
   records: GameRecord[];
+  /**
+   * Server-only (plan 05-01): the knights each seat ate and lost in the current game, folded from the
+   * engine's events of every accepted play (commitPlay, @toc/engine foldTally), set to zero when a
+   * game starts (the start, the rematch). It goes into the game's record. Absent in a snapshot from
+   * before plan 05-01 (copyTable sets zero: a game in progress at the deploy counts from there, D-04).
+   * Never put in a frame.
+   */
+  tally: Tally;
   /** The pending reclaims by seat (plan 02-07); server-only: `who` never leaves the table. */
   reclaims: Partial<Record<Color, Reclaim>>;
   /** The pause while the status is "paused"; else null. */
@@ -222,6 +232,7 @@ export function createTable(options: {
     endedAt: null,
     rematch: {},
     records: [],
+    tally: emptyTally(),
     botRng: [options.seed[0], options.seed[1], options.seed[2], options.seed[3]],
     deadlines: { expire: { at: options.now + EXPIRY_MS } },
     notifyAt: {},
@@ -258,6 +269,8 @@ export function copyTable(table: Table): Table {
   for (const person of copy.people) person.account ??= null;
   // Before plan 04-07 nobody was told « C’est ton tour ».
   copy.notifyAt ??= {};
+  // Before plan 05-01 a table kept no tally: it counts from now on.
+  copy.tally ??= emptyTally();
   // Before plan 04-14 (G18) a game had no EXIT_ONLY_PROTECTION switch and no flag on its knights: the
   // missing switches take DEFAULT_RULES, a knight on its own losange at progress 0 is the one just out.
   if (copy.game !== null) {

@@ -29,7 +29,7 @@ const CAPTURE_THEN_WIN: Scenario["before"] = {
   pawns: {
     bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 64 }],
     rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
-    vert: [{ p: 12 }],
+    vert: [{ p: 12 }, "S", "S", "S"],
   },
   hands: { bleu: ["2S", "5S"] },
   turn: "bleu",

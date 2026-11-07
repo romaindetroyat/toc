@@ -155,7 +155,8 @@ describe("the record of a finished game in D1", () => {
     expect(await writeGame(db(), id, replayed)).toBe("written");
     await runInDurableObject(stubOf(id), (_room, state) => {
       const again = load(state.storage.sql) as Table;
-      again.records = [replayed];
+      // The shape of a record pending from before plan 05-01 (no account, tally or creator).
+      again.records = [replayed as unknown as Table["records"][number]];
       commit(state.storage.sql, again, [], Date.now());
     });
     await retryNow(id);

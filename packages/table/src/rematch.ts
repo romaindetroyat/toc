@@ -16,6 +16,7 @@
 import {
   COLORS,
   type Color,
+  emptyTally,
   type GameEvent,
   type GameState,
   nextColor,
@@ -105,6 +106,7 @@ export function maybeStartRematch(
   table.status = "playing";
   table.startedAt = now;
   table.endedAt = null;
+  table.tally = emptyTally();
   table.rematch = {};
   table.thinking = null;
   return startGame({ firstDealer }, seed());

@@ -1,0 +1,112 @@
+// « Mes résultats » on the server (plan 05-01, HIST-02, D-01 to D-04, D-12; 05-RESEARCH Pattern 4).
+//   GET /api/me/results[?before=<ended_at>:<game_id>]  the signed-in player's finished games, newest
+//       first, HISTORY_PAGE_SIZE at a time, with the cursor of the next page (null at the end)
+// The user id comes from the session only (401 { error: "signed-out" } without one): there is no id
+// parameter, so nobody reads another player's history (T-05-05). Each row comes from game_seats (the
+// caller's seats, keyed for this order) joined to played; its seats are mapped to me, account (the
+// stored pseudo), guest (the first name) or bot (the level), and every account id is dropped
+// (T-05-01). The answer has the shape of HistoryPage (@toc/protocol), which the page checks.
+
+import {
+  HISTORY_PAGE_SIZE,
+  type HistoryGame,
+  type HistoryPage,
+  type HistorySeat,
+} from "@toc/protocol";
+import { sessionUser } from "./auth/session.ts";
+import type { Meter } from "./db.ts";
+import { json, notAllowed } from "./http.ts";
+
+type PlayedRow = {
+  id: string;
+  kind: "online" | "solo";
+  started_at: number;
+  ended_at: number;
+  winner: HistoryGame["winner"];
+  seats: string;
+  deals: number;
+  creator: string | null;
+  colour: HistoryGame["mine"];
+  ranked: number;
+};
+
+/** A seat of played.seats as written by record.ts (and, for solo games, plan 05-05). */
+type StoredSeat = {
+  colour: HistorySeat["colour"];
+  kind: "account" | "guest" | "bot";
+  account: string | null;
+  name: string;
+  level: HistorySeat["level"];
+  handedOver: boolean;
+  captured: number;
+  lost: number;
+  home: number;
+};
+
+/** One stored seat as the caller may see it: no account id, only me or another account. */
+function seatFor(seat: StoredSeat, userId: string): HistorySeat {
+  const kind = seat.kind === "account" ? (seat.account === userId ? "me" : "account") : seat.kind;
+  return {
+    colour: seat.colour,
+    kind,
+    name: seat.name,
+    level: seat.level ?? null,
+    handedOver: seat.handedOver === true,
+    captured: seat.captured,
+    lost: seat.lost,
+    home: seat.home,
+  };
+}
+
+function gameOf(row: PlayedRow, userId: string): HistoryGame {
+  const stored = JSON.parse(row.seats) as StoredSeat[];
+  const seats = stored.map((seat) => seatFor(seat, userId)) as HistoryGame["seats"];
+  return {
+    id: row.id,
+    kind: row.kind,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    winner: row.winner,
+    mine: row.colour,
+    seats,
+    deals: row.deals,
+    creator: row.creator,
+    ranked: row.ranked === 1,
+  };
+}
+
+const COLUMNS = `p.id, p.kind, p.started_at, p.ended_at, p.winner, p.seats, p.deals, p.creator,
+       gs.colour, gs.ranked`;
+
+/** GET /api/me/results (GET or HEAD only); null for another path. */
+export async function resultsRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+  now: number,
+): Promise<Response | null> {
+  if (url.pathname !== "/api/me/results") return null;
+  if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
+  const user = await sessionUser(request, url, env, meter, now);
+  if (user === null) return json({ error: "signed-out" }, 401);
+  const found = await meter.all<PlayedRow>(
+    meter
+      .prepare(
+        `SELECT ${COLUMNS}
+           FROM game_seats gs JOIN played p ON p.id = gs.game_id
+          WHERE gs.user_id = ?1
+          ORDER BY gs.ended_at DESC, gs.game_id DESC LIMIT ?2`,
+      )
+      .bind(user.id, HISTORY_PAGE_SIZE + 1),
+  );
+  const rows = found.results;
+  const games = rows.slice(0, HISTORY_PAGE_SIZE).map((row) => gameOf(row, user.id));
+  const last = rows[HISTORY_PAGE_SIZE - 1];
+  const page: HistoryPage = {
+    games,
+    next:
+      rows.length > HISTORY_PAGE_SIZE && last !== undefined ? `${last.ended_at}:${last.id}` : null,
+  };
+  return json(page, 200);
+}

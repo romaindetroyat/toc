@@ -12,6 +12,7 @@
   import Invitation from "./routes/Invitation.svelte";
   import Launch from "./routes/Launch.svelte";
   import Recover from "./routes/Recover.svelte";
+  import Results from "./routes/Results.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
   import Table from "./routes/Table.svelte";
   import { pwaUpdate } from "./pwa/update.svelte.ts";
@@ -107,6 +108,10 @@
   {:else if route === "#/amis"}
     <!-- « Mes amis » (plan 04-10): signed in only, as « Mon compte ». -->
     <Friends />
+  {:else if route === "#/resultats" || route.startsWith("#/resultats/")}
+    <!-- « Mes résultats » (plan 05-01; 05-09 adds its sub-routes inside the page): signed in only, as
+         « Mon compte ». Not behind « Tourne ton téléphone ». -->
+    <Results />
   {:else if route === "#/sons"}
     <SoundTest />
   {:else if route === "#/banc"}
