@@ -12,6 +12,7 @@
   import { COURT_FIGURES, cardFace } from "../cards/faces.ts";
   import { cardName } from "../i18n/fr/cards.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
 
   type Props = {
     card: CardId;
@@ -26,6 +27,8 @@
     onclick?: () => void;
     tabindex?: number;
     el?: HTMLElement;
+    /** In a lesson (plan 05-06): the card the guide asks to touch; its name ends « , à toucher ». */
+    guide?: boolean;
   };
 
   let {
@@ -36,6 +39,7 @@
     onclick,
     tabindex = 0,
     el = $bindable(),
+    guide = false,
   }: Props = $props();
 
   const face = $derived(cardFace(card));
@@ -49,7 +53,8 @@
         ? game.hand.unplayable(name)
         : game.hand.neutral(name),
   );
-  const label = $derived(received ? game.exchange.received(named, received.name) : named);
+  const said = $derived(received ? game.exchange.received(named, received.name) : named);
+  const label = $derived(guide ? lecons.target(said) : said);
   const border = $derived(received ? PALETTE.hex[received.color] : undefined);
 </script>
 

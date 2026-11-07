@@ -48,6 +48,16 @@
   const invitationCode = $derived(
     route.startsWith(INVITATION_PREFIX) ? route.slice(INVITATION_PREFIX.length) : null,
   );
+  /**
+   * A lesson's link: #/apprendre/<1-8> (plan 05-06). Any other number, or anything else after the
+   * prefix, is not a lesson: the home shows (until plan 05-08 adds the lessons page #/apprendre).
+   */
+  const LESSON_PREFIX = "#/apprendre/";
+  const lessonNumber = $derived.by((): number | null => {
+    if (!route.startsWith(LESSON_PREFIX)) return null;
+    const rest = route.slice(LESSON_PREFIX.length);
+    return /^[1-8]$/.test(rest) ? Number(rest) : null;
+  });
 
   // The signed-in account (plan 04-01): the cached one at once, GET /api/me next.
   startAccount();
@@ -86,6 +96,12 @@
 <svelte:boundary onerror={(error) => console.error(error)}>
   {#if route === "#/partie"}
     <Game />
+  {:else if lessonNumber !== null}
+    <!-- A lesson on the game screen (plan 05-06), behind « Tourne ton téléphone » like the game; a new
+         lesson is a new screen. -->
+    {#key lessonNumber}
+      <Game lesson={lessonNumber} />
+    {/key}
   {:else if route === "#/ordinateur"}
     <!-- The solo setup (the launch screen of phases 1 and 3), one tap from the home (02-04, D-09). -->
     <Launch />

@@ -46,6 +46,7 @@
     over,
     hits,
     badges,
+    markers = true,
   }: {
     k?: number;
     render?: RenderState | null;
@@ -63,6 +64,8 @@
     over?: Snippet<[number]>;
     hits?: Snippet<[number]>;
     badges?: Snippet;
+    /** The « D » disc and the « 1er » token on the felt; a lesson has neither (plan 05-06). */
+    markers?: boolean;
   } = $props();
 
   const scene = SCENE;
@@ -140,7 +143,7 @@
   {@render badges?.()}
   <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
-      <FeltTable {render} {discardTop} {k} {px} />
+      <FeltTable {render} {discardTop} {k} {px} {markers} />
     {/if}
     {@render under?.(px)}
     {@render children?.()}

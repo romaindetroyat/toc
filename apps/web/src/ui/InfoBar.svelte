@@ -55,6 +55,11 @@
      * (`[Règles][À la table][Messages]` online, `[Règles]` alone in solo); opens « Règles du TOC ».
      */
     onrules?: (opener: HTMLElement) => void;
+    /**
+     * A lesson (plan 05-06): no team pills, no dealer, deal or first-player line, no score; the
+     * lesson is not a game.
+     */
+    lesson?: boolean;
   };
 
   let {
@@ -71,6 +76,7 @@
     onmessages,
     tableSpeed,
     onrules,
+    lesson = false,
   }: Props = $props();
 
   let infoOpen = $state(false);
@@ -146,13 +152,15 @@
         <span class="respire-mark">…</span>
       {/if}
     </span>
-    <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
+    {#if !lesson}
+      <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
+    {/if}
   </button>
 
   {#if infoOpen}
     <Sheet title={game.info.sheetTitle} onclose={() => (infoOpen = false)} opener={pill}>
       <div class="sheet-info" data-info-sheet>
-        <InfoBar {render} {human} {names} {thinking} form="column" gear={false} />
+        <InfoBar {render} {human} {names} {thinking} {lesson} form="column" gear={false} />
       </div>
       {#if players !== undefined}
         <section class="players-section" aria-labelledby="players-heading" data-players-section>
@@ -207,23 +215,27 @@
           </span>
         {/if}
       </p>
-      <p class="deal" data-deal>
-        {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
-      </p>
-      {#if form === "column"}
+      {#if !lesson}
+        <p class="deal" data-deal>
+          {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
+        </p>
+      {/if}
+      {#if form === "column" && !lesson}
         <!-- Who plays first in this deal: the bottom bar and the sheet « Infos de la partie » (plan 03-11). -->
         <p class="deal" data-starter={starter}>{game.info.starter(names[starter])}</p>
       {/if}
     </div>
 
-    <div class="teams">
-      <span class="pill own" aria-label={game.info.teamAria(us)} data-team-us>
-        {game.info.teamUs(us)}
-      </span>
-      <span class="pill" aria-label={game.info.teamAriaThem(them)} data-team-them>
-        {game.info.teamThem(them)}
-      </span>
-    </div>
+    {#if !lesson}
+      <div class="teams">
+        <span class="pill own" aria-label={game.info.teamAria(us)} data-team-us>
+          {game.info.teamUs(us)}
+        </span>
+        <span class="pill" aria-label={game.info.teamAriaThem(them)} data-team-them>
+          {game.info.teamThem(them)}
+        </span>
+      </div>
+    {/if}
 
     {#if gear}
       <div class="gear" data-settings-slot>

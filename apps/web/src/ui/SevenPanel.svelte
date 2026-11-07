@@ -5,6 +5,7 @@
   import { cardName } from "../i18n/fr/cards.ts";
   import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import KeyHint from "./KeyHint.svelte";
   import PawnTray from "./PawnTray.svelte";
   import StepChip from "./StepChip.svelte";
@@ -44,6 +45,11 @@
      * tray is open). The game screen wraps the three parts in the [data-seven-panel] region.
      */
     part?: "all" | "line" | "chips" | "buttons";
+    /**
+     * In a lesson (plan 05-06): the step chip the guide asks to touch (`steps`), or its « Jouer »
+     * (`confirm`), ringed in cream and named « …, à toucher ».
+     */
+    guide?: { steps: number } | "confirm" | null;
   };
 
   let {
@@ -59,7 +65,10 @@
     onconfirm,
     ontrayPick,
     ontrayClose,
+    guide = null,
   }: Props = $props();
+
+  const guideSteps = $derived(typeof guide === "object" && guide !== null ? guide.steps : null);
 
   const face = $derived(cardFace(seven.card));
   const done = $derived(seven.remaining === 0);
@@ -137,9 +146,11 @@
   <button
     type="button"
     class="btn btn-primary play"
+    class:guide-halo={guide === "confirm"}
+    data-guide-halo={guide === "confirm" ? "button" : undefined}
     data-seven-play
     disabled={!done}
-    aria-label={game.seven.play}
+    aria-label={guide === "confirm" ? lecons.target(game.seven.play) : game.seven.play}
     aria-keyshortcuts="Enter"
     title={compact ? game.seven.play : undefined}
     onclick={onconfirm}
@@ -151,7 +162,12 @@
 
 {#snippet stepChips()}
   {#each chips as steps (steps)}
-    <StepChip {steps} enabled={offered.includes(steps)} onpick={onpickSteps} />
+    <StepChip
+      {steps}
+      enabled={offered.includes(steps)}
+      guide={steps === guideSteps}
+      onpick={onpickSteps}
+    />
   {/each}
 {/snippet}
 

@@ -8,6 +8,17 @@ export const lecons = {
   bravo: "Bravo !",
   suivant: "Suivant",
 
+  /** Plan 05-06: the name of what the guide rings ends with these words. */
+  target: (name: string) => `${name}, à toucher`,
+
+  /** Plan 05-06: the « Bravo ! » plank's buttons (the last lesson has its own two). */
+  plank: {
+    again: "Revoir la leçon",
+    next: "Leçon suivante",
+    lessons: "Revoir les leçons",
+    computer: "Jouer contre l’ordinateur",
+  },
+
   /** Lesson 1. */
   sortir: {
     title: "Sortir un cheval",

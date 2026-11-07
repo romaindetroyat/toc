@@ -9,6 +9,7 @@
 import { quarterTurnsFor, screenSideOf } from "@toc/board";
 import type { BotLevel } from "@toc/bots";
 import {
+  type Action,
   COLORS,
   type Color,
   type GameEvent,
@@ -32,13 +33,15 @@ import {
   type Speed,
 } from "./GameController.ts";
 import {
-  initialTurnUi,
-  reduceTurnUi,
-  type TurnCtx,
-  type TurnUiEvent,
-  type TurnUiState,
-  turnCtx,
-} from "./turnUi.ts";
+  type LessonAt,
+  type LessonEvent,
+  type LessonHalo,
+  lessonGate,
+  lessonHalo,
+  lessonStep,
+} from "./lessonRunner.ts";
+import type { Lesson } from "./lessons.ts";
+import { initialTurnUi, reduceTurnUi, type TurnCtx, type TurnUiState, turnCtx } from "./turnUi.ts";
 
 /**
  * What the game screen provides: it owns the SVG nodes, so it moves and animates the pawns. Its
@@ -66,6 +69,25 @@ export type ControllerFactory = (
 /** What a bot just played: its seat and the events of its play (the action zone words them). */
 export type BotPlay = { seat: Color; events: GameEvent[] };
 
+/** How long a wrong choice's line stays in the guide's band before the step's own line comes back. */
+export const WRONG_LINE_MS = 4000;
+
+/**
+ * A lesson in progress (plan 05-06, D-09): the current step, what the guide rings, the line of a wrong
+ * choice, and whether the lesson is over (its « Bravo ! » plank shows).
+ */
+export type LessonState = {
+  readonly lesson: Lesson;
+  /** The current step; null once the lesson is over. */
+  readonly at: LessonAt | null;
+  /** What the guide rings now. */
+  readonly halo: LessonHalo[];
+  /** The line of the last wrong choice, until 4 s have passed or a right event goes through. */
+  readonly wrong: string | null;
+  /** The lesson is over, once the board has finished moving: the plank shows. */
+  readonly done: boolean;
+};
+
 export type Session = {
   readonly human: Color;
   /** The human's seat index (quarterTurnsFor): which colour sits at the bottom of the galet. */
@@ -87,11 +109,17 @@ export type Session = {
   readonly lastPlay: BotPlay | null;
   /** Set when the bot loop failed: the game cannot go on and the screen shows the error screen. */
   readonly failure: { error: unknown } | null;
+  /** A lesson (plan 05-06), or null in a game. */
+  readonly lesson: LessonState | null;
   stats(): GameStats;
   /** Starts the game: the bots begin to act. */
   start(): void;
-  /** A tap or a button of the screen; the reducer decides what it means. */
-  send(event: TurnUiEvent): void;
+  /**
+   * A tap or a button of the screen; the reducer decides what it means. In a lesson the guide's gate
+   * sees it first: a choice the lesson does not want is refused with its line and changes nothing, and
+   * « Suivant » (`next`) passes a narration line.
+   */
+  send(event: LessonEvent): void;
   dispose(): void;
 };
 
@@ -126,7 +154,9 @@ export function levelsByColour(levels: BotLevels, human: Color): Partial<Record<
 /**
  * `colour` is the seat the human plays; without it, the colour chosen on the launch screen. A debug
  * scenario overrides it with the seat whose turn it is. Online, `tableFast` reads the table's
- * « Avance rapide » (plan 02-10b) at each move.
+ * « Avance rapide » (plan 02-10b) at each move. A `lesson` (plan 05-06, local only) sets the position
+ * and the others' scripted gives, and puts the guide's gate in front of the turn reducer; of the
+ * debug parameters only the test speed applies then.
  */
 export function createSession(
   env: SessionEnv,
@@ -134,8 +164,9 @@ export function createSession(
   colour: Color = settings.lastColor,
   makeController?: ControllerFactory,
   tableFast?: () => boolean,
+  lesson?: Lesson,
 ): Session {
-  const scenario = debug.etat ?? debug.scenario?.before;
+  const scenario = lesson?.before ?? debug.etat ?? debug.scenario?.before;
   const human = humanSeat(colour, scenario);
   const k = quarterTurnsFor(human);
   const testSpeed = debug.vitesse === "test";
@@ -186,6 +217,8 @@ export function createSession(
       // A debug scenario's human is its turn seat: the roles are read from that seat.
       levels: levelsByColour(settings.botLevels, human),
       scenario,
+      // A lesson's other seats play what is written or nothing (lesson 8's gives).
+      script: lesson?.script,
       director: watched,
       // The Champion searches in slices that let the page breathe, within the cap of the speed; the
       // controller's clock and the runner's are the same (performance.now, the controller's default).
@@ -203,6 +236,50 @@ export function createSession(
   let thinking = $state.raw<Color | null>(null);
   let failure = $state.raw<{ error: unknown } | null>(null);
   let disposed = false;
+
+  // --- The lesson (plan 05-06): the narration lines passed and the moves the engine took ---
+  let told = $state(0);
+  let played = $state.raw<readonly Action[]>([]);
+  let wrong = $state.raw<string | null>(null);
+  let wrongTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The lesson is over and the board has finished moving. */
+  let finished = $state(false);
+  const at = $derived(lesson === undefined ? null : lessonStep(lesson, ui, { told, played }));
+  const halo = $derived(lesson === undefined ? [] : lessonHalo(at?.step ?? null, ui));
+  const lessonState: LessonState | null =
+    lesson === undefined
+      ? null
+      : {
+          lesson,
+          get at() {
+            return at;
+          },
+          get halo() {
+            return halo;
+          },
+          get wrong() {
+            return wrong;
+          },
+          get done() {
+            return finished;
+          },
+        };
+
+  function showWrong(line: string | null): void {
+    clearTimeout(wrongTimer);
+    wrong = line;
+    if (line !== null) {
+      wrongTimer = setTimeout(() => {
+        if (!disposed) wrong = null;
+      }, WRONG_LINE_MS);
+    }
+  }
+
+  /** Once the board is idle, whether the lesson is over (its plank shows then, never mid-move). */
+  function checkFinished(): void {
+    if (lesson === undefined || finished) return;
+    if (lessonStep(lesson, ui, { told, played }) === null) finished = true;
+  }
 
   // The reducer's context is worth computing once per view.
   let cached: { view: PlayerView; ctx: TurnCtx } | null = null;
@@ -225,6 +302,7 @@ export function createSession(
     await director.idle();
     if (disposed || ticket !== syncTicket) return;
     ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
+    checkFinished();
   }
 
   controller.onError((error) => {
@@ -281,6 +359,7 @@ export function createSession(
     get failure() {
       return failure;
     },
+    lesson: lessonState,
     stats: () => controller.stats(),
     start() {
       ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
@@ -291,6 +370,27 @@ export function createSession(
     },
     send(event) {
       if (disposed) return;
+      if (lesson !== undefined) {
+        // The guide's gate (05-03), before the reducer: once the lesson is over nothing goes on.
+        const step = lessonStep(lesson, ui, { told, played });
+        if (step === null || finished) return;
+        const verdict = lessonGate(step.step, event, ui, ctx());
+        if (!verdict.pass) {
+          // Refused: nothing is selected, the wrong line shows; lesson 6's split goes back to its start.
+          hint = null;
+          for (const each of verdict.reset ?? []) ui = reduceTurnUi(ui, each, ctx()).state;
+          showWrong(verdict.line);
+          return;
+        }
+        showWrong(null);
+        if (event.t === "next") {
+          told += 1;
+          checkFinished();
+          return;
+        }
+      } else if (event.t === "next") {
+        return;
+      }
       const result = reduceTurnUi(ui, event, ctx());
       ui = result.state;
       hint = result.hint ?? null;
@@ -301,10 +401,13 @@ export function createSession(
         // The engine refused: nothing changed, the interaction starts again from the view.
         hint = outcome.error;
         ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
+      } else if (lesson !== undefined) {
+        played = [...played, result.submit];
       }
     },
     dispose() {
       disposed = true;
+      clearTimeout(wrongTimer);
       controller.dispose();
       director.dispose();
     },

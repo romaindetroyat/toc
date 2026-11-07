@@ -4,6 +4,7 @@
   import { EXIT, pawnColor, RING } from "@toc/engine";
   import { knightLetter } from "../game/turnUi.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { anchorOf } from "./geometry.ts";
 
   type Props = {
@@ -20,9 +21,11 @@
     /** A tap that hit at least one lit knight: those within 44 screen px of it, nearest first. */
     onnear: (near: PawnId[]) => void;
     onmiss: () => void;
+    /** In a lesson (plan 05-06): the knights the guide asks to touch; their names end « , à toucher ». */
+    guided?: readonly PawnId[];
   };
 
-  let { px, k, render, candidates, active, onpick, onnear, onmiss }: Props = $props();
+  let { px, k, render, candidates, active, onpick, onnear, onmiss, guided = [] }: Props = $props();
 
 
   /** Where a knight stands, in words: the stable, the home, or how far it has come from its exit. */
@@ -42,7 +45,8 @@
       const place = render.pawns[pawn];
       const size = knightScale(place);
       const [x, y] = anchorOf(place, k);
-      const label = game.hand.pawn(pawnColor(pawn), knightLetter(pawn), whereOf(pawn, place));
+      const named = game.hand.pawn(pawnColor(pawn), knightLetter(pawn), whereOf(pawn, place));
+      const label = guided.includes(pawn) ? lecons.target(named) : named;
       const radius = Math.max(22 * px, (KNIGHT.w / 2) * size);
       return { pawn, x, y: y - KNIGHT.body * size, radius, near: Math.max(44 * px, radius), label };
     }),

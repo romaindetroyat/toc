@@ -44,10 +44,14 @@
   import Pawn from "../board/Pawn.svelte";
   import { mixFromSettings } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
+  import { markDone } from "../game/lessonProgress.ts";
+  import { LESSONS } from "../game/lessons.ts";
   import { game as copy } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { seats as seatNames } from "../i18n/fr/seats.ts";
   import type { TableConnection } from "../net/connection.svelte.ts";
+  import { pageStorage } from "../net/device.ts";
   import { gameNotices } from "../net/notices.ts";
   import {
     type ControllerFactory,
@@ -62,9 +66,11 @@
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
+  import GuideBand from "../ui/GuideBand.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import LessonPlank from "../ui/LessonPlank.svelte";
   import MessagesButton from "../ui/MessagesButton.svelte";
   import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
@@ -104,9 +110,21 @@
       onleave: () => void;
       onquit: () => void;
     };
+    /**
+     * A lesson (#/apprendre/<1-8>, plan 05-06; 05-UI-SPEC « The lesson screen »): the game screen fed
+     * with the lesson's position, with the guide's band and halo, and « Bravo ! » at the end. Bleu at
+     * the bottom; no computer moves (lesson 8's three others pass their scripted cards); the deal
+     * banner, « D », « 1er », the team pills and « Avance rapide » are hidden. Never online.
+     */
+    lesson?: number;
   };
 
-  let { online }: Props = $props();
+  let { online, lesson }: Props = $props();
+
+  /** The lesson on screen, from its number (the route checked it is 1 to 8). */
+  const lessonData = untrack(() =>
+    online === undefined && lesson !== undefined ? LESSONS[lesson - 1] : undefined,
+  );
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -382,6 +400,7 @@
       colour,
       online?.makeController,
       () => online?.connection.table?.fast === true,
+      lessonData,
     );
     session = created;
     // Online, the game number this screen plays (a higher one is the rematch, plan 02-09).
@@ -397,8 +416,9 @@
     guarded(
       (async () => {
         opened = await loadDebugParams(location.hash);
-        // Online the server holds the game: only the test speed of the debug parameters applies.
-        if (online !== undefined) opened = { vitesse: opened.vitesse };
+        // Online the server holds the game, and a lesson sets its own position: only the test speed
+        // of the debug parameters applies.
+        if (online !== undefined || lessonData !== undefined) opened = { vitesse: opened.vitesse };
         if (alive) await begin(opened, online?.seat);
       })(),
     );
@@ -416,6 +436,18 @@
       return;
     }
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
+  }
+
+  /** « Revoir la leçon »: the lesson again from its position and its first line. */
+  function restartLesson() {
+    guarded(begin({ vitesse: opened.vitesse }));
+  }
+
+  /** The « Bravo ! » plank's primary: the next lesson, or the solo setup after the last one. */
+  function afterLesson() {
+    if (lessonData === undefined) return;
+    location.hash =
+      lessonData.n >= LESSONS.length ? "#/ordinateur" : `#/apprendre/${lessonData.n + 1}`;
   }
 
   /** « Changer de couleur »: back to the solo setup (#/ordinateur, 02-04). */
@@ -658,6 +690,48 @@
   const ui = $derived(session?.ui ?? { kind: "waiting" as const });
   const view = $derived(session?.view);
 
+  // --- The lesson (plan 05-06): the guide's line, its halo, the plank ---
+  const lessonState = $derived(session?.lesson ?? null);
+  const lessonAt = $derived(lessonState?.at ?? null);
+  /** The lesson is over and the board has stopped: the « Bravo ! » plank shows. */
+  const lessonOver = $derived(lessonState?.done === true);
+  /** A narration line the player may pass with « Suivant » (a « cross » line once the cards crossed). */
+  const narration = $derived(
+    lessonAt !== null &&
+      lessonAt.ready &&
+      (lessonAt.step.expect.t === "next" || lessonAt.step.expect.t === "cross"),
+  );
+  /** What the guide says: a wrong choice's line, the game's own refusal, else the step's line. */
+  const guideLine = $derived.by((): string => {
+    if (lessonState === null) return "";
+    if (lessonState.wrong !== null) return lessonState.wrong;
+    const hint = session?.hint ?? null;
+    if (hint === "illegal") return copy.illegal;
+    if (hint !== null) return copy.reasons[hint];
+    return lessonAt?.step.line ?? lecons.bravo;
+  });
+  const guideHalo = $derived(lessonState?.halo ?? []);
+  const guideCard = $derived(guideHalo.find((halo) => halo.t === "card")?.card ?? null);
+  const guidePawns = $derived(
+    guideHalo.flatMap((halo) => (halo.t === "pawn" ? [halo.pawn] : [])),
+  );
+  const guideChip = $derived(guideHalo.find((halo) => halo.t === "chip")?.steps ?? null);
+  const guideButton = $derived.by((): "confirm" | "give" | null => {
+    for (const halo of guideHalo) {
+      if (halo.t === "button" && (halo.button === "confirm" || halo.button === "give")) {
+        return halo.button;
+      }
+    }
+    return null;
+  });
+  // A lesson is done when its plank shows (05-UI-SPEC « Progress »).
+  $effect(() => {
+    if (lessonOver && lessonData !== undefined) {
+      const n = lessonData.n;
+      untrack(() => markDone(pageStorage(), n));
+    }
+  });
+
   // Lower on screen = in front; the pawn on the move is on top of all the others (UI-SPEC).
   const drawn = $derived(
     render === null
@@ -774,7 +848,7 @@
     view?.received != null && view.hand.includes(view.received) ? view.received : null,
   );
 
-  function send(event: TurnUiEvent) {
+  function send(event: TurnUiEvent | { t: "next" }) {
     missed = false;
     session?.send(event);
   }
@@ -831,6 +905,22 @@
       event.stopImmediatePropagation();
       return;
     }
+    // A lesson's narration line: Entrée presses « Suivant » (05-UI-SPEC « Keyboard (additions) »).
+    if (
+      narration &&
+      event.key === "Enter" &&
+      !event.repeat &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      focusTarget().kind !== "field" &&
+      document.querySelector("[data-sheet-layer]") === null
+    ) {
+      event.preventDefault();
+      send({ t: "next" });
+      return;
+    }
     const intent = keyIntent(event, {
       ui,
       hand: view === undefined ? [] : sortHand(view.hand),
@@ -843,6 +933,7 @@
         session === undefined ||
         view === undefined ||
         ended ||
+        lessonOver ||
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
@@ -999,7 +1090,10 @@
       {bar}
       {compact}
       {part}
-      fastToggle={online === undefined}
+      fastToggle={online === undefined && lessonData === undefined}
+      quiet={lessonData !== undefined}
+      onnext={narration ? () => send({ t: "next" }) : undefined}
+      guide={flow.kind === "sevenBuilding" ? null : guideButton}
       {view}
       human={session.human}
       names={session.names}
@@ -1029,6 +1123,7 @@
       {part}
       tray={ui.kind === "tray" ? ui : null}
       {missed}
+      guide={guideChip !== null ? { steps: guideChip } : guideButton === "confirm" ? "confirm" : null}
       onpickSteps={(steps) => send({ t: "pickSteps", steps })}
       onundo={() => send({ t: "undoLast" })}
       oncancelAll={() => send({ t: "cancelAll" })}
@@ -1065,6 +1160,7 @@
       pace={session.pace}
       {compact}
       board={stageEl}
+      guide={guideCard}
       onpick={pickCard}
     />
   {/if}
@@ -1072,7 +1168,10 @@
 
 <main
   class="game"
+  class:lesson={lessonData !== undefined}
   data-chrome={screen.chrome}
+  data-lesson={lessonData?.n}
+  data-lesson-step={lessonData === undefined ? undefined : (lessonAt?.index ?? "done")}
   style:--head-room={SCENE.headRoom}
   style:--board-ratio={SCENE.height / SCENE.width}
   style:--galet-bare={GALET_BARE}
@@ -1090,7 +1189,7 @@
   <div class="play" class:away={prompting} data-game-play inert={prompting} bind:this={playEl}>
     {#if session !== undefined && render !== null && view !== undefined}
       <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
-      <div class="layout" data-layout inert={ended}>
+      <div class="layout" data-layout inert={ended || lessonOver}>
         <div class="info">
           <InfoBar
             {render}
@@ -1107,8 +1206,17 @@
               : undefined}
             onmessages={online !== undefined ? openMessages : undefined}
             onrules={openRules}
+            lesson={lessonData !== undefined}
           />
         </div>
+
+        {#if lessonData !== undefined}
+          <!-- The guide (plan 05-06): in the compact prompt row's place, or above the board on a
+               computer; always mounted, so each new line is read once. -->
+          <div class="band-row">
+            <GuideBand line={guideLine} />
+          </div>
+        {/if}
 
         {#if compact}
           <!-- The top of the right strip: « Réglages », « Règles du jeu » (plan 05-04), then « Avance
@@ -1129,7 +1237,7 @@
             <RulesButton onopen={openRules} />
             {#if online !== undefined}
               <MessagesButton onopen={openMessages} keys />
-            {:else}
+            {:else if lessonData === undefined}
               <div class="fast" inert={plateUp}>
                 {@render zone("fast")}
               </div>
@@ -1145,6 +1253,7 @@
             {burst}
             {flights}
             thinking={session.thinking}
+            markers={lessonData === undefined}
             ontapis={() => (tapisOpen = true)}
           >
             {#snippet badges()}
@@ -1162,6 +1271,7 @@
                 {candidates}
                 selected={selectedPawn}
                 target={targetPawn}
+                guided={guidePawns}
               />
             {/snippet}
             {#each drawn as pawn (pawn.id)}
@@ -1173,6 +1283,7 @@
                 place={render.pawns[pawn.id] as Place}
                 facing={facings[pawn.id]}
                 lift={pawn.id === selectedPawn ? 12 : 0}
+                guide={guidePawns.includes(pawn.id)}
                 bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
               />
             {/each}
@@ -1204,6 +1315,7 @@
                   ui.kind === "sevenBuilding" ||
                   ui.kind === "preview"
                 }
+                guided={guidePawns}
                 onpick={pickPawn}
                 onnear={pickNear}
                 onmiss={() => {
@@ -1212,7 +1324,9 @@
               />
             {/snippet}
           </Board>
-          <DealBanner {render} names={session.names} human={session.human} />
+          {#if lessonData === undefined}
+            <DealBanner {render} names={session.names} human={session.human} />
+          {/if}
         </div>
 
         {#if flow.kind === "sevenBuilding" && compact}
@@ -1225,9 +1339,11 @@
             data-selected={flow.selected ?? ""}
             aria-label={copy.seven.title}
           >
-            <div class="prompt-row">
-              {@render seven("line")}
-            </div>
+            {#if lessonData === undefined}
+              <div class="prompt-row">
+                {@render seven("line")}
+              </div>
+            {/if}
             <div class="chips">
               {@render seven("chips")}
             </div>
@@ -1243,13 +1359,15 @@
         {:else if compact}
           <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
                and the hand (or the « Lequel ? » chips) at the bottom of the left one. -->
-          <div class="prompt-row">
-            {#if plateUp}
-              {@render pausedLine()}
-            {:else}
-              {@render zone("prompt")}
-            {/if}
-          </div>
+          {#if lessonData === undefined}
+            <div class="prompt-row">
+              {#if plateUp}
+                {@render pausedLine()}
+              {:else}
+                {@render zone("prompt")}
+              {/if}
+            </div>
+          {/if}
           {#if ui.kind === "tray"}
             <div class="chips" inert={plateUp}>
               <PawnTray
@@ -1338,6 +1456,18 @@
           opener={messagesOpener}
           onsend={(msg) => online.connection.send({ t: "chat", msg })}
           onclose={() => (messagesOpen = false)}
+        />
+      {/if}
+
+      {#if lessonOver && lessonData !== undefined}
+        <LessonPlank
+          recap={lessonData.recap}
+          last={lessonData.n >= LESSONS.length}
+          board={boardEl}
+          onprimary={afterLesson}
+          onsecondary={lessonData.n >= LESSONS.length
+            ? () => (location.hash = "#/apprendre")
+            : restartLesson}
         />
       {/if}
 
@@ -1631,6 +1761,34 @@
     .seven {
       display: contents;
     }
+
+    /*
+     * A lesson (plan 05-06; 05-UI-SPEC « Board width in a lesson »): the guide's band takes the prompt
+     * row's place, 56 px high (two lines of Body), and the board formula reads its height.
+     */
+    .game.lesson {
+      --prompt-row: 56px;
+      --band: 56px;
+    }
+
+    .band-row {
+      grid-area: prompt;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    /* Room under the lowest button for the guide's ring (8 px outside it). */
+    .game.lesson .actions {
+      padding-bottom: var(--space-sm);
+    }
+  }
+
+  /* Under 640 px wide the band has three lines (80 px): there the board is limited by the width. */
+  @media (orientation: landscape) and (max-width: 639.98px) {
+    .game.lesson {
+      --prompt-row: 80px;
+      --band: 80px;
+    }
   }
 
   /*
@@ -1700,6 +1858,42 @@
       grid-column: hand / action;
       min-width: 0;
       min-height: 0;
+    }
+
+    /*
+     * A lesson (plan 05-06): the guide's band (56 px) above the board, as wide as the board and
+     * centred on it; the board formula takes its height off.
+     */
+    .game.lesson {
+      --band: 56px;
+      --board-size: max(
+        0px,
+        min(
+          100vw - 32px - var(--inset-x),
+          (100dvh - var(--bar) - var(--band) - var(--inset-y)) /
+            (var(--board-ratio) + var(--head-room)),
+          1600px
+        )
+      );
+    }
+
+    .game.lesson .layout {
+      grid-template-areas:
+        "band band band"
+        "stage stage stage"
+        "info hand action";
+      grid-template-rows: var(--band) minmax(0, 1fr) var(--bar);
+    }
+
+    .game.lesson .stage {
+      align-self: start;
+    }
+
+    .band-row {
+      grid-area: band;
+      justify-self: center;
+      width: var(--board-size);
+      min-width: 0;
     }
   }
 </style>

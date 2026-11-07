@@ -2,6 +2,7 @@
   import { KNIGHT, knightScale, SEAT_MARKS } from "@toc/board";
   import type { Color, PawnId, Place } from "@toc/engine";
   import { board as t } from "../i18n/fr/board.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { settings } from "../settings/store.svelte.ts";
   import { type Facing, placeKey } from "./geometry.ts";
 
@@ -20,6 +21,8 @@
     onselect?: () => void;
     /** Board units the knight is lifted off its shadow (12 for the selected one). */
     lift?: number;
+    /** In a lesson (plan 05-06): the guide asks to touch this knight; its name ends « , à toucher ». */
+    guide?: boolean;
   };
 
   let {
@@ -32,7 +35,10 @@
     el = $bindable(),
     onselect,
     lift = 0,
+    guide = false,
   }: Props = $props();
+
+  const label = $derived(guide ? lecons.target(t.pawn[color]) : t.pawn[color]);
 
   const ring = $derived(place.z === "ring" ? place.cell : -1);
   // The mock-up's sizes (« à confirmer par Romain »): 0.92 step wide on the ring, 0.8 in a home and
@@ -113,7 +119,7 @@
     data-facing={facing}
     role="button"
     tabindex="0"
-    aria-label={t.pawn[color]}
+    aria-label={label}
     onclick={() => onselect()}
     {onkeydown}
   >
@@ -128,7 +134,7 @@
     data-ring={ring}
     data-facing={facing}
     role="img"
-    aria-label={t.pawn[color]}
+    aria-label={label}
     pointer-events="none"
   >
     {@render body()}
