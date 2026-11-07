@@ -416,6 +416,42 @@ test.describe("les touches se voient sur ordinateur", () => {
     if (isMobile) await expect(visibleHints(page)).toHaveCount(0);
   });
 
+  test("« R » ouvre et ferme « Règles du TOC », l’anneau du focus sur ses onglets", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "keyboard shortcuts are for computers");
+    await openPosition(page, ACE);
+    const rules = page.getByRole("dialog", { name: "Règles du TOC" });
+    await page.keyboard.press("r");
+    await expect(rules).toBeVisible();
+    const chosen = rules.locator('[role="tab"][aria-selected="true"]');
+    await expect(chosen).toHaveAttribute("data-rules-tab", "cartes");
+    for (let i = 0; i < 20; i++) {
+      if (await chosen.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press("Tab");
+    }
+    await expect(chosen).toBeFocused();
+    const ring = await chosen.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return `${style.outlineStyle} ${style.outlineWidth} ${style.outlineColor}`;
+    });
+    expect(ring).toBe("solid 3px rgb(255, 176, 46)");
+    // The arrows move the focus and the ring with it.
+    await page.keyboard.press("ArrowDown");
+    await expect(rules.locator('[data-rules-tab="donne"]')).toBeFocused();
+    await page.keyboard.press("R");
+    await expect(rules).toHaveCount(0);
+    await expect(zone(page)).toHaveAttribute("data-state", "idle");
+    // Again with « R », and the game's keys work once it is closed.
+    await page.keyboard.press("r");
+    await expect(rules).toBeVisible();
+    await page.keyboard.press("r");
+    await expect(rules).toHaveCount(0);
+    await pressCard(page, "1S");
+    await expect(zone(page)).toHaveAttribute("data-state", "modeChoice");
+  });
+
   test("chaque touche affichée fait ce que fait son bouton", async ({ context, isMobile }) => {
     test.skip(isMobile, "keyboard shortcuts are for computers");
 
