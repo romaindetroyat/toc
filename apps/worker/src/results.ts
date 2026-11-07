@@ -6,8 +6,13 @@
 // caller's seats, keyed for this order) joined to played; its seats are mapped to me, account (the
 // stored pseudo), guest (the first name) or bot (the level), and every account id is dropped
 // (T-05-01). The answer has the shape of HistoryPage (@toc/protocol), which the page checks.
+// The cursor `before` is the `next` of the previous page, « <ended_at>:<game_id> »: read with an
+// anchored regex and bound as two parameters, never put in the SQL text (400 { error: "cursor" }
+// otherwise). The explicit OR form of the keyset (no row-value comparison) skips no game whose end
+// time equals the cursor's.
 
 import {
+  HISTORY_CURSOR_RE,
   HISTORY_PAGE_SIZE,
   type HistoryGame,
   type HistoryPage,
@@ -90,16 +95,32 @@ export async function resultsRoute(
   if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
   const user = await sessionUser(request, url, env, meter, now);
   if (user === null) return json({ error: "signed-out" }, 401);
-  const found = await meter.all<PlayedRow>(
-    meter
+  const before = url.searchParams.get("before");
+  let statement: D1PreparedStatement;
+  if (before === null) {
+    statement = meter
       .prepare(
         `SELECT ${COLUMNS}
            FROM game_seats gs JOIN played p ON p.id = gs.game_id
           WHERE gs.user_id = ?1
           ORDER BY gs.ended_at DESC, gs.game_id DESC LIMIT ?2`,
       )
-      .bind(user.id, HISTORY_PAGE_SIZE + 1),
-  );
+      .bind(user.id, HISTORY_PAGE_SIZE + 1);
+  } else {
+    const cursor = HISTORY_CURSOR_RE.exec(before);
+    const endedAt = Number(cursor?.[1]);
+    if (cursor === null || !Number.isSafeInteger(endedAt)) return json({ error: "cursor" }, 400);
+    statement = meter
+      .prepare(
+        `SELECT ${COLUMNS}
+           FROM game_seats gs JOIN played p ON p.id = gs.game_id
+          WHERE gs.user_id = ?1
+            AND (gs.ended_at < ?2 OR (gs.ended_at = ?2 AND gs.game_id < ?3))
+          ORDER BY gs.ended_at DESC, gs.game_id DESC LIMIT ?4`,
+      )
+      .bind(user.id, endedAt, cursor[2], HISTORY_PAGE_SIZE + 1);
+  }
+  const found = await meter.all<PlayedRow>(statement);
   const rows = found.results;
   const games = rows.slice(0, HISTORY_PAGE_SIZE).map((row) => gameOf(row, user.id));
   const last = rows[HISTORY_PAGE_SIZE - 1];
