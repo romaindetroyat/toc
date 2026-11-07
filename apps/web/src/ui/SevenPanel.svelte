@@ -50,6 +50,11 @@
      * (`confirm`), ringed in cream and named « …, à toucher ».
      */
     guide?: { steps: number } | "confirm" | null;
+    /**
+     * In a compact lesson (plan 05-06), where the guide's band takes the prompt row: « Reste n » stands
+     * at the top of the chips' column instead.
+     */
+    counter?: boolean;
   };
 
   let {
@@ -66,6 +71,7 @@
     ontrayPick,
     ontrayClose,
     guide = null,
+    counter = false,
   }: Props = $props();
 
   const guideSteps = $derived(typeof guide === "object" && guide !== null ? guide.steps : null);
@@ -202,6 +208,16 @@
   {#if tray !== null}
     <PawnTray options={tray.options} part="chips" compact onpick={ontrayPick} onclose={ontrayClose} />
   {:else}
+    {#if counter}
+      <p
+        class="chip-counter tabular"
+        class:done
+        data-remaining={seven.remaining}
+        aria-live="polite"
+      >
+        {counterText}
+      </p>
+    {/if}
     <div class="chip-column" data-seven-chips>
       {@render stepChips()}
     </div>
@@ -517,6 +533,16 @@
   }
 
   /* The compact left strip: 44 x 44 chips, 4 px apart, in a column (the strip's slot scrolls). */
+  /* « Reste n » over the chips' column in a compact lesson: Label 14 bold amber, as in the row. */
+  .chip-counter {
+    margin: 0 0 var(--space-xs);
+    color: var(--ambre);
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: var(--label-line);
+    text-align: center;
+  }
+
   .chip-column {
     display: flex;
     flex-direction: column;

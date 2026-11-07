@@ -1124,6 +1124,7 @@
       tray={ui.kind === "tray" ? ui : null}
       {missed}
       guide={guideChip !== null ? { steps: guideChip } : guideButton === "confirm" ? "confirm" : null}
+      counter={lessonData !== undefined && part === "chips"}
       onpickSteps={(steps) => send({ t: "pickSteps", steps })}
       onundo={() => send({ t: "undoLast" })}
       oncancelAll={() => send({ t: "cancelAll" })}
