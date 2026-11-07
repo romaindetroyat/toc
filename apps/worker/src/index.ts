@@ -53,6 +53,8 @@
 // Plan 05-01 (results.ts):
 //   GET  /api/me/results             → the signed-in player's finished games, newest first, 20 at a
 //                                      time ({ games, next }; ?before=<ended_at>:<game_id>), 401 else
+// Plan 05-05 (results.ts, aggregate.ts; a session, 401 else):
+//   GET  /api/me/stats               → « Mes chiffres » for the three filters at once (StatsAnswer)
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -197,7 +199,7 @@ async function accountRoute(
   }
   const tables = await meTablesRoute(request, env, url, meter, now);
   if (tables !== null) return tables;
-  // Plan 05-01: « Mes résultats » (results.ts).
+  // Plan 05-01: « Mes résultats » (results.ts); 05-05: « Mes chiffres ».
   const results = await resultsRoute(request, env, url, meter, now);
   if (results !== null) return results;
   // Plan 04-07: the key and the subscriptions of Web Push (/api/push/key, /api/push/subscriptions).

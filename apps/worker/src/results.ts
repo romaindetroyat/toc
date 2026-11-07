@@ -10,6 +10,9 @@
 // anchored regex and bound as two parameters, never put in the SQL text (400 { error: "cursor" }
 // otherwise). The explicit OR form of the keyset (no row-value comparison) skips no game whose end
 // time equals the cursor's.
+// Plan 05-05 (HIST-03, HIST-04, D-01, D-02, D-13; Pattern 4), the same session rule:
+//   GET /api/me/stats   « Mes chiffres »: every row of the caller (one query), aggregated by statsOf
+//                       (aggregate.ts) for the three filters at once (StatsAnswer)
 
 import {
   HISTORY_CURSOR_RE,
@@ -17,7 +20,9 @@ import {
   type HistoryGame,
   type HistoryPage,
   type HistorySeat,
+  type StatsAnswer,
 } from "@toc/protocol";
+import { type StatsRow, type StoredSeat, statsOf } from "./aggregate.ts";
 import { sessionUser } from "./auth/session.ts";
 import type { Meter } from "./db.ts";
 import { json, notAllowed } from "./http.ts";
@@ -33,19 +38,6 @@ type PlayedRow = {
   creator: string | null;
   colour: HistoryGame["mine"];
   ranked: number;
-};
-
-/** A seat of played.seats as written by record.ts (and, for solo games, plan 05-05). */
-type StoredSeat = {
-  colour: HistorySeat["colour"];
-  kind: "account" | "guest" | "bot";
-  account: string | null;
-  name: string;
-  level: HistorySeat["level"];
-  handedOver: boolean;
-  captured: number;
-  lost: number;
-  home: number;
 };
 
 /** One stored seat as the caller may see it: no account id, only me or another account. */
@@ -83,7 +75,30 @@ function gameOf(row: PlayedRow, userId: string): HistoryGame {
 const COLUMNS = `p.id, p.kind, p.started_at, p.ended_at, p.winner, p.seats, p.deals, p.creator,
        gs.colour, gs.ranked`;
 
-/** GET /api/me/results (GET or HEAD only); null for another path. */
+type Read = (user: { id: string; pseudo: string }, url: URL, meter: Meter) => Promise<Response>;
+
+/** GET /api/me/stats: every game of the caller, aggregated (one query, the rows read once). */
+const stats: Read = async (user, _url, meter) => {
+  const found = await meter.all<StatsRow>(
+    meter
+      .prepare(
+        `SELECT gs.colour, gs.won, gs.solo, gs.captured, gs.lost, gs.home, p.seats
+           FROM game_seats gs JOIN played p ON p.id = gs.game_id
+          WHERE gs.user_id = ?1
+          ORDER BY gs.ended_at DESC, gs.game_id DESC`,
+      )
+      .bind(user.id),
+  );
+  const answer: StatsAnswer = statsOf(found.results, user.id);
+  return json(answer, 200);
+};
+
+const READS = new Map<string, Read>([
+  ["/api/me/results", (user, url, meter) => history(user, url, meter)],
+  ["/api/me/stats", stats],
+]);
+
+/** GET /api/me/results, /api/me/stats (GET or HEAD only, a session); null for another path. */
 export async function resultsRoute(
   request: Request,
   env: Env,
@@ -91,10 +106,16 @@ export async function resultsRoute(
   meter: Meter,
   now: number,
 ): Promise<Response | null> {
-  if (url.pathname !== "/api/me/results") return null;
+  const read = READS.get(url.pathname);
+  if (read === undefined) return null;
   if (request.method !== "GET" && request.method !== "HEAD") return notAllowed("GET");
   const user = await sessionUser(request, url, env, meter, now);
   if (user === null) return json({ error: "signed-out" }, 401);
+  return read(user, url, meter);
+}
+
+/** GET /api/me/results: one page of the caller's history. */
+async function history(user: { id: string }, url: URL, meter: Meter): Promise<Response> {
   const before = url.searchParams.get("before");
   let statement: D1PreparedStatement;
   if (before === null) {

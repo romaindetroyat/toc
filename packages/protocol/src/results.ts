@@ -2,6 +2,8 @@
 // GET /api/me/results, shared by the Worker (what it builds) and the page (what it accepts, untrusted).
 // A seat is the caller's (me), another account's (by its pseudo), a guest's (by the first name typed
 // at the table) or a computer's (by its level): never an account id, a `who`, a token or a card.
+// Plan 05-05: the answers of GET /api/me/stats (« Mes chiffres ») and GET /api/me/ranking (the friends
+// ranking), and the body of POST /api/me/results/solo (a solo game the browser reports, client-claimed).
 // Pure, no I/O.
 
 import { COLORS } from "@toc/engine";
@@ -74,3 +76,66 @@ export function parseHistoryPage(data: unknown): HistoryPage | null {
 
 /** The schema itself, for the Worker's own checks in the tests. */
 export const HistoryPage = historyPage;
+
+// --- « Mes chiffres » (plan 05-05, HIST-03; 05-UI-SPEC Panel 2) ---
+
+const total = z.number().check(z.int(), z.gte(0));
+
+/**
+ * One partner of the player's games: another account (by its pseudo), all the guests together
+ * (« Joueurs sans compte », name null), or the computers of one level (name null). Never an id.
+ */
+const statsPartner = z
+  .strictObject({
+    kind: z.enum(["account", "guests", "bot"]),
+    name: z.nullable(z.string().check(z.maxLength(40))),
+    level: z.nullable(level),
+    games: total,
+    wins: total,
+  })
+  .check(z.refine((partner) => partner.wins <= partner.games));
+
+/** The games against two computers, under the stronger one's level. */
+const statsLevel = z
+  .strictObject({ level, games: total, wins: total })
+  .check(z.refine((entry) => entry.wins <= entry.games));
+
+const statsBlock = z
+  .strictObject({
+    games: total,
+    wins: total,
+    /** Knights the player's seat ate. */
+    captured: total,
+    /** The player's knights eaten. */
+    lost: total,
+    /** The player's knights brought home. */
+    home: total,
+    /** Most games first, then accounts by pseudo, the guests, the computers by level. */
+    partners: z.array(statsPartner),
+    /** In level order. */
+    levels: z.array(statsLevel).check(z.maxLength(5)),
+  })
+  .check(z.refine((block) => block.wins <= block.games));
+
+export type StatsBlock = z.infer<typeof statsBlock>;
+
+const statsAnswer = z.strictObject({
+  /** « Toutes »: every counted game. */
+  all: statsBlock,
+  /** « En ligne ». */
+  online: statsBlock,
+  /** « Contre l’ordinateur »: the solo games the browser reported (D-01). */
+  solo: statsBlock,
+});
+
+/** GET /api/me/stats: the signed-in player's figures for the three filters at once. */
+export type StatsAnswer = z.infer<typeof statsAnswer>;
+
+/** The schema itself, for the Worker's own checks in the tests. */
+export const StatsAnswer = statsAnswer;
+
+/** The page's untrusted answer as a StatsAnswer, or null when it is out of shape. */
+export function parseStatsAnswer(data: unknown): StatsAnswer | null {
+  const parsed = statsAnswer.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
