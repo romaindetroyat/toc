@@ -1,45 +1,30 @@
 <script lang="ts">
-  import { teamOf, type Team } from "@toc/engine";
   import type { HistoryGame } from "@toc/protocol";
-  import { resultats } from "../i18n/fr/resultats.ts";
+  import { rowOf } from "../results/format.ts";
   import Icon from "./Icon.svelte";
 
-  // One game of « Mes résultats » (plan 05-01; 05-UI-SPEC Panel 1 « Historique »): a row of 64, the
-  // kind's icon (users online, bot solo), line 1 « Victoire · 8 – 5 » (knights home, own team first),
-  // line 2 the partner and the opponents, at the right the end date and time.
-  type Props = { game: HistoryGame };
+  // One game of « Mes résultats » (plan 05-01; 05-UI-SPEC Panel 1 « Historique »): a button of 64
+  // (05-09 opens its detail sheet), the kind's icon (users online, bot solo), line 1 « Victoire · 8 – 5 »
+  // (knights home, own team first), line 2 the partner and the opponents (ellipsis, the whole line in
+  // its title), at the right the end date and time. Its accessible name is the whole sentence
+  // (results/format.ts). Text bindings only.
+  type Props = { game: HistoryGame; now: number };
 
-  let { game }: Props = $props();
+  let { game, now }: Props = $props();
 
-  const mine = $derived(teamOf(game.mine));
-  const home = (team: Team) =>
-    game.seats.filter((seat) => teamOf(seat.colour) === team).reduce((n, s) => n + s.home, 0);
-  const other = $derived<Team>(mine === "bleu-rouge" ? "jaune-vert" : "bleu-rouge");
-  const line1 = $derived(
-    resultats.row.line1(
-      game.winner === mine ? resultats.row.win : resultats.row.loss,
-      home(mine),
-      home(other),
-    ),
-  );
-  const line2 = $derived(
-    game.seats
-      .filter((seat) => seat.colour !== game.mine)
-      .map((seat) => seat.name)
-      .join(", "),
-  );
-  const day = $derived(
-    new Intl.DateTimeFormat("fr", { day: "numeric", month: "short" }).format(game.endedAt),
-  );
+  const text = $derived(rowOf(game, now));
 </script>
 
-<button type="button" class="row" data-game-row={game.id}>
-  <span class="icon"><Icon name={game.kind === "solo" ? "bot" : "users"} size={20} /></span>
+<button type="button" class="row" data-game-row={game.id} aria-label={text.label}>
+  <span class="icon"><Icon name={text.icon} size={20} /></span>
   <span class="lines">
-    <span class="first" data-row-line="1">{line1}</span>
-    <span class="second" data-row-line="2">{line2}</span>
+    <span class="first" data-row-line="1">{text.line1}</span>
+    <span class="second" data-row-line="2" title={text.line2}>{text.line2}</span>
   </span>
-  <span class="when">{day}</span>
+  <span class="when">
+    <span>{text.date}</span>
+    <span>{text.time}</span>
+  </span>
 </button>
 
 <style>
@@ -95,6 +80,10 @@
 
   .when {
     flex: none;
-    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 </style>

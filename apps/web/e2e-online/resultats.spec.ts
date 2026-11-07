@@ -114,3 +114,119 @@ test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résu
   await a.context.close();
   await b.context.close();
 });
+
+// Screenshots for the review (TOC_SHOTS names a directory; skipped otherwise): « Mes résultats » with
+// three games (online won, online lost with a guest, a 20-character pseudo) at 844 x 390 and 1280 x 800.
+// The answer of GET /api/me/results is served by the test (the same shape as the Worker's).
+test("captures de « Mes résultats »", async ({ browser }, testInfo) => {
+  const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process
+    ?.env;
+  const dir = env?.TOC_SHOTS;
+  test.skip(!dir || testInfo.project.name !== "desktop", "TOC_SHOTS only, once");
+  const seat = (
+    colour: string,
+    kind: string,
+    name: string,
+    home: number,
+    level: number | null = null,
+  ) => ({
+    colour,
+    kind,
+    name,
+    level,
+    handedOver: false,
+    captured: 0,
+    lost: 0,
+    home,
+  });
+  const hash = "Q".repeat(43);
+  const at = (day: number, hour: number, minute: number) =>
+    new Date(2026, 10, day, hour, minute).getTime();
+  const page = {
+    games: [
+      {
+        id: `${hash}:3`,
+        kind: "online",
+        startedAt: at(6, 20, 31),
+        endedAt: at(6, 21, 14),
+        winner: "bleu-rouge",
+        mine: "bleu",
+        seats: [
+          seat("bleu", "me", "Romain", 4),
+          seat("jaune", "account", "Paul", 3),
+          seat("rouge", "account", "Marie", 4),
+          seat("vert", "bot", "Ourasi", 2, 4),
+        ],
+        deals: 6,
+        creator: "Romain",
+        ranked: true,
+      },
+      {
+        id: `${hash}:2`,
+        kind: "online",
+        startedAt: at(5, 18, 2),
+        endedAt: at(5, 18, 50),
+        winner: "bleu-rouge",
+        mine: "jaune",
+        seats: [
+          seat("bleu", "account", "Marie", 4),
+          seat("jaune", "me", "Romain", 3),
+          seat("rouge", "account", "Paul", 4),
+          seat("vert", "guest", "Mamie", 3),
+        ],
+        deals: 5,
+        creator: "Marie",
+        ranked: true,
+      },
+      {
+        id: `${hash}:1`,
+        kind: "online",
+        startedAt: at(2, 9, 0),
+        endedAt: at(2, 9, 41),
+        winner: "jaune-vert",
+        mine: "vert",
+        seats: [
+          seat("bleu", "account", "Marie-Christine Abcd", 2),
+          seat("jaune", "guest", "Bon-Papa", 4),
+          seat("rouge", "bot", "Ténor", 1, 3),
+          seat("vert", "me", "Romain", 4),
+        ],
+        deals: 7,
+        creator: "Marie-Christine Abcd",
+        ranked: false,
+      },
+    ],
+    next: null,
+  };
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const tab = await context.newPage();
+  await tab.route("**/api/me/results", (route) => route.fulfill({ json: page }));
+  await tab.goto("/");
+  await tab.goto("/#/resultats");
+  await expect(rows(tab)).toHaveCount(3);
+  for (const size of [
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    await tab.setViewportSize(size);
+    await tab.waitForTimeout(300);
+    await tab.screenshot({ path: `${dir}/05-01-resultats-${size.width}x${size.height}.png` });
+  }
+  // The empty history.
+  await tab.unroute("**/api/me/results");
+  await tab.route("**/api/me/results", (route) =>
+    route.fulfill({ json: { games: [], next: null } }),
+  );
+  await tab.goto("/");
+  await tab.goto("/#/resultats");
+  await expect(tab.locator("[data-history-empty]")).toBeVisible();
+  for (const size of [
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    await tab.setViewportSize(size);
+    await tab.waitForTimeout(300);
+    await tab.screenshot({ path: `${dir}/05-01-vide-${size.width}x${size.height}.png` });
+  }
+  await context.close();
+});

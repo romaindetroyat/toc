@@ -7,7 +7,7 @@ import { nameOf, rowOf } from "./format.ts";
 // and the opponents, the end date and time, and the accessible sentence. A guest is « Prénom (sans
 // compte) », a computer its level name, never its horse name.
 
-const NBSP = " ";
+const NBSP = "\u00a0";
 
 const seat = (
   colour: HistorySeat["colour"],

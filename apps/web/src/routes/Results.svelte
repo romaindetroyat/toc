@@ -19,6 +19,7 @@
   let online = $state(typeof navigator === "undefined" || navigator.onLine !== false);
   let status = $state<"loading" | "ready" | "error">("loading");
   let games = $state<HistoryGame[]>([]);
+  let now = $state(Date.now());
 
   let leaving = false;
 
@@ -50,6 +51,7 @@
       return;
     }
     games = answer.games;
+    now = Date.now();
     status = "ready";
   }
 
@@ -77,7 +79,9 @@
     busy={status === "loading"}
     attrs={{ "data-results": "" }}
   >
-    {#snippet left()}{/snippet}
+    {#snippet left()}
+      <p class="t-label muted">{resultats.since}</p>
+    {/snippet}
 
     {#snippet right()}
       <section class="panel" aria-labelledby="history-heading" data-results-panel="historique">
@@ -91,10 +95,22 @@
               {resultats.history.retry}
             </button>
           </div>
+        {:else if games.length === 0}
+          <div class="empty" data-history-empty>
+            <p class="t-body strong">{resultats.history.empty.heading}</p>
+            <p class="t-body">{resultats.history.empty.body}</p>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick={() => (location.hash = "#/ordinateur")}
+            >
+              {resultats.history.empty.solo}
+            </button>
+          </div>
         {:else}
           <ul class="rows" data-history>
             {#each games as game (game.id)}
-              <li><GameRow {game} /></li>
+              <li><GameRow {game} {now} /></li>
             {/each}
           </ul>
         {/if}
@@ -125,6 +141,17 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .strong {
+    font-weight: 700;
   }
 
   .error-row {
