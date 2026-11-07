@@ -7,6 +7,7 @@ import {
   HISTORY_CURSOR_RE,
   type HistoryPage,
   parseHistoryPage,
+  parseRankingAnswer,
   parseStatsAnswer,
   type StatsBlock,
 } from "./index.ts";
@@ -164,5 +165,40 @@ describe("StatsAnswer", () => {
     expect(
       parseStatsAnswer({ all: { ...block(), wins: 4 }, online: empty(), solo: empty() }),
     ).toBeNull();
+  });
+});
+
+// --- Plan 05-05: the friends ranking (GET /api/me/ranking) ---
+
+const ranking = () => ({
+  friends: 4,
+  ranked: [
+    { rank: 1, pseudo: "Chloé", games: 9, wins: 6, me: false },
+    { rank: 2, pseudo: "Anaïs", games: 6, wins: 4, me: true },
+  ],
+  unranked: [{ pseudo: "Bruno", games: 3, me: false }],
+});
+
+describe("RankingAnswer", () => {
+  it("reads a ranking, and an empty one", () => {
+    expect(parseRankingAnswer(ranking())).toEqual(ranking());
+    const none = { friends: 0, ranked: [], unranked: [{ pseudo: "Anaïs", games: 0, me: true }] };
+    expect(parseRankingAnswer(none)).toEqual(none);
+  });
+
+  it("refuses an id on a row, an extra key, a rank 0 and a ranked row under 5 games", () => {
+    const withId = ranking();
+    (withId.ranked[0] as Record<string, unknown>).id = "secret-id";
+    expect(parseRankingAnswer(withId)).toBeNull();
+    expect(parseRankingAnswer({ ...ranking(), more: 1 })).toBeNull();
+    const zero = ranking();
+    (zero.ranked[0] as { rank: number }).rank = 0;
+    expect(parseRankingAnswer(zero)).toBeNull();
+    const few = ranking();
+    (few.ranked[1] as { games: number }).games = 4;
+    expect(parseRankingAnswer(few)).toBeNull();
+    const many = ranking();
+    (many.unranked[0] as { games: number }).games = 5;
+    expect(parseRankingAnswer(many)).toBeNull();
   });
 });

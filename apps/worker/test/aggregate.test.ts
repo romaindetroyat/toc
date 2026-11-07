@@ -1,9 +1,16 @@
 // The pure aggregation of « Mes chiffres » (plan 05-05, HIST-03; 05-UI-SPEC Panel 2, 05-RESEARCH
-// Pattern 4): statsOf over the player's game_seats ⋈ played rows, for the three filters at once.
+// Pattern 4): statsOf over the player's game_seats ⋈ played rows, for the three filters at once; and
+// rankingOf over the circle's ranked counts (HIST-04, D-13, Pitfall 9: exact rates, shared ranks).
 
 import type { Color } from "@toc/engine";
 import { describe, expect, it } from "vitest";
-import { type StatsRow, type StoredSeat, statsOf } from "../src/aggregate.ts";
+import {
+  type RankingRow,
+  rankingOf,
+  type StatsRow,
+  type StoredSeat,
+  statsOf,
+} from "../src/aggregate.ts";
 
 const ME = "me-account-id";
 const BRUNO = "bruno-account-id";
@@ -196,5 +203,101 @@ describe("statsOf", () => {
     expect(statsOf([], ME)).toEqual({ all: empty, online: empty, solo: empty });
     const text = JSON.stringify(statsOf([onlineWin, onlineLoss, soloWin], ME));
     for (const id of [ME, BRUNO, "other-id"]) expect(text).not.toContain(id);
+  });
+});
+
+const person = (id: string, pseudo: string, wins: number, games: number): RankingRow => ({
+  id,
+  pseudo,
+  games,
+  wins,
+});
+
+describe("rankingOf", () => {
+  it("5 games to enter, the rate compared exactly, then wins; the others by games", () => {
+    const circle = [
+      person("a", "Anaïs", 4, 6),
+      person("c", "Chloé", 6, 9),
+      person("d", "David", 3, 5),
+      person("b", "Bruno", 2, 3),
+      person("e", "Élise", 1, 4),
+    ];
+    const answer = rankingOf(circle, "a");
+    expect(answer.friends).toBe(4);
+    // 6/9 equals 4/6: Chloé is first by her wins, Anaïs second; David 3/5 third.
+    expect(answer.ranked).toEqual([
+      { rank: 1, pseudo: "Chloé", games: 9, wins: 6, me: false },
+      { rank: 2, pseudo: "Anaïs", games: 6, wins: 4, me: true },
+      { rank: 3, pseudo: "David", games: 5, wins: 3, me: false },
+    ]);
+    expect(answer.unranked).toEqual([
+      { pseudo: "Élise", games: 4, me: false },
+      { pseudo: "Bruno", games: 3, me: false },
+    ]);
+    expect(JSON.stringify(answer)).not.toMatch(/"id"/);
+  });
+
+  it("2/3 and 4/6 are the same rate (no float), so wins decide", () => {
+    const answer = rankingOf([person("x", "Xavier", 20, 30), person("y", "Yvon", 40, 60)], "x");
+    expect(answer.ranked.map((row) => [row.rank, row.pseudo])).toEqual([
+      [1, "Yvon"],
+      [2, "Xavier"],
+    ]);
+    // 1/3 against 33/99 against 0.333…: exact equality, never a float's last digit.
+    const thirds = rankingOf([person("p", "Paul", 33, 99), person("q", "Quentin", 11, 33)], "p");
+    expect(thirds.ranked.map((row) => row.pseudo)).toEqual(["Paul", "Quentin"]);
+  });
+
+  it("the same rate, wins and games share their rank: « 1, 1, 3 » and « 1, 2, 2, 4 »", () => {
+    const three = rankingOf(
+      [person("a", "Anaïs", 2, 5), person("b", "Bruno", 2, 5), person("c", "Chloé", 1, 5)],
+      "c",
+    );
+    expect(three.ranked.map((row) => [row.rank, row.pseudo])).toEqual([
+      [1, "Anaïs"],
+      [1, "Bruno"],
+      [3, "Chloé"],
+    ]);
+    const four = rankingOf(
+      [
+        person("a", "Anaïs", 5, 5),
+        person("d", "david", 3, 6),
+        person("b", "Bruno", 3, 6),
+        person("e", "Élise", 1, 6),
+      ],
+      "a",
+    );
+    // Equal ranks list by pseudo, accents and case aside.
+    expect(four.ranked.map((row) => [row.rank, row.pseudo])).toEqual([
+      [1, "Anaïs"],
+      [2, "Bruno"],
+      [2, "david"],
+      [4, "Élise"],
+    ]);
+  });
+
+  it("the same rate and wins with different games: more games first, a rank of its own", () => {
+    // 0 wins: the same rate (0) and wins, so more games first.
+    const answer = rankingOf([person("a", "Anaïs", 0, 5), person("b", "Bruno", 0, 7)], "a");
+    expect(answer.ranked.map((row) => [row.rank, row.pseudo])).toEqual([
+      [1, "Bruno"],
+      [2, "Anaïs"],
+    ]);
+  });
+
+  it("nobody ranked, no friend: the player alone in the unranked list", () => {
+    expect(rankingOf([person("a", "Anaïs", 0, 0)], "a")).toEqual({
+      friends: 0,
+      ranked: [],
+      unranked: [{ pseudo: "Anaïs", games: 0, me: true }],
+    });
+  });
+
+  it("unranked ties by games go by pseudo", () => {
+    const answer = rankingOf(
+      [person("z", "zoé", 1, 2), person("a", "Anaïs", 0, 2), person("m", "Marc", 4, 4)],
+      "a",
+    );
+    expect(answer.unranked.map((row) => row.pseudo)).toEqual(["Marc", "Anaïs", "zoé"]);
   });
 });

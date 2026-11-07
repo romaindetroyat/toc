@@ -4,9 +4,10 @@
 // answer is read through the strict schemas of @toc/protocol and holds no account id.
 
 import { SELF } from "cloudflare:test";
-import { parseStatsAnswer } from "@toc/protocol";
+import { parseRankingAnswer, parseStatsAnswer } from "@toc/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  befriendRows,
   d1Of,
   get,
   type Jar,
@@ -142,6 +143,132 @@ describe("GET /api/me/stats", () => {
     expect(await out.json()).toEqual({ error: "signed-out" });
     expect(out.headers.get("x-toc-d1")).toMatch(/^w=\d+;r=\d+$/);
     const posted = await SELF.fetch(`${ORIGIN}/api/me/stats`, { method: "POST" });
+    expect(posted.status).toBe(405);
+  });
+});
+
+// --- Task 2: the friends ranking ---
+
+let gameNo = 1000;
+
+/**
+ * A ranked online game (two accounts or more): `winners` sit bleu and rouge, `losers` jaune and vert;
+ * a missing seat is a guest.
+ */
+async function ranked(winners: Person[], losers: Person[], ranking = true): Promise<void> {
+  const seat = (colour: "bleu" | "jaune" | "rouge" | "vert", who: Person | undefined) =>
+    who === undefined
+      ? { colour, kind: "guest" as const, name: "Mamie" }
+      : { colour, kind: "account" as const, account: who.id, name: who.pseudo };
+  gameNo++;
+  await seedGame({
+    id: `${HASH}:${gameNo}`,
+    endedAt: T0 + gameNo * 1000,
+    winner: "bleu-rouge",
+    seats: [
+      seat("bleu", winners[0]),
+      seat("jaune", losers[0]),
+      seat("rouge", winners[1]),
+      seat("vert", losers[1]),
+    ],
+    ranked: ranking,
+  });
+}
+
+type RankingBody = {
+  friends: number;
+  ranked: { rank: number; pseudo: string; games: number; wins: number; me: boolean }[];
+  unranked: { pseudo: string; games: number; me: boolean }[];
+};
+
+describe("GET /api/me/ranking", () => {
+  it("the circle: the player and their friends, each with all their ranked games", async () => {
+    const a = await account("Anaïs");
+    const b = await account("Bruno");
+    const c = await account("Chloé");
+    const d = await account("David");
+    await befriendRows(a.person.id, b.person.id);
+    await befriendRows(a.person.id, c.person.id);
+    // David is a friend of Bruno only: a friend of a friend never appears in A's ranking.
+    await befriendRows(b.person.id, d.person.id);
+    // A wins 4 of 6 with B; C plays with D (outside A's circle) and wins 2 of 2.
+    for (let i = 0; i < 4; i++) await ranked([a.person], [b.person]);
+    for (let i = 0; i < 2; i++) await ranked([b.person], [a.person]);
+    for (let i = 0; i < 2; i++) await ranked([c.person], [d.person]);
+    // Not ranked: a solo game of A, an online game where A was the only account.
+    await seedGame({
+      id: `solo:${a.person.id}:0c7e6f7a-1b2c-4d5e-8f90-1234567890ab`,
+      kind: "solo",
+      endedAt: T0 + 5,
+      winner: "bleu-rouge",
+      seats: [
+        { colour: "bleu", kind: "account", account: a.person.id, name: a.person.pseudo },
+        { colour: "jaune", kind: "bot", level: 1 },
+        { colour: "rouge", kind: "bot", level: 1 },
+        { colour: "vert", kind: "bot", level: 1 },
+      ],
+    });
+    await ranked([a.person], [], false);
+
+    const answer = await get("/api/me/ranking", a.jar);
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get("cache-control")).toBe("no-store");
+    expect(d1Of(answer).written).toBe(0);
+    const text = await answer.text();
+    for (const who of [a, b, c, d]) expect(text).not.toContain(who.person.id);
+    expect(text).not.toContain(d.person.pseudo);
+    const body = parseRankingAnswer(JSON.parse(text)) as RankingBody;
+    expect(body).not.toBeNull();
+    expect(body.friends).toBe(2);
+    expect(body.ranked).toEqual([
+      { rank: 1, pseudo: a.person.pseudo, games: 6, wins: 4, me: true },
+      { rank: 2, pseudo: b.person.pseudo, games: 6, wins: 2, me: false },
+    ]);
+    expect(body.unranked).toEqual([{ pseudo: c.person.pseudo, games: 2, me: false }]);
+
+    // B's circle is A, B and D: C is not B's friend.
+    const forB = (await (await get("/api/me/ranking", b.jar)).json()) as RankingBody;
+    expect(forB.friends).toBe(2);
+    expect(forB.unranked.map((row) => row.pseudo)).toEqual([d.person.pseudo]);
+    expect(JSON.stringify(forB)).not.toContain(c.person.pseudo);
+  });
+
+  it("a player without friends: friends 0, alone in the list", async () => {
+    const a = await account("Anaïs");
+    const body = (await (await get("/api/me/ranking", a.jar)).json()) as RankingBody;
+    expect(body).toEqual({
+      friends: 0,
+      ranked: [],
+      unranked: [{ pseudo: a.person.pseudo, games: 0, me: true }],
+    });
+  });
+
+  it("a circle of 10 friends: the rows read", async () => {
+    const a = await account("Anaïs");
+    const friends: Person[] = [];
+    for (let i = 0; i < 10; i++) {
+      const friend = await account(`Ami${i}`);
+      friends.push(friend.person);
+      await befriendRows(a.person.id, friend.person.id);
+    }
+    for (let i = 0; i < 10; i++) {
+      const one = friends[i] as Person;
+      const two = friends[(i + 1) % 10] as Person;
+      for (let g = 0; g < 3; g++) await ranked([a.person, one], [two]);
+    }
+    const answer = await get("/api/me/ranking", a.jar);
+    console.log(`GET /api/me/ranking, 10 friends, 30 games: ${answer.headers.get("x-toc-d1")}`);
+    const body = (await answer.json()) as RankingBody;
+    expect(body.friends).toBe(10);
+    expect(body.ranked[0]).toMatchObject({ rank: 1, pseudo: a.person.pseudo, games: 30, wins: 30 });
+    expect(body.ranked).toHaveLength(11);
+  });
+
+  it("401 signed out, and only GET or HEAD", async () => {
+    const out = await get("/api/me/ranking");
+    expect(out.status).toBe(401);
+    expect(await out.json()).toEqual({ error: "signed-out" });
+    const posted = await SELF.fetch(`${ORIGIN}/api/me/ranking`, { method: "POST" });
     expect(posted.status).toBe(405);
   });
 });

@@ -586,3 +586,10 @@ export function d1Of(response: Response): { written: number; read: number } {
   if (match === null) throw new Error(`no x-toc-d1 header: ${header}`);
   return { written: Number(match[1]), read: Number(match[2]) };
 }
+
+/** A friendship written straight into the tests' D1: two rows, one per direction (0002). */
+export async function befriendRows(a: string, b: string, at = Date.now()): Promise<void> {
+  const db = accountDb();
+  const insert = "INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)";
+  await db.batch([db.prepare(insert).bind(a, b, at), db.prepare(insert).bind(b, a, at)]);
+}
