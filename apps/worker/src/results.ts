@@ -18,7 +18,19 @@
 //                       enough; a friend of a friend never appears, T-05-15); each counts their
 //                       ranked game_seats rows only (ranked = 1: online, two accounts or more; never a
 //                       solo game), played with anyone; ordered by rankingOf (RankingAnswer)
+//   POST /api/me/results/solo  a solo game the signed-in browser reports (D-01, T-05-11 to T-05-16),
+//                       registered in index.ts's POSTS, so our own non-null Origin is checked first
+//                       (403); then readJson(SoloReport) (415, 413, 400 body), the session (401),
+//                       plausible (400 implausible), SOLO_PER_DAY reports a day per account through
+//                       the account's PlayerHub.allow (429 rate), and one batch: the played row (id
+//                       solo:<user_id>:<uuid>, kind solo, accounts 1) and its game_seats row taken from
+//                       that played row (ranked 0, solo 1), both ON CONFLICT DO NOTHING, so a resend,
+//                       even with other times, adds nothing (201 added, 200 already there). The game is
+//                       client-claimed: it counts in the player's own history and figures, never in the
+//                       ranking. Nothing of the body is a name: the player's seat is the session's
+//                       account and pseudo, the computers are their levels with an empty name.
 
+import { COLORS, teamOf } from "@toc/engine";
 import {
   HISTORY_CURSOR_RE,
   HISTORY_PAGE_SIZE,
@@ -26,6 +38,7 @@ import {
   type HistoryPage,
   type HistorySeat,
   type RankingAnswer,
+  SoloReport,
   type StatsAnswer,
 } from "@toc/protocol";
 import {
@@ -37,7 +50,7 @@ import {
 } from "./aggregate.ts";
 import { sessionUser } from "./auth/session.ts";
 import type { Meter } from "./db.ts";
-import { json, notAllowed } from "./http.ts";
+import { json, notAllowed, readJson } from "./http.ts";
 
 type PlayedRow = {
   id: string;
@@ -181,4 +194,123 @@ async function history(user: { id: string }, url: URL, meter: Meter): Promise<Re
       rows.length > HISTORY_PAGE_SIZE && last !== undefined ? `${last.ended_at}:${last.id}` : null,
   };
   return json(page, 200);
+}
+
+// --- The solo report (D-01; research Pattern 2 and A5: the thresholds stay « à confirmer ») ---
+
+/**
+ * The shortest believable solo game. Research A5 proposed 60 s; 30 s is chosen because the seeded
+ * test-speed game of plan 01 took about 85 s, so a real game is always far longer (à confirmer).
+ */
+export const SOLO_MIN_MS = 30_000;
+/** How far ahead of the server's clock a report may end (a device's clock running fast). */
+export const SOLO_AHEAD_MS = 5 * 60_000;
+/** How old a report may be: a game kept on an offline device (`toc.pending.v1`, plan 05-07). */
+export const SOLO_MAX_AGE_MS = 60 * 86_400_000;
+/** The most deals a game may have taken. */
+export const SOLO_MAX_DEALS = 300;
+/** The most knights a seat may have eaten, or lost. */
+export const SOLO_MAX_COUNT = 64;
+/** Solo reports a day per account (PlayerHub.allow, kind "solo"). */
+export const SOLO_PER_DAY = 30;
+const SOLO_WINDOW_MS = 86_400_000;
+
+/**
+ * A finished game as it could have happened (pure): 1 to SOLO_MAX_DEALS deals, at least SOLO_MIN_MS
+ * long (so it also ends after it started), ended no later than SOLO_AHEAD_MS from `now` and no
+ * earlier than SOLO_MAX_AGE_MS ago, every count within 0..SOLO_MAX_COUNT, the winning team's two
+ * colours with their 4 knights home, the losers not both. The schema already checked the shape and
+ * that the three other colours each have a level.
+ */
+export function plausible(report: SoloReport, now: number): boolean {
+  if (report.deals < 1 || report.deals > SOLO_MAX_DEALS) return false;
+  if (report.endedAt - report.startedAt < SOLO_MIN_MS) return false;
+  if (report.endedAt > now + SOLO_AHEAD_MS || report.endedAt < now - SOLO_MAX_AGE_MS) return false;
+  const seats = COLORS.map((colour) => ({ colour, ...report.seats[colour] }));
+  if (seats.some((seat) => seat.captured > SOLO_MAX_COUNT || seat.lost > SOLO_MAX_COUNT)) {
+    return false;
+  }
+  const winners = seats.filter((seat) => teamOf(seat.colour) === report.winner);
+  const losers = seats.filter((seat) => teamOf(seat.colour) !== report.winner);
+  if (!winners.every((seat) => seat.home === 4)) return false;
+  return !losers.every((seat) => seat.home === 4);
+}
+
+/** The four seats of a solo game as played.seats stores them: the session's account, three levels. */
+function soloSeats(report: SoloReport, user: { id: string; pseudo: string }): StoredSeat[] {
+  return COLORS.map((colour) => {
+    const counts = report.seats[colour];
+    const human = colour === report.human;
+    return {
+      colour,
+      kind: human ? "account" : "bot",
+      account: human ? user.id : null,
+      name: human ? user.pseudo : "",
+      level: human ? null : (report.levels[colour] ?? null),
+      handedOver: false,
+      captured: counts.captured,
+      lost: counts.lost,
+      home: counts.home,
+    };
+  });
+}
+
+/** POST /api/me/results/solo (index.ts checked our Origin and the method). */
+export async function soloRoute(
+  request: Request,
+  env: Env,
+  url: URL,
+  meter: Meter,
+  now: number,
+): Promise<Response> {
+  const read = await readJson(request, SoloReport);
+  if (!read.ok) return read.response;
+  const user = await sessionUser(request, url, env, meter, now);
+  if (user === null) return json({ error: "signed-out" }, 401);
+  const report = read.body;
+  if (!plausible(report, now)) return json({ error: "implausible" }, 400);
+  const hub = env.PLAYER_HUB.getByName(user.id);
+  if (!(await hub.allow({ kind: "solo", max: SOLO_PER_DAY, windowMs: SOLO_WINDOW_MS, now }))) {
+    return json({ error: "rate" }, 429);
+  }
+  const gameId = `solo:${user.id}:${report.id}`;
+  const mine = report.seats[report.human];
+  const [played] = await meter.batch([
+    meter
+      .prepare(
+        `INSERT INTO played (id, kind, started_at, ended_at, winner, seats, deals, creator, accounts)
+         VALUES (?, 'solo', ?, ?, ?, ?, ?, NULL, 1)
+         ON CONFLICT (id) DO NOTHING`,
+      )
+      .bind(
+        gameId,
+        report.startedAt,
+        report.endedAt,
+        report.winner,
+        JSON.stringify(soloSeats(report, user)),
+        report.deals,
+      ),
+    // The seat row takes its end time and its result from the played row, the first report's: a
+    // resend with other times hits the same key and adds nothing.
+    meter
+      .prepare(
+        `INSERT INTO game_seats
+           (user_id, ended_at, game_id, colour, won, ranked, solo, captured, lost, home)
+         SELECT ?1, p.ended_at, p.id, ?3, CASE WHEN p.winner = ?4 THEN 1 ELSE 0 END, 0, 1, ?5, ?6, ?7
+           FROM played p
+          WHERE p.id = ?2 AND EXISTS (SELECT 1 FROM users WHERE id = ?1)
+         ON CONFLICT DO NOTHING`,
+      )
+      .bind(
+        user.id,
+        gameId,
+        report.human,
+        teamOf(report.human),
+        mine.captured,
+        mine.lost,
+        mine.home,
+      ),
+  ]);
+  const added = (played?.meta?.changes ?? 0) > 0;
+  return json({ added }, added ? 201 : 200);
 }

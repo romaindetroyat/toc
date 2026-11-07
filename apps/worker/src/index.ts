@@ -56,6 +56,8 @@
 // Plan 05-05 (results.ts, aggregate.ts; a session, 401 else):
 //   GET  /api/me/stats               → « Mes chiffres » for the three filters at once (StatsAnswer)
 //   GET  /api/me/ranking             → the friends ranking of the caller's circle (RankingAnswer)
+//   POST /api/me/results/solo        → a solo game the signed-in browser reports (Origin, JSON,
+//                                      SoloReport, plausible, 30 a day): 201 added, 200 already there
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)
@@ -81,7 +83,7 @@ import { inviteRoute } from "./invite.ts";
 import { meRoute, meTablesRoute } from "./me.ts";
 import { PlayerHub } from "./PlayerHub.ts";
 import { pushRoute } from "./push.ts";
-import { resultsRoute } from "./results.ts";
+import { resultsRoute, soloRoute } from "./results.ts";
 import { socialRoute } from "./social.ts";
 
 // The two Durable Object classes of both deploy configs (GameRoom: migration v1; PlayerHub, one per
@@ -161,7 +163,10 @@ async function summaryRoute(request: Request, env: Env, id: string): Promise<Res
 
 type Post = (request: Request, env: Env, url: URL, meter: Meter, now: number) => Promise<Response>;
 
-/** The POST routes of the accounts (plans 04-01 to 04-03), each behind writeAllowed and readJson. */
+/**
+ * The POST routes of the accounts (plans 04-01 to 04-03) and the solo report (05-05), each behind
+ * writeAllowed and readJson.
+ */
 const POSTS = new Map<string, Post>([
   ["/api/auth/signup/options", signupOptions],
   ["/api/auth/signup/verify", signupVerify],
@@ -177,6 +182,8 @@ const POSTS = new Map<string, Post>([
   ["/api/auth/backup-code/verify", backupCodeVerify],
   ["/api/auth/recover", recoverOptions],
   ["/api/auth/recover/verify", recoverVerify],
+  // Plan 05-05: a solo game reported by a signed-in browser (results.ts).
+  ["/api/me/results/solo", soloRoute],
 ]);
 
 /** The account routes (plans 04-01, 04-02), or null for a path that is not one of them. */

@@ -183,3 +183,61 @@ export function parseRankingAnswer(data: unknown): RankingAnswer | null {
   const parsed = rankingAnswer.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
+
+// --- The solo report (plan 05-05, D-01; 05-RESEARCH Pattern 2) ---
+
+/** The report's own id, made by the browser at the start of the game (crypto.randomUUID()). */
+export const SOLO_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Loose bounds only: the Worker's plausibility check (results.ts) has the game's own limits.
+const reported = z.number().check(z.int(), z.gte(0), z.lte(100_000));
+const instant = z.number().check(z.int(), z.gte(0), z.lte(Number.MAX_SAFE_INTEGER));
+
+const soloSeat = z.strictObject({
+  /** Knights this seat ate. */
+  captured: reported,
+  /** This seat's knights eaten. */
+  lost: reported,
+  /** This seat's knights home at the end. */
+  home: z.number().check(z.int(), z.gte(0), z.lte(4)),
+});
+
+const soloReport = z
+  .strictObject({
+    id: z.string().check(z.regex(SOLO_ID_RE)),
+    startedAt: instant,
+    endedAt: instant,
+    /** The player's colour; the three others are computers. */
+    human: z.enum(COLORS),
+    winner: team,
+    deals: reported,
+    /** The level of each computer: exactly the three colours other than the player's. */
+    levels: z.strictObject({
+      bleu: z.optional(level),
+      jaune: z.optional(level),
+      rouge: z.optional(level),
+      vert: z.optional(level),
+    }),
+    seats: z.strictObject({ bleu: soloSeat, jaune: soloSeat, rouge: soloSeat, vert: soloSeat }),
+  })
+  .check(
+    z.refine((body) =>
+      COLORS.every((colour) => (colour === body.human) === (body.levels[colour] === undefined)),
+    ),
+  );
+
+/**
+ * POST /api/me/results/solo: a solo game that ended while signed in, as the browser reports it
+ * (client-claimed: the server stores it for the player's own figures only, never the ranking). No
+ * name: the player is the session's account, the computers are their levels.
+ */
+export type SoloReport = z.infer<typeof soloReport>;
+
+/** The schema itself: the Worker's readJson checks the body against it. */
+export const SoloReport = soloReport;
+
+/** An untrusted body as a SoloReport, or null when it is out of shape. */
+export function parseSoloReport(data: unknown): SoloReport | null {
+  const parsed = soloReport.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
