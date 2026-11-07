@@ -362,11 +362,11 @@ Plans:
   4. Un nouveau joueur apprend les règles en faisant une partie guidée par un tutoriel interactif.
   5. Toute l'interface est en français. Chaque place se reconnaît autrement que par sa couleur, et les zones tactiles sont assez grandes pour jouer au doigt sur téléphone.
 
-**Plans:** 11 plans (run one after the other on the main tree: the Playwright suites share the ports 4173, 4174 and 8787; each plan runs only the specs it touches; 05-10 installs @axe-core/playwright 4.14.0, the only package of the phase, approved by Romain (D-10); no plan runs a remote command: 05-01 adds D1 migration 0003, applied locally only; 05-11 runs everything, completes 05-UAT.md and writes the deploy steps the orchestrator runs, remote migration 0003 before the deploy)
+**Plans:** 1/11 plans executed (run one after the other on the main tree: the Playwright suites share the ports 4173, 4174 and 8787; each plan runs only the specs it touches; 05-10 installs @axe-core/playwright 4.14.0, the only package of the phase, approved by Romain (D-10); no plan runs a remote command: 05-01 adds D1 migration 0003, applied locally only; 05-11 runs everything, completes 05-UAT.md and writes the deploy steps the orchestrator runs, remote migration 0003 before the deploy)
 
 Plans:
 **Wave 1**
-- [ ] 05-01-PLAN.md — Traceur : une partie en ligne à deux comptes, écrite dans D1 (migration 0003) et lue dans « Mes résultats »
+- [x] 05-01-PLAN.md — Traceur : une partie en ligne à deux comptes, écrite dans D1 (migration 0003) et lue dans « Mes résultats »
 - [ ] 05-02-PLAN.md — Les formes des places, sur les chevaux (désactivables dans « Réglages ») et à côté des écuries
 - [ ] 05-03-PLAN.md — Le moteur des leçons : huit situations préparées, rejouées en test jusqu’à « Bravo »
 
@@ -387,6 +387,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 05-11-PLAN.md — Vérification finale, le coût sur l’offre gratuite, la recette de Romain et les étapes de mise en ligne
+
 **UI hint**: yes
 
 ## Progress
@@ -400,4 +401,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Jouer en ligne entre proches | 14/14 | Closed, UAT pending | 2026-10-17 |
 | 3. L'ordinateur à la force choisie | 11/11 | Closed, UAT pending | 2026-10-17 |
 | 4. Comptes, amis et application installable | 16/16 | Closed, UAT pending | 2026-11-07 |
-| 5. Suivi, apprentissage et finition | 0/TBD | Not started | - |
+| 5. Suivi, apprentissage et finition | 1/11 | In Progress | - |
