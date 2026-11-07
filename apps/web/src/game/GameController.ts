@@ -66,6 +66,13 @@ export type CreateGameOptions = {
    * the browser session passes the time-sliced inline runner. Its clock must be `now`'s.
    */
   runner?: BotRunner;
+  /**
+   * Lessons only (05-03): the actions of the listed seats, in order. A listed seat never thinks: when it
+   * is due it plays its next action at once (no think, no pace), and once its list is empty it waits
+   * forever; the other seats are not held up by it in the exchange. A scripted action the engine
+   * refuses is a failure reported through onError. The lists are copied at creation.
+   */
+  script?: Partial<Record<Color, Action[]>>;
   director: GameDirector;
 };
 
@@ -137,6 +144,14 @@ export function createGame(options: CreateGameOptions): GameController {
   const now = options.now ?? (() => performance.now());
   const runner = options.runner ?? syncRunner;
   let botRng: Rng = options.botSeed ?? randomSeed();
+  const scripts = new Map<Color, Action[]>(
+    COLORS.flatMap((c) => {
+      const actions = options.script?.[c];
+      return actions === undefined ? [] : [[c, [...actions]] as [Color, Action[]]];
+    }),
+  );
+  /** A scripted seat with nothing left to play: it never acts again. */
+  const stalled = (seat: Color): boolean => scripts.get(seat)?.length === 0;
   const speedOf: () => Speed =
     typeof options.speed === "function"
       ? options.speed
@@ -191,11 +206,12 @@ export function createGame(options: CreateGameOptions): GameController {
     if (state.phase === "won") return null;
     if (state.phase === "exchange") {
       return (
-        COLORS.find((c) => c !== human && state.given[c] === null && state.hands[c].length > 0) ??
-        null
+        COLORS.find(
+          (c) => c !== human && state.given[c] === null && state.hands[c].length > 0 && !stalled(c),
+        ) ?? null
       );
     }
-    return state.turn === human ? null : state.turn;
+    return state.turn === human || stalled(state.turn) ? null : state.turn;
   }
 
   function play(seat: Color, action: Action): void {
@@ -221,6 +237,12 @@ export function createGame(options: CreateGameOptions): GameController {
         if (disposed) break;
         const bot = nextBot();
         if (bot === null) break;
+        // A lesson's scripted seat plays its next written action at once: no think, no pace.
+        const written = scripts.get(bot)?.shift();
+        if (written !== undefined) {
+          play(bot, written);
+          continue;
+        }
         const seen = state;
         setThinking(bot);
         const start = now();
