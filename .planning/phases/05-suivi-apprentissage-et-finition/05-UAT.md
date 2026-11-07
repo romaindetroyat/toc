@@ -8,10 +8,10 @@ updated: 2026-11-07T16:58:57Z
 
 ## Current Test
 
-number: 11
-name: "Relire le texte de la feuille « Règles »"
+number: 1
+name: "Tes parties dans « Mes résultats »"
 expected: |
-  Lis le texte de la feuille « Règles du TOC », copié en entier dans le test 11 ci-dessous, et dis ce qu’il faut changer.
+  Juste après la mise en ligne : joue une partie en ligne avec un proche qui a un compte, une personne sans compte et un ordinateur, puis ouvrez « Mes résultats » sur vos deux appareils (test 1 ci-dessous).
 awaiting: user response
 
 ## Tests
