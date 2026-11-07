@@ -2,7 +2,9 @@
   import type { Rank } from "@toc/engine";
   import { onDestroy, onMount, tick } from "svelte";
   import { RULES_TABS, type RulesTabId, regles } from "../i18n/fr/regles.ts";
+  import { figuresOf } from "../game/ruleFigures.ts";
   import CardRule from "./CardRule.svelte";
+  import RuleFigure from "./RuleFigure.svelte";
   import { holdForRules } from "./rulesOpen.svelte.ts";
   import Sheet from "./Sheet.svelte";
 
@@ -43,6 +45,7 @@
   // svelte-ignore state_referenced_locally
   let current = $state<RulesTabId>(tab ?? (inGame ? "cartes" : "but"));
   const shown = $derived(regles.tabs[current]);
+  const figures = $derived(figuresOf(current));
 
   /** Two columns when the dialog is at least 656 px wide: from a 688 px window (880 or 100vw − 32). */
   const TWO_COLUMNS = "(min-width: 688px)";
@@ -170,6 +173,9 @@
           {/each}
         </ul>
       {/if}
+      {#each figures as spec (spec.id)}
+        <RuleFigure {spec} />
+      {/each}
     </div>
   </div>
 </Sheet>

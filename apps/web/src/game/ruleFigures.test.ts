@@ -174,7 +174,8 @@ describe("the release code never imports the scenario set (D-15, 05-RESEARCH Pat
 
   for (const [file, text] of Object.entries(sources)) {
     it(`${file} has no import of @toc/engine/scenarios`, () => {
-      expect(text).not.toMatch(/@toc\/engine\/scenarios/);
+      // An import of it, static or dynamic (a comment may name it).
+      expect(text).not.toMatch(/(?:from|import\()\s*["']@toc\/engine\/scenarios["']/);
     });
   }
 });
