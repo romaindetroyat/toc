@@ -311,7 +311,7 @@ result: pending
 expected: |
   À remplir par l’orchestrateur après la mise en ligne. Rien à faire pour toi, sauf vérifier que tout marche.
   - Version en ligne : (le commit et l’identifiant de version de Cloudflare, à remplir).
-  - Base D1 : la migration 0003 (les résultats : les tables played et game_seats) appliquée sur la base en ligne avant la mise en ligne du nouveau Worker (la sortie de la commande, à remplir). 0001 et 0002 l’étaient déjà.
+  - Base D1 : la migration 0003 (les résultats : les tables played et game_seats) appliquée sur la base en ligne avant la mise en ligne du nouveau Worker (appliquée le 2026-11-07 avant le premier déploiement de la phase 5 ; la commande relancée avant ce déploiement répond « No migrations to apply! »). 0001 et 0002 l’étaient déjà.
   - Durable Objects : aucune migration nouvelle ; v1 (les tables) et v2 (l’objet de chaque compte) sont inchangées. Aucun secret nouveau.
   - Contrôle après la mise en ligne (tools/smoke-online.mjs) : (la sortie, à remplir). Il vérifie aussi que, sans cookie, « Mes résultats », « Mes chiffres » et le classement répondent 401, et qu’un rapport de partie solo venu d’un autre site est refusé (403).
   - Retour en arrière possible : le Worker de la phase 4 ignore les deux tables nouvelles.
