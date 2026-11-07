@@ -245,6 +245,13 @@ test("« Mettre à jour » dans un onglet ne recharge pas la partie d’un autre
 }) => {
   test.setTimeout(90_000);
   const copy = await serveCopy();
+  // Plan 05-08: the copy's origin is not the config's, so its storage starts empty; « Première fois ? »
+  // must not cover the home's strip.
+  await context.addInitScript(() => {
+    if (localStorage.getItem("toc.tutorial.v1") === null) {
+      localStorage.setItem("toc.tutorial.v1", '{"offered":true,"done":[]}');
+    }
+  });
   try {
     // Two tabs of one browser: the home in one, then a solo game opened in another (a first load).
     const home = await context.newPage();

@@ -4,7 +4,12 @@
 // `done` keeps only the lesson numbers 1 to 8, once each and sorted, and anything else reads as empty
 // progress. Every read and write is in a try/catch: without a usable storage the progress lives in
 // memory for this page, and nothing here ever throws. Pure: the storage is passed in, so it runs under
-// Node. (Plan 05-08 adds the first-launch rule that sets `offered`.)
+// Node. Plan 05-08 adds the first-launch rule (firstTimeDue) that writes the key on the home.
+
+import { normalizeName } from "@toc/protocol";
+import { ME_KEY } from "../account/cache.ts";
+import { DEVICE_KEY } from "../net/device.ts";
+import { TABLES_KEY } from "../net/tables.ts";
 
 export const TUTORIAL_KEY = "toc.tutorial.v1";
 
@@ -92,4 +97,51 @@ export function markDone(storage: StorageLike | null, n: number): TutorialProgre
   const next = { offered: current.offered, done: lessonsOf([...current.done, n]) };
   write(storage, next);
   return next;
+}
+
+/** The first lesson not done, or null once all eight are (« Continuer : leçon {n} », « Leçon {n} sur 8 »). */
+export function nextLesson(done: readonly number[]): number | null {
+  for (let n = 1; n <= LESSON_COUNT; n++) if (!done.includes(n)) return n;
+  return null;
+}
+
+/**
+ * Whether the device's stored first name, account or tables say it has played. The home always writes
+ * a device token, so the device counts only with a first name. A value that cannot be read counts as
+ * played (T-05-23: any doubt means the sheet does not show).
+ */
+function hasPlayed(storage: StorageLike): boolean {
+  const device = storage.getItem(DEVICE_KEY);
+  if (device) {
+    let value: unknown;
+    try {
+      value = JSON.parse(device);
+    } catch {
+      return true;
+    }
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return true;
+    const source = value as Record<string, unknown>;
+    if (Object.hasOwn(source, "name") && normalizeName(source.name) !== null) return true;
+  }
+  return Boolean(storage.getItem(ME_KEY)) || Boolean(storage.getItem(TABLES_KEY));
+}
+
+/**
+ * The first-launch rule of « Première fois ? » (plan 05-08, D-08; 05-UI-SPEC « First-launch sheet »):
+ * true on a brand-new device only, and the key is written at once ({ offered: true, done: [] }), so the
+ * sheet shows once whatever the answer. A device that has played gets the key silently (offered
+ * false) and never sees it. Once the key is there, whatever it holds, never again. A storage that
+ * throws, on reading or on writing, never shows it: no nagging on each start. The caller asks only
+ * when the sheet can show (the home, no other sheet up), since the answer is final.
+ */
+export function firstTimeDue(storage: StorageLike | null): boolean {
+  if (storage === null) return false;
+  try {
+    if (storage.getItem(TUTORIAL_KEY) !== null) return false;
+    const due = !hasPlayed(storage);
+    storage.setItem(TUTORIAL_KEY, JSON.stringify({ offered: due, done: [] }));
+    return due;
+  } catch {
+    return false;
+  }
 }

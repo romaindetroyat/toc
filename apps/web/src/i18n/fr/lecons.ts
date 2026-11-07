@@ -36,6 +36,32 @@ export const lecons = {
       done ? `Leçon ${n}, ${title}, faite` : `Leçon ${n}, ${title}`,
   },
 
+  /** Plan 05-08: the sheet « Première fois ? » on a brand-new device (D-08). */
+  firstTime: {
+    title: "Première fois ?",
+    text: "Apprends à jouer en jouant : huit petites leçons, avec un guide qui te montre quoi toucher.",
+    start: "Apprendre en 10 minutes",
+    note: "Tu retrouveras les leçons sur l’accueil, dans « Apprendre ».",
+    later: "Plus tard",
+  },
+
+  /** Plan 05-08: the page « Apprendre à jouer » (#/apprendre). */
+  page: {
+    title: "Apprendre à jouer",
+    home: "Accueil",
+    text: "Huit petites leçons d’environ une minute. Un guide te montre quoi toucher. Si tu te trompes, il t’explique et tu réessaies.",
+    /** The primary by progress: none done, some done (the first not done), all done. */
+    start: "Commencer",
+    next: (n: number) => `Continuer : leçon ${n}`,
+    computer: "Jouer contre l’ordinateur",
+    /** Only when all are done: lesson 1 again, the progress kept. */
+    again: "Revoir depuis le début",
+    note: "Les règles complètes sont dans « Règles », à tout moment de la partie.",
+    rules: "Règles du jeu",
+    /** The list's accessible name. */
+    list: "Les huit leçons",
+  },
+
   /** Plan 05-06: the « Bravo ! » plank's buttons (the last lesson has its own two). */
   plank: {
     again: "Revoir la leçon",

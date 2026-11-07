@@ -4,7 +4,7 @@
   import { LESSONS } from "../game/lessons.ts";
   import { lecons } from "../i18n/fr/lecons.ts";
   import { pageStorage } from "../net/device.ts";
-  import Icon from "./Icon.svelte";
+  import LessonRow from "./LessonRow.svelte";
   import Sheet from "./Sheet.svelte";
 
   // « Les leçons », opened from the lesson pill (plan 05-06; 05-UI-SPEC « The lesson screen »): the
@@ -52,27 +52,13 @@
       {#each LESSONS as lesson (lesson.n)}
         {@const finished = done.includes(lesson.n)}
         <li>
-          <a
-            class="row"
-            href={`#/apprendre/${lesson.n}`}
-            data-lesson={lesson.n}
-            data-done={finished}
-            aria-current={lesson.n === current ? "page" : undefined}
-            aria-label={lecons.sheet.row(lesson.n, lesson.title, finished)}
+          <LessonRow
+            n={lesson.n}
+            title={lesson.title}
+            done={finished}
+            current={lesson.n === current}
             onclick={(event) => pick(event, lesson.n)}
-          >
-            <span class="disc tabular" aria-hidden="true">
-              {#if finished}
-                <Icon name="check" size={20} />
-              {:else}
-                {lesson.n}
-              {/if}
-            </span>
-            <span class="lines" aria-hidden="true">
-              <span class="title">{lesson.title}</span>
-              <span class="sub">{finished ? lecons.sheet.done : lecons.sheet.about}</span>
-            </span>
-          </a>
+          />
         </li>
       {/each}
     </ol>
@@ -96,59 +82,6 @@
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  /* A 56 px row on bois sombre: the disc, 12, the title (Body 700) over its line 2 (Label muted). */
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-sizing: border-box;
-    min-height: 56px;
-    padding: 0 12px;
-    border-radius: var(--radius-button);
-    background: var(--bois-sombre);
-    color: var(--creme);
-    text-decoration: none;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  /* The lesson on screen: a cream outline (never amber). */
-  .row[aria-current="page"] {
-    box-shadow: inset 0 0 0 2px var(--creme);
-  }
-
-  .disc {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--chene);
-    color: var(--noyer);
-    font-size: var(--heading-size);
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .lines {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .title {
-    font-size: var(--body-size);
-    font-weight: 700;
-    line-height: var(--body-line);
-  }
-
-  .sub {
-    color: var(--creme-attenuee);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
   }
 
   .restart {

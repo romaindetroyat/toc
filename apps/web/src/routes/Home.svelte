@@ -1,12 +1,15 @@
 <script lang="ts">
+  import { onMount, tick } from "svelte";
   import { homeTiles, type TileKind } from "../account/flow.ts";
-  import { account, openSignIn } from "../account/store.svelte.ts";
+  import { account, openSignIn, signInSheet } from "../account/store.svelte.ts";
   import logo from "../assets/logo/logo-128.webp";
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
+  import { firstTimeDue } from "../game/lessonProgress.ts";
   import { browserApi, createTable } from "../net/api.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
+  import FirstTimeSheet from "../ui/FirstTimeSheet.svelte";
   import HomeStrip from "../ui/HomeStrip.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
@@ -108,6 +111,19 @@
     else if (kind === "connexion") openSignIn(tileElements.connexion ?? null);
   }
 
+  // « Première fois ? » (plan 05-08, D-08): once per brand-new device, over the home only. It waits for
+  // the next home visit (the key not written) while another sheet or the in-app card is up: the
+  // sign-in sheet of a session that ended, for instance. firstTimeDue writes the key when it answers.
+  let firstTime = $state(false);
+
+  onMount(() => {
+    void tick().then(() => {
+      if (signInSheet.open) return;
+      if (document.querySelector("[data-sheet-layer], [data-notice-card]") !== null) return;
+      firstTime = firstTimeDue(storage);
+    });
+  });
+
   function rename(name: string) {
     const saved = saveName(storage, name);
     if (saved !== null) device = saved;
@@ -204,6 +220,10 @@
     </section>
   </div>
 </main>
+{/if}
+
+{#if firstTime}
+  <FirstTimeSheet onclose={() => (firstTime = false)} />
 {/if}
 
 {#if changing && device.name !== null}

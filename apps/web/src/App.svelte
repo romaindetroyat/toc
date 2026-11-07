@@ -11,6 +11,7 @@
   import Home from "./routes/Home.svelte";
   import Invitation from "./routes/Invitation.svelte";
   import Launch from "./routes/Launch.svelte";
+  import Lessons from "./routes/Lessons.svelte";
   import Recover from "./routes/Recover.svelte";
   import Results from "./routes/Results.svelte";
   import SoundTest from "./routes/SoundTest.svelte";
@@ -50,7 +51,7 @@
   );
   /**
    * A lesson's link: #/apprendre/<1-8> (plan 05-06). Any other number, or anything else after the
-   * prefix, is not a lesson: the home shows (until plan 05-08 adds the lessons page #/apprendre).
+   * prefix, is not a lesson: the home shows. The lessons page itself is #/apprendre (plan 05-08).
    */
   const LESSON_PREFIX = "#/apprendre/";
   const lessonNumber = $derived.by((): number | null => {
@@ -102,6 +103,10 @@
     {#key lessonNumber}
       <Game lesson={lessonNumber} />
     {/key}
+  {:else if route === "#/apprendre"}
+    <!-- « Apprendre à jouer » (plan 05-08): the eight lessons and the progress. A « Page », not behind
+         « Tourne ton téléphone »: it works upright too. -->
+    <Lessons />
   {:else if route === "#/ordinateur"}
     <!-- The solo setup (the launch screen of phases 1 and 3), one tap from the home (02-04, D-09). -->
     <Launch />

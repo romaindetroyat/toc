@@ -138,7 +138,7 @@ describe("« Première fois ? » (firstTimeDue, plan 05-08, D-08)", () => {
   });
 
   it("is not due on a device that has played; the key is written silently", () => {
-    for (const played of [
+    const playedDevices: Record<string, string>[] = [
       { "toc.device.v1": JSON.stringify({ token: TOKEN, name: "Mamie" }) },
       { "toc.me.v1": JSON.stringify({ id: "b".repeat(22), pseudo: "Romain" }) },
       { "toc.tables.v1": "[]" },
@@ -146,7 +146,8 @@ describe("« Première fois ? » (firstTimeDue, plan 05-08, D-08)", () => {
       // Any doubt means « not shown »: a value that cannot be read counts as played.
       { "toc.device.v1": "{" },
       { "toc.me.v1": "nimporte quoi" },
-    ]) {
+    ];
+    for (const played of playedDevices) {
       const storage = deviceStorage(played);
       expect(firstTimeDue(storage), JSON.stringify(played)).toBe(false);
       expect(storage.written()).toEqual([TUTORIAL_KEY]);
