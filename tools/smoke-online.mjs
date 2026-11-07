@@ -1,5 +1,5 @@
-// Smoke run of the online tables, the accounts and the installable app against a running Worker
-// (plans 02-10 and 04-12): the deployed site, or a local `wrangler dev`.
+// Smoke run of the online tables, the accounts, the results and the installable app against a running
+// Worker (plans 02-10, 04-12 and 05-11): the deployed site, or a local `wrangler dev`.
 //
 //   node tools/smoke-online.mjs [base-url] [--turns N] [--level 1-5] [--read-only] [--verbose]
 //
@@ -23,6 +23,10 @@
 //                                (no-cache on the deployed embedded Worker; max-age=0 with
 //                                must-revalidate from the static assets of a local `wrangler dev`)
 //   GET  /manifest.webmanifest → 200, orientation « landscape », lang « fr »
+//   GET  /api/me/results, /api/me/stats, /api/me/ranking (no cookie) → 401 (plan 05-11: the results
+//                                routes of phase 5 answer only a session; nothing read)
+//   POST /api/me/results/solo with a JSON body and no Origin → 403 (a write from another site is refused
+//                                before the body or the session is looked at; nothing written)
 // WebSocket steps (best effort): hello with a random device token → welcome; sit bleu; the three other
 // seats at Champion (level 5, or --level); start; pass a card and play N turns (default 3) with randomLegal on the
 // page's own view while the Champions play; then « stop » (the table is saved, 30 days) and close.
@@ -193,6 +197,30 @@ try {
     manifest.status === 200 && app?.orientation === "landscape" && app?.lang === "fr",
     "GET /manifest.webmanifest",
     `${manifest.status} ${manifest.type}, orientation ${app?.orientation}, lang ${app?.lang}`,
+  );
+} catch (error) {
+  report(false, "HTTP", String(error?.cause ?? error));
+}
+
+// --- The results of phase 5 (plan 05-11), HTTP, each must pass ---
+// Node's fetch sends no Origin header: the solo report is refused as a write from another site.
+try {
+  for (const path of ["/api/me/results", "/api/me/stats", "/api/me/ranking"]) {
+    const answer = await http("GET", path);
+    report(
+      answer.status === 401 && json(answer.text)?.error === "signed-out",
+      `GET ${path} (no cookie)`,
+      `${answer.status} ${answer.text}`,
+    );
+  }
+  const solo = await http("POST", "/api/me/results/solo", {
+    id: crypto.randomUUID(),
+    seats: {},
+  });
+  report(
+    solo.status === 403,
+    "POST /api/me/results/solo (no Origin)",
+    `${solo.status} ${solo.text}`,
   );
 } catch (error) {
   report(false, "HTTP", String(error?.cause ?? error));
