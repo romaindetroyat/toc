@@ -179,3 +179,348 @@ for (const size of WIDTHS) {
     });
   });
 }
+
+// --- The eight lessons, each with its declared wrong choice (plan 05-06 task 2) ---
+
+/** One move of a lesson's script, as a person would make it. */
+type Act =
+  /** The band says this line (and, in the measure test, it is measured there). */
+  | { say: string }
+  | { next: true }
+  | { card: string }
+  | { pawn: string }
+  | { chip: number }
+  | { play: true }
+  | { give: true }
+  /** Anything to check on the way. */
+  | { check: (page: Page) => Promise<void> };
+
+/** The partner's 7 has Rouge's border once the cards have crossed (lesson 8). */
+const receivedSeven = async (page: Page) => {
+  await expect(card(page, "7H")).toHaveAttribute("data-received", "rouge");
+};
+
+const { sortir, avancer, manger, recule, valet, sept, maison, echange } = lecons;
+
+/** Each lesson's right path, with one wrong choice (lesson 5: Jaune 40; 6: a split; 7: the 9, the Roi). */
+const SCRIPTS: Record<number, Act[]> = {
+  1: [
+    { say: sortir.bienvenue },
+    { next: true },
+    { say: sortir.but },
+    { next: true },
+    { say: sortir.carte },
+    { card: "8S" },
+    { say: sortir.wrong.carte },
+    { card: "1H" },
+    { say: sortir.jouer },
+    { play: true },
+  ],
+  2: [
+    { say: avancer.intro },
+    { next: true },
+    { say: avancer.carte },
+    { card: "12H" },
+    { say: avancer.wrong.carte },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="bleu1"]')).toHaveAttribute("data-place", "ring:10"),
+    },
+    { card: "8C" },
+    { say: avancer.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="bleu1"]')).toHaveAttribute("data-place", "ring:18"),
+    },
+  ],
+  3: [
+    { say: manger.carte },
+    { card: "3S" },
+    { say: manger.wrong.carte },
+    { card: "8D" },
+    { say: manger.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="jaune0"]')).toHaveAttribute("data-place", /^stable/),
+    },
+  ],
+  4: [
+    { say: recule.carte },
+    { card: "9S" },
+    { say: recule.wrong.carte },
+    { card: "4H" },
+    { say: recule.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="vert0"]')).toHaveAttribute("data-place", /^stable/),
+    },
+  ],
+  5: [
+    { say: valet.carte },
+    { card: "6D" },
+    { say: valet.wrong.carte },
+    { card: "11S" },
+    { say: valet.cheval },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-guide-halo="pawn"]')).toHaveAttribute(
+          "data-guide-pawn",
+          "bleu0",
+        ),
+    },
+    { pawn: "bleu0" },
+    { say: valet.cible },
+    { pawn: "jaune1" },
+    { say: valet.wrong.cible },
+    { check: async (page) => expect(page.locator("[data-swap-preview]")).toHaveCount(0) },
+    { pawn: "jaune0" },
+    { say: valet.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", "ring:66"),
+    },
+  ],
+  6: [
+    { say: sept.intro },
+    { next: true },
+    { say: sept.carte },
+    { card: "2H" },
+    { say: sept.carte },
+    { card: "7C" },
+    { say: sept.premier },
+    { pawn: "bleu0" },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-guide-halo="chip"]')).toHaveAttribute("data-step", "3"),
+    },
+    // A split that eats only Vert: refused on « Jouer », the split goes back to its start.
+    { chip: 1 },
+    { pawn: "bleu1" },
+    { chip: 6 },
+    { say: sept.jouer },
+    { play: true },
+    { say: sept.wrong.plan },
+    {
+      check: async (page) =>
+        expect(page.locator("[data-remaining]").first()).toHaveAttribute("data-remaining", "7"),
+    },
+    { pawn: "bleu0" },
+    { chip: 3 },
+    { say: sept.second },
+    { pawn: "bleu1" },
+    { chip: 4 },
+    { say: sept.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="jaune0"]')).toHaveAttribute("data-place", /^stable/),
+    },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="vert0"]')).toHaveAttribute("data-place", /^stable/),
+    },
+  ],
+  7: [
+    { say: maison.intro },
+    { next: true },
+    { say: maison.carte },
+    { card: "9H" },
+    { say: maison.wrong.neuf },
+    { card: "13C" },
+    { say: maison.wrong.roi },
+    { card: "6S" },
+    { say: maison.jouer },
+    { play: true },
+    {
+      check: async (page) =>
+        expect(page.locator('[data-pawn="bleu0"]')).toHaveAttribute("data-place", /^home/),
+    },
+  ],
+  8: [
+    { say: echange.intro },
+    { next: true },
+    { say: echange.carte },
+    { card: "9C" },
+    { say: echange.wrong.carte },
+    { card: "13S" },
+    { say: echange.passer },
+    { give: true },
+    { say: echange.recu },
+    { check: receivedSeven },
+    { next: true },
+  ],
+};
+
+/** Plays one move of a script; `measure` is called at each line the band says. */
+async function act(page: Page, step: Act, measure?: (line: string) => Promise<void>) {
+  if ("say" in step) {
+    await says(page, step.say);
+    await measure?.(step.say);
+  } else if ("next" in step) await next(page).click();
+  else if ("card" in step) await card(page, step.card).click();
+  else if ("pawn" in step) await page.locator(`[data-hit="${step.pawn}"]`).click({ force: true });
+  else if ("chip" in step)
+    await page.locator(`[data-seven-chips] [data-step="${step.chip}"]`).click();
+  else if ("play" in step) await play(page).click();
+  else if ("give" in step) await page.getByRole("button", { name: /^Passer cette carte/ }).click();
+  else await step.check(page);
+}
+
+for (const n of [2, 3, 4, 5, 6, 7, 8]) {
+  test(`leçon ${n} : une erreur expliquée, puis « Bravo ! »`, async ({ page }) => {
+    const writes = watchWrites(page);
+    await openLesson(page, n);
+    for (const step of SCRIPTS[n] ?? []) await act(page, step);
+    const shown = await plankShown(page);
+    const done = JSON.parse(
+      (await page.evaluate(() => localStorage.getItem("toc.tutorial.v1"))) ?? "null",
+    );
+    expect(done?.done).toContain(n);
+    expect(writes).toEqual([]);
+    if (n < 8) {
+      await expect(shown.getByRole("button", { name: lecons.plank.next })).toBeFocused();
+      return;
+    }
+    // The last lesson: « Revoir les leçons » and « Jouer contre l’ordinateur » (#/ordinateur).
+    await expect(shown).toContainText(echange.recap);
+    await expect(shown.getByRole("button", { name: lecons.plank.lessons })).toBeVisible();
+    await expect(shown.getByRole("button", { name: lecons.plank.computer })).toBeFocused();
+    await shown.getByRole("button", { name: lecons.plank.computer }).click();
+    await expect(page).toHaveURL(/#\/ordinateur$/);
+  });
+}
+
+test.describe("au clavier", () => {
+  test.skip(({ isMobile }) => isMobile, "the keyboard: desktop project only");
+
+  test("Échap ramène l’étape de la carte, les chiffres et Entrée jouent", async ({ page }) => {
+    await openLesson(page, 3);
+    await says(page, manger.carte);
+    // The hand reads 3, 8, 10: « 2 » is the 8, which has one move (its preview opens by itself).
+    await page.keyboard.press("2");
+    await says(page, manger.jouer);
+    await page.keyboard.press("Escape");
+    await says(page, manger.carte);
+    await expect(page.locator('[data-hand] [aria-pressed="true"]')).toHaveCount(0);
+    await page.keyboard.press("1");
+    await says(page, manger.wrong.carte);
+    await page.keyboard.press("2");
+    await says(page, manger.jouer);
+    await page.keyboard.press("Enter");
+    await plankShown(page);
+  });
+
+  test("les lettres choisissent les chevaux, comme en partie", async ({ page }) => {
+    await openLesson(page, 5);
+    await says(page, valet.carte);
+    // The hand reads 6, Valet: « 2 » is the Valet; « A » is Bleu's knight, then Jaune 66 (« B » is 40).
+    await page.keyboard.press("2");
+    await says(page, valet.cheval);
+    await page.keyboard.press("a");
+    await says(page, valet.cible);
+    await page.keyboard.press("b");
+    await says(page, valet.wrong.cible);
+    // « A » is also Bleu's own knight, chosen already: as in a game, the tray tells the two apart.
+    await page.keyboard.press("a");
+    const chip = page.locator('[data-tray-option="jaune0"]');
+    await expect(chip).toBeVisible();
+    await page.keyboard.press((await chip.locator(".letter").textContent())?.trim() ?? "");
+    await says(page, valet.jouer);
+    await page.keyboard.press("Enter");
+    await plankShown(page);
+  });
+});
+
+// Every guide line, wrong line and narration line in the band (05-UI-SPEC « Text budget »): at most
+// two lines on a 750 x 342 board and three on a 480 x 320 one, never clipped. Each lesson is played
+// with each declared wrong choice, and the band is measured at every line it says.
+const BAND_SIZES = [
+  { width: 750, height: 342, lines: 2 },
+  { width: 480, height: 320, lines: 3 },
+] as const;
+
+for (const size of BAND_SIZES) {
+  test.describe(`chaque phrase du guide dans la bande à ${size.width} x ${size.height}`, () => {
+    test.use({ viewport: { width: size.width, height: size.height } });
+    test.skip(({ isMobile }) => isMobile, "explicit viewports: desktop project only");
+
+    for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      test(`leçon ${n}`, async ({ page }) => {
+        const measured: string[] = [];
+        await openLesson(page, n);
+        for (const step of SCRIPTS[n] ?? []) {
+          await act(page, step, async (line) => {
+            const fit = await band(page).evaluate(async (el) => {
+              await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+              const text = el.querySelector("[data-guide-line]") as HTMLElement;
+              const bubble = text.parentElement as HTMLElement;
+              const box = text.getBoundingClientRect();
+              const outer = el.getBoundingClientRect();
+              const lineHeight = Number.parseFloat(getComputedStyle(text).lineHeight);
+              return {
+                lines: Math.round(box.height / lineHeight),
+                clipped:
+                  bubble.scrollHeight > bubble.clientHeight + 0.5 ||
+                  text.scrollWidth > text.clientWidth + 0.5 ||
+                  box.top < outer.top - 0.5 ||
+                  box.bottom > outer.bottom + 0.5,
+              };
+            });
+            expect(fit.lines, line).toBeLessThanOrEqual(size.lines);
+            expect(fit.clipped, line).toBe(false);
+            measured.push(line);
+          });
+        }
+        expect(measured.length).toBeGreaterThan(0);
+      });
+    }
+  });
+}
+
+test.describe("animations réduites", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("le halo ne pulse pas et la planche apparaît en fondu", async ({ page }) => {
+    await openLesson(page, 3);
+    await says(page, manger.carte);
+    const ring = page.locator('[data-guide-halo="card"]');
+    await expect(ring).toHaveCount(1);
+    expect(await ring.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+    await card(page, "8D").click();
+    const button = page.locator('[data-guide-halo="button"]');
+    expect(await button.evaluate((el) => getComputedStyle(el, "::after").animationName)).toBe(
+      "none",
+    );
+    await play(page).click();
+    const shown = plank(page);
+    await expect(shown).toBeVisible();
+    const name = await shown.evaluate((el) => getComputedStyle(el).animationName);
+    expect(name).toMatch(/fade/);
+    expect(name).not.toMatch(/plank-in/);
+  });
+
+  test("l’anneau du cheval ne pulse pas", async ({ page }) => {
+    await openLesson(page, 5);
+    await card(page, "11S").click();
+    const ring = page.locator('[data-guide-halo="pawn"] .guide-pulse');
+    await expect(ring).toHaveCount(1);
+    expect(await ring.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  });
+});
+
+test("sans animations réduites, le halo pulse", async ({ page }) => {
+  await openLesson(page, 3);
+  const ring = page.locator('[data-guide-halo="card"]');
+  await expect(ring).toHaveCount(1);
+  expect(await ring.evaluate((el) => getComputedStyle(el).animationName)).not.toBe("none");
+  await card(page, "8D").click();
+  expect(
+    await page
+      .locator('[data-guide-halo="button"]')
+      .evaluate((el) => getComputedStyle(el, "::after").animationName),
+  ).not.toBe("none");
+});
