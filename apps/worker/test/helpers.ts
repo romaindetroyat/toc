@@ -212,7 +212,10 @@ export function accountDb(): D1Database {
   return env.DB;
 }
 
+/** In an order the foreign keys allow (plan 05-01: game_seats, then played, before users). */
 export const ACCOUNT_TABLES = [
+  "game_seats",
+  "played",
   "table_members",
   "push_subscriptions",
   "friendships",

@@ -4,10 +4,14 @@
 // row, one played row and one game_seats row per account seat; GET /api/me/results answers the
 // signed-in player's games with every seat as me, account, guest or bot, never another account's id.
 
-import { SELF } from "cloudflare:test";
+import { env, evictDurableObject, runInDurableObject, SELF } from "cloudflare:test";
+import { type Scenario, scenarioState } from "@toc/engine";
+import type { Table } from "@toc/table";
 import { beforeEach, describe, expect, it } from "vitest";
 import { tableHash } from "../src/record.ts";
+import { commit, load } from "../src/storage.ts";
 import {
+  accountDb,
   type Client,
   connect,
   connectAs,
@@ -26,6 +30,8 @@ import {
 } from "./helpers.ts";
 
 beforeEach(resetAccounts);
+
+const stubOf = (id: string) => env.GAME_ROOM.getByName(id);
 
 /** The pseudo of a test account: unique enough, at most 20 characters. */
 const pseudo = (base: string) => `${base}${Math.floor(Math.random() * 1e6)}`;
@@ -212,4 +218,137 @@ describe("a finished online game with two accounts in D1", () => {
     expect(posted.status).toBe(405);
     closeAll(seated);
   }, 60_000);
+});
+
+// --- Plan 05-01 Task 2: the rematch, the pages of 20, the cursor ---
+
+/** A played row and A's game_seats row, written straight into the tests' D1. */
+async function insertGame(userId: string, gameId: string, endedAt: number): Promise<void> {
+  const seats = JSON.stringify(
+    ["bleu", "jaune", "rouge", "vert"].map((colour) => ({
+      colour,
+      kind: colour === "bleu" ? "account" : "bot",
+      account: colour === "bleu" ? userId : null,
+      name: colour === "bleu" ? "Anaïs" : "Ourasi",
+      level: colour === "bleu" ? null : 3,
+      handedOver: false,
+      captured: 0,
+      lost: 0,
+      home: colour === "bleu" || colour === "rouge" ? 4 : 0,
+    })),
+  );
+  await accountDb().batch([
+    accountDb()
+      .prepare(
+        `INSERT INTO played (id, kind, started_at, ended_at, winner, seats, deals, creator, accounts)
+         VALUES (?, 'online', ?, ?, 'bleu-rouge', ?, 1, 'Anaïs', 1)`,
+      )
+      .bind(gameId, endedAt - 600_000, endedAt, seats),
+    accountDb()
+      .prepare(
+        `INSERT INTO game_seats (user_id, ended_at, game_id, colour, won, ranked, solo, captured, lost, home)
+         VALUES (?, ?, ?, 'bleu', 1, 0, 0, 0, 0, 4)`,
+      )
+      .bind(userId, endedAt, gameId),
+  ]);
+}
+
+const HASH = "H".repeat(43);
+
+describe("the history of a player, page by page", () => {
+  it("the rematch starts at zero and both games are in A's history, newest first", async () => {
+    const seated = await twoAccounts();
+    const { id, a, b, guest } = seated;
+    await win(a.client);
+    const hash = await tableHash(id);
+    await untilRows(2, "SELECT * FROM game_seats WHERE game_id = ?", `${hash}:1`);
+    for (const client of [a.client, b.client, guest]) client.send({ t: "rematch", agree: true });
+    await a.client.next("table", (frame) => frame.table.gameNo === 2);
+    // The second game: its tally is zero; it is brought to the same end (A's 5 wins again).
+    await evictDurableObject(stubOf(id));
+    const base = await runInDurableObject(stubOf(id), async (_room, state) => {
+      const table = load(state.storage.sql) as Table;
+      expect(table.tally.bleu).toEqual({ captured: 0, lost: 0 });
+      table.game = scenarioState(NEAR_END as Scenario["before"], [1, 2, 3, 4]);
+      table.thinking = null;
+      delete table.deadlines.bot;
+      commit(state.storage.sql, table, [], Date.now());
+      return table.seq;
+    });
+    a.client.send({ t: "act", base, action: { t: "move", card: "5S", pawn: "bleu3" } });
+    await a.client.next(
+      "table",
+      (frame) => frame.table.status === "finished" && frame.table.gameNo === 2,
+    );
+    await untilRows(2, "SELECT * FROM game_seats WHERE game_id = ?", `${hash}:2`);
+    const page = (await (await get("/api/me/results", a.jar)).json()) as HistoryAnswer;
+    expect(page.games.map((game) => game.id)).toEqual([`${hash}:2`, `${hash}:1`]);
+    expect(page.games[0]?.endedAt).toBeGreaterThanOrEqual(page.games[1]?.endedAt ?? 0);
+    closeAll(seated);
+  }, 90_000);
+
+  it("25 games: 20 then 5, none skipped or repeated, ties on the end time ordered by id", async () => {
+    const jar = newJar();
+    const a = await signUpPerson(pseudo("Anaïs"), jar);
+    const ids: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      // Games 10 and 11 end at the same time: the id decides, and the page edge falls between ties.
+      const endedAt = 1_800_000_000_000 + (i === 11 ? 10 : i) * 1000;
+      const gameId = `${HASH}:${String(i).padStart(2, "0")}`;
+      ids.push(gameId);
+      await insertGame(a.id, gameId, endedAt);
+    }
+    const first = await get("/api/me/results", jar);
+    expect(first.headers.get("x-toc-d1")).toMatch(/^w=\d+;r=\d+$/);
+    console.log(`GET /api/me/results, first page of 20: ${first.headers.get("x-toc-d1")}`);
+    const one = (await first.json()) as HistoryAnswer;
+    expect(one.games).toHaveLength(20);
+    expect(one.next).not.toBeNull();
+    const second = await get(`/api/me/results?before=${encodeURIComponent(one.next ?? "")}`, jar);
+    expect(second.status).toBe(200);
+    console.log(`GET /api/me/results, second page of 5: ${second.headers.get("x-toc-d1")}`);
+    const two = (await second.json()) as HistoryAnswer;
+    expect(two.games).toHaveLength(5);
+    expect(two.next).toBeNull();
+    const seen = [...one.games, ...two.games].map((game) => game.id);
+    expect(new Set(seen).size).toBe(25);
+    expect([...seen].sort()).toEqual([...ids].sort());
+    // Newest first, then the greater id first among equal end times.
+    const key = (game: HistoryAnswer["games"][number]) => [game.endedAt, game.id] as const;
+    const all = [...one.games, ...two.games].map(key);
+    for (let i = 1; i < all.length; i++) {
+      const [t0, id0] = all[i - 1] as readonly [number, string];
+      const [t1, id1] = all[i] as readonly [number, string];
+      expect(t0 > t1 || (t0 === t1 && id0 > id1)).toBe(true);
+    }
+    expect(seen.indexOf(`${HASH}:11`)).toBe(seen.indexOf(`${HASH}:10`) - 1);
+  });
+
+  it("a page edge between two games of the same end time skips neither", async () => {
+    const jar = newJar();
+    const a = await signUpPerson(pseudo("Anaïs"), jar);
+    for (let i = 0; i < 22; i++) {
+      // Games 0, 1 and 2 share the oldest end time; the 20th row of the first page is one of them.
+      const endedAt = 1_800_000_000_000 + Math.max(i, 2) * 1000;
+      await insertGame(a.id, `${HASH}:${String(i).padStart(2, "0")}`, endedAt);
+    }
+    const one = (await (await get("/api/me/results", jar)).json()) as HistoryAnswer;
+    const two = (await (
+      await get(`/api/me/results?before=${encodeURIComponent(one.next ?? "")}`, jar)
+    ).json()) as HistoryAnswer;
+    const seen = [...one.games, ...two.games].map((game) => game.id);
+    expect(seen).toHaveLength(22);
+    expect(new Set(seen).size).toBe(22);
+  });
+
+  it("a malformed cursor is refused with 400 cursor", async () => {
+    const jar = newJar();
+    await signUpPerson(pseudo("Anaïs"), jar);
+    for (const bad of ["soon", "12", "12:x", "x:abc:1", "12:a b:1", "1' OR 1=1 --:a:1"]) {
+      const answer = await get(`/api/me/results?before=${encodeURIComponent(bad)}`, jar);
+      expect(answer.status).toBe(400);
+      expect(await answer.json()).toEqual({ error: "cursor" });
+      expect(answer.headers.get("x-toc-d1")).toMatch(/^w=\d+;r=\d+$/);
+    }
+  });
 });

@@ -143,6 +143,20 @@ describe("the record of a finished game, phase 5 (plan 05-01)", () => {
     expect(gameRecordOf(win.table)).toEqual(record);
   });
 
+  it("a seat handed to the computer still belongs to its person's account", () => {
+    const eaten = move(started(), "2S", 2500).table;
+    eaten.seats.vert = { kind: "human", who: BEN, handedOver: 3 };
+    const record = move(eaten, "5S", 3000).records?.[0];
+    expect(record?.seats[3]).toMatchObject({
+      colour: "vert",
+      kind: "human",
+      account: "acc-ben",
+      handedOver: true,
+      level: 3,
+      lost: 1,
+    });
+  });
+
   it("never reaches a frame: no account id and no tally in what the table sends (creatorName is public since 02)", () => {
     const { eat, win } = won();
     const text = JSON.stringify([...eat.out, ...win.out]);
