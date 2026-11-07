@@ -91,6 +91,18 @@ test("sans réseau, l’application démarre et la partie contre l’ordinateur 
   await context.setOffline(false);
 });
 
+/**
+ * Plan 05-08: the copy's origin is not the config's, so its storage starts empty; « Première fois ? »
+ * must not cover the home's strip.
+ */
+async function seenLessons(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    if (localStorage.getItem("toc.tutorial.v1") === null) {
+      localStorage.setItem("toc.tutorial.v1", '{"offered":true,"done":[]}');
+    }
+  });
+}
+
 /** A copy of the build served by a small static server of the test's own, on a free port. */
 async function serveCopy(): Promise<{ root: string; origin: string; server: Server }> {
   const root = mkdtempSync(join(tmpdir(), "toc-pwa-"));
@@ -150,9 +162,11 @@ function workerVersion(page: Page): Promise<string> {
 
 test("une nouvelle version attend la fin de la partie, puis « Mettre à jour » sur l’accueil (APP-02)", async ({
   page,
+  context,
 }) => {
   test.setTimeout(90_000);
   const copy = await serveCopy();
+  await seenLessons(context);
   try {
     await page.goto(`${copy.origin}/#/partie`);
     await controlled(page);
@@ -245,13 +259,7 @@ test("« Mettre à jour » dans un onglet ne recharge pas la partie d’un autre
 }) => {
   test.setTimeout(90_000);
   const copy = await serveCopy();
-  // Plan 05-08: the copy's origin is not the config's, so its storage starts empty; « Première fois ? »
-  // must not cover the home's strip.
-  await context.addInitScript(() => {
-    if (localStorage.getItem("toc.tutorial.v1") === null) {
-      localStorage.setItem("toc.tutorial.v1", '{"offered":true,"done":[]}');
-    }
-  });
+  await seenLessons(context);
   try {
     // Two tabs of one browser: the home in one, then a solo game opened in another (a first load).
     const home = await context.newPage();
