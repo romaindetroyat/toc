@@ -62,6 +62,10 @@ function drive(lesson: Lesson): Driver {
   game.onError((error) => errors.push(error));
   const ctx = () => turnCtx(game.view(), "bleu");
   let ui = reduceTurnUi(initialTurnUi, { t: "sync" }, ctx()).state;
+  // As the session does: the turn state is derived again whenever the game changes.
+  game.onChange(() => {
+    ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
+  });
   const progress = { told: 0, played: [] as Action[] };
   game.start();
   return {
@@ -91,7 +95,6 @@ function drive(lesson: Lesson): Driver {
         progress.played.push(result.submit);
       }
       await flush();
-      ui = reduceTurnUi(ui, { t: "sync" }, ctx()).state;
       return verdict;
     },
   };
@@ -126,6 +129,8 @@ function rightEvent(lesson: Lesson, d: Driver): LessonEvent {
 
 /** Follows the halos until the step `index` is current (or the end when omitted). */
 async function playUntil(lesson: Lesson, d: Driver, index?: number): Promise<void> {
+  // Lets the scripted seats play what they play at once (lesson 8's gives) before looking.
+  await flush();
   for (let guard = 0; guard < 40; guard++) {
     const at = lessonStep(lesson, d.ui(), d.progress);
     if (at === null || at.index === index) return;
