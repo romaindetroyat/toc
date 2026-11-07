@@ -258,3 +258,127 @@ test.describe("« Apprendre à jouer » (#/apprendre)", () => {
     });
   }
 });
+
+// --- Plan 05-08 task 3 (D-05, D-08; 05-UI-SPEC « Where it opens »): « Règles du jeu » first in every
+// « Réglages », « Apprendre en jouant » in the rules outside a game only.
+
+const settingsDialog = (page: Page) => page.getByRole("dialog", { name: "Réglages" });
+const rulesDialog = (page: Page) => page.getByRole("dialog", { name: "Règles du TOC" });
+const learnButton = (page: Page) =>
+  rulesDialog(page).getByRole("button", { name: "Apprendre en jouant" });
+
+async function rulesFromSettings(page: Page, tab: "but" | "cartes") {
+  const gear = page.getByRole("button", { name: "Réglages", exact: true });
+  await gear.click();
+  await expect(settingsDialog(page)).toBeVisible();
+  const links = settingsDialog(page)
+    .locator("nav")
+    .getByRole("button")
+    .or(settingsDialog(page).locator("nav").getByRole("link"));
+  await expect(links.first()).toHaveText("Règles du jeu");
+  const open = settingsDialog(page).getByRole("button", { name: "Règles du jeu" });
+  await expect(open).toHaveAttribute("aria-haspopup", "dialog");
+  const box = await open.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual(43.99);
+  await open.click();
+  await expect(rulesDialog(page)).toBeVisible();
+  await expect(rulesDialog(page).locator("[data-rules-sheet]")).toHaveAttribute(
+    "data-rules-current",
+    tab,
+  );
+  return { gear, open };
+}
+
+test.describe("« Règles du jeu » dans « Réglages »", () => {
+  test("depuis la roue de l’accueil : « Le but », puis « Apprendre en jouant »", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const { gear, open } = await rulesFromSettings(page, "but");
+    // Échap closes the rules, then « Réglages », each giving the focus back.
+    await page.keyboard.press("Escape");
+    await expect(rulesDialog(page)).toHaveCount(0);
+    await expect(settingsDialog(page)).toBeVisible();
+    await expect(open).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(settingsDialog(page)).toHaveCount(0);
+    await expect(gear).toBeFocused();
+    // « Apprendre en jouant » closes everything and opens « Apprendre à jouer ».
+    await rulesFromSettings(page, "but");
+    await expect(learnButton(page)).toBeVisible();
+    await learnButton(page).click();
+    await expect(page).toHaveURL(/#\/apprendre$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(lessonsPage(page)).toBeVisible();
+  });
+
+  test("depuis l’écran de lancement contre l’ordinateur : « Le but »", async ({ page }) => {
+    await page.goto("/#/ordinateur");
+    await rulesFromSettings(page, "but");
+    await expect(learnButton(page)).toBeVisible();
+  });
+
+  test("en partie : « Les cartes », sans « Apprendre en jouant »", async ({ page }) => {
+    await page.goto("/");
+    await page.goto("/#/partie?graine=1234567890abcdef1234567890abcdef&vitesse=test");
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    await rulesFromSettings(page, "cartes");
+    await expect(learnButton(page)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(rulesDialog(page)).toHaveCount(0);
+    await expect(settingsDialog(page)).toBeVisible();
+  });
+
+  test("dans une leçon : « Les cartes », sans « Apprendre en jouant »", async ({ page }) => {
+    await page.goto("/");
+    await page.goto("/#/apprendre/3?vitesse=test");
+    await expect(page.locator("[data-guide-band]")).toBeVisible();
+    await rulesFromSettings(page, "cartes");
+    await expect(learnButton(page)).toHaveCount(0);
+  });
+});
+
+test.describe("« Apprendre en jouant » dans les règles", () => {
+  test("depuis la tuile « Règles » de l’accueil, sous les onglets en deux colonnes", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await page.locator('[data-small-tile="regles"]').click();
+    await expect(rulesDialog(page)).toBeVisible();
+    const learn = learnButton(page);
+    await expect(learn).toBeInViewport({ ratio: 1 });
+    const box = await learn.boundingBox();
+    expect(box?.height).toBeCloseTo(48, 0);
+    // Under the last tab, as wide as the nav.
+    const last = await rulesDialog(page).locator('[data-rules-tab="regles-maison"]').boundingBox();
+    expect(box?.y).toBeGreaterThan((last?.y ?? 0) + (last?.height ?? 0));
+    expect(box?.width).toBeCloseTo(last?.width ?? 0, 0);
+    // It stays under the tabs whatever the tab.
+    await rulesDialog(page).locator('[data-rules-tab="sept"]').click();
+    await expect(learn).toBeVisible();
+    await learn.click();
+    await expect(page).toHaveURL(/#\/apprendre$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("en une colonne, le dernier élément de « Le but »", async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await page.goto("/");
+    await page.locator('[data-small-tile="regles"]').click();
+    await expect(rulesDialog(page)).toBeVisible();
+    const panel = rulesDialog(page).getByRole("tabpanel");
+    await expect(panel.getByRole("button", { name: "Apprendre en jouant" })).toHaveCount(1);
+    await rulesDialog(page).locator('[data-rules-tab="cartes"]').click();
+    await expect(learnButton(page)).toHaveCount(0);
+  });
+
+  test("le livre d’une partie n’en a pas", async ({ page }) => {
+    await page.goto("/");
+    await page.goto("/#/partie?graine=1234567890abcdef1234567890abcdef&vitesse=test");
+    await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+    await page.getByRole("button", { name: "Règles du jeu" }).click();
+    await expect(rulesDialog(page)).toBeVisible();
+    await expect(learnButton(page)).toHaveCount(0);
+  });
+});

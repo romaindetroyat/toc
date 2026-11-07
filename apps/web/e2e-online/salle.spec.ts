@@ -8,8 +8,14 @@ import { createTable, deviceOptions, join, seatTile } from "./online.ts";
 
 const toast = (page: Page) => page.locator("[data-toast]");
 
-async function device(browser: Browser, testInfo: TestInfo): Promise<Page> {
+async function device(browser: Browser, testInfo: TestInfo, lessonDone = false): Promise<Page> {
   const context = await browser.newContext(deviceOptions(testInfo));
+  // Plan 05-08: a device with a finished lesson does not get the newcomer hint.
+  if (lessonDone) {
+    await context.addInitScript(() => {
+      localStorage.setItem("toc.tutorial.v1", '{"offered":true,"done":[1]}');
+    });
+  }
   return context.newPage();
 }
 
@@ -193,11 +199,13 @@ test("the waiting room fits the target sizes, scrolls in one column, and asks to
 }, testInfo) => {
   test.setTimeout(90_000);
   const id = await createTable(request, { pace: "zero" });
-  const romain = await device(browser, testInfo);
+  // The UI-SPEC fit table is the one of a device that knows the game (no newcomer hint, plan 05-08).
+  const romain = await device(browser, testInfo, true);
   await join(romain, id, "Romain");
   await seatTile(romain, "bleu").click();
   await expect(seatTile(romain, "bleu")).toHaveAttribute("data-seat-state", "you");
   const room = romain.locator("[data-waiting-room]");
+  await expect(romain.locator("[data-newcomer-hint]")).toHaveCount(0);
 
   for (const size of FITS) {
     await romain.setViewportSize({ width: size.width, height: size.height });
@@ -232,4 +240,79 @@ test("the waiting room fits the target sizes, scrolls in one column, and asks to
   await expect(room).toHaveAttribute("inert", "");
   await romain.setViewportSize({ width: 844, height: 390 });
   await expect(romain.locator("[data-rotate-prompt]")).toHaveCount(0);
+});
+
+// Plan 05-08 (05-UI-SPEC « Waiting room hint for newcomers »): a seated device that has done no lesson
+// reads « Première fois ? Lis les règles en attendant. » and opens the rules over the waiting room; the
+// tutorial is never offered there (leaving would free the seat).
+test("a newcomer seated in the waiting room is pointed to the rules, never to the lessons", async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  const id = await createTable(request, { pace: "zero" });
+  const ana = await device(browser, testInfo);
+  const ben = await device(browser, testInfo);
+  const known = await device(browser, testInfo, true);
+  await join(ana, id, "Ana");
+  await seatTile(ana, "bleu").click();
+  await expect(seatTile(ana, "bleu")).toHaveAttribute("data-seat-state", "you");
+  await join(ben, id, "Ben");
+  // Not seated yet: no hint.
+  await expect(ben.locator("[data-newcomer-hint]")).toHaveCount(0);
+  await seatTile(ben, "jaune").click();
+  await expect(seatTile(ben, "jaune")).toHaveAttribute("data-seat-state", "you");
+
+  for (const page of [ana, ben]) {
+    const hint = page.locator("[data-newcomer-hint]");
+    await expect(hint).toContainText("Première fois\u202f? Lis les règles en attendant.");
+    const open = hint.getByRole("button", { name: "Règles du jeu" });
+    await expect(open).toHaveAttribute("aria-haspopup", "dialog");
+    const box = await open.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole("link", { name: /Apprendre/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Apprendre/ })).toHaveCount(0);
+  }
+
+  // Ben reads the rules over the waiting room, on « Le but », without « Apprendre en jouant ».
+  const open = ben.locator("[data-newcomer-hint]").getByRole("button", { name: "Règles du jeu" });
+  await open.click();
+  const rules = ben.getByRole("dialog", { name: "Règles du TOC" });
+  await expect(rules).toBeVisible();
+  await expect(rules.locator("[data-rules-sheet]")).toHaveAttribute("data-rules-current", "but");
+  await expect(rules.getByRole("button", { name: "Apprendre en jouant" })).toHaveCount(0);
+  await ben.keyboard.press("Escape");
+  await expect(rules).toHaveCount(0);
+  await expect(open).toBeFocused();
+  await expect(seatTile(ben, "jaune")).toHaveAttribute("data-seat-state", "you");
+
+  // « Réglages » in the waiting room: « Règles du jeu » first, on « Le but », no lessons either.
+  await ben.getByRole("button", { name: "Réglages", exact: true }).click();
+  const settings = ben.getByRole("dialog", { name: "Réglages" });
+  await settings.getByRole("button", { name: "Règles du jeu" }).click();
+  await expect(rules.locator("[data-rules-sheet]")).toHaveAttribute("data-rules-current", "but");
+  await expect(rules.getByRole("button", { name: "Apprendre en jouant" })).toHaveCount(0);
+  await ben.keyboard.press("Escape");
+  await ben.keyboard.press("Escape");
+  await expect(settings).toHaveCount(0);
+
+  // A device that has finished a lesson sees no hint.
+  await join(known, id, "Céline");
+  await seatTile(known, "rouge").click();
+  await expect(seatTile(known, "rouge")).toHaveAttribute("data-seat-state", "you");
+  await expect(known.locator("[data-newcomer-hint]")).toHaveCount(0);
+
+  // The hint fits: no sideways scroll, the action row in sight.
+  for (const size of [
+    { width: 844, height: 390 },
+    { width: 640, height: 360 },
+    { width: 1280, height: 800 },
+  ]) {
+    await ben.setViewportSize(size);
+    expect((await scroll(ben)).sideways).toBe(0);
+    expect(await actionsVisible(ben), `${size.width}x${size.height}`).toBe(true);
+    await ben.locator("[data-newcomer-hint]").scrollIntoViewIfNeeded();
+    await expect(ben.locator("[data-newcomer-hint]")).toBeInViewport();
+  }
+  for (const page of [ana, ben, known]) await page.context().close();
 });
