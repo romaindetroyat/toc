@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { markDone, readProgress, TUTORIAL_KEY } from "./lessonProgress.ts";
+import {
+  firstTimeDue,
+  markDone,
+  nextLesson,
+  readProgress,
+  TUTORIAL_KEY,
+} from "./lessonProgress.ts";
 
 // toc.tutorial.v1 (05-UI-SPEC « Progress », T-05-18): untrusted, read field by field, written once per
 // lesson, and never an exception, whatever the storage does.
@@ -93,5 +99,96 @@ describe("toc.tutorial.v1", () => {
   it("keeps the progress in memory without any storage", () => {
     markDone(null, 6);
     expect(readProgress(null).done).toEqual([6]);
+  });
+});
+
+/** A storage holding several keys, counting its writes (plan 05-08: the first-launch rule). */
+function deviceStorage(initial: Record<string, string> = {}) {
+  const items = new Map<string, string>(Object.entries(initial));
+  const written: string[] = [];
+  return {
+    getItem: (key: string) => items.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      written.push(key);
+      items.set(key, value);
+    },
+    get: (key: string) => items.get(key),
+    written: () => written,
+  };
+}
+
+const TOKEN = "a".repeat(43);
+
+describe("« Première fois ? » (firstTimeDue, plan 05-08, D-08)", () => {
+  it("is due on a brand-new device, and the key is written at once", () => {
+    const storage = deviceStorage();
+    expect(firstTimeDue(storage)).toBe(true);
+    expect(JSON.parse(storage.get(TUTORIAL_KEY) ?? "null")).toEqual({ offered: true, done: [] });
+    expect(storage.written()).toEqual([TUTORIAL_KEY]);
+    // Once only, whatever the answer.
+    expect(firstTimeDue(storage)).toBe(false);
+    expect(storage.written()).toEqual([TUTORIAL_KEY]);
+  });
+
+  it("is due when the device has only its token (the home writes one), without a first name", () => {
+    const storage = deviceStorage({
+      "toc.device.v1": JSON.stringify({ token: TOKEN, name: null }),
+    });
+    expect(firstTimeDue(storage)).toBe(true);
+  });
+
+  it("is not due on a device that has played; the key is written silently", () => {
+    for (const played of [
+      { "toc.device.v1": JSON.stringify({ token: TOKEN, name: "Mamie" }) },
+      { "toc.me.v1": JSON.stringify({ id: "b".repeat(22), pseudo: "Romain" }) },
+      { "toc.tables.v1": "[]" },
+      { "toc.tables.v1": JSON.stringify([{ id: "c".repeat(22), seat: "bleu", joinedAt: 1 }]) },
+      // Any doubt means « not shown »: a value that cannot be read counts as played.
+      { "toc.device.v1": "{" },
+      { "toc.me.v1": "nimporte quoi" },
+    ]) {
+      const storage = deviceStorage(played);
+      expect(firstTimeDue(storage), JSON.stringify(played)).toBe(false);
+      expect(storage.written()).toEqual([TUTORIAL_KEY]);
+      expect(readProgress(storage)).toEqual({ offered: false, done: [] });
+      expect(firstTimeDue(storage)).toBe(false);
+    }
+  });
+
+  it("is not due once the key is there, whatever it holds, and writes nothing", () => {
+    for (const raw of ['{"offered":true,"done":[]}', '{"offered":false,"done":[2]}', "{", "[]"]) {
+      const storage = deviceStorage({ [TUTORIAL_KEY]: raw });
+      expect(firstTimeDue(storage), raw).toBe(false);
+      expect(storage.written()).toEqual([]);
+    }
+  });
+
+  it("is never due when the storage throws or is missing, and nothing is written", () => {
+    expect(firstTimeDue(throwingStorage())).toBe(false);
+    expect(firstTimeDue(null)).toBe(false);
+    // Reading works but writing throws: the sheet would nag on each start, so it never shows.
+    const readOnly = {
+      getItem: (): string | null => null,
+      setItem: (): void => {
+        throw new Error("full");
+      },
+    };
+    expect(firstTimeDue(readOnly)).toBe(false);
+  });
+
+  it("keeps the lessons a later markDone writes", () => {
+    const storage = deviceStorage();
+    firstTimeDue(storage);
+    expect(markDone(storage, 1)).toEqual({ offered: true, done: [1] });
+  });
+});
+
+describe("nextLesson", () => {
+  it("is the first lesson not done, or null once all eight are", () => {
+    expect(nextLesson([])).toBe(1);
+    expect(nextLesson([1, 2])).toBe(3);
+    expect(nextLesson([2, 3])).toBe(1);
+    expect(nextLesson([1, 2, 3, 4, 5, 6, 7])).toBe(8);
+    expect(nextLesson([1, 2, 3, 4, 5, 6, 7, 8])).toBeNull();
   });
 });
