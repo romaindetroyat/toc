@@ -90,3 +90,60 @@ describe("history", () => {
     expect(await history("not a cursor", fake(() => Response.json(PAGE)).deps)).toBe("error");
   });
 });
+
+describe("history refuses a hostile answer", () => {
+  const hostile = (change: (page: Record<string, unknown>) => void) => {
+    const page = JSON.parse(JSON.stringify(PAGE)) as Record<string, unknown>;
+    change(page);
+    return fake(() => Response.json(page)).deps;
+  };
+  const firstGame = (page: Record<string, unknown>) =>
+    (page.games as Record<string, unknown>[])[0] as Record<string, unknown>;
+
+  it("an extra key on the page, a game or a seat", async () => {
+    expect(
+      await history(
+        null,
+        hostile((page) => (page.debug = true)),
+      ),
+    ).toBe("error");
+    expect(
+      await history(
+        null,
+        hostile((page) => (firstGame(page).script = "x")),
+      ),
+    ).toBe("error");
+    expect(
+      await history(
+        null,
+        hostile((page) => {
+          (
+            (firstGame(page).seats as Record<string, unknown>[])[1] as Record<string, unknown>
+          ).account = "u".repeat(22);
+        }),
+      ),
+    ).toBe("error");
+  });
+
+  it("a fifth or sixth seat, a level 9", async () => {
+    expect(
+      await history(
+        null,
+        hostile((page) => {
+          const seats = firstGame(page).seats as unknown[];
+          seats.push(seats[0], seats[1]);
+        }),
+      ),
+    ).toBe("error");
+    expect(
+      await history(
+        null,
+        hostile((page) => {
+          (
+            (firstGame(page).seats as Record<string, unknown>[])[3] as Record<string, unknown>
+          ).level = 9;
+        }),
+      ),
+    ).toBe("error");
+  });
+});
