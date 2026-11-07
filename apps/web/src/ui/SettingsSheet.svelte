@@ -31,6 +31,11 @@
      */
     onabandon?: (to?: string) => void;
     /**
+     * In a lesson (plan 05-06): « Quitter les leçons » in place of « Abandonner la partie », without
+     * a confirmation (finished lessons stay marked).
+     */
+    onquitlessons?: () => void;
+    /**
      * At an online table (plan 02-05): « Tester les sons » is hidden (leaving the page would drop the
      * table's connection), and « Quitter la table » is offered when `onleave` is given, confirmed first.
      */
@@ -58,6 +63,7 @@
     onclose,
     opener = null,
     onabandon,
+    onquitlessons,
     online = false,
     onleave,
     inGame = false,
@@ -195,7 +201,7 @@
           {reglages.install}
         </button>
       {/if}
-      {#if onabandon || inGame}
+      {#if onabandon || onquitlessons || inGame}
         <!-- In a game, on a computer only: the same help as the « ? » key (plan 01-28). -->
         <button
           type="button"
@@ -208,6 +214,20 @@
         </button>
       {/if}
     </nav>
+
+    {#if onquitlessons}
+      <button
+        type="button"
+        class="btn btn-text abandon"
+        data-quit-lessons
+        onclick={() => {
+          onclose();
+          onquitlessons();
+        }}
+      >
+        {reglages.quitLessons}
+      </button>
+    {/if}
 
     {#if onabandon}
       <button

@@ -11,6 +11,8 @@
   type Props = {
     /** Called once the player has confirmed « Abandonner la partie » (offered by « Réglages »). */
     onabandon?: (to?: string) => void;
+    /** In a lesson (plan 05-06): « Quitter les leçons » in place of « Abandonner la partie ». */
+    onquitlessons?: () => void;
     /** At an online table: no sound test, and « Quitter la table » when `onleave` is given. */
     online?: boolean;
     onleave?: () => void;
@@ -25,7 +27,15 @@
     tableSpeed?: TableSpeed;
   };
 
-  let { onabandon, online = false, onleave, inGame = false, onstop, tableSpeed }: Props = $props();
+  let {
+    onabandon,
+    onquitlessons,
+    online = false,
+    onleave,
+    inGame = false,
+    onstop,
+    tableSpeed,
+  }: Props = $props();
 
   const fast = $derived(tableSpeed?.fast === true);
 
@@ -55,6 +65,7 @@
     onclose={() => (settingsOpen = false)}
     opener={gear}
     {onabandon}
+    {onquitlessons}
     {online}
     {onleave}
     {inGame}

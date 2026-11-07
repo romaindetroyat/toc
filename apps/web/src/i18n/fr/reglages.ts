@@ -23,6 +23,8 @@ export const reglages = {
   credits: "Crédits et licences",
   /** At an online table (plan 02-05): leave it, after a confirmation. */
   leaveTable: "Quitter la table",
+  /** Plan 05-06: in a lesson, in place of « Abandonner la partie » (no confirmation). */
+  quitLessons: "Quitter les leçons",
   /** The chef de table's « Arrêter la partie » in an online game (plan 02-07). */
   stopGame: "Arrêter la partie",
   /**

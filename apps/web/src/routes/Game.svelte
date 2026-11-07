@@ -71,6 +71,7 @@
   import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
   import LessonPlank from "../ui/LessonPlank.svelte";
+  import LessonsSheet from "../ui/LessonsSheet.svelte";
   import MessagesButton from "../ui/MessagesButton.svelte";
   import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
@@ -438,9 +439,49 @@
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
   }
 
-  /** « Revoir la leçon »: the lesson again from its position and its first line. */
+  /** « Revoir la leçon », « Recommencer cette leçon »: the position and the first line again. */
   function restartLesson() {
+    lessonsOpen = false;
     guarded(begin({ vitesse: opened.vitesse }));
+  }
+
+  /** « Les leçons », opened from the lesson pill; the pill gets the focus back on close. */
+  let lessonsOpen = $state(false);
+  let lessonsOpener = $state.raw<HTMLElement | null>(null);
+
+  /** The lesson pill of the info (plan 05-06). */
+  const lessonPill = $derived(
+    lessonData === undefined
+      ? undefined
+      : {
+          n: lessonData.n,
+          count: LESSONS.length,
+          title: lessonData.title,
+          onopen: (opener: HTMLElement) => {
+            lessonsOpener = opener;
+            lessonsOpen = true;
+          },
+        },
+  );
+
+  /** A row of « Les leçons »: that lesson, once the sheet has slid away (pickedLesson, sheetGone). */
+  let pickedLesson: number | null = null;
+  function pickLesson(n: number) {
+    pickedLesson = n;
+    lessonsOpen = false;
+  }
+  function sheetGone() {
+    const n = pickedLesson;
+    pickedLesson = null;
+    if (n !== null && alive) location.hash = `#/apprendre/${n}`;
+  }
+
+  /** « Quitter les leçons » (Réglages, no confirmation): the lessons page; finished lessons stay. */
+  function quitLessons() {
+    epoch++;
+    session?.dispose();
+    session = undefined;
+    location.hash = "#/apprendre";
   }
 
   /** The « Bravo ! » plank's primary: the next lesson, or the solo setup after the last one. */
@@ -1198,7 +1239,8 @@
             names={session.names}
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
-            onabandon={online === undefined ? abandon : undefined}
+            onabandon={online === undefined && lessonData === undefined ? abandon : undefined}
+            onquitlessons={lessonData === undefined ? undefined : quitLessons}
             onleave={online?.onleave}
             onstop={canStop ? stopGame : undefined}
             {tableSpeed}
@@ -1207,7 +1249,7 @@
               : undefined}
             onmessages={online !== undefined ? openMessages : undefined}
             onrules={openRules}
-            lesson={lessonData !== undefined}
+            lesson={lessonPill}
           />
         </div>
 
@@ -1226,7 +1268,8 @@
           <div class="tools">
             <div class="gear" data-settings-slot>
               <SettingsButton
-                onabandon={online === undefined ? abandon : undefined}
+                onabandon={online === undefined && lessonData === undefined ? abandon : undefined}
+                onquitlessons={lessonData === undefined ? undefined : quitLessons}
                 online={online !== undefined}
                 inGame={online !== undefined}
                 onleave={online?.onleave}
@@ -1457,6 +1500,17 @@
           opener={messagesOpener}
           onsend={(msg) => online.connection.send({ t: "chat", msg })}
           onclose={() => (messagesOpen = false)}
+        />
+      {/if}
+
+      {#if lessonsOpen && lessonData !== undefined}
+        <LessonsSheet
+          current={lessonData.n}
+          opener={lessonsOpener}
+          onrestart={restartLesson}
+          onpick={pickLesson}
+          onclose={() => (lessonsOpen = false)}
+          ongone={sheetGone}
         />
       {/if}
 

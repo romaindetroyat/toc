@@ -11,6 +11,31 @@ export const lecons = {
   /** Plan 05-06: the name of what the guide rings ends with these words. */
   target: (name: string) => `${name}, à toucher`,
 
+  /**
+   * Plan 05-06: the lesson pill in place of the game's info (its visible text in two parts on a
+   * phone held sideways) and its accessible name.
+   */
+  pill: {
+    lesson: (n: number) => `Leçon ${n}`,
+    of: (count: number) => `sur ${count}`,
+    label: (n: number, count: number, title: string) =>
+      `Leçon ${n} sur ${count} : ${title}, voir les leçons`,
+  },
+
+  /** Plan 05-06: the sheet « Les leçons » opened from the pill. */
+  sheet: {
+    title: "Les leçons",
+    restart: "Recommencer cette leçon",
+    close: "Fermer",
+    /** Line 2 of a lesson not done yet. */
+    about: "Environ 1 minute",
+    /** Line 2 of a lesson done. */
+    done: "Faite",
+    /** A row's accessible name: « Leçon 3, Manger, faite ». */
+    row: (n: number, title: string, done: boolean) =>
+      done ? `Leçon ${n}, ${title}, faite` : `Leçon ${n}, ${title}`,
+  },
+
   /** Plan 05-06: the « Bravo ! » plank's buttons (the last lesson has its own two). */
   plank: {
     again: "Revoir la leçon",

@@ -2,6 +2,7 @@
   import { type Color, firstPlayer, PARTNER, type RenderState } from "@toc/engine";
   import type { TablePublic } from "@toc/protocol";
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings } from "../settings/store.svelte.ts";
   import InfoBar from "./InfoBar.svelte";
@@ -56,10 +57,13 @@
      */
     onrules?: (opener: HTMLElement) => void;
     /**
-     * A lesson (plan 05-06): no team pills, no dealer, deal or first-player line, no score; the
-     * lesson is not a game.
+     * A lesson (plan 05-06): the lesson pill « Leçon {n} sur 8 » in place of the info pill (phone) and
+     * of the turn line (computer); a tap opens « Les leçons » (`onopen`). No team pills, no dealer,
+     * deal or first-player line, no score: a lesson is not a game.
      */
-    lesson?: boolean;
+    lesson?: { n: number; count: number; title: string; onopen: (opener: HTMLElement) => void };
+    /** In a lesson: « Quitter les leçons » in « Réglages ». */
+    onquitlessons?: () => void;
   };
 
   let {
@@ -76,8 +80,11 @@
     onmessages,
     tableSpeed,
     onrules,
-    lesson = false,
+    lesson,
+    onquitlessons,
   }: Props = $props();
+
+  let lessonPill = $state<HTMLButtonElement | null>(null);
 
   let infoOpen = $state(false);
   let playersOpen = $state(false);
@@ -121,7 +128,32 @@
   );
 </script>
 
-{#if form === "pill"}
+{#snippet lessonButton(compact: boolean)}
+  {#if lesson !== undefined}
+    <!-- The lesson pill (plan 05-06): Label 700, tabular; on a phone in two parts, one above the
+         other, so it fits the strip. -->
+    <button
+      type="button"
+      class="lesson-pill"
+      class:compact
+      data-lesson-pill={lesson.n}
+      data-info-bar={compact ? "" : undefined}
+      aria-label={lecons.pill.label(lesson.n, lesson.count, lesson.title)}
+      aria-haspopup="dialog"
+      bind:this={lessonPill}
+      onclick={() => {
+        if (lessonPill !== null) lesson.onopen(lessonPill);
+      }}
+    >
+      <span>{lecons.pill.lesson(lesson.n)}</span>
+      <span>{lecons.pill.of(lesson.count)}</span>
+    </button>
+  {/if}
+{/snippet}
+
+{#if form === "pill" && lesson !== undefined}
+  {@render lessonButton(true)}
+{:else if form === "pill"}
   <!-- The compact mode's info pill (plan 01-47): whose turn it is and the score; the rest in a sheet. -->
   <button
     type="button"
@@ -152,15 +184,13 @@
         <span class="respire-mark">…</span>
       {/if}
     </span>
-    {#if !lesson}
-      <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
-    {/if}
+    <span class="pill-score" aria-hidden="true" data-score>{game.info.score(us, them)}</span>
   </button>
 
   {#if infoOpen}
     <Sheet title={game.info.sheetTitle} onclose={() => (infoOpen = false)} opener={pill}>
       <div class="sheet-info" data-info-sheet>
-        <InfoBar {render} {human} {names} {thinking} {lesson} form="column" gear={false} />
+        <InfoBar {render} {human} {names} {thinking} form="column" gear={false} />
       </div>
       {#if players !== undefined}
         <section class="players-section" aria-labelledby="players-heading" data-players-section>
@@ -183,50 +213,54 @@
     data-form={form}
   >
     <div class="left">
-      <p class="turn" data-turn={playing ? render.turn : ""}>
-        {#if playing}
-          <span class="dot" class:own={ownTurn} aria-hidden="true"></span>
-          <span
-            class="glyph"
-            class:respire={breathing}
-            data-thinking={breathing ? render.turn : undefined}
-            style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
-          >
-            <SeatChip color={render.turn} showName={false} small />
-          </span>
-          {#if ownTurn}
-            <span class="name">{game.info.ownTurn}</span>
-          {:else}
-            <!-- Prefix and name in one box: the row's gap never splits « Tour d’Ana ». -->
-            <span class="who"
-              ><span class="prefix" class:respire-texte={breathing}
-                >{game.info.turnPrefix(turnName)}</span
-              ><span class="name other" class:respire-texte={breathing} title={turnName}
-                >{turnName}</span
-              ></span
+      {#if lesson !== undefined}
+        {@render lessonButton(false)}
+      {:else}
+        <p class="turn" data-turn={playing ? render.turn : ""}>
+          {#if playing}
+            <span class="dot" class:own={ownTurn} aria-hidden="true"></span>
+            <span
+              class="glyph"
+              class:respire={breathing}
+              data-thinking={breathing ? render.turn : undefined}
+              style:--respire-seat={breathing ? `var(--seat-${render.turn}-clair)` : undefined}
             >
-            {#if breathing}
-              <span class="respire-mark" aria-hidden="true">…</span>
+              <SeatChip color={render.turn} showName={false} small />
+            </span>
+            {#if ownTurn}
+              <span class="name">{game.info.ownTurn}</span>
+            {:else}
+              <!-- Prefix and name in one box: the row's gap never splits « Tour d’Ana ». -->
+              <span class="who"
+                ><span class="prefix" class:respire-texte={breathing}
+                  >{game.info.turnPrefix(turnName)}</span
+                ><span class="name other" class:respire-texte={breathing} title={turnName}
+                  >{turnName}</span
+                ></span
+              >
+              {#if breathing}
+                <span class="respire-mark" aria-hidden="true">…</span>
+              {/if}
             {/if}
+          {:else}
+            <span class="name">
+              {render.phase === "exchange" ? game.info.exchanging : game.info.over}
+            </span>
           {/if}
-        {:else}
-          <span class="name">
-            {render.phase === "exchange" ? game.info.exchanging : game.info.over}
-          </span>
-        {/if}
-      </p>
-      {#if !lesson}
+        </p>
+      {/if}
+      {#if lesson === undefined}
         <p class="deal" data-deal>
           {game.info.dealer(names[render.dealer])} · {game.info.deal(render.dealIndex + 1)}
         </p>
       {/if}
-      {#if form === "column" && !lesson}
+      {#if form === "column" && lesson === undefined}
         <!-- Who plays first in this deal: the bottom bar and the sheet « Infos de la partie » (plan 03-11). -->
         <p class="deal" data-starter={starter}>{game.info.starter(names[starter])}</p>
       {/if}
     </div>
 
-    {#if !lesson}
+    {#if lesson === undefined}
       <div class="teams">
         <span class="pill own" aria-label={game.info.teamAria(us)} data-team-us>
           {game.info.teamUs(us)}
@@ -241,6 +275,7 @@
       <div class="gear" data-settings-slot>
         <SettingsButton
           {onabandon}
+          {onquitlessons}
           online={onleave !== undefined}
           inGame={onleave !== undefined}
           {onleave}
@@ -433,6 +468,38 @@
     flex: none;
     width: var(--touch);
     height: var(--touch);
+  }
+
+  /* The lesson pill (plan 05-06): a cream-edged pill, Label 700 tabular. On the computer one line,
+     44 high; on a phone two lines (« Leçon 3 », « sur 8 »), at least 52 wide, in the strip. */
+  .lesson-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3em;
+    min-width: 52px;
+    min-height: var(--touch);
+    padding: 0 var(--space-sm);
+    border: 2px solid var(--creme-attenuee);
+    border-radius: var(--radius-button);
+    background: var(--bois-sombre);
+    color: var(--creme);
+    font-family: var(--font-ui);
+    font-size: var(--label-size);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: var(--label-line);
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .lesson-pill.compact {
+    flex-direction: column;
+    gap: 0;
+    padding: 0 2px;
+    line-height: 1.2;
   }
 
   /* The compact mode's pill: 52 x 44, the turn on top, the score « n–m » under it. */
