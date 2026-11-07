@@ -9,6 +9,7 @@
   import SettingsButton from "./SettingsButton.svelte";
   import Icon from "./Icon.svelte";
   import MessagesButton from "./MessagesButton.svelte";
+  import RulesButton from "./RulesButton.svelte";
   import Sheet from "./Sheet.svelte";
   import TablePlayers from "./TablePlayers.svelte";
   import type { TableSpeed } from "./tableSpeed.ts";
@@ -49,6 +50,11 @@
     onmessages?: (opener: HTMLElement) => void;
     /** An online table (plan 02-10b): the table-wide « Avance rapide » of its gear. */
     tableSpeed?: TableSpeed;
+    /**
+     * A game (plan 05-04): « Règles du jeu », first on the column form's fourth row
+     * (`[Règles][À la table][Messages]` online, `[Règles]` alone in solo); opens « Règles du TOC ».
+     */
+    onrules?: (opener: HTMLElement) => void;
   };
 
   let {
@@ -64,6 +70,7 @@
     players,
     onmessages,
     tableSpeed,
+    onrules,
   }: Props = $props();
 
   let infoOpen = $state(false);
@@ -231,21 +238,27 @@
       </div>
     {/if}
 
-    {#if form === "column" && gear && players !== undefined}
-      <!-- The computer's fourth row: « À la table » (plan 02-06), then « Messages » (plan 02-08). -->
+    {#if form === "column" && gear && (players !== undefined || onrules !== undefined)}
+      <!-- The computer's fourth row: « Règles du jeu » (plan 05-04), « À la table » (plan 02-06),
+           then « Messages » (plan 02-08); in solo the book alone. -->
       <div class="table-row" data-table-row-buttons>
-        <button
-          type="button"
-          class="round"
-          aria-label={tableCopy.game.players.title}
-          title={tableCopy.game.players.title}
-          aria-haspopup="dialog"
-          data-players-button
-          bind:this={playersButton}
-          onclick={() => (playersOpen = true)}
-        >
-          <Icon name="users" size={24} />
-        </button>
+        {#if onrules !== undefined}
+          <RulesButton onopen={onrules} />
+        {/if}
+        {#if players !== undefined}
+          <button
+            type="button"
+            class="round"
+            aria-label={tableCopy.game.players.title}
+            title={tableCopy.game.players.title}
+            aria-haspopup="dialog"
+            data-players-button
+            bind:this={playersButton}
+            onclick={() => (playersOpen = true)}
+          >
+            <Icon name="users" size={24} />
+          </button>
+        {/if}
         {#if onmessages !== undefined}
           <MessagesButton onopen={onmessages} keys />
         {/if}

@@ -390,7 +390,8 @@ test.describe("les touches se voient sur ordinateur", () => {
     await expect(play).toHaveCount(1);
     await expectHint(play, "Entrée");
     await expect(hintsOf(page.getByRole("button", { name: "Annuler ce coup" }))).toHaveCount(0);
-    await expect(visibleHints(page)).toHaveCount(isMobile ? 0 : 1 + 3);
+    // « Entrée », the three cards, and the book's « R » (plan 05-04).
+    await expect(visibleHints(page)).toHaveCount(isMobile ? 0 : 1 + 3 + 1);
     const shown = await play.boundingBox();
     await page.addStyleTag({ content: "[data-key-hint]{display:none!important}" });
     await expect(hintsOf(play)).toBeHidden();

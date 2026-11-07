@@ -151,10 +151,10 @@ test.describe("la feuille « Règles » en partie", () => {
     await expect(sheet(page)).toBeVisible();
     const row = page.locator('[data-card-rule="11"]');
     await expect(row).toHaveAttribute("data-chosen", "");
-    await expect(page.getByRole("listitem", { name: /, ta carte choisie$/ })).toHaveCount(1);
-    await expect(page.getByRole("listitem", { name: /^Valet\b.*, ta carte choisie$/ })).toHaveCount(
-      1,
-    );
+    await expect(page.getByRole("listitem", { name: /, ta carte choisie\.$/ })).toHaveCount(1);
+    await expect(
+      page.getByRole("listitem", { name: /^Valet\b.*, ta carte choisie\.$/ }),
+    ).toHaveCount(1);
     const outline = await row.evaluate((el) => {
       const style = getComputedStyle(el);
       return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };

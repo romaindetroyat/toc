@@ -11,6 +11,7 @@
     type Playability,
     pawnColor,
     playability,
+    rankOf,
     sortHand,
     teamOf,
   } from "@toc/engine";
@@ -68,6 +69,10 @@
   import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
+  import RulesButton from "../ui/RulesButton.svelte";
+  import RulesSheet from "../ui/RulesSheet.svelte";
+  import { rulesOpen } from "../ui/rulesOpen.svelte.ts";
+  import type { RulesTabId } from "../i18n/fr/regles.ts";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import type { TableSpeed } from "../ui/tableSpeed.ts";
   import SevenPanel from "../ui/SevenPanel.svelte";
@@ -239,11 +244,23 @@
     untrack(announceVisibility);
   });
 
+  // --- « Règles du TOC » (plan 05-04, PLAY-06): the book button, « R », the sheet ---
+  /** The sheet is open (set in the same task as the tap or the key, before the sheet mounts). */
+  let rulesShown = $state(false);
+  let rulesOpener = $state.raw<HTMLElement | null>(null);
+  /** The last tab opened in this game (memory only); « Les cartes » at first. */
+  let rulesTab = $state<RulesTabId>("cartes");
+
   /**
    * The computer players wait while the invitation shows (« Conséquence de mise en œuvre, à confirmer
-   * par Romain »): the session's idle awaits this hold, which resolves once the screen is back in
-   * landscape. Every pending hold is released then, and on destroy, so a disposed game's loop ends.
+   * par Romain »), and in a solo game while a rules sheet is open (plan 05-04: this screen's own, or
+   * one opened from « Réglages »; online the game goes on): the session's idle awaits this hold, which
+   * resolves once the screen is back in landscape and the rules are closed. Every pending hold is
+   * released then, and on destroy, so a disposed game's loop ends.
    */
+  const held = $derived(
+    prompting || (online === undefined && (rulesShown || rulesOpen.count > 0)),
+  );
   let holds: (() => void)[] = [];
   function releaseHolds() {
     const waiting = holds;
@@ -251,11 +268,11 @@
     for (const resolve of waiting) resolve();
   }
   function hold(): Promise<void> {
-    if (!prompting || !alive) return Promise.resolve();
+    if (!held || !alive) return Promise.resolve();
     return new Promise<void>((resolve) => holds.push(resolve));
   }
   $effect(() => {
-    if (!prompting) untrack(releaseHolds);
+    if (!held) untrack(releaseHolds);
   });
 
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
@@ -356,6 +373,7 @@
     flights = [];
     tapped = null;
     missed = false;
+    rulesTab = "cartes";
     await tick();
     if (!alive || mine !== epoch) return;
     const created = createSession(
@@ -539,6 +557,12 @@
     if (online === undefined) return;
     messagesOpener = opener;
     messagesOpen = true;
+  }
+
+  /** Opens « Règles du TOC » on the last tab of this game; `opener` gets the focus back. */
+  function openRules(opener: HTMLElement | null) {
+    rulesOpener = opener;
+    rulesShown = true;
   }
   let previousTable: TablePublic | null = null;
   $effect(() => {
@@ -814,6 +838,7 @@
       concealed,
       focus: focusTarget(),
       messages: online !== undefined,
+      rules: rulesShown,
       blocked:
         session === undefined ||
         view === undefined ||
@@ -821,8 +846,10 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
-    // Under a plate only « ? » and « M » reach the game.
-    if (plateUp && intent.kind !== "help" && intent.kind !== "messages") return;
+    // Under a plate only « ? », « M » and « R » reach the game.
+    if (plateUp && intent.kind !== "help" && intent.kind !== "messages" && intent.kind !== "rules") {
+      return;
+    }
     // The key is handled: no native action (a focused card or button is not also activated). It is
     // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
     // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
@@ -837,6 +864,16 @@
     if (intent.kind === "messages") {
       const active = document.activeElement;
       openMessages(active instanceof HTMLElement && active !== document.body ? active : null);
+      return;
+    }
+    if (intent.kind === "rules") {
+      // « R » opens the rules, and closes them from inside the sheet.
+      if (rulesShown) {
+        rulesShown = false;
+        return;
+      }
+      const active = document.activeElement;
+      openRules(active instanceof HTMLElement && active !== document.body ? active : null);
       return;
     }
     for (const each of intent.events) {
@@ -1069,13 +1106,14 @@
               ? { table: onlineTable, me: online.seat }
               : undefined}
             onmessages={online !== undefined ? openMessages : undefined}
+            onrules={openRules}
           />
         </div>
 
         {#if compact}
-          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays;
-               online « Messages » takes that slot (the server paces the computers, plan 02-08) and
-               stays usable under a plate. -->
+          <!-- The top of the right strip: « Réglages », « Règles du jeu » (plan 05-04), then « Avance
+               rapide » while the computer plays; online « Messages » takes that slot (the server
+               paces the computers, plan 02-08) and stays usable under a plate. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
               <SettingsButton
@@ -1087,6 +1125,8 @@
                 {tableSpeed}
               />
             </div>
+            <!-- « Règles du jeu », under the gear (plan 05-04). -->
+            <RulesButton onopen={openRules} />
             {#if online !== undefined}
               <MessagesButton onopen={openMessages} keys />
             {:else}
@@ -1275,6 +1315,17 @@
           opener={shortcutsOpener}
           online={online !== undefined}
           onclose={() => (shortcutsOpen = false)}
+        />
+      {/if}
+
+      {#if rulesShown}
+        <RulesSheet
+          tab={rulesTab}
+          selectedRank={selectedCard === null ? null : rankOf(selectedCard)}
+          inGame
+          opener={rulesOpener}
+          ontab={(next) => (rulesTab = next)}
+          onclose={() => (rulesShown = false)}
         />
       {/if}
 
@@ -1535,13 +1586,14 @@
       --head-room: 0;
     }
 
-    /* The bottom of the right strip, under the gear and « Avance rapide » (two 44 px targets). */
+    /* The bottom of the right strip, under the gear, the book and « Avance rapide » (three 44 px
+       targets, plan 05-04). */
     .actions {
       grid-area: right;
       align-self: end;
       justify-self: center;
       min-height: 0;
-      max-height: calc(100% - 2 * var(--touch) - 3 * var(--space-xs));
+      max-height: calc(100% - 3 * var(--touch) - 4 * var(--space-xs));
     }
 
     /* The hand over the whole left strip, in front of the board: its cards stand from the strip's

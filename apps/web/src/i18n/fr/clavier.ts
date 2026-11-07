@@ -36,6 +36,8 @@ export const clavier = {
       action: "Passer la carte choisie, ou poser tes cartes quand aucune n’est jouable.",
     },
     { keys: ["?"], action: "Afficher cette aide." },
+    /** « Règles du TOC » (plan 05-04); inside the sheet the same key closes it. */
+    { keys: ["R"], action: "Ouvrir les règles." },
     /** In an online game only (plan 02-08); the local game has no messages. */
     { keys: ["M"], action: "Ouvrir les messages rapides.", online: true },
   ] satisfies ShortcutRow[],
@@ -50,5 +52,6 @@ export const clavier = {
     pass: "P",
     help: "?",
     messages: "M",
+    rules: "R",
   },
 } as const;

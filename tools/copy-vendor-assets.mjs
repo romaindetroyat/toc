@@ -29,7 +29,9 @@ const SUBSETS = ["latin", "latin-ext"];
  * 04-UI-SPEC as their screens come (plan 04-01: user, triangle-alert; copy was there; plan 04-08:
  * refresh-cw, download, share, square-plus for the home strip and « Installer TOC »; plan 04-09:
  * log-in, key-round, handshake for the small tiles and « Se connecter »; plan 04-10: log-out, bell,
- * bell-off for « Mon compte », link, user-plus for « Mes amis »).
+ * bell-off for « Mon compte », link, user-plus for « Mes amis »), then the five of 05-UI-SPEC, all
+ * added by plan 05-04 so the later plans of phase 5 touch neither file: book-open (« Règles »),
+ * graduation-cap (« Apprendre »), trophy (« Mes résultats »), history and chart-column (its tabs).
  */
 const ICON_NAMES = [
   "settings",
@@ -64,7 +66,18 @@ const ICON_NAMES = [
   "bell-off",
   "link",
   "user-plus",
+  "book-open",
+  "graduation-cap",
+  "trophy",
+  "history",
+  "chart-column",
 ];
+
+/**
+ * Names of the UI-SPEC that lucide-static 1.56 ships only as an alias (an SVG file under that name,
+ * no entry in icon-nodes.json): the drawing is read from the icon it aliases (the same paths).
+ */
+const ALIASES = { history: "rotate-ccw-clock" };
 
 mkdirSync(fontsOut, { recursive: true });
 for (const { pkg, stem, licence } of FAMILIES) {
@@ -88,7 +101,7 @@ const key = (name) => (/^[A-Za-z_$][\w$]*$/.test(name) ? name : quote(name));
 
 let body = "";
 for (const name of ICON_NAMES) {
-  const elements = nodes[name];
+  const elements = nodes[ALIASES[name] ?? name];
   if (!Array.isArray(elements)) throw new Error(`lucide-static has no icon "${name}"`);
   body += `  ${key(name)}: [\n`;
   for (const [tag, attrs] of elements) {

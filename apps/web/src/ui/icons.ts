@@ -715,6 +715,124 @@ export const ICONS = {
       },
     },
   ],
+  "book-open": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 5v16",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z",
+      },
+    },
+  ],
+  "graduation-cap": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M22 10v6",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M6 12.5V16a6 3 0 0 0 12 0v-3.5",
+      },
+    },
+  ],
+  trophy: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M4 22h16",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3",
+      },
+    },
+  ],
+  history: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 3v5h5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M12 7v5l4 2",
+      },
+    },
+  ],
+  "chart-column": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M3 3v16a2 2 0 0 0 2 2h16",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M18 17V9",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M13 17V5",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M8 17v-3",
+      },
+    },
+  ],
 } as const;
 
 export type IconName = keyof typeof ICONS;

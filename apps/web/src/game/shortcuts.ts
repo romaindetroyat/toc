@@ -40,13 +40,22 @@ export type KeyContext = {
   blocked: boolean;
   /** An online game: « M » opens « Messages rapides » (plan 02-08); absent or false in the local game. */
   messages?: boolean;
+  /**
+   * « Règles du TOC » is the sheet open (plan 05-04): « R » closes it, every other key is left to the
+   * sheet. The game screen still reports `blocked` then, as for any sheet.
+   */
+  rules?: boolean;
 };
 
-/** Reducer events to send, the help sheet (« ? ») or the quick messages (« M », online) to open, or nothing. */
+/**
+ * Reducer events to send, the help sheet (« ? »), the quick messages (« M », online) or the rules
+ * (« R », plan 05-04: open, or closed from inside the sheet) to open, or nothing.
+ */
 export type KeyIntent =
   | { kind: "turn"; events: TurnUiEvent[] }
   | { kind: "help" }
   | { kind: "messages" }
+  | { kind: "rules" }
   | null;
 
 /**
@@ -194,10 +203,16 @@ function knightIntent(letter: string, ctx: KeyContext): KeyIntent {
 
 /** What a key press means on the game screen, or null when it means nothing there. */
 export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
-  if (ctx.blocked || ctx.focus.kind === "field") return null;
+  if (ctx.focus.kind === "field") return null;
   if (input.ctrlKey || input.metaKey || input.altKey || input.repeat || input.isComposing) {
     return null;
   }
+  // « R » (the typed letter, wherever the layout puts it) opens « Règles du TOC », whatever the turn;
+  // inside that sheet it closes it. Under any other sheet it does nothing.
+  const rulesKey = input.key === "r" || input.key === "R";
+  if (ctx.rules === true) return rulesKey ? { kind: "rules" } : null;
+  if (ctx.blocked) return null;
+  if (rulesKey) return { kind: "rules" };
   // « ? » (typed with Shift on most layouts) opens the help sheet, whatever the turn.
   if (input.key === "?") return { kind: "help" };
   // « M » (the typed letter, wherever the layout puts it) opens the quick messages online, whatever the turn.
