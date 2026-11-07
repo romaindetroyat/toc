@@ -293,6 +293,7 @@ test("a newcomer seated in the waiting room is pointed to the rules, never to th
   await expect(rules.locator("[data-rules-sheet]")).toHaveAttribute("data-rules-current", "but");
   await expect(rules.getByRole("button", { name: "Apprendre en jouant" })).toHaveCount(0);
   await ben.keyboard.press("Escape");
+  await expect(rules).toHaveCount(0);
   await ben.keyboard.press("Escape");
   await expect(settings).toHaveCount(0);
 

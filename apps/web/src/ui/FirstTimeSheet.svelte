@@ -54,9 +54,11 @@
     margin: 0;
   }
 
+  /* A link drawn as a button: no underline. */
   .wide {
     width: 100%;
     box-sizing: border-box;
+    text-decoration: none;
     margin: var(--space-md) 0 var(--space-sm);
   }
 

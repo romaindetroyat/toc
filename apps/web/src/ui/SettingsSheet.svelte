@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { setMix } from "../audio/engine.ts";
   import { mixFromSettings } from "../game/audioSettings.ts";
   import { clavier } from "../i18n/fr/clavier.ts";
@@ -12,6 +13,7 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreditsSheet from "./CreditsSheet.svelte";
   import InstallSheet from "./InstallSheet.svelte";
+  import RulesSheet from "./RulesSheet.svelte";
   import Sheet from "./Sheet.svelte";
   import ShortcutsSheet from "./ShortcutsSheet.svelte";
   import Switch from "./Switch.svelte";
@@ -88,6 +90,20 @@
   // engine keeps them until it is unlocked).
   $effect(() => {
     setMix(mixFromSettings(settings));
+  });
+
+  // « Règles du jeu » (plan 05-08, 05-UI-SPEC « Where it opens »): the first link, the rules over this
+  // sheet like « Crédits et licences ». In a game or a lesson on « Les cartes » (the solo computers
+  // wait: the rules sheet counts in rulesOpen); elsewhere on « Le but ». « Apprendre en jouant » only
+  // outside a game and away from an online table (leaving the waiting room would free the seat): it
+  // closes both sheets, then opens #/apprendre once this one has gone.
+  const playing = $derived(onabandon !== undefined || onquitlessons !== undefined || inGame);
+  const canLearn = $derived(!playing && !online);
+  let rulesOpen = $state(false);
+  let rulesButton = $state<HTMLButtonElement | null>(null);
+  let learning = false;
+  onDestroy(() => {
+    if (learning) location.hash = "#/apprendre";
   });
 
   let creditsOpen = $state(false);
@@ -176,6 +192,16 @@
     {/if}
 
     <nav class="links">
+      <button
+        type="button"
+        class="btn btn-text"
+        aria-haspopup="dialog"
+        data-settings-rules
+        bind:this={rulesButton}
+        onclick={() => (rulesOpen = true)}
+      >
+        {reglages.rules}
+      </button>
       {#if !online}
         <a class="btn btn-text" href="#/sons" bind:this={soundsLink} onclick={onSoundsClick}>
           {reglages.testSounds}
@@ -288,6 +314,21 @@
     oncancel={() => (stopOpen = false)}
     onconfirm={confirmStop}
     opener={stopButton}
+  />
+{/if}
+
+{#if rulesOpen}
+  <RulesSheet
+    tab={playing ? "cartes" : "but"}
+    inGame={playing}
+    opener={rulesButton}
+    onclose={() => (rulesOpen = false)}
+    onlearn={canLearn
+      ? () => {
+          learning = true;
+          onclose();
+        }
+      : undefined}
   />
 {/if}
 

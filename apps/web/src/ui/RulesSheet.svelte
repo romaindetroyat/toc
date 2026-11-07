@@ -4,6 +4,7 @@
   import { RULES_TABS, type RulesTabId, regles } from "../i18n/fr/regles.ts";
   import { figuresOf } from "../game/ruleFigures.ts";
   import CardRule from "./CardRule.svelte";
+  import Icon from "./Icon.svelte";
   import RuleFigure from "./RuleFigure.svelte";
   import { holdForRules } from "./rulesOpen.svelte.ts";
   import Sheet from "./Sheet.svelte";
@@ -29,6 +30,12 @@
     ontab?: (tab: RulesTabId) => void;
     /** Element that gets the focus back on close. */
     opener?: HTMLElement | null;
+    /**
+     * Plan 05-08: outside a game only (never in a game, a lesson or the waiting room), « Apprendre en
+     * jouant »: the sheet closes, and this runs once it has gone (the caller opens #/apprendre), so the
+     * lessons page never appears under the sheet's slide-out.
+     */
+    onlearn?: () => void;
   };
 
   let {
@@ -39,6 +46,7 @@
     onclose,
     ontab,
     opener = null,
+    onlearn,
   }: Props = $props();
 
   const uid = $props.id();
@@ -47,6 +55,17 @@
 
   // The computers of a solo game wait while any rules sheet is open (05-RESEARCH Pitfall 8).
   onDestroy(holdForRules());
+
+  // « Apprendre en jouant »: close first, then the caller's route once the sheet has gone.
+  let learning = false;
+  onDestroy(() => {
+    if (learning) onlearn?.();
+  });
+
+  function learn() {
+    learning = true;
+    onclose();
+  }
 
   // svelte-ignore state_referenced_locally
   let current = $state<RulesTabId>(tab ?? (inGame ? "cartes" : "but"));
@@ -120,32 +139,45 @@
   });
 </script>
 
+{#snippet learnButton()}
+  <button type="button" class="btn btn-secondary learn" data-rules-learn onclick={learn}>
+    <Icon name="graduation-cap" size={20} />
+    {regles.learn}
+  </button>
+{/snippet}
+
 <Sheet title={regles.title} size="large" closeLabel={regles.close} {onclose} {opener}>
   <div class="rules" class:two data-rules-sheet data-rules-current={current}>
-    <div
-      class="nav"
-      role="tablist"
-      tabindex="-1"
-      aria-label={regles.nav}
-      aria-orientation={two ? "vertical" : "horizontal"}
-      onkeydown={onNavKey}
-    >
-      {#each RULES_TABS as id (id)}
-        <button
-          type="button"
-          class="tab"
-          role="tab"
-          id={tabId(id)}
-          aria-selected={id === current}
-          aria-controls={panelId}
-          tabindex={id === current ? 0 : -1}
-          data-rules-tab={id}
-          bind:this={tabEls[id]}
-          onclick={() => select(id)}
-        >
-          {regles.tabs[id].name}
-        </button>
-      {/each}
+    <!-- The nav, and under it in two columns « Apprendre en jouant » (plan 05-08). -->
+    <div class="side">
+      <div
+        class="nav"
+        role="tablist"
+        tabindex="-1"
+        aria-label={regles.nav}
+        aria-orientation={two ? "vertical" : "horizontal"}
+        onkeydown={onNavKey}
+      >
+        {#each RULES_TABS as id (id)}
+          <button
+            type="button"
+            class="tab"
+            role="tab"
+            id={tabId(id)}
+            aria-selected={id === current}
+            aria-controls={panelId}
+            tabindex={id === current ? 0 : -1}
+            data-rules-tab={id}
+            bind:this={tabEls[id]}
+            onclick={() => select(id)}
+          >
+            {regles.tabs[id].name}
+          </button>
+        {/each}
+      </div>
+      {#if onlearn !== undefined && two}
+        {@render learnButton()}
+      {/if}
     </div>
 
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -193,6 +225,9 @@
       {#each figures as spec (spec.id)}
         <RuleFigure {spec} />
       {/each}
+      {#if onlearn !== undefined && !two && current === "but"}
+        {@render learnButton()}
+      {/if}
     </div>
   </div>
 </Sheet>
@@ -205,6 +240,27 @@
     gap: var(--space-sm);
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  /* One column: the nav is a row of the sheet's body (the wrapper steps aside). */
+  .side {
+    display: contents;
+  }
+
+  /* « Apprendre en jouant » (plan 05-08): secondary, 48 high; under the tabs in two columns (the nav's
+     width, 16 under it), the last item of « Le but » in one. */
+  .learn {
+    flex: none;
+    box-sizing: border-box;
+    padding-inline: var(--space-sm);
+  }
+
+  .two .learn {
+    width: 100%;
+  }
+
+  .panel .learn {
+    margin: 0 0 var(--space-md);
   }
 
   .nav {
@@ -353,7 +409,15 @@
     column-gap: var(--space-md);
   }
 
+  .two .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-height: 0;
+  }
+
   .two .nav {
+    flex: 0 1 auto;
     flex-direction: column;
     min-height: 0;
     overflow-x: hidden;

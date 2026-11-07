@@ -70,6 +70,8 @@ export const regles = {
   close: "Fermer les règles",
   /** The book button of the game (the phone's right strip, the computer's info row). */
   button: "Règles du jeu",
+  /** Plan 05-08: outside a game only, under the tabs (the last item of « Le but » in one column). */
+  learn: "Apprendre en jouant",
   /** The name of the tab list. */
   nav: "Les parties des règles",
 

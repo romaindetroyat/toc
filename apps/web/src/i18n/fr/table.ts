@@ -129,6 +129,12 @@ export const table = {
     moveSeat: (name: string, colour: string) => `Déplacer ${name} (${colour})`,
     /** « Libérer ma place » under the grid. */
     stand: "Libérer ma place",
+    /**
+     * Plan 05-08: a seated device without a finished lesson, at the end of the right column; the
+     * rules only, never the lessons (leaving would free the seat).
+     */
+    newcomer: "Première fois ? Lis les règles en attendant.",
+    newcomerRules: "Règles du jeu",
     invite: "Inviter",
     partner: "Partenaire",
     noComputer: "Quatre joueurs à la table : pas d’ordinateur.",

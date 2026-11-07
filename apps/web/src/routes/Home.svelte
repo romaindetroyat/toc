@@ -283,7 +283,12 @@
 {/if}
 
 {#if rulesOpen}
-  <RulesSheet tab="but" onclose={() => (rulesOpen = false)} opener={rulesTile} />
+  <RulesSheet
+    tab="but"
+    onclose={() => (rulesOpen = false)}
+    opener={rulesTile}
+    onlearn={() => (location.hash = "#/apprendre")}
+  />
 {/if}
 
 {#if firstTime}

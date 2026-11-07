@@ -19,6 +19,8 @@ export const reglages = {
   knightMarksHelper:
     "Un rond, un triangle, un carré ou une étoile sur chaque cheval, pour reconnaître les couleurs autrement.",
 
+  /** Plan 05-08: the first link, the « Règles » sheet (« Le but » outside a game, « Les cartes » in one). */
+  rules: "Règles du jeu",
   testSounds: "Tester les sons",
   credits: "Crédits et licences",
   /** At an online table (plan 02-05): leave it, after a confirmation. */
