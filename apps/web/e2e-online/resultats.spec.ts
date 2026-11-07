@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, type TestInfo, test } from "@playwright/test";
-import { mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
+import { BASE_URL, mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
 import { createTable, deviceOptions, join, NEAR_END, playOneMove, seatTile } from "./online.ts";
 
 // « Mes résultats » end to end (plan 05-01, HIST-02, D-01 to D-04, D-12), against `wrangler dev` with
@@ -45,6 +45,146 @@ async function openResults(page: Page, count: number): Promise<void> {
     await expect(rows(page)).toHaveCount(count, { timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
 }
+
+// --- Plan 05-09 Task 1: the navigation, the months, the paging and the detail sheet ---
+
+const tab = (page: Page, name: "historique" | "chiffres" | "classement") =>
+  page.locator(`[data-results-tab="${name}"]`);
+
+/**
+ * A solo game reported for the signed-in account of `page` (POST /api/me/results/solo, the session
+ * cookie and our Origin), the way the browser sends it at the end plank (plan 05-07); answers its
+ * report id. The player is bleu, the three computers have a level, the game took 40 minutes.
+ */
+async function reportSolo(page: Page, endedAt: number, won: boolean): Promise<string> {
+  const id = crypto.randomUUID();
+  const report = {
+    id,
+    startedAt: endedAt - 40 * 60_000,
+    endedAt,
+    human: "bleu",
+    winner: won ? "bleu-rouge" : "jaune-vert",
+    deals: 5,
+    levels: { jaune: 3, rouge: 2, vert: 4 },
+    seats: {
+      bleu: { captured: 2, lost: 1, home: won ? 4 : 2 },
+      jaune: { captured: 0, lost: 2, home: won ? 1 : 4 },
+      rouge: { captured: 1, lost: 0, home: won ? 4 : 3 },
+      vert: { captured: 1, lost: 1, home: won ? 3 : 4 },
+    },
+  };
+  const response = await page.request.post("/api/me/results/solo", {
+    data: report,
+    headers: { Origin: BASE_URL },
+  });
+  expect(response.status()).toBe(201);
+  return id;
+}
+
+test("l’historique par mois, 20 parties à la fois, la fiche d’une partie et les trois onglets", async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.setTimeout(180_000);
+  const a = await accountDevice(browser, testInfo, request, "Pagination");
+  const page = a.page;
+  // 25 games, one every two days from today back (under the 30 a day and the 60 days of the server).
+  const now = Date.now();
+  const ids: string[] = [];
+  for (let i = 0; i < 25; i++)
+    ids.push(await reportSolo(page, now - i * 2 * 86_400_000, i % 3 !== 0));
+
+  await page.goto("/");
+  await page.goto("/#/resultats");
+  const nav = page.getByRole("navigation", { name: "Mes résultats" });
+  await expect(nav).toBeVisible();
+  await expect(tab(page, "historique")).toHaveAttribute("aria-current", "page");
+  await expect(tab(page, "chiffres")).not.toHaveAttribute("aria-current", "page");
+  await expect(rows(page)).toHaveCount(20);
+  // Month headings over the rows, newest month first, with a capital letter.
+  const months = page.locator("[data-month]");
+  expect(await months.count()).toBeGreaterThanOrEqual(2);
+  await expect(months.first()).toHaveText(/^\p{Lu}\p{Ll}+ \d{4}$/u);
+
+  // Loading more fails once: the toast, and the button stays.
+  const more = page.getByRole("button", { name: "Voir les parties plus anciennes" });
+  await page.route("**/api/me/results?before=*", (route) =>
+    route.fulfill({ status: 503, body: "" }),
+  );
+  await more.click();
+  await expect(
+    page.getByText("Impossible de charger la suite. Réessaie dans un instant."),
+  ).toBeVisible();
+  await expect(more).toBeVisible();
+  await expect(rows(page)).toHaveCount(20);
+  await page.unroute("**/api/me/results?before=*");
+
+  // Loading more: busy, then the 5 older games and the end line; no game twice, none skipped.
+  await page.route("**/api/me/results?before=*", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await route.continue();
+  });
+  await more.click();
+  const busy = page.locator('[data-history-more][aria-busy="true"]');
+  await expect(busy).toHaveText("Chargement…");
+  await expect(rows(page)).toHaveCount(25);
+  await expect(page.locator("[data-history-more]")).toHaveCount(0);
+  await expect(
+    page.getByText("C’est tout : les parties comptent depuis novembre 2026."),
+  ).toBeVisible();
+  await expect(page.locator("[data-results-live]")).toHaveText("25 parties");
+  const shown = await rows(page).evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("data-game-row") ?? ""),
+  );
+  expect(shown).toEqual(ids);
+  await page.unroute("**/api/me/results?before=*");
+
+  // No account id in the DOM (the solo game ids carry it on the server only).
+  const me = await page.evaluate(async () => {
+    const response = await fetch("/api/me", { headers: { accept: "application/json" } });
+    return ((await response.json()) as { id: string }).id;
+  });
+  expect(await page.content()).not.toContain(me);
+
+  // A row opens its sheet; « Fermer » gives the focus back to the row.
+  const first = rows(page).first();
+  await first.click();
+  const sheet = page.locator("[data-game-sheet]");
+  await expect(sheet).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(/^Partie du \p{L}+ \d{1,2} \p{L}+$/u);
+  await expect(sheet).toContainText("Contre l’ordinateur");
+  await expect(sheet).toContainText("Défaite de ton équipe");
+  await expect(sheet).toContainText("Ton équipe");
+  await expect(sheet).toContainText("L’équipe adverse");
+  await expect(sheet).toContainText("toi");
+  await expect(sheet).toContainText("Galopeur");
+  await expect(sheet).toContainText("(ordinateur)");
+  await expect(sheet).toContainText(/De \d{1,2}\sh\s\d{2} à \d{1,2}\sh\s\d{2} \(40\smin\)/);
+  await expect(sheet).toContainText("Donnes jouées : 5");
+  await expect(sheet).toContainText(
+    "Partie contre l’ordinateur : elle compte dans tes chiffres, pas au classement.",
+  );
+  await page.getByRole("dialog").getByRole("button", { name: "Fermer" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(first).toBeFocused();
+
+  // The tabs: each its route, the focus on the panel's heading, the back button walks them.
+  await tab(page, "chiffres").click();
+  await expect(page).toHaveURL(/#\/resultats\/chiffres$/);
+  await expect(tab(page, "chiffres")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { level: 2, name: "Mes chiffres" })).toBeFocused();
+  await tab(page, "classement").click();
+  await expect(page).toHaveURL(/#\/resultats\/classement$/);
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Classement entre amis" }),
+  ).toBeFocused();
+  await page.goBack();
+  await expect(tab(page, "chiffres")).toHaveAttribute("aria-current", "page");
+  await page.goBack();
+  await expect(tab(page, "historique")).toHaveAttribute("aria-current", "page");
+  await expect(rows(page).first()).toBeVisible();
+  await a.context.close();
+});
 
 test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résultats »", async ({
   browser,
