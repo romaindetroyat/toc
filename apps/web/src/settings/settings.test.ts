@@ -37,6 +37,7 @@ describe("parseSettings", () => {
       tableFast: true,
       lastColor: "vert",
       botLevels: { partner: 5, left: 1, right: 4 },
+      knightMarks: false,
     };
     expect(parseSettings(JSON.parse(JSON.stringify(valid)), false)).toEqual(valid);
   });
@@ -71,6 +72,7 @@ describe("parseSettings", () => {
       tableFast: false,
       lastColor: "jaune",
       botLevels: { partner: 3, left: 3, right: 3 },
+      knightMarks: true,
     });
     expect(Object.hasOwn(parsed, "ambience")).toBe(false);
     expect(Object.hasOwn(parsed, "ambienceVolume")).toBe(false);
@@ -245,5 +247,43 @@ describe("parseSettings: the creator's last table-wide « Avance rapide » (plan
     for (const tableFast of ["true", 1, null, {}]) {
       expect(parseSettings({ tableFast }, false).tableFast).toBe(false);
     }
+  });
+});
+
+describe("parseSettings: the shapes on the knights (plan 05-02, D-11, D-14)", () => {
+  it("shows them by default and on an old stored object without the key, the rest unchanged", () => {
+    expect(DEFAULT_SETTINGS.knightMarks).toBe(true);
+    expect(parseSettings({}, false).knightMarks).toBe(true);
+    const old = { sound: false, sfx: true, reduceMotion: true, fast: true, lastColor: "rouge" };
+    expect(parseSettings(old, false)).toEqual({
+      ...DEFAULT_SETTINGS,
+      sound: false,
+      reduceMotion: true,
+      fast: true,
+      lastColor: "rouge",
+      knightMarks: true,
+    });
+  });
+
+  it("keeps a boolean and falls back to on for anything else (T-05-07)", () => {
+    expect(parseSettings({ knightMarks: false }, false).knightMarks).toBe(false);
+    expect(parseSettings({ knightMarks: true }, false).knightMarks).toBe(true);
+    for (const knightMarks of ["yes", "false", 0, 1, null, {}, []]) {
+      expect(parseSettings({ knightMarks }, false).knightMarks).toBe(true);
+    }
+    // A bad value does not spoil the others, and the others do not spoil it.
+    const parsed = parseSettings({ knightMarks: false, sound: "oui", lastColor: "pourpre" }, false);
+    expect(parsed.knightMarks).toBe(false);
+    expect(parsed.sound).toBe(DEFAULT_SETTINGS.sound);
+  });
+
+  it("survives a save then a load", () => {
+    const storage = new Map<string, string>();
+    const fake = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+    };
+    saveSettings(fake, { ...DEFAULT_SETTINGS, knightMarks: false });
+    expect(loadSettings(fake, false).knightMarks).toBe(false);
   });
 });
