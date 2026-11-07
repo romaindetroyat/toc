@@ -454,22 +454,30 @@ for (const size of BAND_SIZES) {
         await openLesson(page, n);
         for (const step of SCRIPTS[n] ?? []) {
           await act(page, step, async (line) => {
-            const fit = await band(page).evaluate(async (el) => {
-              await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
-              const text = el.querySelector("[data-guide-line]") as HTMLElement;
-              const bubble = text.parentElement as HTMLElement;
-              const box = text.getBoundingClientRect();
-              const outer = el.getBoundingClientRect();
-              const lineHeight = Number.parseFloat(getComputedStyle(text).lineHeight);
-              return {
-                lines: Math.round(box.height / lineHeight),
-                clipped:
-                  bubble.scrollHeight > bubble.clientHeight + 0.5 ||
-                  text.scrollWidth > text.clientWidth + 0.5 ||
-                  box.top < outer.top - 0.5 ||
-                  box.bottom > outer.bottom + 0.5,
-              };
-            });
+            // Measured once the band has settled: under the load of the full suite the line change
+            // (a 150 ms fade and a 4 px rise) can still be running at the first look, which reads as
+            // a clip for a moment (plan 05-09, deferred-items.md). A real clip stays and still fails.
+            const measure = () =>
+              band(page).evaluate(async (el) => {
+                await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+                const text = el.querySelector("[data-guide-line]") as HTMLElement;
+                const bubble = text.parentElement as HTMLElement;
+                const box = text.getBoundingClientRect();
+                const outer = el.getBoundingClientRect();
+                const lineHeight = Number.parseFloat(getComputedStyle(text).lineHeight);
+                return {
+                  lines: Math.round(box.height / lineHeight),
+                  clipped:
+                    bubble.scrollHeight > bubble.clientHeight + 0.5 ||
+                    text.scrollWidth > text.clientWidth + 0.5 ||
+                    box.top < outer.top - 0.5 ||
+                    box.bottom > outer.bottom + 0.5,
+                };
+              });
+            await expect
+              .poll(async () => (await measure()).clipped, { message: line, timeout: 2_000 })
+              .toBe(false);
+            const fit = await measure();
             expect(fit.lines, line).toBeLessThanOrEqual(size.lines);
             expect(fit.clipped, line).toBe(false);
             measured.push(line);
