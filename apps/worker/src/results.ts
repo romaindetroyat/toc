@@ -13,6 +13,11 @@
 // Plan 05-05 (HIST-03, HIST-04, D-01, D-02, D-13; Pattern 4), the same session rule:
 //   GET /api/me/stats   « Mes chiffres »: every row of the caller (one query), aggregated by statsOf
 //                       (aggregate.ts) for the three filters at once (StatsAnswer)
+//   GET /api/me/ranking the friends ranking: the circle is the caller and the friends of the
+//                       caller's own friendships (two rows per friendship, so one direction is
+//                       enough; a friend of a friend never appears, T-05-15); each counts their
+//                       ranked game_seats rows only (ranked = 1: online, two accounts or more; never a
+//                       solo game), played with anyone; ordered by rankingOf (RankingAnswer)
 
 import {
   HISTORY_CURSOR_RE,
@@ -20,9 +25,16 @@ import {
   type HistoryGame,
   type HistoryPage,
   type HistorySeat,
+  type RankingAnswer,
   type StatsAnswer,
 } from "@toc/protocol";
-import { type StatsRow, type StoredSeat, statsOf } from "./aggregate.ts";
+import {
+  type RankingRow,
+  rankingOf,
+  type StatsRow,
+  type StoredSeat,
+  statsOf,
+} from "./aggregate.ts";
 import { sessionUser } from "./auth/session.ts";
 import type { Meter } from "./db.ts";
 import { json, notAllowed } from "./http.ts";
@@ -93,12 +105,30 @@ const stats: Read = async (user, _url, meter) => {
   return json(answer, 200);
 };
 
+/** GET /api/me/ranking: the circle's ranked counts (one query), ranked by rankingOf. */
+const ranking: Read = async (user, _url, meter) => {
+  const found = await meter.all<RankingRow>(
+    meter
+      .prepare(
+        `WITH circle(id) AS (SELECT ?1 UNION SELECT friend_id FROM friendships WHERE user_id = ?1)
+         SELECT u.id, u.pseudo, COUNT(gs.game_id) AS games, COALESCE(SUM(gs.won), 0) AS wins
+           FROM circle c JOIN users u ON u.id = c.id
+           LEFT JOIN game_seats gs ON gs.user_id = c.id AND gs.ranked = 1
+          GROUP BY u.id, u.pseudo`,
+      )
+      .bind(user.id),
+  );
+  const answer: RankingAnswer = rankingOf(found.results, user.id);
+  return json(answer, 200);
+};
+
 const READS = new Map<string, Read>([
   ["/api/me/results", (user, url, meter) => history(user, url, meter)],
   ["/api/me/stats", stats],
+  ["/api/me/ranking", ranking],
 ]);
 
-/** GET /api/me/results, /api/me/stats (GET or HEAD only, a session); null for another path. */
+/** GET /api/me/results, /api/me/stats, /api/me/ranking (GET or HEAD only, a session); null for another path. */
 export async function resultsRoute(
   request: Request,
   env: Env,

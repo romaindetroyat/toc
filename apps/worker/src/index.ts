@@ -55,6 +55,7 @@
 //                                      time ({ games, next }; ?before=<ended_at>:<game_id>), 401 else
 // Plan 05-05 (results.ts, aggregate.ts; a session, 401 else):
 //   GET  /api/me/stats               → « Mes chiffres » for the three filters at once (StatsAnswer)
+//   GET  /api/me/ranking             → the friends ranking of the caller's circle (RankingAnswer)
 //   other /api/*            → 404
 // In TOC_TEST_MODE every /api answer carries x-toc-d1 (the D1 rows the request wrote and read).
 //   everything else         → the app (static assets, or the embedded files of wrangler.embarque.jsonc)

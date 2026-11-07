@@ -139,3 +139,47 @@ export function parseStatsAnswer(data: unknown): StatsAnswer | null {
   const parsed = statsAnswer.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
+
+// --- The friends ranking (plan 05-05, HIST-04, D-02, D-13; 05-UI-SPEC Panel 3) ---
+
+/** Ranked games a player needs to enter the ranking (D-13). */
+export const RANKING_THRESHOLD = 5;
+
+const pseudoText = z.string().check(z.maxLength(40));
+
+const rankedRow = z
+  .strictObject({
+    /** Competition rank: tied players share it, the next skips (« 1, 2, 2, 4 »). */
+    rank: z.number().check(z.int(), z.gte(1)),
+    pseudo: pseudoText,
+    games: total,
+    wins: total,
+    /** The signed-in player's own row. */
+    me: z.boolean(),
+  })
+  .check(z.refine((row) => row.games >= RANKING_THRESHOLD && row.wins <= row.games));
+
+const unrankedRow = z
+  .strictObject({ pseudo: pseudoText, games: total, me: z.boolean() })
+  .check(z.refine((row) => row.games < RANKING_THRESHOLD));
+
+const rankingAnswer = z.strictObject({
+  /** The signed-in player's friends (the circle is them and the player). */
+  friends: total,
+  /** Win rate, then wins, then games, then pseudo. */
+  ranked: z.array(rankedRow),
+  /** Fewer than RANKING_THRESHOLD ranked games: by games, then pseudo (« n sur 5 »). */
+  unranked: z.array(unrankedRow),
+});
+
+/** GET /api/me/ranking: the signed-in player and their friends, by their ranked games. */
+export type RankingAnswer = z.infer<typeof rankingAnswer>;
+
+/** The schema itself, for the Worker's own checks in the tests. */
+export const RankingAnswer = rankingAnswer;
+
+/** The page's untrusted answer as a RankingAnswer, or null when it is out of shape. */
+export function parseRankingAnswer(data: unknown): RankingAnswer | null {
+  const parsed = rankingAnswer.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}

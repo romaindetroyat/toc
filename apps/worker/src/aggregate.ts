@@ -4,6 +4,11 @@
 //                        three filters at once (« Toutes », « En ligne », « Contre l’ordinateur »):
 //                        games, wins, the knights of the player's seat (eaten by it, eaten from it,
 //                        brought home), the partners and the computer levels
+//   rankingOf(rows, me)  the friends ranking over the circle's ranked counts (D-02, D-13, Pitfall 9):
+//                        RANKING_THRESHOLD games to enter; the win rate compared exactly as
+//                        a.wins × b.games against b.wins × a.games (never a float), then wins, then
+//                        games, then pseudo; a rank is shared only when rate, wins and games are all
+//                        equal (« 1, 2, 2, 4 »); the others by games, then pseudo
 // A partner is the seat of the player's team mate: another account (by its pseudo), all the guests
 // together, or the computers of one level. A game counts under a computer level only when both
 // opponents were computers from the start (a person's seat handed over is still a human opponent),
@@ -12,7 +17,12 @@
 // pseudo or a level, grouped by the account id server-side.
 
 import { type Color, type Team, teamOf } from "@toc/engine";
-import type { StatsAnswer, StatsBlock } from "@toc/protocol";
+import {
+  RANKING_THRESHOLD,
+  type RankingAnswer,
+  type StatsAnswer,
+  type StatsBlock,
+} from "@toc/protocol";
 
 type Level = 1 | 2 | 3 | 4 | 5;
 
@@ -154,4 +164,39 @@ export function statsOf(rows: readonly StatsRow[], me: string): StatsAnswer {
     (row.solo === 1 ? solo : online).add(row, partner, level);
   }
   return { all: all.done(), online: online.done(), solo: solo.done() };
+}
+
+/** One person of the circle (the player or a friend) and their ranked games (the circle query). */
+export type RankingRow = { id: string; pseudo: string; games: number; wins: number };
+
+const byPseudo = (a: { pseudo: string }, b: { pseudo: string }) =>
+  a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" });
+
+/** Rate, wins and games compared; 0 when all three are equal (the same rank). */
+function standing(a: RankingRow, b: RankingRow): number {
+  // a.wins / a.games against b.wins / b.games, exactly: both counts are small integers.
+  const rate = b.wins * a.games - a.wins * b.games;
+  if (rate !== 0) return rate;
+  if (a.wins !== b.wins) return b.wins - a.wins;
+  return b.games - a.games;
+}
+
+/** The friends ranking of the player `me` (an account id); no id leaves. */
+export function rankingOf(rows: readonly RankingRow[], me: string): RankingAnswer {
+  const ranked = rows
+    .filter((row) => row.games >= RANKING_THRESHOLD)
+    .sort((a, b) => standing(a, b) || byPseudo(a, b));
+  const unranked = rows
+    .filter((row) => row.games < RANKING_THRESHOLD)
+    .sort((a, b) => b.games - a.games || byPseudo(a, b));
+  let rank = 0;
+  return {
+    friends: rows.filter((row) => row.id !== me).length,
+    ranked: ranked.map((row, i) => {
+      const previous = ranked[i - 1];
+      if (previous === undefined || standing(previous, row) !== 0) rank = i + 1;
+      return { rank, pseudo: row.pseudo, games: row.games, wins: row.wins, me: row.id === me };
+    }),
+    unranked: unranked.map((row) => ({ pseudo: row.pseudo, games: row.games, me: row.id === me })),
+  };
 }
