@@ -342,7 +342,7 @@ test("le 7 : réparti sur deux chevaux, prise en chemin, un seul « Jouer »", a
   await expect(panel(page)).toHaveCount(0);
 });
 
-test("le 7 : « Tout annuler » rend la main, rien n’a bougé", async ({ page }) => {
+test("le 7 : « Tout effacer » rend la main, rien n’a bougé", async ({ page }) => {
   await openPosition(page, SEVEN_CAPTURE);
   await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
   await tap(page, "bleu0");
@@ -351,7 +351,7 @@ test("le 7 : « Tout annuler » rend la main, rien n’a bougé", async ({ page 
   await chip(page, 5).click();
   await expect(counter(page)).toHaveText("Tout est réparti.");
 
-  await page.getByRole("button", { name: "Tout annuler" }).click();
+  await page.getByRole("button", { name: "Tout effacer" }).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(zone(page)).toHaveAttribute("data-state", "idle");
   await expect(page.locator("[data-hand]")).toBeVisible();
@@ -419,8 +419,8 @@ test("le 7 d’un cheval seul se remplit tout seul : « Tout est réparti. », p
   await page.waitForTimeout(1000);
   expect(await placeOf(page, "bleu0")).toBe("ring:10");
 
-  // « Tout annuler » puts the card down, and the 7 fills itself again.
-  await page.getByRole("button", { name: "Tout annuler" }).click();
+  // « Tout effacer » puts the card down, and the 7 fills itself again.
+  await page.getByRole("button", { name: "Tout effacer" }).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(zone(page)).toHaveAttribute("data-state", "idle");
   await page.getByRole("button", { name: "7 de cœur, jouable" }).click();

@@ -482,12 +482,14 @@ test.describe("au clavier", () => {
         typeof pattern === "string" ? name === pattern : pattern.test(name),
       );
     expect(at("Réglages"), "Réglages").toBeGreaterThanOrEqual(0);
-    const knight = "Cheval bleu A, à 10 cases de sa sortie, jouable";
+    const knight = "Cheval bleu A, à toi, à 10 cases de sa sortie, jouable";
     expect(at(knight), "Cheval bleu A").toBeGreaterThan(at("Réglages"));
     expect(at("Sur le tapis"), "tapis").toBeGreaterThan(at(knight));
-    expect(at("Changer de carte"), "Changer de carte").toBeGreaterThan(at("Sur le tapis"));
+    expect(at("Choisir une autre carte"), "Choisir une autre carte").toBeGreaterThan(
+      at("Sur le tapis"),
+    );
     expect(at(/^(?!Cheval).+, (jouable|pas jouable)$/), "main").toBeGreaterThan(
-      at("Changer de carte"),
+      at("Choisir une autre carte"),
     );
   });
 
@@ -527,10 +529,10 @@ test.describe("au clavier", () => {
     await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
     await page.getByRole("button", { name: "3 de pique, jouable" }).click();
     await expect(
-      page.getByRole("button", { name: "Cheval bleu A, à 5 cases de sa sortie, jouable" }),
+      page.getByRole("button", { name: "Cheval bleu A, à toi, à 5 cases de sa sortie, jouable" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Cheval bleu B, à 20 cases de sa sortie, jouable" }),
+      page.getByRole("button", { name: "Cheval bleu B, à toi, à 20 cases de sa sortie, jouable" }),
     ).toBeVisible();
   });
 
@@ -562,7 +564,7 @@ test.describe("au clavier", () => {
     await expect(page.getByRole("button", { name: "Valet de pique, pas jouable" })).toBeVisible();
     await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
     await expect(
-      page.getByRole("button", { name: "Cheval bleu A, à 10 cases de sa sortie, jouable" }),
+      page.getByRole("button", { name: "Cheval bleu A, à toi, à 10 cases de sa sortie, jouable" }),
     ).toBeVisible();
 
     const controls = await namesOfControls(page);

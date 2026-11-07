@@ -48,7 +48,7 @@ test("créer une table depuis l’accueil, la retrouver dans « Mes parties en c
   await expect(row(ana, id)).toContainText("Salle d’attente");
   await expect(row(ana, id).getByRole("link")).toHaveAttribute("href", `#/table/${id}`);
   await expect(row(ana, id).getByRole("link")).toHaveAccessibleName(
-    /^Reprendre la partie\s: Personne d’autre pour l’instant, Salle d’attente · .+\. Ta couleur\s: Bleu\.$/,
+    /^Bleu, Personne d’autre pour l’instant, Salle d’attente · .+, reprendre la partie$/,
   );
 
   // Ben opens the link: the prompt says who invites him; he sits on Jaune.
@@ -136,7 +136,7 @@ test("avec un compte, la rangée de liens a « Mes résultats », qui ouvre #/re
   const results = links.locator('[data-small-tile="resultats"]');
   await expect(results).toContainText("Mes résultats");
   await expect(results).toContainText("Parties et classement");
-  await expect(results).toHaveAccessibleName("Mes résultats");
+  await expect(results).toHaveAccessibleName("Mes résultats : parties et classement");
   // Three tiles of 152 in one row; the list keeps three 64 px rows in sight.
   const boxes = await links
     .locator("[data-small-tile]")

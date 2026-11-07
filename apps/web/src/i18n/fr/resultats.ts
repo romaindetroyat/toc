@@ -182,19 +182,11 @@ export const resultats = {
     online: "en ligne",
     solo: "contre l’ordinateur",
     /**
-     * The row's accessible name: « Victoire, 8 à 5, le 25 octobre à 21 h 14, en ligne, avec Marie,
-     * contre Paul et Pur-sang ».
+     * The row's accessible name. Plan 05-10 (WCAG 2.5.3 « Label in Name »): the row's visible words in
+     * order, then how it was played: « Victoire · 8 – 5, Avec Marie · contre Paul et Pur-sang, 25 oct.,
+     * 21 h 14, en ligne ».
      */
-    label: (input: {
-      result: string;
-      mine: number;
-      theirs: number;
-      day: string;
-      time: string;
-      kind: string;
-      partner: string;
-      opponents: string;
-    }) =>
-      `${input.result}, ${input.mine} à ${input.theirs}, le ${input.day} à ${input.time}, ${input.kind}, avec ${input.partner}, contre ${input.opponents}`,
+    label: (input: { line1: string; line2: string; date: string; time: string; kind: string }) =>
+      `${input.line1}, ${input.line2}, ${input.date}, ${input.time}, ${input.kind}`,
   },
 } as const;

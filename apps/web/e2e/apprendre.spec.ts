@@ -134,7 +134,7 @@ test.describe("« Apprendre à jouer » (#/apprendre)", () => {
     for (const [i, title] of titles.entries()) {
       const row = rows(page).nth(i);
       await expect(row).toHaveAttribute("href", `#/apprendre/${i + 1}`);
-      await expect(row).toHaveAccessibleName(`Leçon ${i + 1}, ${title}`);
+      await expect(row).toHaveAccessibleName(`Leçon ${i + 1}, ${title}, environ 1 minute`);
       await expect(row).toContainText(title);
       await expect(row).toContainText("Environ 1 minute");
       await expect(row).toHaveCSS("height", "56px");

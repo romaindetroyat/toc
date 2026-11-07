@@ -8,6 +8,9 @@ export const lecons = {
   bravo: "Bravo !",
   suivant: "Suivant",
 
+  /** Plan 05-10 (APP-05 audit, one h1 per page): a lesson’s heading, for screen readers. */
+  heading: (n: number, title: string) => `Leçon ${n} : ${title}`,
+
   /** Plan 05-06: the name of what the guide rings ends with these words. */
   target: (name: string) => `${name}, à toucher`,
 
@@ -32,8 +35,9 @@ export const lecons = {
     /** Line 2 of a lesson done. */
     done: "Faite",
     /** A row's accessible name: « Leçon 3, Manger, faite ». */
+    // Plan 05-10 (WCAG 2.5.3 « Label in Name »): the name holds the row's visible lines in order.
     row: (n: number, title: string, done: boolean) =>
-      done ? `Leçon ${n}, ${title}, faite` : `Leçon ${n}, ${title}`,
+      done ? `Leçon ${n}, ${title}, faite` : `Leçon ${n}, ${title}, environ 1 minute`,
   },
 
   /** Plan 05-08: the sheet « Première fois ? » on a brand-new device (D-08). */

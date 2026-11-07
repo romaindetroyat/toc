@@ -577,7 +577,7 @@ test.describe("la pastille de la leçon et « Les leçons »", () => {
     await expect(rows.nth(1)).toHaveAttribute("data-done", "true");
     await expect(rows.nth(2)).toHaveAttribute("data-done", "false");
     await expect(rows.nth(0)).toHaveAccessibleName(`Leçon 1, ${sortir.title}, faite`);
-    await expect(rows.nth(2)).toHaveAccessibleName(`Leçon 3, ${manger.title}`);
+    await expect(rows.nth(2)).toHaveAccessibleName(`Leçon 3, ${manger.title}, environ 1 minute`);
 
     // « Fermer » closes; the lesson is as it was.
     await sheet.getByRole("button", { name: "Fermer" }).click();

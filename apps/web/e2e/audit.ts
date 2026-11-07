@@ -185,20 +185,33 @@ function textsOf(page: Page): Promise<{ where: string; text: string }[]> {
   });
 }
 
-/** Waits until no finite animation runs (reduced motion makes the endless ones still). */
+/**
+ * Waits until no finite animation runs (reduced motion makes the endless ones still, and keeps the
+ * fades): two quiet readings 100 ms apart, each after two frames, since a transition may start a frame
+ * after the element it moves appears.
+ */
 async function settle(page: Page) {
-  const deadline = Date.now() + 3000;
-  while (Date.now() < deadline) {
+  const deadline = Date.now() + 4000;
+  let quiet = 0;
+  while (Date.now() < deadline && quiet < 2) {
     const running = await page.evaluate(
       () =>
-        document.getAnimations().filter((a) => {
-          if (a.playState !== "running") return false;
-          const timing = a.effect?.getComputedTiming();
-          return timing !== undefined && timing.endTime !== Number.POSITIVE_INFINITY;
-        }).length,
+        new Promise<number>((resolve) => {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              resolve(
+                document.getAnimations().filter((a) => {
+                  if (a.playState !== "running") return false;
+                  const timing = a.effect?.getComputedTiming();
+                  return timing !== undefined && timing.endTime !== Number.POSITIVE_INFINITY;
+                }).length,
+              ),
+            ),
+          );
+        }),
     );
-    if (running === 0) return;
-    await page.waitForTimeout(50);
+    quiet = running === 0 ? quiet + 1 : 0;
+    await page.waitForTimeout(running === 0 ? 100 : 50);
   }
 }
 

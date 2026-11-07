@@ -81,7 +81,7 @@
      (T-01-30, T-01-57). -->
 <g role="group" aria-label={game.tapis.title} data-felt pointer-events="none">
   <!-- Talon: a face-down stack, left of the felt's centre. -->
-  <g data-talon={render.talonSize} aria-label={game.tapis.talon(render.talonSize)}>
+  <g data-talon={render.talonSize} role="img" aria-label={game.tapis.talon(render.talonSize)}>
     {#if layers === 0}
       <rect
         x={talon[0] - PW / 2}
@@ -114,7 +114,7 @@
   </g>
 
   <!-- Défausse: its top card face up, or an empty outline, right of the felt's centre. -->
-  <g data-discard={render.discardSize} aria-label={game.tapis.discard(render.discardSize)}>
+  <g data-discard={render.discardSize} role="img" aria-label={game.tapis.discard(render.discardSize)}>
     {#if discardTop === null}
       <rect
         x={discard[0] - PW / 2}

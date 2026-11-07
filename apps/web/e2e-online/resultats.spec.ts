@@ -390,7 +390,7 @@ test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résu
   await expect(rows(a.page).first()).toHaveAttribute(
     "aria-label",
     new RegExp(
-      `^Victoire, 8 à 0, le \\d{1,2} \\p{L}+ à \\d{1,2}\\s?h\\s?\\d{2}, en ligne, avec Mamie \\(sans compte\\), contre ${b.pseudo} et Pur-sang$`,
+      `^Victoire · 8 – 0, Avec Mamie \\(sans compte\\) · contre ${b.pseudo} et Pur-sang, \\d{1,2} \\p{L}+\\.?, \\d{1,2}\\s?h\\s?\\d{2}, en ligne$`,
       "u",
     ),
   );

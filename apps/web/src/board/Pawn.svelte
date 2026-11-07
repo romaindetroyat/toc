@@ -1,10 +1,9 @@
 <script lang="ts">
   import { KNIGHT, knightScale, SEAT_MARKS } from "@toc/board";
   import type { Color, PawnId, Place } from "@toc/engine";
-  import { board as t } from "../i18n/fr/board.ts";
-  import { lecons } from "../i18n/fr/lecons.ts";
   import { settings } from "../settings/store.svelte.ts";
   import { type Facing, placeKey } from "./geometry.ts";
+  import { knightName } from "./knightName.ts";
 
   type Props = {
     pawn: PawnId;
@@ -23,6 +22,13 @@
     lift?: number;
     /** In a lesson (plan 05-06): the guide asks to touch this knight; its name ends « , à toucher ». */
     guide?: boolean;
+    /**
+     * Plan 05-10 (05-UI-SPEC « Knight names »): the player's seat and the seats' names, so the knight
+     * is named « à toi », « à ton partenaire {Nom} » or « adversaire »; `lit` adds « , jouable ».
+     */
+    human?: Color;
+    names?: Readonly<Partial<Record<Color, string>>>;
+    lit?: boolean;
   };
 
   let {
@@ -36,9 +42,12 @@
     onselect,
     lift = 0,
     guide = false,
+    human = "bleu",
+    names = {},
+    lit = false,
   }: Props = $props();
 
-  const label = $derived(guide ? lecons.target(t.pawn[color]) : t.pawn[color]);
+  const label = $derived(knightName(pawn, place, human, names, { lit, target: guide }));
 
   const ring = $derived(place.z === "ring" ? place.cell : -1);
   // The mock-up's sizes (« à confirmer par Romain »): 0.92 step wide on the ring, 0.8 in a home and

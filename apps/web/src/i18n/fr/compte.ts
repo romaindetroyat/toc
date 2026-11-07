@@ -151,15 +151,19 @@ export const compte = {
   },
   tile: {
     account: "Mon compte",
-    /** Accessible name of the tile: « Mon compte (Marie) ». */
-    accountLabel: (pseudo: string) => `Mon compte (${pseudo})`,
+    /**
+     * Accessible name of the tile, its two visible lines in order (plan 05-10, WCAG 2.5.3 « Label in
+     * Name »): « Mon compte : Marie ».
+     */
+    accountLabel: (pseudo: string) => `Mon compte : ${pseudo}`,
     /** Plan 04-09: the signed-in tile 1, a link to #/amis. */
     friends: "Mes amis",
     friendsSub: "Inviter un proche",
+    friendsLabel: "Mes amis : inviter un proche",
     /** Plan 04-09: the guest's tile, which opens the sign-in sheet. */
     signIn: "Se connecter",
     signInSub: "Créer un compte",
-    signInLabel: "Se connecter ou créer un compte",
+    signInLabel: "Se connecter : créer un compte",
   },
   /** Plan 04-09: the sign-in sheet « Se connecter » (04-UI-SPEC « Sign-in sheet »). */
   signIn: {

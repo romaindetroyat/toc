@@ -47,14 +47,14 @@ describe("homeTiles", () => {
       icon: "user",
       label: "Ton prénom",
       sub: "Marie",
-      name: "Changer de prénom (Marie)",
+      name: "Ton prénom : Marie",
     });
     expect(tiles[0]?.href).toBeUndefined();
     expect(tiles[1]).toMatchObject({
       icon: "log-in",
       label: "Se connecter",
       sub: "Créer un compte",
-      name: "Se connecter ou créer un compte",
+      name: "Se connecter : créer un compte",
     });
     expect(tiles[1]?.href).toBeUndefined();
   });
@@ -72,14 +72,14 @@ describe("homeTiles", () => {
       icon: "handshake",
       label: "Mes amis",
       sub: "Inviter un proche",
-      name: "Mes amis",
+      name: "Mes amis : inviter un proche",
       href: "#/amis",
     });
     expect(tiles[1]).toMatchObject({
       icon: "user",
       label: "Mon compte",
       sub: "Élodie",
-      name: "Mon compte (Élodie)",
+      name: "Mon compte : Élodie",
       href: "#/compte",
     });
     expect(JSON.stringify(tiles)).not.toContain("Marie");

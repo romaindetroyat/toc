@@ -42,7 +42,7 @@ test("se connecter sur un nouvel appareil avec sa clé, et y retrouver ses parti
   await two.goto("/");
   await expect(tile(two, "connexion")).toContainText("Se connecter");
   await expect(tile(two, "connexion")).toContainText("Créer un compte");
-  await expect(tile(two, "connexion")).toHaveAccessibleName("Se connecter ou créer un compte");
+  await expect(tile(two, "connexion")).toHaveAccessibleName("Se connecter : créer un compte");
   await expect(tile(two, "connexion")).toHaveAttribute("aria-haspopup", "dialog");
   await expect(tile(two, "compte")).toHaveCount(0);
   await expect(row(two, id)).toHaveCount(0);
@@ -64,7 +64,7 @@ test("se connecter sur un nouvel appareil avec sa clé, et y retrouver ses parti
   await expect(sheet).toHaveCount(0);
   await expect(tile(two, "amis")).toContainText("Mes amis");
   await expect(tile(two, "amis")).toContainText("Inviter un proche");
-  await expect(tile(two, "compte")).toHaveAccessibleName(`Mon compte (${pseudo})`);
+  await expect(tile(two, "compte")).toHaveAccessibleName(`Mon compte : ${pseudo}`);
   await expect(tile(two, "compte")).toBeFocused();
   await expect(tile(two, "connexion")).toHaveCount(0);
   await expect(two.locator('[data-home-choice="table"]')).toContainText(
@@ -137,7 +137,7 @@ test("un pseudo de 20 caractères ne déborde jamais de sa petite tuile", async 
     await page.setViewportSize({ width: size.width, height: size.height });
     await page.goto("/");
     const compte = tile(page, "compte");
-    await expect(compte).toHaveAccessibleName(`Mon compte (${pseudo})`);
+    await expect(compte).toHaveAccessibleName(`Mon compte : ${pseudo}`);
     await expect(compte).toHaveAttribute("title", pseudo);
     const fit = await compte.evaluate((el) => {
       const sub = el.querySelector<HTMLElement>("[data-small-tile-sub]");

@@ -63,12 +63,16 @@
           : bots.levels[seat.level],
   );
 
-  /** The tile's sentence (02-UI-SPEC copy table « Waiting room »). */
+  /**
+   * The tile's sentence (02-UI-SPEC copy table « Waiting room »). Plan 05-10 (WCAG 2.5.3 « Label in
+   * Name »): a button's sentence holds its visible words in order, the partner's tag included.
+   */
   const sentence = $derived.by(() => {
     if (tileState === "you") return host ? copy.lobby.ownSeatHost(colour) : copy.lobby.ownSeat(colour);
-    if (tileState === "free") return copy.lobby.takeSeat(colour, status);
-    if (moveLabel) return copy.lobby.moveSeat(name, colour);
-    const said = copy.lobby.otherSeat(colour, name, status);
+    const tag = partner ? `, ${copy.lobby.partnerWord}` : "";
+    if (tileState === "free") return `${copy.lobby.takeSeat(colour, status)}${tag}`;
+    const said = `${copy.lobby.otherSeat(colour, name, status)}${tag}`;
+    if (moveLabel) return copy.lobby.moveSeat(said);
     return host ? `${said}, ${copy.lobby.host}` : said;
   });
 
@@ -85,7 +89,6 @@
   }
   const duration = $derived(still() ? 0 : 150);
 
-  const tagId = $props.id();
 </script>
 
 {#snippet content()}
@@ -113,7 +116,7 @@
     <span class="check" aria-hidden="true"><Icon name="check" size={16} /></span>
   {/if}
   {#if partner}
-    <span class="tag" class:hidden={!large} id={`${tagId}-tag`}>{copy.lobby.partner}</span>
+    <span class="tag" class:hidden={!large}>{copy.lobby.partner}</span>
   {/if}
 {/snippet}
 
@@ -127,7 +130,6 @@
     data-seat-tile={color}
     data-seat-state={tileState}
     aria-label={sentence}
-    aria-describedby={partner ? `${tagId}-tag` : undefined}
     bind:this={el}
     onclick={onpick}
   >

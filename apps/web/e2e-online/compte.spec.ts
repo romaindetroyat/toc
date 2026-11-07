@@ -66,7 +66,7 @@ test("créer son compte par une invitation, et le garder après un rechargement"
   await expect(tile).toBeVisible();
   await expect(tile).toContainText("Mon compte");
   await expect(tile).toContainText(pseudo);
-  await expect(tile).toHaveAccessibleName(`Mon compte (${pseudo})`);
+  await expect(tile).toHaveAccessibleName(`Mon compte : ${pseudo}`);
   await expect(page.locator("[data-toast]")).toContainText(`Bienvenue, ${pseudo}`);
 
   // Still signed in after a reload, and on a new page of the same browser (ACCT-02).

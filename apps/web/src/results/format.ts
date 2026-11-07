@@ -81,21 +81,21 @@ export function rowOf(game: HistoryGame, now: number): GameRowText {
   const partner = partnerSeat === undefined ? "" : nameOf(partnerSeat);
   const opponents = opponentsOf(game.seats.filter((seat) => teamOf(seat.colour) === theirs));
   const time = timeText(game.endedAt);
+  const line1 = copy.line1(result, own, other);
+  const line2 = copy.line2(partner, opponents);
+  const date = dayText(game.endedAt, now, "short");
   return {
     icon: game.kind === "solo" ? "bot" : "users",
-    line1: copy.line1(result, own, other),
-    line2: copy.line2(partner, opponents),
-    date: dayText(game.endedAt, now, "short"),
+    line1,
+    line2,
+    date,
     time,
     label: copy.label({
-      result,
-      mine: own,
-      theirs: other,
-      day: dayText(game.endedAt, now, "long"),
+      line1,
+      line2,
+      date,
       time,
       kind: game.kind === "solo" ? copy.solo : copy.online,
-      partner,
-      opponents,
     }),
   };
 }

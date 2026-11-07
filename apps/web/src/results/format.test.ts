@@ -72,8 +72,9 @@ describe("rowOf", () => {
     expect(row.line2).toBe("Avec Marie · contre Paul et Pur-sang");
     expect(row.date).toBe("25 oct.");
     expect(row.time).toBe(`21${NBSP}h${NBSP}14`);
+    // Plan 05-10 (WCAG 2.5.3 « Label in Name »): the visible words in order, then how it was played.
     expect(row.label).toBe(
-      `Victoire, 8 à 5, le 25 octobre à 21${NBSP}h${NBSP}14, en ligne, avec Marie, contre Paul et Pur-sang`,
+      `Victoire · 8 – 5, Avec Marie · contre Paul et Pur-sang, 25 oct., 21${NBSP}h${NBSP}14, en ligne`,
     );
   });
 
@@ -90,7 +91,7 @@ describe("rowOf", () => {
     const row = rowOf(lost, NOW);
     expect(row.line1).toBe("Défaite · 6 – 8");
     expect(row.line2).toBe("Avec Mamie (sans compte) · contre Paul et Marie");
-    expect(row.label.startsWith("Défaite, 6 à 8, ")).toBe(true);
+    expect(row.label.startsWith("Défaite · 6 – 8, Avec Mamie (sans compte) · ")).toBe(true);
     expect(`${row.line2} ${row.label}`).not.toMatch(/invit/i);
   });
 
@@ -136,7 +137,7 @@ describe("rowOf", () => {
     const row = rowOf(game({ endedAt: old }), NOW);
     expect(row.date).toBe("31 déc. 2025");
     expect(row.time).toBe(`9${NBSP}h${NBSP}05`);
-    expect(row.label).toContain(`le 31 décembre 2025 à 9${NBSP}h${NBSP}05`);
+    expect(row.label).toContain(`, 31 déc. 2025, 9${NBSP}h${NBSP}05, `);
   });
 
   it("a long pseudo stays whole in the sentence", () => {

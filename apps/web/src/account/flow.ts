@@ -65,7 +65,7 @@ export function homeTiles(input: {
         icon: "handshake",
         label: compte.tile.friends,
         sub: compte.tile.friendsSub,
-        name: compte.tile.friends,
+        name: compte.tile.friendsLabel,
         href: "#/amis",
       },
       {

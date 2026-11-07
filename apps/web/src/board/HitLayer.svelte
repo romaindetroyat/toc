@@ -1,11 +1,8 @@
 <script lang="ts">
   import { KNIGHT, knightScale, SCENE } from "@toc/board";
-  import type { PawnId, Place, RenderState } from "@toc/engine";
-  import { EXIT, pawnColor, RING } from "@toc/engine";
-  import { knightLetter } from "../game/turnUi.ts";
-  import { game } from "../i18n/fr/game.ts";
-  import { lecons } from "../i18n/fr/lecons.ts";
+  import type { Color, PawnId, RenderState } from "@toc/engine";
   import { anchorOf } from "./geometry.ts";
+  import { knightName } from "./knightName.ts";
 
   type Props = {
     /** Board units per screen pixel. */
@@ -23,18 +20,25 @@
     onmiss: () => void;
     /** In a lesson (plan 05-06): the knights the guide asks to touch; their names end « , à toucher ». */
     guided?: readonly PawnId[];
+    /** Plan 05-10: the player's seat and the seats' names, for the knights' full names (knightName). */
+    human?: Color;
+    names?: Readonly<Partial<Record<Color, string>>>;
   };
 
-  let { px, k, render, candidates, active, onpick, onnear, onmiss, guided = [] }: Props = $props();
+  let {
+    px,
+    k,
+    render,
+    candidates,
+    active,
+    onpick,
+    onnear,
+    onmiss,
+    guided = [],
+    human = "bleu",
+    names = {},
+  }: Props = $props();
 
-
-  /** Where a knight stands, in words: the stable, the home, or how far it has come from its exit. */
-  function whereOf(pawn: PawnId, place: Place): string {
-    if (place.z === "stable") return game.hand.place.stable;
-    if (place.z === "home") return game.hand.place.home;
-    const done = (((place.cell - EXIT[pawnColor(pawn)]) % RING) + RING) % RING;
-    return done === 0 ? game.hand.place.exit : game.hand.place.ring(done);
-  }
 
   // One target per lit knight, on its body at the size of its zone (ring, home, stable): centre =
   // anchor − KNIGHT.body × size, radius = max(22 screen px, half the knight's width); knights this
@@ -45,8 +49,10 @@
       const place = render.pawns[pawn];
       const size = knightScale(place);
       const [x, y] = anchorOf(place, k);
-      const named = game.hand.pawn(pawnColor(pawn), knightLetter(pawn), whereOf(pawn, place));
-      const label = guided.includes(pawn) ? lecons.target(named) : named;
+      const label = knightName(pawn, place, human, names, {
+        lit: true,
+        target: guided.includes(pawn),
+      });
       const radius = Math.max(22 * px, (KNIGHT.w / 2) * size);
       return { pawn, x, y: y - KNIGHT.body * size, radius, near: Math.max(44 * px, radius), label };
     }),

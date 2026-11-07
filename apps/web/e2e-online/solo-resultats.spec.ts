@@ -88,7 +88,7 @@ test("une partie contre l’ordinateur finie connecté arrive dans « Mes résul
 
   await openResults(a.page, 1);
   const row = a.page.locator("[data-game-row]").first();
-  await expect(row).toHaveAttribute("aria-label", /, contre l’ordinateur, /);
+  await expect(row).toHaveAttribute("aria-label", /, contre l’ordinateur$/);
   await expect(row.locator(BOT_ICON)).toHaveCount(1);
 
   const stats = await api<Stats>(a.page, "/api/me/stats");
@@ -125,7 +125,7 @@ test("sans réseau, la planche le dit, la partie attend sur l’appareil et part
   await openResults(a.page, 1);
   await expect(a.page.locator("[data-game-row]").first()).toHaveAttribute(
     "aria-label",
-    /, contre l’ordinateur, /,
+    /, contre l’ordinateur$/,
   );
   const stats = await api<Stats>(a.page, "/api/me/stats");
   expect(stats.solo.games).toBe(1);

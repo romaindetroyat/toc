@@ -167,11 +167,9 @@ test("accueil : au clavier, la roue puis les deux choix", async ({ page }) => {
   await expect(tile(page, "table")).toBeFocused();
   await page.keyboard.press("Tab");
   // Plan 04-09: « Changer » is now the small tile « Ton prénom », then « Se connecter ».
-  await expect(
-    page.getByRole("button", { name: "Changer de prénom (Marie-Charlotte)" }),
-  ).toBeFocused();
+  await expect(page.getByRole("button", { name: "Ton prénom : Marie-Charlotte" })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Se connecter ou créer un compte" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Se connecter : créer un compte" })).toBeFocused();
   // Entrée on the solo tile opens the solo setup.
   await tile(page, "ordinateur").focus();
   await page.keyboard.press("Enter");
@@ -291,12 +289,12 @@ test("accueil : « Règles » et « Apprendre » pour un invité, sans « Mes r�
   const rules = linkTile(page, "regles");
   await expect(rules).toContainText("Règles");
   await expect(rules).toContainText("Les cartes, le 7, la maison");
-  await expect(rules).toHaveAccessibleName("Règles du jeu");
+  await expect(rules).toHaveAccessibleName("Règles : les cartes, le 7, la maison");
   await expect(rules).toHaveAttribute("aria-haspopup", "dialog");
   const learn = linkTile(page, "apprendre");
   await expect(learn).toContainText("Apprendre");
   await expect(learn).toContainText("En 10 minutes");
-  await expect(learn).toHaveAccessibleName("Apprendre à jouer (En 10 minutes)");
+  await expect(learn).toHaveAccessibleName("Apprendre : en 10 minutes");
   await expect(learn).toHaveAttribute("href", "#/apprendre");
 
   // Left-aligned at the width of the three-tile row: 152 each, 8 apart, from the column's left edge.
@@ -328,18 +326,14 @@ test("accueil : « Apprendre » dit où on en est", async ({ page }) => {
   await withProgress(page, [1, 2]);
   await page.goto("/");
   await expect(linkTile(page, "apprendre")).toContainText("Leçon 3 sur 8");
-  await expect(linkTile(page, "apprendre")).toHaveAccessibleName(
-    "Apprendre à jouer (Leçon 3 sur 8)",
-  );
+  await expect(linkTile(page, "apprendre")).toHaveAccessibleName("Apprendre : leçon 3 sur 8");
 });
 
 test("accueil : « Apprendre » dit « Leçons faites » quand les huit le sont", async ({ page }) => {
   await withProgress(page, [1, 2, 3, 4, 5, 6, 7, 8]);
   await page.goto("/");
   await expect(linkTile(page, "apprendre")).toContainText("Leçons faites");
-  await expect(linkTile(page, "apprendre")).toHaveAccessibleName(
-    "Apprendre à jouer (Leçons faites)",
-  );
+  await expect(linkTile(page, "apprendre")).toHaveAccessibleName("Apprendre : leçons faites");
 });
 
 for (const size of [

@@ -55,7 +55,7 @@ test("the creator arranges the table, moves a person, and starts without the uns
   await expect(seatTile(bruno, "rouge")).toContainText("Champion");
 
   // The creator moves Bruno to Vert; Bruno is told.
-  await expect(seatTile(romain, "jaune")).toHaveAccessibleName("Déplacer Bruno (Jaune)");
+  await expect(seatTile(romain, "jaune")).toHaveAccessibleName("Jaune : Bruno, en ligne, déplacer");
   await seatTile(romain, "jaune").click();
   const sheet = romain.getByRole("dialog", { name: "Déplacer Bruno" });
   await expect(sheet.getByRole("button", { name: "Échanger avec Romain (Bleu)" })).toBeVisible();

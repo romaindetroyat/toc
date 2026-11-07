@@ -20,7 +20,11 @@ export const accueil = {
     changeLabel: "Changer de prénom",
     /** Plan 04-09: the small tile that took the name line's place (04-UI-SPEC « Small tiles »). */
     nameTile: "Ton prénom",
-    nameTileLabel: (name: string) => `Changer de prénom (${name})`,
+    /**
+     * The tile's accessible name: its two visible lines in order (plan 05-10, WCAG 2.5.3 « Label in
+     * Name »), « Ton prénom : Marie ».
+     */
+    nameTileLabel: (name: string) => `Ton prénom : ${name}`,
     listHeading: "Mes parties en cours",
     emptyHeading: "Aucune partie en cours",
     emptyBody: "Crée une table en ligne, ou ouvre le lien qu’un proche t’a envoyé.",
@@ -29,15 +33,25 @@ export const accueil = {
      * « Mes résultats » signed in only. Line 2 of « Apprendre » follows the lessons' progress.
      */
     links: {
-      rules: { label: "Règles", sub: "Les cartes, le 7, la maison", name: "Règles du jeu" },
+      // Plan 05-10 (WCAG 2.5.3 « Label in Name »): each tile's accessible name is its two visible
+      // lines in order, « Règles : les cartes, le 7, la maison ».
+      rules: {
+        label: "Règles",
+        sub: "Les cartes, le 7, la maison",
+        name: "Règles : les cartes, le 7, la maison",
+      },
       learn: {
         label: "Apprendre",
         sub: "En 10 minutes",
         started: (n: number) => `Leçon ${n} sur 8`,
         done: "Leçons faites",
-        name: (sub: string) => `Apprendre à jouer (${sub})`,
+        name: (sub: string) => `Apprendre : ${sub.charAt(0).toLowerCase()}${sub.slice(1)}`,
       },
-      results: { label: "Mes résultats", sub: "Parties et classement", name: "Mes résultats" },
+      results: {
+        label: "Mes résultats",
+        sub: "Parties et classement",
+        name: "Mes résultats : parties et classement",
+      },
     },
     /** Toast: « Créer une table en ligne » without a network. */
     offline: "Pas de connexion : la table en ligne a besoin d’Internet.",

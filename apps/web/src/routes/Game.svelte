@@ -1225,6 +1225,15 @@
   {/if}
   {#if prompting}
     <RotatePrompt bind:heading={rotateHeading} />
+  {:else}
+    <!-- The page's one h1 (plan 05-10, APP-05 audit), for screen readers: the rotate prompt has its own. -->
+    <h1 class="sr-only" data-game-heading>
+      {lessonData !== undefined
+        ? lecons.heading(lessonData.n, lessonData.title)
+        : online !== undefined
+          ? copy.heading.online
+          : copy.heading.solo}
+    </h1>
   {/if}
   <!-- Behind the invitation to turn the screen the whole game is kept, mounted, but not displayed and
        inert: no focus, no tap, nothing for a screen reader. -->
@@ -1328,6 +1337,9 @@
                 facing={facings[pawn.id]}
                 lift={pawn.id === selectedPawn ? 12 : 0}
                 guide={guidePawns.includes(pawn.id)}
+                human={session.human}
+                names={session.names}
+                lit={candidates.includes(pawn.id)}
                 bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
               />
             {/each}
@@ -1360,6 +1372,8 @@
                   ui.kind === "preview"
                 }
                 guided={guidePawns}
+                human={session?.human}
+                names={session?.names}
                 onpick={pickPawn}
                 onnear={pickNear}
                 onmiss={() => {

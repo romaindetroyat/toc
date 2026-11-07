@@ -356,7 +356,10 @@ test.describe("les touches se voient sur ordinateur", () => {
     for (const badge of await badges.all()) await expect(badge).toBeVisible();
     const seen = await badges.evaluateAll((all) =>
       all
-        .map((each) => ({ x: each.getBoundingClientRect().x, text: each.textContent }))
+        .map((each) => ({
+          x: each.getBoundingClientRect().x,
+          text: each.getAttribute("data-key-hint"),
+        }))
         .sort((a, b) => a.x - b.x)
         .map((each) => each.text),
     );
@@ -373,7 +376,8 @@ test.describe("les touches se voient sur ordinateur", () => {
       if (isMobile) await expect(hintsOf(button)).toBeHidden();
       else {
         await expect(hintsOf(button)).toBeVisible();
-        await expect(hintsOf(button)).toHaveText(label);
+        // Plan 05-10: the key is painted from its attribute (KeyHint), not written as text.
+        await expect(hintsOf(button)).toHaveAttribute("data-key-hint", label);
       }
     };
 
@@ -381,7 +385,7 @@ test.describe("les touches se voient sur ordinateur", () => {
     await openPosition(page, QUEEN_HAND);
     await page.getByRole("button", { name: "Dame de cœur, jouable" }).click();
     await expect(zone(page)).toHaveAttribute("data-state", "cardSelected");
-    const change = page.getByRole("button", { name: "Changer de carte" });
+    const change = page.getByRole("button", { name: "Choisir une autre carte" });
     await expect(change).toBeVisible();
     await expect(hintsOf(change)).toHaveCount(0);
     await page.locator('[data-hit="bleu0"]').click({ force: true });
@@ -404,7 +408,7 @@ test.describe("les touches se voient sur ordinateur", () => {
     await expectHint(page.getByRole("button", { name: "Sortir un cheval" }), "S");
     await expectHint(page.getByRole("button", { name: "Avancer de 1" }), "A");
 
-    // The 7: « Entrée » on « Jouer », « ⌫ » on « Retirer le dernier pas », nothing on « Tout annuler ».
+    // The 7: « Entrée » on « Jouer », « ⌫ » on « Retirer le dernier pas », nothing on « Tout effacer ».
     await openPosition(page, SEVEN);
     await page.getByRole("button", { name: "7 de cœur, jouable" }).click();
     await expect(seven(page)).toBeVisible();
@@ -412,7 +416,7 @@ test.describe("les touches se voient sur ordinateur", () => {
     await page.locator('[data-step="3"]').click();
     await expectHint(page.getByRole("button", { name: "Jouer", exact: true }), "Entrée");
     await expectHint(page.getByRole("button", { name: "Retirer le dernier pas" }), "⌫");
-    await expect(hintsOf(page.getByRole("button", { name: "Tout annuler" }))).toHaveCount(0);
+    await expect(hintsOf(page.getByRole("button", { name: "Tout effacer" }))).toHaveCount(0);
     if (isMobile) await expect(visibleHints(page)).toHaveCount(0);
   });
 
