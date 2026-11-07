@@ -138,3 +138,35 @@ test("marques: une valeur gardée qui n’est pas un booléen les laisse allumé
   await openGame(page);
   await expect(marks(page)).toHaveCount(16);
 });
+
+test("marques: chaque écurie a sa forme à côté d’elle, interrupteur allumé ou éteint", async ({
+  page,
+}) => {
+  await openGame(page);
+  const stableMarks = page.locator("[data-board-art] [data-stable-mark]");
+  const expectStableMarks = async () => {
+    await expect(stableMarks).toHaveCount(4);
+    for (const [color, shape] of Object.entries(SHAPE)) {
+      const mark = page.locator(`[data-board-art] [data-stable-mark][data-mark-color="${color}"]`);
+      await expect(mark).toHaveCount(1);
+      await expect(mark).toHaveAttribute("data-stable-mark", shape);
+      await expect(mark).toHaveAttribute("aria-hidden", "true");
+    }
+  };
+  await expectStableMarks();
+
+  await openSettings(page);
+  await sw(page).click();
+  await expect(sw(page)).toHaveAttribute("aria-checked", "false");
+  await closeSettings(page);
+  await expect(marks(page)).toHaveCount(0);
+  await expectStableMarks();
+});
+
+test("marques: le plateau de la partie garde ses identifiants « toc- »", async ({ page }) => {
+  await openGame(page);
+  for (const id of ["toc-grain", "toc-felt", "toc-board-clip", "toc-felt-clip", "toc-felt-light"]) {
+    await expect(page.locator(`[data-board-art] [id="${id}"]`)).toHaveCount(1);
+  }
+  await expect(page.locator('[data-board-art] [filter="url(#toc-grain)"]')).toHaveCount(1);
+});
