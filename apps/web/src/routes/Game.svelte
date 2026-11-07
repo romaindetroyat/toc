@@ -955,7 +955,10 @@
       !event.ctrlKey &&
       !event.metaKey &&
       !event.shiftKey &&
+      // Plan 05-10 (keyboard audit): a focused control keeps its own Entrée (the lesson pill opens
+      // « Les leçons », the gear « Réglages »); « Suivant » itself is such a control and presses itself.
       focusTarget().kind !== "field" &&
+      focusTarget().kind !== "control" &&
       document.querySelector("[data-sheet-layer]") === null
     ) {
       event.preventDefault();
