@@ -5,6 +5,14 @@
 
 export const resultats = {
   title: "Mes résultats",
+  /**
+   * Plan 05-07: the solo end plank's line, signed in only (« What counts »); a failure says nothing,
+   * a guest has no line.
+   */
+  report: {
+    added: "Partie ajoutée à tes résultats.",
+    offline: "Pas de connexion : la partie sera ajoutée à tes résultats au retour du réseau.",
+  },
   home: "Accueil",
   /** Under the navigation (D-04): history starts with phase 5. */
   since: "Les parties comptent depuis novembre 2026.",

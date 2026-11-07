@@ -8,9 +8,13 @@
 // « J’ai déjà un compte », an used invitation, the session-ended toast), and the end of a session: a
 // 401 on an account call while this page believed it signed in clears the account and says once
 // « Ta session a pris fin : connecte-toi de nouveau. » with « Se connecter ».
+// Plan 05-07: once the server names the account (GET /api/me at start or back online, a sign-in, a
+// sign-up), the solo games waiting on this device for that account (toc.pending.v1) are sent in the
+// background, never another account's, never blocking the home, never showing an error.
 
 import { compte } from "../i18n/fr/compte.ts";
 import { type ApiDeps, browserApi } from "../net/api.ts";
+import { flushPending } from "../results/pending.ts";
 import { showToast } from "../ui/toast.svelte.ts";
 import { me } from "./api.ts";
 import {
@@ -97,6 +101,21 @@ export async function refreshAccount(): Promise<void> {
 export function setAccount(next: { id: string; pseudo: string }): void {
   account.current = { id: next.id, pseudo: next.pseudo };
   writeCachedAccount(storage(), account.current);
+  sendWaiting(next.id);
+}
+
+/** The accounts whose waiting games are being sent now: one flush at a time per account. */
+const flushing = new Set<string>();
+
+/** Plan 05-07: the solo games this device keeps for `id` go to the server, in the background. */
+function sendWaiting(id: string): void {
+  if (flushing.has(id)) return;
+  flushing.add(id);
+  flushPending(id)
+    .catch(() => {
+      // Silent: the games stay queued for the next start.
+    })
+    .finally(() => flushing.delete(id));
 }
 
 /** Signed in on this device (plan 04-02: a login, a new key). */
