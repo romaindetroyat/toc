@@ -5,13 +5,14 @@
   import logo from "../assets/logo/logo-128.webp";
   import { unlock } from "../audio/engine.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
-  import { firstTimeDue } from "../game/lessonProgress.ts";
+  import { firstTimeDue, nextLesson, readProgress } from "../game/lessonProgress.ts";
   import { browserApi, createTable } from "../net/api.ts";
   import { loadDevice, pageStorage, saveName } from "../net/device.ts";
   import ChoiceTile from "../ui/ChoiceTile.svelte";
   import FirstTimeSheet from "../ui/FirstTimeSheet.svelte";
   import HomeStrip from "../ui/HomeStrip.svelte";
   import NamePrompt from "../ui/NamePrompt.svelte";
+  import RulesSheet from "../ui/RulesSheet.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import SmallTile from "../ui/SmallTile.svelte";
   import { markNewTable } from "../ui/InviteSheet.svelte";
@@ -111,6 +112,22 @@
     else if (kind === "connexion") openSignIn(tileElements.connexion ?? null);
   }
 
+  // The links row (plan 05-08, D-05, D-08; 05-UI-SPEC « The links row »): « Règles » (the rules sheet
+  // over the home, on « Le but »), « Apprendre » (#/apprendre, its line 2 by the lessons' progress)
+  // and, signed in, « Mes résultats ». Bottom of the right column; right after the account tiles in
+  // one column and in portrait, so the list never buries it. Never amber.
+  const progress = readProgress(storage);
+  const learnNext = nextLesson(progress.done);
+  const learnSub =
+    learnNext === null
+      ? accueil.home.links.learn.done
+      : progress.done.length === 0
+        ? accueil.home.links.learn.sub
+        : accueil.home.links.learn.started(learnNext);
+  let rulesOpen = $state(false);
+  let rulesTile = $state<HTMLElement | null>(null);
+  const linksFirst = $derived(layout === "one" || layout === "portrait");
+
   // « Première fois ? » (plan 05-08, D-08): once per brand-new device, over the home only. It waits for
   // the next home visit (the key not written) while another sheet or the in-app card is up: the
   // sign-in sheet of a session that ended, for instance. firstTimeDue writes the key when it answers.
@@ -132,6 +149,43 @@
 </script>
 
 <svelte:window bind:innerWidth={width} />
+
+{#snippet linksRow()}
+  <div class="links-box">
+    <div class="links" data-home-links>
+      <SmallTile
+        kind="regles"
+        icon="book-open"
+        label={accueil.home.links.rules.label}
+        sub={accueil.home.links.rules.sub}
+        name={accueil.home.links.rules.name}
+        fill
+        bind:element={rulesTile}
+        onclick={() => (rulesOpen = true)}
+      />
+      <SmallTile
+        kind="apprendre"
+        icon="graduation-cap"
+        label={accueil.home.links.learn.label}
+        sub={learnSub}
+        name={accueil.home.links.learn.name(learnSub)}
+        href="#/apprendre"
+        fill
+      />
+      {#if account.current !== null}
+        <SmallTile
+          kind="resultats"
+          icon="trophy"
+          label={accueil.home.links.results.label}
+          sub={accueil.home.links.results.sub}
+          name={accueil.home.links.results.name}
+          href="#/resultats"
+          fill
+        />
+      {/if}
+    </div>
+  </div>
+{/snippet}
 
 {#if prompting}
   <NamePrompt
@@ -207,6 +261,9 @@
           />
         {/each}
       </div>
+      {#if linksFirst}
+        {@render linksRow()}
+      {/if}
     </section>
 
     <section class="tables" aria-labelledby="tables-heading">
@@ -214,12 +271,19 @@
       <div class="list">
         <TableList {storage} />
       </div>
+      {#if !linksFirst}
+        {@render linksRow()}
+      {/if}
       {#if layout === "computer" || layout === "two"}
         <HomeStrip margin={layout === "computer" ? "var(--space-md) 0 0" : "var(--space-sm) 0 0"} />
       {/if}
     </section>
   </div>
 </main>
+{/if}
+
+{#if rulesOpen}
+  <RulesSheet tab="but" onclose={() => (rulesOpen = false)} opener={rulesTile} />
 {/if}
 
 {#if firstTime}
@@ -299,6 +363,36 @@
   .home[data-layout="computer"] .small-tiles {
     gap: var(--space-md);
     margin-top: var(--space-md);
+  }
+
+  /* The links row: n tiles of (W − 8 × (n − 1)) / n, at most 152, three to a row from a 400 px column,
+     else two; a guest's two keep the three-tile width, left-aligned. 8 under the list (16 on the
+     computer). One column and portrait: full-width rows of two, 8 under the account tiles. */
+  .links-box {
+    flex: none;
+    container-type: inline-size;
+    margin-top: var(--space-sm);
+  }
+
+  .home[data-layout="computer"] .links-box {
+    margin-top: var(--space-md);
+  }
+
+  .links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 152px));
+    gap: var(--space-sm);
+  }
+
+  @container (max-width: 399.98px) {
+    .links {
+      grid-template-columns: repeat(2, minmax(0, 152px));
+    }
+  }
+
+  .home[data-layout="one"] .links,
+  .home[data-layout="portrait"] .links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tables {

@@ -331,25 +331,28 @@ test("accueil : « Apprendre » dit où on en est", async ({ page }) => {
   await expect(linkTile(page, "apprendre")).toHaveAccessibleName(
     "Apprendre à jouer (Leçon 3 sur 8)",
   );
-  await page.evaluate(() =>
-    localStorage.setItem(
-      "toc.tutorial.v1",
-      JSON.stringify({ offered: true, done: [1, 2, 3, 4, 5, 6, 7, 8] }),
-    ),
-  );
-  await page.reload();
+});
+
+test("accueil : « Apprendre » dit « Leçons faites » quand les huit le sont", async ({ page }) => {
+  await withProgress(page, [1, 2, 3, 4, 5, 6, 7, 8]);
+  await page.goto("/");
   await expect(linkTile(page, "apprendre")).toContainText("Leçons faites");
+  await expect(linkTile(page, "apprendre")).toHaveAccessibleName(
+    "Apprendre à jouer (Leçons faites)",
+  );
 });
 
 for (const size of [
-  { width: 844, height: 390, tile: 152, list: 192 },
-  { width: 1280, height: 800, tile: 152, list: 192 },
-  { width: 750, height: 342, tile: 130, list: 192 },
-  { width: 640, height: 360, tile: 144, list: 192 },
+  { width: 844, height: 390, perRow: 3 },
+  { width: 1280, height: 800, perRow: 3 },
+  { width: 750, height: 342, perRow: 3 },
+  { width: 640, height: 360, perRow: 2 },
 ] as const) {
   test(`accueil : la rangée de liens en bas de la colonne de droite (${size.width} × ${size.height})`, async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // The computer's size is the desktop project's (an iPhone is never 1280 wide).
+    test.skip(size.width === 1280 && testInfo.project.name === "phone");
     await withName(page);
     await withTables(page, 20);
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -360,15 +363,20 @@ for (const size of [
     for (const target of [rules, learn]) await expect(target).toBeInViewport({ ratio: 1 });
     const a = await rules.boundingBox();
     const b = await learn.boundingBox();
-    expect(a?.width).toBeCloseTo(size.tile, 0);
-    expect(b?.width).toBeCloseTo(size.tile, 0);
+    // (W − 8 × (n − 1)) / n, at most 152, with W the right column's width.
+    const column = (await links(page).boundingBox())?.width ?? 0;
+    const tile = Math.min(152, (column - 8 * (size.perRow - 1)) / size.perRow);
+    expect(a?.width).toBeCloseTo(tile, 0);
+    expect(b?.width).toBeCloseTo(tile, 0);
     expect(a?.y).toBeCloseTo(b?.y ?? 0, 0);
-    // Under the list, which shrinks (it keeps three 64 px rows in sight) and is never covered.
+    // Under the list, which shrinks and is never covered: three 64 px rows in sight without a strip
+    // (the phone project's iPhone gets the two-row install strip under the row: one and a half).
     const list = await page.locator("[data-home] .list").evaluate((el) => {
       const box = el.getBoundingClientRect();
       return { top: box.top, bottom: box.bottom, height: box.height };
     });
-    expect(list.height).toBeGreaterThanOrEqual(size.list);
+    const strip = await page.locator("[data-home-strip]").count();
+    expect(list.height).toBeGreaterThanOrEqual(strip === 0 ? 192 : 96);
     expect(list.bottom).toBeLessThanOrEqual((a?.y ?? 0) - 8 + 0.5);
     const heading = await page.getByRole("heading", { name: "Mes parties en cours" }).boundingBox();
     expect(a?.x).toBeCloseTo(heading?.x ?? 0, 0);
@@ -402,7 +410,8 @@ for (const size of [
 
 test("accueil : au clavier, la rangée de liens après la liste en deux colonnes, avant elle en une", async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(testInfo.project.name === "phone", "keyboard: the desktop project");
   await withName(page);
   await withTables(page, 1);
   await page.setViewportSize({ width: 844, height: 390 });

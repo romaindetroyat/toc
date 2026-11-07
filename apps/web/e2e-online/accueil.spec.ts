@@ -145,8 +145,10 @@ test("avec un compte, la rangée de liens a « Mes résultats », qui ouvre #/re
     expect(box.width).toBeCloseTo(152, 0);
     expect(box.y).toBeCloseTo(boxes[0]?.y ?? 0, 0);
   }
+  // Without a strip (the phone project's iPhone has the two-row install strip under the row).
   const list = await page.locator("[data-home] .list").evaluate((el) => el.clientHeight);
-  expect(list).toBeGreaterThanOrEqual(192);
+  const strip = await page.locator("[data-home-strip]").count();
+  expect(list).toBeGreaterThanOrEqual(strip === 0 ? 192 : 96);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
     0,
   );
@@ -155,7 +157,8 @@ test("avec un compte, la rangée de liens a « Mes résultats », qui ouvre #/re
   const narrow = await links
     .locator("[data-small-tile]")
     .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
-  expect(narrow[0]?.width).toBeCloseTo(144, 0);
+  const column = (await links.boundingBox())?.width ?? 0;
+  expect(narrow[0]?.width).toBeCloseTo(Math.min(152, (column - 8) / 2), 0);
   expect(narrow[1]?.y).toBeCloseTo(narrow[0]?.y ?? 0, 0);
   expect(narrow[2]?.y).toBeCloseTo((narrow[0]?.y ?? 0) + 56, 0);
   expect(narrow[2]?.x).toBeCloseTo(narrow[0]?.x ?? 0, 0);

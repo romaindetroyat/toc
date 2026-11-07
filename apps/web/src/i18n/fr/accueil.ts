@@ -24,6 +24,21 @@ export const accueil = {
     listHeading: "Mes parties en cours",
     emptyHeading: "Aucune partie en cours",
     emptyBody: "Crée une table en ligne, ou ouvre le lien qu’un proche t’a envoyé.",
+    /**
+     * Plan 05-08 (05-UI-SPEC « The links row »): the small tiles at the bottom of the right column,
+     * « Mes résultats » signed in only. Line 2 of « Apprendre » follows the lessons' progress.
+     */
+    links: {
+      rules: { label: "Règles", sub: "Les cartes, le 7, la maison", name: "Règles du jeu" },
+      learn: {
+        label: "Apprendre",
+        sub: "En 10 minutes",
+        started: (n: number) => `Leçon ${n} sur 8`,
+        done: "Leçons faites",
+        name: (sub: string) => `Apprendre à jouer (${sub})`,
+      },
+      results: { label: "Mes résultats", sub: "Parties et classement", name: "Mes résultats" },
+    },
     /** Toast: « Créer une table en ligne » without a network. */
     offline: "Pas de connexion : la table en ligne a besoin d’Internet.",
   },
