@@ -4,13 +4,17 @@ import {
   type CardId,
   COLORS,
   type Color,
+  emptyTally,
+  foldTally,
   type GameEvent,
   IllegalActionError,
   next,
   type PlayerView,
   type Rng,
   type Scenario,
+  teamOf,
 } from "@toc/engine";
+import { SOLO_ID_RE } from "@toc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOT_NAMES } from "./botNames.ts";
 import { type BotRunner, ThinkCancelled, type ThinkRequest } from "./botRunner.ts";
@@ -821,7 +825,7 @@ describe("events, change notices and statistics", () => {
       turn: "bleu",
     };
     const { game } = scenarioGame(before, "test");
-    expect(game.stats()).toEqual({ dealsPlayed: 0, captured: { nous: 0, eux: 0 } });
+    expect(game.stats()).toEqual({ dealsPlayed: 0, captured: { nous: 0, eux: 0 }, solo: null });
     game.start();
     expect(game.submit({ t: "move", card: "3S", pawn: "bleu0" })).toEqual({ ok: true });
     expect(game.stats().captured).toEqual({ nous: 1, eux: 0 });
@@ -958,4 +962,126 @@ describe("lessons: scripted seats play what is written, or nothing (05-03)", () 
     expect(JSON.stringify(script)).toBe(copy);
     game.dispose();
   });
+});
+
+describe("the result of a real solo game, for « Mes résultats » (05-07, D-01)", () => {
+  const ID = "1b4e28ba-2fa1-41d2-883f-0016d3cca427";
+  const T0 = 1_790_000_000_000;
+
+  /** Plays the human's first legal move each time it is due, until the game is won. */
+  async function playOut(game: ReturnType<typeof createGame>, human: Color): Promise<void> {
+    let rng: [number, number, number, number] = [1, 2, 3, 4];
+    let guard = 0;
+    while (game.view().phase !== "won" && guard++ < 20_000) {
+      await vi.runAllTimersAsync();
+      const view = game.view();
+      if (view.phase === "won") break;
+      const [action, after] = randomLegal(view, human, rng);
+      rng = after;
+      expect(game.submit(action).ok).toBe(true);
+    }
+    expect(game.view().phase).toBe("won");
+  }
+
+  function realGame(extra: Partial<CreateGameOptions> = {}) {
+    const director = fakeDirector();
+    let wall = T0;
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      director,
+      clock: () => wall,
+      newId: () => ID,
+      ...extra,
+    });
+    return { game, director, later: (ms: number) => (wall = T0 + ms) };
+  }
+
+  it("has no result before the end", async () => {
+    const { game } = realGame();
+    expect(game.stats().solo).toBeNull();
+    game.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(game.stats().solo).toBeNull();
+    game.dispose();
+  });
+
+  it("knows its id, its times, the player, the winner, the deals, the levels and each seat's knights", async () => {
+    const { game, director, later } = realGame({ levels: { jaune: 5, rouge: 1 } });
+    game.start();
+    later(95_000);
+    await playOut(game, "bleu");
+    const solo = game.stats().solo;
+    expect(solo).not.toBeNull();
+    if (solo === null) return;
+    const view = game.view();
+    expect(solo.id).toBe(ID);
+    expect(solo.startedAt).toBe(T0);
+    expect(solo.endedAt).toBe(T0 + 95_000);
+    expect(solo.human).toBe("bleu");
+    expect(solo.winner).toBe(view.winner);
+    expect(solo.deals).toBe(view.dealsPlayed);
+    expect(solo.deals).toBe(game.stats().dealsPlayed);
+    // The three computers, the player's own colour left out; Vert has no level: Galopeur (3).
+    expect(solo.levels).toEqual({ jaune: 5, rouge: 1, vert: 3 });
+    // The knights eaten and lost, folded from every batch the director saw.
+    const tally = foldTally(emptyTally(), director.events);
+    for (const colour of COLORS) {
+      expect(solo.seats[colour].captured, colour).toBe(tally[colour].captured);
+      expect(solo.seats[colour].lost, colour).toBe(tally[colour].lost);
+      const home = [0, 1, 2, 3].filter((i) => view.pawns[`${colour}${i}`].zone === "home").length;
+      expect(solo.seats[colour].home, colour).toBe(home);
+      if (teamOf(colour) === solo.winner) expect(solo.seats[colour].home, colour).toBe(4);
+    }
+    // The seats' captures add up to the team counts of the plank.
+    const ours = COLORS.filter((c) => teamOf(c) === teamOf("bleu"));
+    const eaten = ours.reduce((sum, c) => sum + solo.seats[c].captured, 0);
+    expect(eaten).toBe(game.stats().captured.nous);
+    // The end time is the winning play's: a later read does not move it.
+    later(200_000);
+    expect(game.stats().solo?.endedAt).toBe(T0 + 95_000);
+    game.dispose();
+  }, 120_000);
+
+  it("makes its id with crypto.randomUUID when none is given", async () => {
+    const director = fakeDirector();
+    const game = createGame({
+      human: "bleu",
+      seed: SEED,
+      botSeed: BOT_SEED,
+      speed: "test",
+      director,
+    });
+    game.start();
+    await playOut(game, "bleu");
+    expect(game.stats().solo?.id).toMatch(SOLO_ID_RE);
+    game.dispose();
+  }, 120_000);
+
+  it("has no result for a debug position (scenario or etat), even won", async () => {
+    const before: Scenario["before"] = {
+      pawns: {
+        bleu: [{ h: 1 }, { h: 2 }, { h: 3 }, { p: 66 }],
+        rouge: [{ h: 0 }, { h: 1 }, { h: 2 }, { h: 3 }],
+      },
+      hands: { bleu: ["5S"] },
+      turn: "bleu",
+    };
+    const { game } = scenarioGame(before, "test", { clock: () => T0, newId: () => ID });
+    game.start();
+    expect(game.submit({ t: "move", card: "5S", pawn: "bleu3" })).toEqual({ ok: true });
+    expect(game.view().phase).toBe("won");
+    expect(game.stats().solo).toBeNull();
+    game.dispose();
+  });
+
+  it("has no result for a scripted game (the lessons), even from a real deal and won", async () => {
+    const { game } = realGame({ script: {} });
+    game.start();
+    await playOut(game, "bleu");
+    expect(game.stats().solo).toBeNull();
+    game.dispose();
+  }, 120_000);
 });
