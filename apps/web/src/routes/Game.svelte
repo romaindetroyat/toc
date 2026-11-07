@@ -1323,6 +1323,7 @@
           tab={rulesTab}
           selectedRank={selectedCard === null ? null : rankOf(selectedCard)}
           inGame
+          yourTurn={online !== undefined && (handMode === "turn" || handMode === "dead")}
           opener={rulesOpener}
           ontab={(next) => (rulesTab = next)}
           onclose={() => (rulesShown = false)}

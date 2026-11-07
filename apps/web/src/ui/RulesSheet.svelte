@@ -19,6 +19,11 @@
     selectedRank?: Rank | null;
     /** Opened from a game or a lesson. */
     inGame?: boolean;
+    /**
+     * Online, the player's turn has come while the sheet is open: « C’est à toi de jouer. » at the top
+     * of the panel, announced once, with « Revenir à la partie ». The sheet never closes by itself.
+     */
+    yourTurn?: boolean;
     onclose: () => void;
     /** Each tab chosen, so the game keeps the last one for its next opening. */
     ontab?: (tab: RulesTabId) => void;
@@ -30,6 +35,7 @@
     tab,
     selectedRank = null,
     inGame = false,
+    yourTurn = false,
     onclose,
     ontab,
     opener = null,
@@ -152,6 +158,17 @@
       bind:this={panel}
       data-rules-panel={current}
     >
+      <!-- The turn line (online): the live region is always there, so its sentence is announced once
+           when it appears; the pill and its button only while it is the player's turn. -->
+      <div class="turn" class:shown={yourTurn} data-rules-turn={yourTurn ? "" : undefined}>
+        {#if yourTurn}<span class="turn-dot" aria-hidden="true"></span>{/if}
+        <span class="turn-text" role="status" aria-live="polite">{yourTurn ? regles.yourTurn : ""}</span>
+        {#if yourTurn}
+          <button type="button" class="btn btn-text back" onclick={onclose}>
+            {regles.backToGame}
+          </button>
+        {/if}
+      </div>
       <h3 class="t-heading">{shown.name}</h3>
       {#if "intro" in shown}
         <p class="intro t-label">{shown.intro}</p>
@@ -226,6 +243,11 @@
   }
 
   /* The chosen tab: cream fill, walnut text (the Segmented checked option), never amber. */
+  /* The focus ring inside the tab: the nav's scrolling box would clip it outside. */
+  .tab:focus-visible {
+    outline-offset: -3px;
+  }
+
   .tab[aria-selected="true"] {
     border-color: var(--creme);
     background: var(--creme);
@@ -253,6 +275,45 @@
 
   h3 {
     margin: 0 0 var(--space-sm);
+  }
+
+  /* The turn line: Label 700 on a bois sombre pill with the amber turn dot, kept in sight at the top
+     of the panel while it scrolls. Without the turn it takes no room. */
+  .turn {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .turn.shown {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--space-sm);
+    margin: 0 0 var(--space-sm);
+    padding: 0 0 0 var(--space-md);
+    border: 1px solid var(--creme);
+    border-radius: 999px;
+    background: var(--bois-sombre);
+    box-shadow: 0 2px 0 var(--noyer);
+  }
+
+  .turn-dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--ambre);
+  }
+
+  .turn-text {
+    font-size: var(--label-size);
+    font-weight: 700;
+    line-height: var(--label-line);
+  }
+
+  .back {
+    font-weight: 700;
   }
 
   .text,
