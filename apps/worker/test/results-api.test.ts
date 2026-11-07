@@ -6,6 +6,7 @@
 import { SELF } from "cloudflare:test";
 import { parseRankingAnswer, parseStatsAnswer } from "@toc/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { plausible } from "../src/results.ts";
 import {
   befriendRows,
   d1Of,
@@ -14,7 +15,9 @@ import {
   newJar,
   ORIGIN,
   type Person,
+  post,
   resetAccounts,
+  rows,
   seedGame,
   signUpPerson,
 } from "./helpers.ts";
@@ -271,4 +274,305 @@ describe("GET /api/me/ranking", () => {
     const posted = await SELF.fetch(`${ORIGIN}/api/me/ranking`, { method: "POST" });
     expect(posted.status).toBe(405);
   });
+});
+
+// --- Task 3: the solo report ---
+
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+function report(now = Date.now(), id: string = crypto.randomUUID()) {
+  return {
+    id,
+    startedAt: now - 20 * MINUTE,
+    endedAt: now - MINUTE,
+    human: "bleu" as const,
+    winner: "bleu-rouge" as const,
+    deals: 6,
+    levels: { jaune: 3, rouge: 2, vert: 5 } as Record<string, number>,
+    seats: {
+      bleu: { captured: 3, lost: 2, home: 4 },
+      jaune: { captured: 1, lost: 2, home: 1 },
+      rouge: { captured: 2, lost: 1, home: 4 },
+      vert: { captured: 1, lost: 2, home: 3 },
+    },
+  };
+}
+
+type Report = ReturnType<typeof report>;
+
+const SOLO = "/api/me/results/solo";
+
+describe("POST /api/me/results/solo", () => {
+  it("a valid report: 201, one played row and one seat row, never ranked, the session's pseudo", async () => {
+    const a = await account("Anaïs");
+    const body = report();
+    const added = await post(SOLO, body, { jar: a.jar });
+    expect(added.status).toBe(201);
+    expect(added.headers.get("cache-control")).toBe("no-store");
+    console.log(`POST /api/me/results/solo, added: ${added.headers.get("x-toc-d1")}`);
+    const gameId = `solo:${a.person.id}:${body.id}`;
+    const [played] = await rows("SELECT * FROM played WHERE id = ?", gameId);
+    expect(played).toMatchObject({
+      kind: "solo",
+      accounts: 1,
+      started_at: body.startedAt,
+      ended_at: body.endedAt,
+      winner: "bleu-rouge",
+      deals: 6,
+      creator: null,
+    });
+    const seats = JSON.parse(String(played?.seats)) as Record<string, unknown>[];
+    expect(seats).toEqual([
+      {
+        colour: "bleu",
+        kind: "account",
+        account: a.person.id,
+        name: a.person.pseudo,
+        level: null,
+        handedOver: false,
+        captured: 3,
+        lost: 2,
+        home: 4,
+      },
+      {
+        colour: "jaune",
+        kind: "bot",
+        account: null,
+        name: "",
+        level: 3,
+        handedOver: false,
+        captured: 1,
+        lost: 2,
+        home: 1,
+      },
+      {
+        colour: "rouge",
+        kind: "bot",
+        account: null,
+        name: "",
+        level: 2,
+        handedOver: false,
+        captured: 2,
+        lost: 1,
+        home: 4,
+      },
+      {
+        colour: "vert",
+        kind: "bot",
+        account: null,
+        name: "",
+        level: 5,
+        handedOver: false,
+        captured: 1,
+        lost: 2,
+        home: 3,
+      },
+    ]);
+    const seatRows = await rows("SELECT * FROM game_seats WHERE game_id = ?", gameId);
+    expect(seatRows).toEqual([
+      {
+        user_id: a.person.id,
+        ended_at: body.endedAt,
+        game_id: gameId,
+        colour: "bleu",
+        won: 1,
+        ranked: 0,
+        solo: 1,
+        captured: 3,
+        lost: 2,
+        home: 4,
+      },
+    ]);
+
+    // The history lists it as solo; the figures count it in « Toutes » and « Contre l’ordinateur ».
+    const history = (await (await get("/api/me/results", a.jar)).json()) as {
+      games: { id: string; kind: string; ranked: boolean; seats: { kind: string }[] }[];
+    };
+    expect(history.games).toHaveLength(1);
+    expect(history.games[0]).toMatchObject({ id: gameId, kind: "solo", ranked: false });
+    expect(history.games[0]?.seats.map((seat) => seat.kind)).toEqual(["me", "bot", "bot", "bot"]);
+    const stats = parseStatsAnswer(await (await get("/api/me/stats", a.jar)).json());
+    expect(stats?.all).toMatchObject({ games: 1, wins: 1, captured: 3 });
+    expect(stats?.solo).toMatchObject({ games: 1, wins: 1 });
+    expect(stats?.online.games).toBe(0);
+    expect(stats?.all.levels).toEqual([{ level: 5, games: 1, wins: 1 }]);
+  });
+
+  it("the same report again: 200 and still one row each; the same id with other times: 200", async () => {
+    const a = await account("Anaïs");
+    const body = report();
+    expect((await post(SOLO, body, { jar: a.jar })).status).toBe(201);
+    const again = await post(SOLO, body, { jar: a.jar });
+    expect(again.status).toBe(200);
+    console.log(`POST /api/me/results/solo, resent: ${again.headers.get("x-toc-d1")}`);
+    const moved: Report = {
+      ...body,
+      startedAt: body.startedAt - MINUTE,
+      endedAt: body.endedAt - MINUTE,
+    };
+    expect((await post(SOLO, moved, { jar: a.jar })).status).toBe(200);
+    const gameId = `solo:${a.person.id}:${body.id}`;
+    expect(await rows("SELECT id FROM played WHERE id = ?", gameId)).toHaveLength(1);
+    const seatRows = await rows("SELECT ended_at FROM game_seats WHERE game_id = ?", gameId);
+    expect(seatRows).toEqual([{ ended_at: body.endedAt }]);
+    expect(await rows("SELECT * FROM game_seats WHERE user_id = ?", a.person.id)).toHaveLength(1);
+  });
+
+  it("two accounts reporting the same uuid keep two games of their own", async () => {
+    const a = await account("Anaïs");
+    const b = await account("Bruno");
+    const body = report();
+    expect((await post(SOLO, body, { jar: a.jar })).status).toBe(201);
+    expect((await post(SOLO, body, { jar: b.jar })).status).toBe(201);
+    const forA = await rows("SELECT game_id FROM game_seats WHERE user_id = ?", a.person.id);
+    expect(forA).toEqual([{ game_id: `solo:${a.person.id}:${body.id}` }]);
+  });
+
+  it("never in the ranking", async () => {
+    const a = await account("Anaïs");
+    const b = await account("Bruno");
+    await befriendRows(a.person.id, b.person.id);
+    const before = await (await get("/api/me/ranking", a.jar)).text();
+    for (let i = 0; i < 6; i++)
+      expect((await post(SOLO, report(), { jar: a.jar })).status).toBe(201);
+    const after = await (await get("/api/me/ranking", a.jar)).text();
+    expect(after).toBe(before);
+    expect(parseRankingAnswer(JSON.parse(after))?.unranked).toContainEqual({
+      pseudo: a.person.pseudo,
+      games: 0,
+      me: true,
+    });
+  });
+
+  it("refuses a body out of shape with 400 body", async () => {
+    const a = await account("Anaïs");
+    const levels = (value: Record<string, number>) => ({ ...report(), levels: value });
+    const bodies: unknown[] = [
+      { ...report(), more: 1 },
+      { ...report(), name: "Anaïs" },
+      { ...report(), pseudo: "Quelqu'un d'autre" },
+      levels({ bleu: 1, jaune: 3, rouge: 2, vert: 5 }),
+      levels({ bleu: 1, rouge: 2, vert: 5 }),
+      levels({ jaune: 6, rouge: 2, vert: 5 }),
+      { ...report(), id: "pas-un-uuid" },
+      "pas du JSON",
+    ];
+    for (const body of bodies) {
+      const answer = await post(SOLO, body, { jar: a.jar });
+      expect(answer.status, JSON.stringify(body)).toBe(400);
+      expect(await answer.json()).toEqual({ error: "body" });
+    }
+    expect(await rows("SELECT * FROM played")).toHaveLength(0);
+  });
+
+  it("refuses an implausible game with 400 implausible", async () => {
+    const a = await account("Anaïs");
+    const now = Date.now();
+    const change = (edit: (body: Report) => void): Report => {
+      const body = report(now);
+      edit(body);
+      return body;
+    };
+    const bodies: Report[] = [
+      change((body) => {
+        body.seats.rouge.home = 3;
+      }),
+      change((body) => {
+        body.seats.jaune.home = 4;
+        body.seats.vert.home = 4;
+      }),
+      change((body) => {
+        body.seats.vert.captured = 65;
+      }),
+      change((body) => {
+        body.seats.bleu.lost = 65;
+      }),
+      change((body) => {
+        body.deals = 0;
+      }),
+      change((body) => {
+        body.deals = 301;
+      }),
+      change((body) => {
+        body.endedAt = body.startedAt;
+      }),
+      change((body) => {
+        body.startedAt = body.endedAt + MINUTE;
+      }),
+      change((body) => {
+        body.startedAt = body.endedAt - 29_999;
+      }),
+      change((body) => {
+        body.endedAt = now + 6 * MINUTE;
+      }),
+      change((body) => {
+        body.endedAt = now - 61 * DAY;
+        body.startedAt = body.endedAt - 20 * MINUTE;
+      }),
+    ];
+    for (const body of bodies) {
+      const answer = await post(SOLO, body, { jar: a.jar });
+      expect(answer.status, JSON.stringify(body)).toBe(400);
+      expect(await answer.json()).toEqual({ error: "implausible" });
+    }
+    expect(await rows("SELECT * FROM played")).toHaveLength(0);
+    // At the edges: 30 s long, 64 knights eaten, 1 and 300 deals, up to 5 minutes ahead.
+    const edges: Report[] = [
+      change((body) => {
+        body.startedAt = body.endedAt - 30_000;
+      }),
+      change((body) => {
+        body.seats.bleu.captured = 64;
+        body.deals = 1;
+      }),
+      change((body) => {
+        body.deals = 300;
+        body.endedAt = now + 4 * MINUTE;
+      }),
+    ];
+    for (const body of edges) expect((await post(SOLO, body, { jar: a.jar })).status).toBe(201);
+  });
+
+  it("plausible is pure: the same checks with a given now", () => {
+    const now = 1_800_000_000_000;
+    expect(plausible(report(now) as never, now)).toBe(true);
+    expect(plausible({ ...report(now), deals: 301 } as never, now)).toBe(false);
+    expect(plausible(report(now - 59 * DAY) as never, now)).toBe(true);
+    expect(plausible(report(now - 61 * DAY) as never, now)).toBe(false);
+  });
+
+  it("Origin first (403), then JSON (415), then the size (413), then the session (401)", async () => {
+    const a = await account("Anaïs");
+    const none = await post(SOLO, report(), { jar: a.jar, origin: null });
+    expect(none.status).toBe(403);
+    expect(await none.json()).toEqual({ error: "origin" });
+    expect(none.headers.get("x-toc-d1")).toMatch(/^w=\d+;r=\d+$/);
+    const other = await post(SOLO, report(), { jar: a.jar, origin: "https://ailleurs.test" });
+    expect(other.status).toBe(403);
+    const text = await post(SOLO, report(), { jar: a.jar, contentType: "text/plain" });
+    expect(text.status).toBe(415);
+    const big = await post(SOLO, { ...report(), pad: "x".repeat(9 * 1024) }, { jar: a.jar });
+    expect(big.status).toBe(413);
+    const out = await post(SOLO, report());
+    expect(out.status).toBe(401);
+    expect(await out.json()).toEqual({ error: "signed-out" });
+    const got = await get(SOLO, a.jar);
+    expect(got.status).toBe(405);
+    expect(await rows("SELECT * FROM played")).toHaveLength(0);
+  });
+
+  it("30 reports a day per account: the 31st is 429", async () => {
+    const a = await account("Anaïs");
+    for (let i = 0; i < 30; i++) {
+      expect((await post(SOLO, report(), { jar: a.jar })).status).toBe(201);
+    }
+    const refused = await post(SOLO, report(), { jar: a.jar });
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toEqual({ error: "rate" });
+    expect(await rows("SELECT * FROM game_seats WHERE user_id = ?", a.person.id)).toHaveLength(30);
+    // Another account has its own count.
+    const b = await account("Bruno");
+    expect((await post(SOLO, report(), { jar: b.jar })).status).toBe(201);
+  }, 60_000);
 });
