@@ -45,6 +45,47 @@ export const resultats = {
       solo: "Jouer contre l’ordinateur",
     },
   },
+  /** Plan 05-09: « Mes chiffres » (05-UI-SPEC Panel 2). */
+  stats: {
+    loading: "Chargement de tes chiffres…",
+    error: "Impossible de charger tes chiffres.",
+    filter: "Parties comptées",
+    all: "Toutes",
+    online: "En ligne",
+    solo: "Contre l’ordinateur",
+    /** The live region on a change of filter: « En ligne : 7 parties ». */
+    announce: (filter: string, count: string) => `${filter} : ${count}`,
+    tiles: { games: "Parties", wins: "Victoires", rate: "Réussite" },
+    /** The rate without a game. */
+    noRate: "–",
+    knights: {
+      heading: "Chevaux",
+      captured: "Mangés par toi",
+      lost: "Mangés à toi",
+      home: "Rentrés par toi",
+    },
+    partners: {
+      heading: "Avec mes partenaires",
+      guests: "Joueurs sans compte",
+      /** Computers of one level: « Pur-sang (ordinateur) ». */
+      bot: (level: string) => `${level} (ordinateur)`,
+      more: "Voir tous mes partenaires",
+      /** The live region when all partners show: « 9 partenaires ». */
+      shown: (n: number) => `${n} partenaires`,
+    },
+    levels: {
+      heading: "Contre l’ordinateur, par force",
+      intro: "Classé par la force de l’adversaire le plus fort.",
+    },
+    /** « 3 parties · 2 victoires · 67 % », « 1 partie · 1 victoire · 100 % ». */
+    line: (games: number, wins: number, rate: string) =>
+      `${games} ${games >= 2 ? "parties" : "partie"} · ${wins} ${wins >= 2 ? "victoires" : "victoire"} · ${rate}`,
+    empty: {
+      heading: "Pas encore de chiffres",
+      body: "Termine une partie, en ligne ou contre l’ordinateur, pour voir tes chiffres ici.",
+      filter: "Aucune partie de ce genre pour l’instant.",
+    },
+  },
   /** Plan 05-09: the detail sheet of a game (05-UI-SPEC « Game detail sheet »). */
   sheet: {
     /** « Partie du samedi 24 octobre ». */

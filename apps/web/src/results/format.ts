@@ -9,7 +9,7 @@
 // Galopeur ». Dates in French with Intl.
 
 import { type Color, PARTNER, type Team, teamOf } from "@toc/engine";
-import type { HistoryGame, HistorySeat } from "@toc/protocol";
+import type { HistoryGame, HistorySeat, StatsBlock } from "@toc/protocol";
 import { bots } from "../i18n/fr/bots.ts";
 import { resultats } from "../i18n/fr/resultats.ts";
 
@@ -227,4 +227,36 @@ export function sheetOf(game: HistoryGame, now: number): GameSheetText {
     eaten: sheetCopy.eaten(sum(ours, "captured"), sum(theirs, "captured")),
     counting: countingLine(game),
   };
+}
+
+// --- Plan 05-09: « Mes chiffres » (05-UI-SPEC Panel 2, « Typography ») ---
+
+type Level = 1 | 2 | 3 | 4 | 5;
+
+const percent = new Intl.NumberFormat("fr", { style: "percent", maximumFractionDigits: 0 });
+
+/**
+ * The win rate « 67 % », « – » without a game. Intl rounds and writes it; the space before « % » is
+ * always U+202F (the phase-1 typography), whatever space the runtime's locale data puts there.
+ */
+export function rate(wins: number, games: number): string {
+  if (games === 0) return resultats.stats.noRate;
+  return percent.format(wins / games).replace(/\s*%$/u, "\u202f%");
+}
+
+/** A partner's or a level's line: « 3 parties · 2 victoires · 67 % ». */
+export function partnerLine(games: number, wins: number): string {
+  return resultats.stats.line(games, wins, rate(wins, games));
+}
+
+/** A level's name: « Poulain » … « Champion ». */
+export const levelName = (level: Level): string => bots.levels[level];
+
+/** A partner: the pseudo, « Joueurs sans compte », or « Pur-sang (ordinateur) ». */
+export function partnerName(partner: StatsBlock["partners"][number]): string {
+  if (partner.kind === "guests") return resultats.stats.partners.guests;
+  if (partner.kind === "bot") {
+    return resultats.stats.partners.bot(partner.level === null ? "" : levelName(partner.level));
+  }
+  return partner.name ?? "";
 }

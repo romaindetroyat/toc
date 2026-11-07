@@ -8,6 +8,7 @@
   import Page from "../ui/Page.svelte";
   import { pageLayout } from "../ui/pageLayout.svelte.ts";
   import ResultsNav, { type ResultsTab, tabOf } from "../ui/ResultsNav.svelte";
+  import StatsPanel from "../ui/StatsPanel.svelte";
 
   // « Mes résultats » at #/resultats (plans 05-01 and 05-09, HIST-02..04; 05-UI-SPEC « Mes
   // résultats »), the « Page » layout of « Mon compte »: the header (« Accueil », the h1, which takes
@@ -106,6 +107,8 @@
         {#key `${tab}:${attempt}`}
           {#if tab === "historique"}
             <HistoryList onsignedout={signedOutHere} onoffline={offline} {announce} />
+          {:else if tab === "chiffres"}
+            <StatsPanel onsignedout={signedOutHere} onoffline={offline} {announce} />
           {/if}
         {/key}
       </section>
