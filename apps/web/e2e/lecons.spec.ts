@@ -524,3 +524,132 @@ test("sans animations réduites, le halo pulse", async ({ page }) => {
       .evaluate((el) => getComputedStyle(el, "::after").animationName),
   ).not.toBe("none");
 });
+
+// --- The lesson pill, « Les leçons », leaving, the rules (plan 05-06 task 3) ---
+
+const pill = (page: Page) => page.getByRole("button", { name: /^Leçon \d sur 8 : / });
+const lessonsSheet = (page: Page) => page.getByRole("dialog", { name: lecons.sheet.title });
+
+/** Seeds the progress before the app starts (lessons 1 and 2 done). */
+async function seedProgress(page: Page, done: number[]) {
+  await page.goto("/");
+  await page.evaluate((value) => localStorage.setItem("toc.tutorial.v1", JSON.stringify(value)), {
+    offered: true,
+    done,
+  });
+}
+
+test.describe("la pastille de la leçon et « Les leçons »", () => {
+  test("la pastille ouvre la liste, une leçon s’y choisit, « Recommencer », « Fermer »", async ({
+    page,
+  }) => {
+    await seedProgress(page, [1, 2]);
+    await openLesson(page, 3);
+    await says(page, manger.carte);
+
+    await expect(pill(page)).toHaveAccessibleName(
+      `Leçon 3 sur 8 : ${manger.title}, voir les leçons`,
+    );
+    await expect(pill(page)).toContainText("Leçon 3 sur 8");
+    await pill(page).click();
+    const sheet = lessonsSheet(page);
+    await expect(sheet).toBeVisible();
+
+    // The eight titles, the done marks of toc.tutorial.v1.
+    const rows = sheet.locator("[data-lesson]");
+    await expect(rows).toHaveCount(8);
+    const titles = [sortir, avancer, manger, recule, valet, sept, maison, echange].map(
+      (lesson) => lesson.title,
+    );
+    for (const [i, title] of titles.entries()) {
+      await expect(rows.nth(i)).toHaveAttribute("data-lesson", String(i + 1));
+      await expect(rows.nth(i)).toContainText(title);
+    }
+    await expect(rows.nth(0)).toHaveAttribute("data-done", "true");
+    await expect(rows.nth(1)).toHaveAttribute("data-done", "true");
+    await expect(rows.nth(2)).toHaveAttribute("data-done", "false");
+    await expect(rows.nth(0)).toHaveAccessibleName(`Leçon 1, ${sortir.title}, faite`);
+    await expect(rows.nth(2)).toHaveAccessibleName(`Leçon 3, ${manger.title}`);
+
+    // « Fermer » closes; the lesson is as it was.
+    await sheet.getByRole("button", { name: "Fermer" }).click();
+    await expect(sheet).toHaveCount(0);
+    await says(page, manger.carte);
+
+    // « Recommencer cette leçon »: the position and the first line again.
+    await card(page, "8D").click();
+    await says(page, manger.jouer);
+    await pill(page).click();
+    await lessonsSheet(page).getByRole("button", { name: lecons.sheet.restart }).click();
+    await expect(lessonsSheet(page)).toHaveCount(0);
+    await says(page, manger.carte);
+    await expect(page.locator('[data-hand] [aria-pressed="true"]')).toHaveCount(0);
+    await expect(page.locator('[data-pawn="jaune0"]')).toHaveAttribute("data-place", "ring:20");
+
+    // A row starts its lesson.
+    await pill(page).click();
+    await lessonsSheet(page).locator('[data-lesson="5"]').click();
+    await expect(page).toHaveURL(/#\/apprendre\/5$/);
+    await says(page, valet.carte);
+    await expect(pill(page)).toHaveAccessibleName(
+      `Leçon 5 sur 8 : ${valet.title}, voir les leçons`,
+    );
+  });
+});
+
+test.describe("« Réglages » dans une leçon", () => {
+  test("« Quitter les leçons » sans question, les leçons faites restent cochées", async ({
+    page,
+  }) => {
+    await seedProgress(page, [1]);
+    await openLesson(page, 4);
+    await says(page, recule.carte);
+    await page.getByRole("button", { name: "Réglages", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: "Réglages" });
+    await expect(settings).toBeVisible();
+    await expect(settings.getByRole("button", { name: "Abandonner la partie" })).toHaveCount(0);
+    await settings.getByRole("button", { name: "Quitter les leçons" }).click();
+    await expect(page).toHaveURL(/#\/apprendre$/);
+    await expect(band(page)).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const stored = JSON.parse(
+      (await page.evaluate(() => localStorage.getItem("toc.tutorial.v1"))) ?? "null",
+    );
+    expect(stored?.done).toEqual([1]);
+  });
+});
+
+test.describe("les règles dans une leçon", () => {
+  test("le livre ouvre « Règles » sur « Les cartes », la leçon attend derrière", async ({
+    page,
+  }) => {
+    await openLesson(page, 2);
+    await says(page, avancer.intro);
+    await page.getByRole("button", { name: "Règles du jeu" }).first().click();
+    const rules = page.locator("[data-rules-sheet]");
+    await expect(rules).toBeVisible();
+    await expect(page.locator('[data-rules-tab="cartes"]')).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.keyboard.press("Escape");
+    await expect(rules).toHaveCount(0);
+    await says(page, avancer.intro);
+    await expect(page.locator("[data-lesson]")).toHaveAttribute("data-lesson-step", "0");
+  });
+
+  test("« R » aussi, sur ordinateur", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the keyboard: desktop project only");
+    await openLesson(page, 2);
+    await says(page, avancer.intro);
+    await page.keyboard.press("r");
+    await expect(page.locator("[data-rules-sheet]")).toBeVisible();
+    await expect(page.locator('[data-rules-tab="cartes"]')).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await page.keyboard.press("r");
+    await expect(page.locator("[data-rules-sheet]")).toHaveCount(0);
+    await says(page, avancer.intro);
+  });
+});
