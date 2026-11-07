@@ -80,3 +80,6 @@ Out of scope: chat, spectators, replays of a game move by move, e-mail, new lang
 - **D-12:** Guests appear as « Prénom (sans compte) », gender-neutral. Supersedes the « (invitée) » example in D-03.
 - **D-13:** Friends ranking: all online games with at least two account holders; you enter after 5 such games; order by win rate, then wins, then games; a « Comment ça marche ? » sheet. « Oui (Recommandé) »
 - The remaining « À confirmer » items in 05-UI-SPEC.md stand as proposed until Romain says otherwise at UAT.
+- **D-14 (correction of D-11):** the four shapes are the existing seat glyphs of `seats.ts` (round, square, triangle, **star** for Vert), not a diamond, which would look like the board's exit squares. « Étoile (Recommandé) »
+- **D-15 (Claude's call, from 05-RESEARCH):** the rule figures in the « Règles » sheet and lessons are drawn live with the existing board drawing, not shipped as webp, so the Worker stays well under its size limit.
+- **Deploy note:** D1 migration 0003 is applied to the remote database by the orchestrator before the Worker that uses it is deployed.
