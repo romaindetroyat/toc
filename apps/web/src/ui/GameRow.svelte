@@ -1,21 +1,32 @@
 <script lang="ts">
   import type { HistoryGame } from "@toc/protocol";
-  import { rowOf } from "../results/format.ts";
+  import { gameKey, rowOf } from "../results/format.ts";
   import Icon from "./Icon.svelte";
 
   // One game of « Mes résultats » (plan 05-01; 05-UI-SPEC Panel 1 « Historique »): a button of 64
-  // (05-09 opens its detail sheet), the kind's icon (users online, bot solo), line 1 « Victoire · 8 – 5 »
+  // that opens its detail sheet (plan 05-09), the kind's icon (users online, bot solo), line 1 « Victoire · 8 – 5 »
   // (knights home, own team first), line 2 the partner and the opponents (ellipsis, the whole line in
   // its title), at the right the end date and time. Its accessible name is the whole sentence
-  // (results/format.ts). Text bindings only.
-  type Props = { game: HistoryGame; now: number };
+  // (results/format.ts). Text bindings only. Its hook is the game's key, never an account id.
+  type Props = {
+    game: HistoryGame;
+    now: number;
+    onopen?: (game: HistoryGame, button: HTMLButtonElement) => void;
+  };
 
-  let { game, now }: Props = $props();
+  let { game, now, onopen }: Props = $props();
 
   const text = $derived(rowOf(game, now));
 </script>
 
-<button type="button" class="row" data-game-row={game.id} aria-label={text.label}>
+<button
+  type="button"
+  class="row"
+  data-game-row={gameKey(game)}
+  aria-label={text.label}
+  aria-haspopup="dialog"
+  onclick={(event) => onopen?.(game, event.currentTarget)}
+>
   <span class="icon"><Icon name={text.icon} size={20} /></span>
   <span class="lines">
     <span class="first" data-row-line="1">{text.line1}</span>

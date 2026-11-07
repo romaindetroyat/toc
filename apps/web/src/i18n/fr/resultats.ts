@@ -16,16 +16,65 @@ export const resultats = {
   home: "Accueil",
   /** Under the navigation (D-04): history starts with phase 5. */
   since: "Les parties comptent depuis novembre 2026.",
+  /** Plan 05-09: the navigation of the three panels (05-UI-SPEC « Navigation »). */
+  nav: {
+    label: "Mes résultats",
+    history: "Historique",
+    stats: "Mes chiffres",
+    ranking: "Classement",
+  },
+  /** The sr-only h2 of each panel (the first is history.heading). */
+  panels: { stats: "Mes chiffres", ranking: "Classement entre amis" },
+  /** « La connexion est lente. » after 10 s of loading, in every panel. */
+  slow: "La connexion est lente.",
+  /** The polite live region's count: « 25 parties », « 1 partie ». */
+  count: (n: number) => (n >= 2 ? `${n} parties` : `${n} partie`),
   history: {
     heading: "Historique",
     loading: "Chargement de tes parties…",
     error: "Impossible de charger tes parties.",
     retry: "Réessayer",
+    /** Plan 05-09: paging by 20 (05-UI-SPEC Panel 1). */
+    more: "Voir les parties plus anciennes",
+    moreBusy: "Chargement…",
+    moreFailed: "Impossible de charger la suite. Réessaie dans un instant.",
+    end: "C’est tout : les parties comptent depuis novembre 2026.",
     empty: {
       heading: "Aucune partie pour l’instant",
       body: "Tes parties terminées s’affichent ici, en ligne et contre l’ordinateur. Lance une partie pour commencer.",
       solo: "Jouer contre l’ordinateur",
     },
+  },
+  /** Plan 05-09: the detail sheet of a game (05-UI-SPEC « Game detail sheet »). */
+  sheet: {
+    /** « Partie du samedi 24 octobre ». */
+    title: (day: string) => `Partie du ${day}`,
+    online: (creator: string) => `En ligne, à la table de ${creator}`,
+    onlineAlone: "En ligne",
+    solo: "Contre l’ordinateur",
+    win: "Victoire de ton équipe",
+    loss: "Défaite de ton équipe",
+    score: (mine: number, theirs: number) =>
+      `Chevaux rentrés : ton équipe ${mine}, l’équipe adverse ${theirs}`,
+    mine: "Ton équipe",
+    theirs: "L’équipe adverse",
+    me: "toi",
+    guest: "(sans compte)",
+    bot: "(ordinateur)",
+    handedOver: "l’ordinateur a fini à sa place",
+    /** « De 20 h 31 à 21 h 14 (43 min) ». */
+    span: (from: string, to: string, length: string) => `De ${from} à ${to} (${length})`,
+    /** « 43 min » (U+202F between the number and its unit). */
+    minutes: (n: number) => `${n} min`,
+    /** « 1 h 05 » (U+00A0 around « h », as the times). */
+    hours: (hours: number, minutes: string) => `${hours} h ${minutes}`,
+    deals: (n: number) => `Donnes jouées : ${n}`,
+    eaten: (mine: number, theirs: number) =>
+      `Chevaux mangés : ton équipe ${mine}, l’équipe adverse ${theirs}`,
+    ranked: "Cette partie compte pour le classement entre amis.",
+    alone: "Elle ne compte pas pour le classement : il faut au moins deux joueurs avec un compte.",
+    soloCounting: "Partie contre l’ordinateur : elle compte dans tes chiffres, pas au classement.",
+    close: "Fermer",
   },
   row: {
     win: "Victoire",

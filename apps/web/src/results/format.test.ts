@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   countingLine,
   durationText,
+  gameKey,
   gamesCount,
   groupByMonth,
   monthHeading,
@@ -297,5 +298,13 @@ describe("the detail sheet's wording", () => {
     expect(sheet.mine[0]).toEqual({ colour: "jaune", name: "Trotteur", tags: ["(ordinateur)"] });
     expect(sheet.theirs.map((each) => each.name)).toEqual(["Champion", "Galopeur"]);
     expect(sheet.counting).toContain("pas au classement");
+  });
+});
+
+describe("gameKey", () => {
+  it("an online game keeps its id; a solo game drops the account part of its id", () => {
+    expect(gameKey(game())).toBe(`${"A".repeat(43)}:1`);
+    const uuid = "0f8e2c4a-1b2c-4d3e-8f90-123456789abc";
+    expect(gameKey(game({ kind: "solo", id: `solo:${"u".repeat(22)}:${uuid}` }))).toBe(uuid);
   });
 });

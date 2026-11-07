@@ -93,3 +93,138 @@ export function rowOf(game: HistoryGame, now: number): GameRowText {
     }),
   };
 }
+
+// --- Plan 05-09: the months, the detail sheet and the counting line (05-UI-SPEC Panel 1, « Game
+// detail sheet », « Typography ») ---
+
+const sheetCopy = resultats.sheet;
+
+/** « Novembre 2026 »: a month heading of the history, a capital first letter. */
+export function monthHeading(at: number): string {
+  const text = new Intl.DateTimeFormat("fr", { month: "long", year: "numeric" }).format(at);
+  return text.charAt(0).toLocaleUpperCase("fr") + text.slice(1);
+}
+
+const monthKey = (at: number) => {
+  const date = new Date(at);
+  return `${date.getFullYear()}-${date.getMonth()}`;
+};
+
+export type MonthGroup = { key: string; heading: string; games: HistoryGame[] };
+
+/** The games (newest first) under their month's heading, in the same order. */
+export function groupByMonth(games: readonly HistoryGame[]): MonthGroup[] {
+  const groups: MonthGroup[] = [];
+  for (const game of games) {
+    const key = monthKey(game.endedAt);
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.key === key) last.games.push(game);
+    else groups.push({ key, heading: monthHeading(game.endedAt), games: [game] });
+  }
+  return groups;
+}
+
+/** The live region's count: « 25 parties », « 1 partie ». */
+export const gamesCount = (n: number): string => resultats.count(n);
+
+/**
+ * A game's key in the page (its row's test hook and its list key): the game id without the account
+ * part of a solo id (« solo:<user_id>:<uuid> » → the uuid), so no account id reaches the DOM.
+ */
+export function gameKey(game: HistoryGame): string {
+  if (game.kind !== "solo") return game.id;
+  const parts = game.id.split(":");
+  return parts[parts.length - 1] ?? "";
+}
+
+/** « Partie du samedi 24 octobre » (the end day; the year when it is not the current one). */
+export function sheetTitle(endedAt: number, now: number): string {
+  const day = new Intl.DateTimeFormat("fr", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(sameYear(endedAt, now) ? {} : { year: "numeric" }),
+  }).format(endedAt);
+  return sheetCopy.title(day);
+}
+
+/** « 43 min » under an hour, « 1 h 05 » from an hour (minutes rounded, at least one). */
+export function durationText(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return sheetCopy.minutes(minutes);
+  return sheetCopy.hours(Math.floor(minutes / 60), String(minutes % 60).padStart(2, "0"));
+}
+
+/** « De 20 h 31 à 21 h 14 (43 min) ». */
+export function spanText(startedAt: number, endedAt: number): string {
+  return sheetCopy.span(timeText(startedAt), timeText(endedAt), durationText(endedAt - startedAt));
+}
+
+/** The tags after a seat's name in the sheet. */
+export function seatTags(seat: HistorySeat): string[] {
+  const tags: string[] = [];
+  if (seat.kind === "me") tags.push(sheetCopy.me);
+  if (seat.kind === "guest") tags.push(sheetCopy.guest);
+  if (seat.kind === "bot") tags.push(sheetCopy.bot);
+  else if (seat.handedOver) tags.push(sheetCopy.handedOver);
+  return tags;
+}
+
+/** What counts (D-01, D-02): ranked, the only account at an online table, or a solo game. */
+export function countingLine(game: HistoryGame): string {
+  if (game.kind === "solo") return sheetCopy.soloCounting;
+  return game.ranked ? sheetCopy.ranked : sheetCopy.alone;
+}
+
+export type SheetSeat = { colour: Color; name: string; tags: string[] };
+
+export type GameSheetText = {
+  title: string;
+  kind: string;
+  result: string;
+  score: string;
+  mine: SheetSeat[];
+  theirs: SheetSeat[];
+  span: string;
+  deals: string;
+  eaten: string;
+  counting: string;
+};
+
+/** A seat's name in the sheet: the pseudo, the guest's first name (tagged), the computer's level. */
+function sheetName(seat: HistorySeat): string {
+  if (seat.kind === "bot") return seat.level === null ? seat.name : bots.levels[seat.level];
+  return seat.name;
+}
+
+/** Everything the detail sheet of `game` says, at time `now` (for the year). */
+export function sheetOf(game: HistoryGame, now: number): GameSheetText {
+  const mine = teamOf(game.mine);
+  const of = (own: boolean) => game.seats.filter((seat) => (teamOf(seat.colour) === mine) === own);
+  const sum = (seats: HistorySeat[], key: "home" | "captured") =>
+    seats.reduce((n, seat) => n + seat[key], 0);
+  const ours = of(true);
+  const theirs = of(false);
+  const line = (seat: HistorySeat): SheetSeat => ({
+    colour: seat.colour,
+    name: sheetName(seat),
+    tags: seatTags(seat),
+  });
+  return {
+    title: sheetTitle(game.endedAt, now),
+    kind:
+      game.kind === "solo"
+        ? sheetCopy.solo
+        : game.creator === null || game.creator === ""
+          ? sheetCopy.onlineAlone
+          : sheetCopy.online(game.creator),
+    result: game.winner === mine ? sheetCopy.win : sheetCopy.loss,
+    score: sheetCopy.score(sum(ours, "home"), sum(theirs, "home")),
+    mine: ours.map(line),
+    theirs: theirs.map(line),
+    span: spanText(game.startedAt, game.endedAt),
+    deals: sheetCopy.deals(game.deals),
+    eaten: sheetCopy.eaten(sum(ours, "captured"), sum(theirs, "captured")),
+    counting: countingLine(game),
+  };
+}
