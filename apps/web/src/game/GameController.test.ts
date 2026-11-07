@@ -5,6 +5,7 @@ import {
   COLORS,
   type Color,
   type GameEvent,
+  IllegalActionError,
   next,
   type PlayerView,
   type Rng,
@@ -847,4 +848,114 @@ describe("events, change notices and statistics", () => {
     expect(game.stats().dealsPlayed).toBeGreaterThan(5);
     game.dispose();
   }, 120_000);
+});
+
+describe("lessons: scripted seats play what is written, or nothing (05-03)", () => {
+  /** A runner that fails the test if any seat thinks. */
+  const noThink: BotRunner = {
+    think() {
+      throw new Error("a scripted seat thought");
+    },
+    cancel() {},
+  };
+
+  /** The start of a deal, in the exchange: four hands of five, dealer vert, so Bleu plays first. */
+  const exchange: Scenario["before"] = {
+    pawns: { bleu: [{ p: 10 }, "S", "S", "S"], jaune: [{ p: 12 }, "S", "S", "S"] },
+    hands: {
+      bleu: ["13S", "9C", "5H", "10D", "2S"],
+      jaune: ["3C", "4C", "6C", "8C", "12C"],
+      rouge: ["7H", "4H", "6H", "8H", "12H"],
+      vert: ["2D", "4D", "6D", "8D", "12D"],
+    },
+    turn: "bleu",
+    phase: "exchange",
+    dealer: "vert",
+  };
+
+  function scripted(script: CreateGameOptions["script"], before = exchange) {
+    const errors: unknown[] = [];
+    const { game, director } = scenarioGame(before, "test", { runner: noThink, script });
+    game.onError((error) => errors.push(error));
+    return { game, director, errors };
+  }
+
+  it("applies the three scripted gives without thinking, crosses the cards, and gives Bleu the turn", async () => {
+    const { game, director, errors } = scripted({
+      jaune: [{ t: "give", card: "3C" }],
+      rouge: [{ t: "give", card: "7H" }],
+      vert: [{ t: "give", card: "2D" }],
+    });
+    game.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(game.submit({ t: "give", card: "13S" })).toEqual({ ok: true });
+    await vi.runAllTimersAsync();
+    const view = game.view();
+    expect(errors).toEqual([]);
+    expect(view.phase).toBe("play");
+    expect(view.turn).toBe("bleu");
+    expect(view.hand).toContain("7H");
+    expect(view.hand).not.toContain("13S");
+    expect(director.events.map((e) => e.t)).toContain("cardsExchanged");
+    expect(game.thinking()).toBeNull();
+    game.dispose();
+  });
+
+  it("never thinks nor plays for a scripted seat with no action left, and does not block the others", async () => {
+    const { game, errors } = scripted({
+      jaune: [],
+      rouge: [{ t: "give", card: "7H" }],
+      vert: [{ t: "give", card: "2D" }],
+    });
+    game.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(game.submit({ t: "give", card: "13S" })).toEqual({ ok: true });
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    const view = game.view();
+    expect(errors).toEqual([]);
+    expect(view.hasGiven).toEqual({ bleu: true, jaune: false, rouge: true, vert: true });
+    expect(view.phase).toBe("exchange");
+    expect(game.thinking()).toBeNull();
+    game.dispose();
+  });
+
+  it("waits on the turn of a scripted seat with nothing left to play", async () => {
+    const before = play({ bleu: ["5H", "6H"], jaune: ["4S"], rouge: ["8D"], vert: ["9C"] });
+    const { game, director, errors } = scripted({ jaune: [] }, before);
+    game.start();
+    expect(game.submit({ t: "move", card: "5H", pawn: "bleu0" })).toEqual({ ok: true });
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(errors).toEqual([]);
+    expect(game.view().turn).toBe("jaune");
+    expect(game.view().handSizes.jaune).toBe(1);
+    expect(director.events.filter((e) => e.t === "cardPlayed")).toHaveLength(1);
+    game.dispose();
+  });
+
+  it("reports a scripted action the engine refuses through onError, never a silent freeze", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { game, errors } = scripted({ jaune: [{ t: "give", card: "9H" }] });
+    game.start();
+    await vi.runAllTimersAsync();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(IllegalActionError);
+    expect(game.view().hasGiven.jaune).toBe(false);
+    game.dispose();
+  });
+
+  it("copies the scripts at creation and never changes the option", async () => {
+    const script: NonNullable<CreateGameOptions["script"]> = {
+      jaune: [{ t: "give", card: "3C" }],
+      rouge: [{ t: "give", card: "7H" }],
+      vert: [{ t: "give", card: "2D" }],
+    };
+    const copy = JSON.stringify(script);
+    const { game } = scripted(script);
+    game.start();
+    game.submit({ t: "give", card: "13S" });
+    await vi.runAllTimersAsync();
+    expect(game.view().phase).toBe("play");
+    expect(JSON.stringify(script)).toBe(copy);
+    game.dispose();
+  });
 });
