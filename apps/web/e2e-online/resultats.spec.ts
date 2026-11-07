@@ -1,5 +1,12 @@
 import { type Browser, expect, type Page, type TestInfo, test } from "@playwright/test";
-import { BASE_URL, mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
+import {
+  BASE_URL,
+  befriend,
+  mintInvitation,
+  passkeyContext,
+  signUp,
+  uniquePseudo,
+} from "./comptes.ts";
 import { createTable, deviceOptions, join, NEAR_END, playOneMove, seatTile } from "./online.ts";
 
 // « Mes résultats » end to end (plan 05-01, HIST-02, D-01 to D-04, D-12), against `wrangler dev` with
@@ -47,6 +54,9 @@ async function openResults(page: Page, count: number): Promise<void> {
 }
 
 // --- Plan 05-09 Task 1: the navigation, the months, the paging and the detail sheet ---
+
+/** The first stroke of Lucide's « bot », the icon of a game against the computer. */
+const BOT_ICON = 'svg path[d="M12 8V4H8"]';
 
 const tab = (page: Page, name: "historique" | "chiffres" | "classement") =>
   page.locator(`[data-results-tab="${name}"]`);
@@ -344,12 +354,14 @@ test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résu
   browser,
   request,
 }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const id = await createTable(request, { pace: "zero", before: NEAR_END, levels: { vert: 4 } });
   const a = await accountDevice(browser, testInfo, request, "Anaïs");
   // A 20-character pseudo (« Long names »).
   const b = await accountDevice(browser, testInfo, request, "Marie-Christine");
   expect([...b.pseudo]).toHaveLength(20);
+  // Plan 05-09: A and B are friends.
+  await befriend(a.page, b.page);
   // A opens the link first: A creates the table and starts it.
   await openTable(a.page, id);
   await sitAt(a.page, "bleu");
@@ -404,9 +416,376 @@ test("une partie à deux comptes, un invité et un ordinateur, dans « Mes résu
     `Avec Pur-sang · contre ${a.pseudo} et Mamie (sans compte)`,
   );
 
+  // Plan 05-09, the whole path: A adds a solo game; A's history has both, B's only the online one.
+  await a.page.setViewportSize(
+    testInfo.project.name === "desktop"
+      ? { width: 1280, height: 800 }
+      : { width: 844, height: 390 },
+  );
+  await reportSolo(a.page, Date.now(), true);
+  await openResults(a.page, 2);
+  await expect(rows(a.page).first().locator(BOT_ICON)).toHaveCount(1);
+  await expect(rows(a.page).nth(1).locator(BOT_ICON)).toHaveCount(0);
+  await openResults(b.page, 1);
+
+  // The detail sheets say what each game counts for.
+  const counting = a.page.locator("[data-sheet-counting]");
+  await rows(a.page).nth(1).click();
+  await expect(a.page.locator("[data-game-sheet]")).toContainText(
+    `En ligne, à la table de ${a.pseudo}`,
+  );
+  await expect(a.page.locator("[data-game-sheet]")).toContainText("Mamie");
+  await expect(a.page.locator("[data-game-sheet]")).toContainText("(sans compte)");
+  await expect(counting).toHaveText("Cette partie compte pour le classement entre amis.");
+  await a.page.keyboard.press("Escape");
+  await expect(a.page.locator("[data-game-sheet]")).toHaveCount(0);
+  await expect(rows(a.page).nth(1)).toBeFocused();
+  await rows(a.page).first().click();
+  await expect(counting).toHaveText(
+    "Partie contre l’ordinateur : elle compte dans tes chiffres, pas au classement.",
+  );
+  await a.page.keyboard.press("Escape");
+
+  // « Mes chiffres »: 2 under « Toutes », 1 « En ligne », 1 « Contre l’ordinateur ».
+  await tab(a.page, "chiffres").click();
+  await expect(tile(a.page, "parties")).toHaveText("2");
+  await expect(tile(a.page, "victoires")).toHaveText("2");
+  await expect(tile(a.page, "reussite")).toHaveText(/^100\s%$/);
+  await a.page.getByRole("radio", { name: "En ligne" }).click();
+  await expect(tile(a.page, "parties")).toHaveText("1");
+  await a.page.getByRole("radio", { name: "Contre l’ordinateur" }).click();
+  await expect(tile(a.page, "parties")).toHaveText("1");
+
+  // « Classement »: only the two-account game counts; both friends are not ranked yet, 1 of 5.
+  await tab(a.page, "classement").click();
+  await expect(a.page.getByText("Personne n’est encore au classement")).toBeVisible();
+  await expect(a.page.locator("[data-rank-row][data-rank]")).toHaveCount(0);
+  const mine = a.page.locator(`[data-rank-row="${a.pseudo}"]`);
+  const friend = a.page.locator(`[data-rank-row="${b.pseudo}"]`);
+  await expect(mine).toContainText("toi");
+  await expect(mine).toContainText("1 partie sur 5");
+  await expect(friend).toContainText("1 partie sur 5");
+  await expect(friend).not.toContainText("toi");
+  const bId = await b.page.evaluate(async () => {
+    const response = await fetch("/api/me", { headers: { accept: "application/json" } });
+    return ((await response.json()) as { id: string }).id;
+  });
+  expect(await a.page.content()).not.toContain(bId);
+  await a.page.getByRole("button", { name: "Comment ça marche ?" }).click();
+  const how = a.page.getByRole("dialog", { name: "Le classement" });
+  await expect(how).toBeVisible();
+  await expect(how).toContainText(
+    "Le classement compte les parties en ligne terminées où au moins deux joueurs ont un compte, partenaires ou adversaires.",
+  );
+  await expect(how).toContainText("On entre au classement après 5 parties.");
+  await expect(how).toContainText(
+    "À égalité, le plus de victoires passe devant, puis le plus de parties.",
+  );
+  await how.getByRole("button", { name: "Fermer" }).click();
+  await expect(how).toHaveCount(0);
+  await expect(a.page.getByRole("button", { name: "Comment ça marche ?" })).toBeFocused();
+
+  // A third account without friends.
+  const c = await accountDevice(browser, testInfo, request, "Céleste");
+  await c.page.goto("/#/resultats/classement");
+  await expect(c.page.getByText("Pas encore d’amis sur TOC")).toBeVisible();
+  await expect(c.page.getByText("Invite un proche pour vous mesurer entre amis.")).toBeVisible();
+  await expect(c.page.getByRole("link", { name: "Mes amis" })).toHaveAttribute("href", "#/amis");
+  await c.context.close();
+
   await guest.close();
   await a.context.close();
   await b.context.close();
+});
+
+// --- Plan 05-09 Task 3: « Classement » with a served answer: ties, one's own row, the states ---
+
+const RANKED = {
+  friends: 5,
+  ranked: [
+    { rank: 1, pseudo: "Marie", games: 12, wins: 8, me: false },
+    { rank: 2, pseudo: "Romain", games: 9, wins: 5, me: true },
+    { rank: 2, pseudo: "Paul", games: 9, wins: 5, me: false },
+    { rank: 4, pseudo: "Marie-Christine Abcd", games: 7, wins: 2, me: false },
+  ],
+  unranked: [
+    { pseudo: "Lucie", games: 3, me: false },
+    { pseudo: "Hugo", games: 0, me: false },
+  ],
+};
+
+async function openRanking(page: Page, answer: unknown): Promise<void> {
+  await page.unroute("**/api/me/ranking");
+  await page.route("**/api/me/ranking", (route) => route.fulfill({ json: answer }));
+  await page.goto("/");
+  await page.goto("/#/resultats/classement");
+}
+
+test("« Classement » : les rangs partagés, sa propre ligne, ceux qui n’y sont pas encore", async ({
+  page,
+}) => {
+  await openRanking(page, RANKED);
+  await expect(
+    page.getByText(
+      "Entre toi et tes amis, sur les parties en ligne jouées avec au moins un autre joueur qui a un compte.",
+    ),
+  ).toBeVisible();
+  const ranked = page.locator("[data-rank-row][data-rank]");
+  await expect(ranked).toHaveCount(4);
+  expect(
+    await ranked.evaluateAll((all) => all.map((row) => row.getAttribute("data-rank"))),
+  ).toEqual(["1", "2", "2", "4"]);
+  await expect(ranked.first()).toHaveAccessibleName(/^1er, Marie, 67\s%, 12 parties, 8 victoires$/);
+  await expect(page.locator('[data-rank-row="Romain"]')).toHaveAccessibleName(
+    /^2e, toi, 56\s%, 9 parties, 5 victoires$/,
+  );
+  await expect(page.locator('[data-rank-row="Romain"]')).toContainText("toi");
+  await expect(page.locator('[data-rank-row="Romain"]')).toContainText("9 parties · 5 victoires");
+  // One's own row: a 2 px cream outline, never amber.
+  const outline = await page.locator('[data-rank-row="Romain"]').evaluate((row) => {
+    const style = getComputedStyle(row);
+    return {
+      color: style.outlineColor,
+      width: style.outlineWidth,
+      background: style.backgroundColor,
+    };
+  });
+  expect(outline).toEqual({
+    color: "rgb(255, 248, 225)",
+    width: "2px",
+    background: "rgb(74, 47, 26)",
+  });
+  const amber = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-results] *")].some((element) => {
+      const style = getComputedStyle(element);
+      return (
+        [style.color, style.backgroundColor, style.borderTopColor, style.outlineColor].includes(
+          "rgb(255, 176, 46)",
+        ) && !element.matches(".btn-primary")
+      );
+    }),
+  );
+  expect(amber).toBe(false);
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Pas encore au classement" }),
+  ).toBeVisible();
+  await expect(page.getByText("Il faut 5 parties pour entrer au classement.")).toBeVisible();
+  await expect(page.locator('[data-rank-row="Lucie"]')).toContainText("3 parties sur 5");
+  await expect(page.locator('[data-rank-row="Hugo"]')).toContainText("0 partie sur 5");
+  await expect(page.locator('[data-rank-row="Hugo"]')).toHaveAccessibleName("Hugo, 0 partie sur 5");
+
+  // Friends, nobody ranked: the heading, the line, « Créer une table en ligne », then everyone.
+  await openRanking(page, {
+    friends: 1,
+    ranked: [],
+    unranked: [
+      { pseudo: "Romain", games: 2, me: true },
+      { pseudo: "Marie", games: 1, me: false },
+    ],
+  });
+  await expect(page.getByText("Personne n’est encore au classement")).toBeVisible();
+  await expect(
+    page.getByText("Jouez ensemble en ligne : chacun y entre après 5 parties."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Créer une table en ligne" })).toBeVisible();
+  await expect(page.locator("[data-rank-row]")).toHaveCount(2);
+
+  // A failing answer: the error and « Réessayer », which loads again.
+  await page.unroute("**/api/me/ranking");
+  let calls = 0;
+  await page.route("**/api/me/ranking", (route) => {
+    calls += 1;
+    return calls === 1 ? route.fulfill({ status: 503, body: "" }) : route.fulfill({ json: RANKED });
+  });
+  await page.goto("/");
+  await page.goto("/#/resultats/classement");
+  await expect(page.getByText("Impossible de charger le classement.")).toBeVisible();
+  await page.getByRole("button", { name: "Réessayer" }).click();
+  await expect(page.locator("[data-rank-row][data-rank]")).toHaveCount(4);
+});
+
+/** The three answers of the page with something in each, for the fit and the screenshots. */
+async function serveAll(page: Page): Promise<void> {
+  const seat = (
+    colour: string,
+    kind: string,
+    name: string,
+    home: number,
+    level: number | null = null,
+  ) => ({
+    colour,
+    kind,
+    name,
+    level,
+    handedOver: false,
+    captured: 1,
+    lost: 1,
+    home,
+  });
+  const at = (month: number, day: number, hour: number, minute: number) =>
+    new Date(2026, month, day, hour, minute).getTime();
+  const hash = "Q".repeat(43);
+  const games = [
+    {
+      id: `${hash}:3`,
+      kind: "online",
+      startedAt: at(10, 6, 20, 31),
+      endedAt: at(10, 6, 21, 14),
+      winner: "bleu-rouge",
+      mine: "bleu",
+      seats: [
+        seat("bleu", "me", "Romain", 4),
+        seat("jaune", "account", "Paul", 3),
+        { ...seat("rouge", "guest", "Mamie", 4), handedOver: true, level: 3 },
+        seat("vert", "bot", "Ourasi", 2, 4),
+      ],
+      deals: 6,
+      creator: "Romain",
+      ranked: true,
+    },
+    {
+      id: `solo:${"u".repeat(22)}:0f8e2c4a-1b2c-4d3e-8f90-123456789abc`,
+      kind: "solo",
+      startedAt: at(10, 2, 17, 0),
+      endedAt: at(10, 2, 18, 5),
+      winner: "jaune-vert",
+      mine: "bleu",
+      seats: [
+        seat("bleu", "me", "Romain", 3),
+        seat("jaune", "bot", "", 4, 4),
+        seat("rouge", "bot", "", 2, 3),
+        seat("vert", "bot", "", 4, 4),
+      ],
+      deals: 9,
+      creator: null,
+      ranked: false,
+    },
+    {
+      id: `${hash}:1`,
+      kind: "online",
+      startedAt: at(9, 24, 20, 31),
+      endedAt: at(9, 24, 21, 2),
+      winner: "jaune-vert",
+      mine: "vert",
+      seats: [
+        seat("bleu", "account", "Marie-Christine Abcd", 2),
+        seat("jaune", "guest", "Bon-Papa", 4),
+        seat("rouge", "bot", "Ténor", 1, 3),
+        seat("vert", "me", "Romain", 4),
+      ],
+      deals: 7,
+      creator: "Marie-Christine Abcd",
+      ranked: false,
+    },
+  ];
+  await page.route("**/api/me/results", (route) => route.fulfill({ json: { games, next: null } }));
+  const partners = [
+    { kind: "account", name: "Marie", level: null, games: 6, wins: 4 },
+    { kind: "account", name: "Paul", level: null, games: 3, wins: 1 },
+    { kind: "guests", name: null, level: null, games: 2, wins: 1 },
+    { kind: "bot", name: null, level: 4, games: 1, wins: 1 },
+  ];
+  const levels = [
+    { level: 3, games: 4, wins: 3 },
+    { level: 4, games: 2, wins: 1 },
+  ];
+  await page.route("**/api/me/stats", (route) =>
+    route.fulfill({
+      json: {
+        all: { ...statsBlock(12, 8, partners, levels), captured: 14, lost: 9, home: 38 },
+        online: statsBlock(6, 4, partners.slice(0, 3)),
+        solo: statsBlock(6, 4, partners.slice(3), levels),
+      },
+    }),
+  );
+  await page.route("**/api/me/ranking", (route) => route.fulfill({ json: RANKED }));
+}
+
+test("« Mes résultats » tient à chaque taille, sans défilement de côté, cibles de 44", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the sizes are set by the test, once");
+  await serveAll(page);
+  const sizes = [
+    { width: 844, height: 390 },
+    { width: 750, height: 342 },
+    { width: 640, height: 360 },
+    { width: 480, height: 320 },
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ];
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    for (const name of ["historique", "chiffres", "classement"] as const) {
+      await page.goto("/");
+      await page.goto(`/#/resultats${name === "historique" ? "" : `/${name}`}`);
+      await expect(page.locator(`[data-results-panel="${name}"]`)).toBeVisible();
+      await expect(
+        page.locator("[data-game-row], [data-number-tile], [data-rank-row]").first(),
+      ).toBeVisible();
+      const report = await page.evaluate(() => {
+        const small = [
+          ...document.querySelectorAll<HTMLElement>("main a[href], main button, main [role=radio]"),
+        ]
+          .filter((element) => element.offsetParent !== null)
+          .map((element) => {
+            const box = element.getBoundingClientRect();
+            return { text: element.textContent?.trim() ?? "", w: box.width, h: box.height };
+          })
+          .filter((box) => box.w < 44 || box.h < 44);
+        return {
+          sideways: document.documentElement.scrollWidth > window.innerWidth,
+          small,
+          bar: document.querySelector("[data-results-nav]")?.getAttribute("data-results-nav"),
+        };
+      });
+      expect(report.sideways, `${name} ${size.width}x${size.height}`).toBe(false);
+      expect(report.small, `${name} ${size.width}x${size.height}`).toEqual([]);
+      expect(report.bar).toBe(size.width < 640 || size.height > size.width ? "bar" : "column");
+      // Upright, the page is not behind « Tourne ton téléphone ».
+      await expect(page.getByRole("heading", { level: 1, name: "Mes résultats" })).toBeVisible();
+    }
+  }
+});
+
+// Plan 05-09 screenshots (TOC_SHOTS): the three panels and the two sheets at 844 x 390 and 1280 x 800.
+test("captures des trois onglets et des deux feuilles", async ({ page }, testInfo) => {
+  const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process
+    ?.env;
+  const dir = env?.TOC_SHOTS;
+  test.skip(!dir || testInfo.project.name !== "desktop", "TOC_SHOTS only, once");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await serveAll(page);
+  for (const size of [
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(size);
+    const suffix = `${size.width}x${size.height}`;
+    await page.goto("/");
+    await page.goto("/#/resultats");
+    await expect(rows(page)).toHaveCount(3);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${dir}/05-09-historique-${suffix}.png` });
+    await rows(page).first().click();
+    await expect(page.locator("[data-game-sheet]")).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${dir}/05-09-fiche-${suffix}.png` });
+    await page.keyboard.press("Escape");
+    await tab(page, "chiffres").click();
+    await expect(page.locator("[data-number-tile]")).toHaveCount(3);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${dir}/05-09-chiffres-${suffix}.png` });
+    await tab(page, "classement").click();
+    await expect(page.locator("[data-rank-row]")).toHaveCount(6);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${dir}/05-09-classement-${suffix}.png` });
+    await page.getByRole("button", { name: "Comment ça marche ?" }).click();
+    await expect(page.getByRole("dialog", { name: "Le classement" })).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${dir}/05-09-le-classement-${suffix}.png` });
+    await page.keyboard.press("Escape");
+  }
 });
 
 // Screenshots for the review (TOC_SHOTS names a directory; skipped otherwise): « Mes résultats » with

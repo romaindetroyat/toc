@@ -11,12 +11,17 @@ import {
   nameOf,
   partnerLine,
   partnerName,
+  rankedLine,
+  rankLabel,
+  rankName,
   rate,
   rowOf,
   seatTags,
   sheetOf,
   sheetTitle,
   spanText,
+  unrankedLabel,
+  unrankedLine,
 } from "./format.ts";
 
 // The wording of a game row in « Mes résultats » (plan 05-01 Task 3; 05-UI-SPEC Panel 1, « Typography »,
@@ -342,5 +347,37 @@ describe("the figures' wording", () => {
     );
     expect(levelName(1)).toBe("Poulain");
     expect(levelName(5)).toBe("Champion");
+  });
+});
+
+// --- Plan 05-09 Task 3: « Classement » (05-UI-SPEC Panel 3, D-13) ---
+
+describe("the ranking's wording", () => {
+  it("« 1er », then « 2e », « 11e »", () => {
+    expect(rankName(1)).toBe("1er");
+    expect(rankName(2)).toBe("2e");
+    expect(rankName(11)).toBe("11e");
+  });
+
+  it("a ranked row's line and its accessible name, « toi » for oneself", () => {
+    expect(rankedLine(12, 8)).toBe("12 parties · 8 victoires");
+    expect(rankedLine(5, 1)).toBe("5 parties · 1 victoire");
+    expect(rankLabel({ rank: 2, pseudo: "Marie", games: 12, wins: 8, me: false })).toBe(
+      `2e, Marie, 67${NNBSP}%, 12 parties, 8 victoires`,
+    );
+    expect(rankLabel({ rank: 3, pseudo: "Anaïs", games: 6, wins: 3, me: true })).toBe(
+      `3e, toi, 50${NNBSP}%, 6 parties, 3 victoires`,
+    );
+    expect(rankLabel({ rank: 1, pseudo: "Paul", games: 5, wins: 1, me: false })).toBe(
+      `1er, Paul, 20${NNBSP}%, 5 parties, 1 victoire`,
+    );
+  });
+
+  it("« n parties sur 5 » under « Pas encore au classement »", () => {
+    expect(unrankedLine(0)).toBe("0 partie sur 5");
+    expect(unrankedLine(1)).toBe("1 partie sur 5");
+    expect(unrankedLine(3)).toBe("3 parties sur 5");
+    expect(unrankedLabel({ pseudo: "Marie", games: 1, me: false })).toBe("Marie, 1 partie sur 5");
+    expect(unrankedLabel({ pseudo: "Anaïs", games: 4, me: true })).toBe("toi, 4 parties sur 5");
   });
 });

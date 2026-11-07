@@ -1,7 +1,7 @@
 import type { HistoryPage } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import type { ApiDeps } from "../net/api.ts";
-import { history, stats } from "./api.ts";
+import { history, ranking, stats } from "./api.ts";
 
 // « Mes résultats » from the page (plan 05-01): GET /api/me/results, read with the shared strict
 // schema. fetch and the online flag are fakes.
@@ -215,5 +215,50 @@ describe("stats", () => {
       ),
     ).toBe("error");
     expect(await stats(hostile((answer) => (answer.debug = {})))).toBe("error");
+  });
+});
+
+// --- Plan 05-09 Task 3: GET /api/me/ranking, read with RankingAnswer (strict) ---
+
+const RANKING = {
+  friends: 2,
+  ranked: [
+    { rank: 1, pseudo: "Marie", games: 6, wins: 4, me: false },
+    { rank: 2, pseudo: "Anaïs", games: 5, wins: 2, me: true },
+  ],
+  unranked: [{ pseudo: "Paul", games: 1, me: false }],
+};
+
+describe("ranking", () => {
+  it("answers the circle as the server sent it, asked without a cache", async () => {
+    const { deps, calls } = fake(() => Response.json(RANKING));
+    expect(await ranking(deps)).toEqual(RANKING);
+    expect(calls[0]?.url).toBe("/api/me/ranking");
+    expect(calls[0]?.init?.cache).toBe("no-store");
+  });
+
+  it("signed out, offline, failing", async () => {
+    expect(await ranking(fake(() => Response.json({}, { status: 401 })).deps)).toBe("signed-out");
+    expect(await ranking(fake(() => Response.json(RANKING), false).deps)).toBe("offline");
+    expect(await ranking(fake(() => new Response("", { status: 500 })).deps)).toBe("error");
+  });
+
+  it("refuses a friend's id, a ranked row under 5 games, an unranked row of 5", async () => {
+    const hostile = (change: (answer: typeof RANKING) => void) => {
+      const answer = JSON.parse(JSON.stringify(RANKING)) as typeof RANKING;
+      change(answer);
+      return fake(() => Response.json(answer)).deps;
+    };
+    expect(
+      await ranking(
+        hostile((answer) => Object.assign(answer.ranked[0] ?? {}, { id: "u".repeat(22) })),
+      ),
+    ).toBe("error");
+    expect(
+      await ranking(hostile((answer) => Object.assign(answer.ranked[1] ?? {}, { games: 4 }))),
+    ).toBe("error");
+    expect(
+      await ranking(hostile((answer) => Object.assign(answer.unranked[0] ?? {}, { games: 5 }))),
+    ).toBe("error");
   });
 });
