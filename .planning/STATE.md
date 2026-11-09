@@ -4,10 +4,10 @@ current_phase: 5
 current_phase_name: Suivi, apprentissage et finition
 status: milestone_complete
 stopped_at: All five phases closed, UAT pending (01- to 05-UAT.md)
-last_updated: "2026-11-07T20:00:00.000Z"
+last_updated: "2026-11-09T05:37:25.663Z"
 last_activity: 2026-11-07
 last_activity_desc: Phase 5 closed at Romain's request, remaining tests noted
-state_head: c32ffdc90952ec7a0259a0761869605f997efe22
+state_head: 65320a037e6f54ea9bb7fc98048cb47a602fd2d5
 progress:
   total_phases: 5
   completed_phases: 5
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-13)
 
 Phase: 5 (Suivi, apprentissage et finition) — CLOSED 2026-11-07
 Status: Phases 1 à 5 closes (« Clôturer, essais notés »), essais restants dans les fichiers UAT ; prochaine étape : les essais de Romain, puis la clôture de la version
-Last activity: 2026-11-07 — phase 5 close ; tuile « Règles » raccourcie en « Cartes, 7, maison »
+Last activity: 2026-11-09 - Completed quick task 261109-6an: compteur « Les cartes du paquet » et test d’équité du tirage
 
 Progress: [██████████] 100%
 
@@ -90,3 +90,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 Last session: 2026-10-17T19:00:00.000Z
 Stopped at: Phases 2 and 3 closed, UAT pending
 Resume file: None (next: /gsd-discuss-phase 4)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261109-6an | Compteur « Les cartes du paquet » (même information que l'ordinateur) et test permanent d'équité du tirage | 2026-11-09 | 65320a0 | [261109-6an-compteur-des-cartes-du-paquet-et-test-d-](./quick/261109-6an-compteur-des-cartes-du-paquet-et-test-d-/) |
