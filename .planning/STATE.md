@@ -4,10 +4,10 @@ current_phase: 5
 current_phase_name: Suivi, apprentissage et finition
 status: milestone_complete
 stopped_at: All five phases closed, UAT pending (01- to 05-UAT.md)
-last_updated: "2026-11-09T06:21:36.434Z"
+last_updated: "2026-11-09T06:42:14.587Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 5 closed at Romain's request, remaining tests noted
-state_head: d52d9210b9e2d72969027e53c8655ebb748b2c9b
+state_head: 82379c84c4a5b9db69fa2bf27346f4a3678812b2
 progress:
   total_phases: 5
   completed_phases: 5
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-13)
 
 Phase: 5 (Suivi, apprentissage et finition) — CLOSED 2026-11-07
 Status: Phases 1 à 5 closes (« Clôturer, essais notés »), essais restants dans les fichiers UAT ; prochaine étape : les essais de Romain, puis la clôture de la version
-Last activity: 2026-11-09 - Completed quick task 261109-80e: « Les cartes jouées » en une touche
+Last activity: 2026-11-09 - Completed quick task 261109-8v7: classement lu sur des totaux par compte
 
 Progress: [██████████] 100%
 
@@ -97,3 +97,4 @@ Resume file: None (next: /gsd-discuss-phase 4)
 |---|-------------|------|--------|-----------|
 | 261109-6an | Compteur « Les cartes du paquet » (même information que l'ordinateur) et test permanent d'équité du tirage | 2026-11-09 | 65320a0 | [261109-6an-compteur-des-cartes-du-paquet-et-test-d-](./quick/261109-6an-compteur-des-cartes-du-paquet-et-test-d-/) |
 | 261109-80e | « Les cartes jouées » par valeur, en une touche sur la défausse | 2026-11-09 | d52d921 | [261109-80e-cartes-deja-jouees-en-une-touche](./quick/261109-80e-cartes-deja-jouees-en-une-touche/) |
+| 261109-8v7 | Classement lu sur des totaux par compte (rester sur l'offre gratuite) | 2026-11-09 | 82379c8 | [261109-8v7-classement-lu-sur-des-totaux-par-compte](./quick/261109-8v7-classement-lu-sur-des-totaux-par-compte/) |
