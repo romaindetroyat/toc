@@ -1,10 +1,14 @@
 // The count of the cards a seat has not seen (quick task 261109-6an): unknownCards, partnerHolds and
 // deckCount, the pool the computer players remember and the sheet « Les cartes du paquet » shows. The
 // own hand, the card passed to the partner while the partner holds it, the played cards and the dead
-// hands laid down are seen; a new pack starts again from the own hand.
+// hands laid down are seen; a new pack starts again from the own hand. Quick task 261109-80e adds the
+// other side, playedCards and deckCount.played (the sheet « Les cartes jouées »): the cards played face
+// up in this pack, dead hands included, empty again after the reshuffle.
 
 import { describe, expect, it } from "vitest";
 import {
+  type Action,
+  apply,
   type CardId,
   COLORS,
   type Color,
@@ -15,9 +19,12 @@ import {
   type GameEvent,
   type GameState,
   giveCard,
+  isDealOver,
+  legalActions,
   newGame,
   PARTNER,
   partnerHolds,
+  playedCards,
   RANKS,
   type Rank,
   rankOf,
@@ -237,5 +244,147 @@ describe("deckCount: the deals of a pack and the new pack", () => {
     // @ts-expect-error the full state is not a seat's view (kind "state", not "view")
     const blind = () => deckCount(state);
     expect(typeof blind).toBe("function");
+  });
+});
+
+describe("playedCards and deckCount.played: the cards already played in this pack", () => {
+  it("a fresh pack: nothing played, during the exchange and once the gives have crossed", () => {
+    const state = fresh();
+    for (const each of [state, exchangeAll(state).state]) {
+      for (const seat of COLORS) {
+        const count = deckCount(viewFor(each, seat));
+        expect(playedCards(viewFor(each, seat)), seat).toEqual([]);
+        expect(count.playedTotal, seat).toBe(0);
+        for (const rank of RANKS) expect(count.played[rank], `${seat} ${rank}`).toBe(0);
+      }
+    }
+  });
+
+  it("rank by rank: the discard pile, every seat the same count", () => {
+    const crossed = exchangeAll(fresh()).state;
+    const discard: CardId[] = ["1S", "1H", "13C", "7D", "7S", "7H", "2C"];
+    const hands = { ...crossed.hands };
+    // Take those cards out of whatever hand or talon held them, so the 52 stay conserved.
+    for (const color of COLORS) hands[color] = hands[color].filter((c) => !discard.includes(c));
+    const played: GameState = {
+      ...crossed,
+      hands,
+      talon: crossed.talon.filter((c) => !discard.includes(c)),
+      discard,
+    };
+    for (const seat of COLORS) {
+      const count = deckCount(viewFor(played, seat));
+      expect(count.played, seat).toEqual({ ...perRank([]), 1: 2, 2: 1, 7: 3, 13: 1 });
+      expect(count.playedTotal, seat).toBe(7);
+      expect(sum(count.played)).toBe(count.playedTotal);
+    }
+    // In deck order, whatever order they were played in.
+    const order = playedCards(viewFor(played, "bleu"));
+    expect(order).toEqual(FULL_DECK.filter((card) => discard.includes(card)));
+  });
+
+  it("a dead hand laid down counts as played at once, and not twice once it joins the discard pile", () => {
+    const crossed = exchangeAll(fresh()).state;
+    const dead = crossed.hands.jaune.slice();
+    const posed: GameState = {
+      ...crossed,
+      hands: { ...crossed.hands, jaune: [] },
+      posed: { ...crossed.posed, jaune: dead },
+    };
+    for (const seat of COLORS) {
+      const count = deckCount(viewFor(posed, seat));
+      expect(count.played, seat).toEqual(perRank(dead));
+      expect(count.playedTotal, seat).toBe(dead.length);
+    }
+    // A card both in the discard pile and in a dead hand (never the engine's case) is counted once.
+    const twice: GameState = { ...posed, discard: [dead[0] as CardId] };
+    expect(deckCount(viewFor(twice, "bleu")).playedTotal).toBe(dead.length);
+    // endDeal moves the dead hands to the discard pile: still played, once.
+    const next = endDeal(emptyHands(posed)).state;
+    expect(next.dealIndex).toBe(1);
+    const count = deckCount(viewFor(next, "rouge"));
+    expect(count.playedTotal).toBe(next.discard.length);
+    expect(count.playedTotal).toBe(20);
+    for (const card of dead) expect(playedCards(viewFor(next, "rouge"))).toContain(card);
+  });
+
+  it("the own hand and the card passed to the partner are not played", () => {
+    const state = fresh();
+    const gave = state.hands.bleu[0] as CardId;
+    const crossed = exchangeAll(state).state;
+    const bleu = viewFor(crossed, "bleu");
+    expect(partnerHolds(bleu)).toBe(gave);
+    expect(playedCards(bleu)).not.toContain(gave);
+    for (const card of bleu.hand) expect(playedCards(bleu)).not.toContain(card);
+  });
+
+  it("counts on through the three deals of a pack, then starts again at zero after the reshuffle", () => {
+    let state = fresh(5, "bleu");
+    const expected = [0, 20, 36];
+    for (const dealIndex of [0, 1, 2] as const) {
+      expect(state.dealIndex).toBe(dealIndex);
+      for (const seat of COLORS) {
+        const count = deckCount(viewFor(state, seat));
+        expect(count.playedTotal, `${dealIndex} ${seat}`).toBe(expected[dealIndex]);
+        expect(count.played, `${dealIndex} ${seat}`).toEqual(perRank(state.discard));
+      }
+      state = endDeal(emptyHands(exchangeAll(state).state)).state;
+    }
+    expect(state.dealIndex).toBe(0);
+    for (const seat of COLORS) {
+      const count = deckCount(viewFor(state, seat));
+      expect(count.playedTotal, seat).toBe(0);
+      expect(count.played, seat).toEqual(perRank([]));
+    }
+  });
+
+  it("whole games by the engine: played = the cards played or laid down since the last shuffle, and per rank played + hidden + own hand + the partner's card = 4", () => {
+    for (const seed of [3, 7, 42, 2026]) {
+      let state = fresh(seed, COLORS[seed % 4] ?? "bleu");
+      // The oracle: the cards seen played or laid down, from the events alone, reset by « reshuffled ».
+      let oracle: CardId[] = [];
+      const follow = (events: readonly GameEvent[]) => {
+        for (const event of events) {
+          if (event.t === "reshuffled") oracle = [];
+          if (event.t === "cardPlayed") oracle.push(event.card);
+          if (event.t === "handDiscarded") oracle.push(...event.cards);
+        }
+      };
+      let steps = 0;
+      while (state.phase !== "won" && state.dealsPlayed < 9 && steps < 4000) {
+        steps += 1;
+        for (const seat of COLORS) {
+          const view = viewFor(state, seat);
+          const count = deckCount(view);
+          expect(new Set(playedCards(view)), `${seed} ${steps} ${seat}`).toEqual(new Set(oracle));
+          expect(count.playedTotal).toBe(oracle.length);
+          const mine = perRank(view.hand);
+          const passed = partnerHolds(view);
+          for (const rank of RANKS) {
+            const partner = passed !== null && rankOf(passed) === rank ? 1 : 0;
+            expect(
+              count.played[rank] + count.hidden[rank] + mine[rank] + partner,
+              `${seed} ${steps} ${seat} ${rank}`,
+            ).toBe(4);
+          }
+        }
+        if (state.phase === "exchange") {
+          const seat = COLORS.find((color) => state.given[color] === null) as Color;
+          const out = giveCard(state, seat, state.hands[seat][0] as CardId);
+          state = out.state;
+          follow(out.events);
+        } else if (isDealOver(state)) {
+          const out = endDeal(state);
+          state = out.state;
+          follow(out.events);
+        } else {
+          const action = legalActions(state, state.turn)[0] as Action;
+          const out = apply(state, state.turn, action);
+          state = out.state;
+          follow(out.events);
+        }
+      }
+      expect(state.dealsPlayed).toBeGreaterThanOrEqual(3);
+    }
   });
 });
