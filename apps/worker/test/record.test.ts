@@ -292,9 +292,10 @@ describe("the results of a finished game in D1 (plan 05-01)", () => {
     const record = phase5Record({ bleu: a.id, jaune: b.id });
     const first = metered();
     expect(await writeGame(first.db, id, record)).toBe("written");
-    // The rows one finished two-account game writes: legacy 3, played 2, one per account seat.
+    // The rows one finished two-account game writes: legacy 3, played 2, one per account seat, and
+    // since 0004 one ranked_totals row per account of a ranked game (the trigger, quick task 261109-8v7).
     console.log(`D1 rows written by one finished two-account game: ${first.written()}`);
-    expect(first.written()).toBeLessThanOrEqual(7);
+    expect(first.written()).toBeLessThanOrEqual(9);
     const again = metered();
     expect(await writeGame(again.db, id, record)).toBe("written");
     expect(again.written()).toBe(0);

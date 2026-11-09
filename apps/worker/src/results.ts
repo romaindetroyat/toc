@@ -118,16 +118,19 @@ const stats: Read = async (user, _url, meter) => {
   return json(answer, 200);
 };
 
-/** GET /api/me/ranking: the circle's ranked counts (one query), ranked by rankingOf. */
+/**
+ * GET /api/me/ranking: the circle's ranked counts (one query), ranked by rankingOf. The counts come
+ * from ranked_totals (0004), kept by a trigger on game_seats: one row read per member of the circle,
+ * whatever the length of the history (quick task 261109-8v7).
+ */
 const ranking: Read = async (user, _url, meter) => {
   const found = await meter.all<RankingRow>(
     meter
       .prepare(
         `WITH circle(id) AS (SELECT ?1 UNION SELECT friend_id FROM friendships WHERE user_id = ?1)
-         SELECT u.id, u.pseudo, COUNT(gs.game_id) AS games, COALESCE(SUM(gs.won), 0) AS wins
+         SELECT u.id, u.pseudo, COALESCE(t.games, 0) AS games, COALESCE(t.wins, 0) AS wins
            FROM circle c JOIN users u ON u.id = c.id
-           LEFT JOIN game_seats gs ON gs.user_id = c.id AND gs.ranked = 1
-          GROUP BY u.id, u.pseudo`,
+           LEFT JOIN ranked_totals t ON t.user_id = c.id`,
       )
       .bind(user.id),
   );

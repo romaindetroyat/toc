@@ -214,6 +214,7 @@ export function accountDb(): D1Database {
 
 /** In an order the foreign keys allow (plan 05-01: game_seats, then played, before users). */
 export const ACCOUNT_TABLES = [
+  "ranked_totals",
   "game_seats",
   "played",
   "table_members",

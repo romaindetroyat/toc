@@ -3,7 +3,7 @@
 // are seeded as the GameRoom's record writes them (test/results.test.ts plays the real game); every
 // answer is read through the strict schemas of @toc/protocol and holds no account id.
 
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { parseRankingAnswer, parseStatsAnswer } from "@toc/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { plausible } from "../src/results.ts";
@@ -265,6 +265,49 @@ describe("GET /api/me/ranking", () => {
     expect(body.friends).toBe(10);
     expect(body.ranked[0]).toMatchObject({ rank: 1, pseudo: a.person.pseudo, games: 30, wins: 30 });
     expect(body.ranked).toHaveLength(11);
+  });
+
+  it("the rows read do not grow with the history (ranked_totals, quick task 261109-8v7)", async () => {
+    const a = await account("Anaïs");
+    const b = await account("Bruno");
+    await befriendRows(a.person.id, b.person.id);
+    for (let g = 0; g < 5; g++) await ranked([a.person], [b.person]);
+    const before = d1Of(await get("/api/me/ranking", a.jar)).read;
+    for (let g = 0; g < 40; g++) await ranked([b.person], [a.person]);
+    const answer = await get("/api/me/ranking", a.jar);
+    expect(d1Of(answer).read).toBe(before);
+    const body = (await answer.json()) as RankingBody;
+    expect(body.ranked).toEqual([
+      { rank: 1, pseudo: b.person.pseudo, games: 45, wins: 40, me: false },
+      { rank: 2, pseudo: a.person.pseudo, games: 45, wins: 5, me: true },
+    ]);
+  });
+
+  it("a game recorded twice counts once, a solo or unranked game never (ranked_totals)", async () => {
+    const a = await account("Anaïs");
+    const b = await account("Bruno");
+    await befriendRows(a.person.id, b.person.id);
+    await ranked([a.person], [b.person]);
+    // The same game_seats row again, as a resent record writes it: ON CONFLICT DO NOTHING.
+    await env.DB.prepare(
+      `INSERT INTO game_seats (user_id, ended_at, game_id, colour, won, ranked, solo, captured, lost, home)
+       SELECT user_id, ended_at, game_id, colour, won, ranked, solo, captured, lost, home
+         FROM game_seats WHERE user_id = ?1
+       ON CONFLICT DO NOTHING`,
+    )
+      .bind(a.person.id)
+      .run();
+    await ranked([a.person], [], false);
+    const totals = await env.DB.prepare("SELECT games, wins FROM ranked_totals WHERE user_id = ?1")
+      .bind(a.person.id)
+      .first();
+    expect(totals).toEqual({ games: 1, wins: 1 });
+    const fromSeats = await env.DB.prepare(
+      "SELECT COUNT(*) AS games, SUM(won) AS wins FROM game_seats WHERE user_id = ?1 AND ranked = 1",
+    )
+      .bind(a.person.id)
+      .first();
+    expect(fromSeats).toEqual(totals);
   });
 
   it("401 signed out, and only GET or HEAD", async () => {
