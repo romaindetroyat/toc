@@ -65,6 +65,7 @@
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
+  import DeckSheet from "../ui/DeckSheet.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
   import GuideBand from "../ui/GuideBand.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
@@ -270,15 +271,21 @@
   /** The last tab opened in this game (memory only); « Les cartes » at first. */
   let rulesTab = $state<RulesTabId>("cartes");
 
+  // --- « Les cartes du paquet » (quick task 261109-6an): « T », the row button, « Sur le tapis » ---
+  /** The sheet is open (set in the same task as the tap or the key, before the sheet mounts). */
+  let deckShown = $state(false);
+  let deckOpener = $state.raw<HTMLElement | null>(null);
+
   /**
    * The computer players wait while the invitation shows (« Conséquence de mise en œuvre, à confirmer
-   * par Romain »), and in a solo game while a rules sheet is open (plan 05-04: this screen's own, or
-   * one opened from « Réglages »; online the game goes on): the session's idle awaits this hold, which
-   * resolves once the screen is back in landscape and the rules are closed. Every pending hold is
-   * released then, and on destroy, so a disposed game's loop ends.
+   * par Romain »), and in a solo game or a lesson while a rules sheet is open (plan 05-04: this
+   * screen's own, or one opened from « Réglages ») or « Les cartes du paquet » is (quick task
+   * 261109-6an); online the game goes on: the session's idle awaits this hold, which resolves once
+   * the screen is back in landscape and those sheets are closed. Every pending hold is released
+   * then, and on destroy, so a disposed game's loop ends.
    */
   const held = $derived(
-    prompting || (online === undefined && (rulesShown || rulesOpen.count > 0)),
+    prompting || (online === undefined && (rulesShown || deckShown || rulesOpen.count > 0)),
   );
   let holds: (() => void)[] = [];
   function releaseHolds() {
@@ -637,6 +644,12 @@
     rulesOpener = opener;
     rulesShown = true;
   }
+
+  /** Opens « Les cartes du paquet »; `opener` gets the focus back. */
+  function openDeck(opener: HTMLElement | null) {
+    deckOpener = opener;
+    deckShown = true;
+  }
   let previousTable: TablePublic | null = null;
   $effect(() => {
     const next = onlineTable;
@@ -973,6 +986,7 @@
       focus: focusTarget(),
       messages: online !== undefined,
       rules: rulesShown,
+      deck: deckShown,
       blocked:
         session === undefined ||
         view === undefined ||
@@ -981,8 +995,14 @@
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
-    // Under a plate only « ? », « M » and « R » reach the game.
-    if (plateUp && intent.kind !== "help" && intent.kind !== "messages" && intent.kind !== "rules") {
+    // Under a plate only « ? », « M », « R » and « T » reach the game.
+    if (
+      plateUp &&
+      intent.kind !== "help" &&
+      intent.kind !== "messages" &&
+      intent.kind !== "rules" &&
+      intent.kind !== "deck"
+    ) {
       return;
     }
     // The key is handled: no native action (a focused card or button is not also activated). It is
@@ -1009,6 +1029,16 @@
       }
       const active = document.activeElement;
       openRules(active instanceof HTMLElement && active !== document.body ? active : null);
+      return;
+    }
+    if (intent.kind === "deck") {
+      // « T » opens the cards of the pack, and closes them from inside the sheet.
+      if (deckShown) {
+        deckShown = false;
+        return;
+      }
+      const active = document.activeElement;
+      openDeck(active instanceof HTMLElement && active !== document.body ? active : null);
       return;
     }
     for (const each of intent.events) {
@@ -1507,6 +1537,10 @@
           ontab={(next) => (rulesTab = next)}
           onclose={() => (rulesShown = false)}
         />
+      {/if}
+
+      {#if deckShown}
+        <DeckSheet {view} opener={deckOpener} onclose={() => (deckShown = false)} />
       {/if}
 
       {#if messagesOpen && online !== undefined && onlineTable !== null && !ended}

@@ -45,17 +45,24 @@ export type KeyContext = {
    * sheet. The game screen still reports `blocked` then, as for any sheet.
    */
   rules?: boolean;
+  /**
+   * « Les cartes du paquet » is the sheet open (quick task 261109-6an): « T » closes it, every other key
+   * is left to the sheet. The game screen still reports `blocked` then, as for any sheet.
+   */
+  deck?: boolean;
 };
 
 /**
- * Reducer events to send, the help sheet (« ? »), the quick messages (« M », online) or the rules
- * (« R », plan 05-04: open, or closed from inside the sheet) to open, or nothing.
+ * Reducer events to send, the help sheet (« ? »), the quick messages (« M », online), the rules
+ * (« R », plan 05-04) or the cards of the pack (« T », quick task 261109-6an) to open (or, for the
+ * last two, closed from inside their sheet), or nothing.
  */
 export type KeyIntent =
   | { kind: "turn"; events: TurnUiEvent[] }
   | { kind: "help" }
   | { kind: "messages" }
   | { kind: "rules" }
+  | { kind: "deck" }
   | null;
 
 /**
@@ -208,11 +215,15 @@ export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
     return null;
   }
   // « R » (the typed letter, wherever the layout puts it) opens « Règles du TOC », whatever the turn;
-  // inside that sheet it closes it. Under any other sheet it does nothing.
+  // inside that sheet it closes it. « T » (talon) does the same for « Les cartes du paquet ». Under
+  // any other sheet they do nothing.
   const rulesKey = input.key === "r" || input.key === "R";
+  const deckKey = input.key === "t" || input.key === "T";
   if (ctx.rules === true) return rulesKey ? { kind: "rules" } : null;
+  if (ctx.deck === true) return deckKey ? { kind: "deck" } : null;
   if (ctx.blocked) return null;
   if (rulesKey) return { kind: "rules" };
+  if (deckKey) return { kind: "deck" };
   // « ? » (typed with Shift on most layouts) opens the help sheet, whatever the turn.
   if (input.key === "?") return { kind: "help" };
   // « M » (the typed letter, wherever the layout puts it) opens the quick messages online, whatever the turn.

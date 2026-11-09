@@ -897,3 +897,55 @@ describe("keyIntent: « R » opens and closes « Règles du TOC » (plan 05-04)"
     expect(keyIntent(r(), context(ACE, modes))).toEqual({ kind: "rules" });
   });
 });
+
+describe("keyIntent: « T » opens and closes « Les cartes du paquet » (quick task 261109-6an)", () => {
+  const t = (extra: Partial<KeyInput> = {}) => press("t", extra);
+
+  it("opens the sheet in every state, upper or lower case, local or online", () => {
+    for (const ui of [
+      { kind: "waiting" } as TurnUiState,
+      reach(QUEEN),
+      reach(ACE, { t: "tapCard", card: "1S" }),
+      ...ROWS.map((row) => row.ui),
+    ]) {
+      expect(keyIntent(t(), context(QUEEN, ui)), ui.kind).toEqual({ kind: "deck" });
+      expect(keyIntent(t(), context(QUEEN, ui, { messages: true })), ui.kind).toEqual({
+        kind: "deck",
+      });
+    }
+    expect(keyIntent(press("T"), context(QUEEN, reach(QUEEN)))).toEqual({ kind: "deck" });
+  });
+
+  it("closes the sheet from inside it, where nothing else reaches the game", () => {
+    const inside = { blocked: true, deck: true };
+    expect(keyIntent(t(), context(QUEEN, reach(QUEEN), inside))).toEqual({ kind: "deck" });
+    expect(keyIntent(press("T"), context(QUEEN, reach(QUEEN), inside))).toEqual({ kind: "deck" });
+    for (const key of ["1", "a", "r", "Enter", "Escape", "?", "m", "p"]) {
+      expect(
+        keyIntent(press(key), context(QUEEN, reach(QUEEN), { ...inside, messages: true })),
+        key,
+      ).toBeNull();
+    }
+  });
+
+  it("does nothing inside the rules, under another sheet, in a field, with a modifier", () => {
+    const idle = reach(QUEEN);
+    expect(keyIntent(press("T"), context(QUEEN, idle, { blocked: true, rules: true }))).toBeNull();
+    expect(keyIntent(t(), context(QUEEN, idle, { blocked: true }))).toBeNull();
+    expect(keyIntent(t(), context(QUEEN, idle, { blocked: true, deck: false }))).toBeNull();
+    expect(keyIntent(t(), context(QUEEN, idle, { focus: { kind: "field" } }))).toBeNull();
+    for (const extra of [
+      { ctrlKey: true },
+      { metaKey: true },
+      { altKey: true },
+      { repeat: true },
+      { isComposing: true },
+    ]) {
+      expect(keyIntent(t(extra), context(QUEEN, idle)), JSON.stringify(extra)).toBeNull();
+      expect(
+        keyIntent(t(extra), context(QUEEN, idle, { blocked: true, deck: true })),
+        `inside ${JSON.stringify(extra)}`,
+      ).toBeNull();
+    }
+  });
+});
