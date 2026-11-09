@@ -898,7 +898,7 @@ describe("keyIntent: « R » opens and closes « Règles du TOC » (plan 05-04)"
   });
 });
 
-describe("keyIntent: « T » opens and closes « Les cartes du paquet » (quick task 261109-6an)", () => {
+describe("keyIntent: « T » opens and closes « Les cartes jouées » (quick tasks 261109-6an, 261109-80e)", () => {
   const t = (extra: Partial<KeyInput> = {}) => press("t", extra);
 
   it("opens the sheet in every state, upper or lower case, local or online", () => {

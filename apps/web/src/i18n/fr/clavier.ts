@@ -38,8 +38,8 @@ export const clavier = {
     { keys: ["?"], action: "Afficher cette aide." },
     /** « Règles du TOC » (plan 05-04); inside the sheet the same key closes it. */
     { keys: ["R"], action: "Ouvrir les règles." },
-    /** « Les cartes du paquet » (quick task 261109-6an); inside the sheet the same key closes it. */
-    { keys: ["T"], action: "Ouvrir les cartes du paquet." },
+    /** « Les cartes jouées » (quick tasks 261109-6an, 261109-80e); inside the sheet the same key closes it. */
+    { keys: ["T"], action: "Ouvrir les cartes jouées." },
     /** In an online game only (plan 02-08); the local game has no messages. */
     { keys: ["M"], action: "Ouvrir les messages rapides.", online: true },
   ] satisfies ShortcutRow[],

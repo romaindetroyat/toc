@@ -4,11 +4,12 @@
   import Icon from "./Icon.svelte";
   import KeyHint from "./KeyHint.svelte";
 
-  // The cards-of-the-pack button (quick task 261109-6an): 44 x 44, `gallery-vertical-end`, named and
-  // titled « Les cartes du paquet ». In a game it stands right after « Règles du jeu » in the
-  // computer's info row (the phone's right strip is full: there the way in is the felt, then « Sur le
-  // tapis »); « T » does the same (aria-keyshortcuts, and the KeyHint « T » on fine pointers only).
-  // It opens « Les cartes du paquet » and gets the focus back when the sheet closes.
+  // The played-cards button (quick task 261109-6an, renamed by 261109-80e): 44 x 44,
+  // `gallery-vertical-end`, named and titled « Cartes jouées ». In a game it stands right after
+  // « Règles du jeu » in the computer's info row (the phone's right strip is full: there the way in is
+  // the défausse pile on the felt, one tap); « T » does the same (aria-keyshortcuts, and the KeyHint
+  // « T » on fine pointers only). It opens « Les cartes jouées » and gets the focus back when the sheet
+  // closes.
   type Props = {
     /** Opens the sheet; the button is its opener. */
     onopen: (opener: HTMLButtonElement) => void;

@@ -7,10 +7,10 @@
   import SeatChip from "./SeatChip.svelte";
   import Sheet from "./Sheet.svelte";
 
-  // « Sur le tapis » (D-08, UI-SPEC « Tapis sheet »): the felt read at a size a phone can show. One row
-  // per seat with its last card in large form, then the counts of the talon and the défausse, and right
-  // under them the button « Les cartes du paquet » (quick task 261109-6an: the way in next to the talon
-  // on every screen, the phone's included). Only public information (T-01-30): the last cards were
+  // « Sur le tapis » (D-08, UI-SPEC « Tapis sheet »): the felt read at a size a phone can show. First
+  // the button « Cartes jouées » (quick task 261109-80e: at the very top, above the fold on a phone;
+  // 261109-6an had it under the counts), then one row per seat with its last card in large form, then
+  // the counts of the talon and the défausse. Only public information (T-01-30): the last cards were
   // played face up, the piles are counted, not shown.
   type Props = {
     render: RenderState;
@@ -19,7 +19,7 @@
     onclose: () => void;
     /** Element that gets the focus back on close. */
     opener?: HTMLElement | null;
-    /** Closes this sheet and opens « Les cartes du paquet »; no button without it. */
+    /** Closes this sheet and opens « Les cartes jouées »; no button without it. */
     ondeck?: () => void;
   };
 
@@ -37,6 +37,11 @@
 
 <Sheet title={game.tapis.title} {onclose} {opener}>
   <div class="tapis" data-tapis>
+    {#if ondeck !== undefined}
+      <button type="button" class="btn btn-secondary deck" data-tapis-deck onclick={ondeck}>
+        {paquet.button}
+      </button>
+    {/if}
     <ul class="seats">
       {#each rows as row (row.color)}
         <li class="seat" data-tapis-seat={row.color}>
@@ -56,11 +61,6 @@
     <p class="count" data-tapis-discard={render.discardSize}>
       {game.tapis.discard(render.discardSize)}
     </p>
-    {#if ondeck !== undefined}
-      <button type="button" class="btn btn-secondary deck" data-tapis-deck onclick={ondeck}>
-        {paquet.button}
-      </button>
-    {/if}
   </div>
 </Sheet>
 

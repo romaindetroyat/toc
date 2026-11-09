@@ -46,7 +46,7 @@ export type KeyContext = {
    */
   rules?: boolean;
   /**
-   * « Les cartes du paquet » is the sheet open (quick task 261109-6an): « T » closes it, every other key
+   * « Les cartes jouées » is the sheet open (quick tasks 261109-6an, 261109-80e): « T » closes it, every other key
    * is left to the sheet. The game screen still reports `blocked` then, as for any sheet.
    */
   deck?: boolean;
@@ -215,7 +215,7 @@ export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
     return null;
   }
   // « R » (the typed letter, wherever the layout puts it) opens « Règles du TOC », whatever the turn;
-  // inside that sheet it closes it. « T » (talon) does the same for « Les cartes du paquet ». Under
+  // inside that sheet it closes it. « T » does the same for « Les cartes jouées ». Under
   // any other sheet they do nothing.
   const rulesKey = input.key === "r" || input.key === "R";
   const deckKey = input.key === "t" || input.key === "T";

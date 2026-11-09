@@ -271,7 +271,8 @@
   /** The last tab opened in this game (memory only); « Les cartes » at first. */
   let rulesTab = $state<RulesTabId>("cartes");
 
-  // --- « Les cartes du paquet » (quick task 261109-6an): « T », the row button, « Sur le tapis » ---
+  // --- « Les cartes jouées » (quick tasks 261109-6an, 261109-80e): the défausse pile on the felt, « T »,
+  // the row button, « Sur le tapis » ---
   /** The sheet is open (set in the same task as the tap or the key, before the sheet mounts). */
   let deckShown = $state(false);
   let deckOpener = $state.raw<HTMLElement | null>(null);
@@ -279,7 +280,7 @@
   /**
    * The computer players wait while the invitation shows (« Conséquence de mise en œuvre, à confirmer
    * par Romain »), and in a solo game or a lesson while a rules sheet is open (plan 05-04: this
-   * screen's own, or one opened from « Réglages ») or « Les cartes du paquet » is (quick task
+   * screen's own, or one opened from « Réglages ») or « Les cartes jouées » is (quick task
    * 261109-6an); online the game goes on: the session's idle awaits this hold, which resolves once
    * the screen is back in landscape and those sheets are closed. Every pending hold is released
    * then, and on destroy, so a disposed game's loop ends.
@@ -645,7 +646,7 @@
     rulesShown = true;
   }
 
-  /** Opens « Les cartes du paquet »; `opener` gets the focus back. */
+  /** Opens « Les cartes jouées »; `opener` gets the focus back. */
   function openDeck(opener: HTMLElement | null) {
     deckOpener = opener;
     deckShown = true;
@@ -1342,6 +1343,7 @@
             thinking={session.thinking}
             markers={lessonData === undefined}
             ontapis={() => (tapisOpen = true)}
+            ondefausse={openDeck}
           >
             {#snippet badges()}
               {#if onlineTable !== null}
@@ -1523,7 +1525,7 @@
           onclose={() => (tapisOpen = false)}
           ondeck={() => {
             // In the same task: « Sur le tapis » closes, the new sheet takes the focus, and the felt
-            // gets it back when « Les cartes du paquet » closes.
+            // gets it back when « Les cartes jouées » closes.
             tapisOpen = false;
             openDeck(stageEl?.querySelector<HTMLElement>("[data-felt-button]") ?? null);
           }}

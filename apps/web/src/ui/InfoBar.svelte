@@ -58,8 +58,8 @@
      */
     onrules?: (opener: HTMLElement) => void;
     /**
-     * A game (quick task 261109-6an): « Les cartes du paquet », right after « Règles du jeu » on the
-     * column form's fourth row; opens the sheet of the cards not seen yet in this pack.
+     * A game (quick task 261109-6an): « Cartes jouées », right after « Règles du jeu » on the column
+     * form's fourth row; opens the sheet of the cards already played in this pack (261109-80e).
      */
     ondeck?: (opener: HTMLElement) => void;
     /**
@@ -293,7 +293,7 @@
     {/if}
 
     {#if form === "column" && gear && (players !== undefined || onrules !== undefined || ondeck !== undefined)}
-      <!-- The computer's fourth row: « Règles du jeu » (plan 05-04), « Les cartes du paquet » (quick
+      <!-- The computer's fourth row: « Règles du jeu » (plan 05-04), « Cartes jouées » (quick
            task 261109-6an), « À la table » (plan 02-06), then « Messages » (plan 02-08); in solo the
            first two alone. -->
       <div class="table-row" data-table-row-buttons>

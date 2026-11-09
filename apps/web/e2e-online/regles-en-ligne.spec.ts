@@ -41,14 +41,14 @@ test("en ligne, la partie continue derrière les règles et la feuille dit « C�
   await expect(zone(page)).toHaveAttribute("data-state", "idle", { timeout: 20_000 });
 
   // The book is there online too: in the strip under the gear, or first in the computer's row,
-  // then « Les cartes du paquet » (quick task 261109-6an), « À la table » and « Messages ».
+  // then « Cartes jouées » (quick tasks 261109-6an, 261109-80e), « À la table » and « Messages ».
   await expect(book(page)).toBeVisible();
   if (!isMobile) {
     const row = await page
       .locator("[data-table-row-buttons] button")
       .evaluateAll((all) => all.map((each) => each.getAttribute("aria-label")));
     expect(row[0]).toBe("Règles du jeu");
-    expect(row[1]).toBe("Les cartes du paquet");
+    expect(row[1]).toBe("Cartes jouées");
     expect(row.length).toBe(4);
   }
 
