@@ -34,11 +34,11 @@ export const accueil = {
      */
     links: {
       // Plan 05-10 (WCAG 2.5.3 « Label in Name »): each tile's accessible name is its two visible
-      // lines in order, « Règles : les cartes, le 7, la maison ».
+      // lines in order, « Règles : cartes, 7, maison ».
       rules: {
         label: "Règles",
         sub: "Cartes, 7, maison",
-        name: "Règles : les cartes, le 7, la maison",
+        name: "Règles : cartes, 7, maison",
       },
       learn: {
         label: "Apprendre",
