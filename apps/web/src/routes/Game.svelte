@@ -1291,6 +1291,7 @@
               : undefined}
             onmessages={online !== undefined ? openMessages : undefined}
             onrules={openRules}
+            ondeck={openDeck}
             lesson={lessonPill}
           />
         </div>
@@ -1516,7 +1517,17 @@
       {/if}
 
       {#if tapisOpen}
-        <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
+        <TapisSheet
+          {render}
+          names={session.names}
+          onclose={() => (tapisOpen = false)}
+          ondeck={() => {
+            // In the same task: « Sur le tapis » closes, the new sheet takes the focus, and the felt
+            // gets it back when « Les cartes du paquet » closes.
+            tapisOpen = false;
+            openDeck(stageEl?.querySelector<HTMLElement>("[data-felt-button]") ?? null);
+          }}
+        />
       {/if}
 
       {#if shortcutsOpen}

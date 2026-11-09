@@ -9,6 +9,7 @@
   import SeatChip from "./SeatChip.svelte";
   import SettingsButton from "./SettingsButton.svelte";
   import Icon from "./Icon.svelte";
+  import DeckButton from "./DeckButton.svelte";
   import MessagesButton from "./MessagesButton.svelte";
   import RulesButton from "./RulesButton.svelte";
   import Sheet from "./Sheet.svelte";
@@ -57,6 +58,11 @@
      */
     onrules?: (opener: HTMLElement) => void;
     /**
+     * A game (quick task 261109-6an): « Les cartes du paquet », right after « Règles du jeu » on the
+     * column form's fourth row; opens the sheet of the cards not seen yet in this pack.
+     */
+    ondeck?: (opener: HTMLElement) => void;
+    /**
      * A lesson (plan 05-06): the lesson pill « Leçon {n} sur 8 » in place of the info pill (phone) and
      * of the turn line (computer); a tap opens « Les leçons » (`onopen`). No team pills, no dealer,
      * deal or first-player line, no score: a lesson is not a game.
@@ -80,6 +86,7 @@
     onmessages,
     tableSpeed,
     onrules,
+    ondeck,
     lesson,
     onquitlessons,
   }: Props = $props();
@@ -285,12 +292,16 @@
       </div>
     {/if}
 
-    {#if form === "column" && gear && (players !== undefined || onrules !== undefined)}
-      <!-- The computer's fourth row: « Règles du jeu » (plan 05-04), « À la table » (plan 02-06),
-           then « Messages » (plan 02-08); in solo the book alone. -->
+    {#if form === "column" && gear && (players !== undefined || onrules !== undefined || ondeck !== undefined)}
+      <!-- The computer's fourth row: « Règles du jeu » (plan 05-04), « Les cartes du paquet » (quick
+           task 261109-6an), « À la table » (plan 02-06), then « Messages » (plan 02-08); in solo the
+           first two alone. -->
       <div class="table-row" data-table-row-buttons>
         {#if onrules !== undefined}
           <RulesButton onopen={onrules} />
+        {/if}
+        {#if ondeck !== undefined}
+          <DeckButton onopen={ondeck} />
         {/if}
         {#if players !== undefined}
           <button

@@ -833,6 +833,30 @@ export const ICONS = {
       },
     },
   ],
+  "gallery-vertical-end": [
+    {
+      tag: "path",
+      attrs: {
+        d: "M7 2h10",
+      },
+    },
+    {
+      tag: "path",
+      attrs: {
+        d: "M5 6h14",
+      },
+    },
+    {
+      tag: "rect",
+      attrs: {
+        width: "18",
+        height: "12",
+        x: "3",
+        y: "10",
+        rx: "2",
+      },
+    },
+  ],
 } as const;
 
 export type IconName = keyof typeof ICONS;

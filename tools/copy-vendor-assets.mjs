@@ -31,7 +31,8 @@ const SUBSETS = ["latin", "latin-ext"];
  * log-in, key-round, handshake for the small tiles and « Se connecter »; plan 04-10: log-out, bell,
  * bell-off for « Mon compte », link, user-plus for « Mes amis »), then the five of 05-UI-SPEC, all
  * added by plan 05-04 so the later plans of phase 5 touch neither file: book-open (« Règles »),
- * graduation-cap (« Apprendre »), trophy (« Mes résultats »), history and chart-column (its tabs).
+ * graduation-cap (« Apprendre »), trophy (« Mes résultats »), history and chart-column (its tabs);
+ * then gallery-vertical-end, added by quick task 261109-6an for « Les cartes du paquet ».
  */
 const ICON_NAMES = [
   "settings",
@@ -71,6 +72,7 @@ const ICON_NAMES = [
   "trophy",
   "history",
   "chart-column",
+  "gallery-vertical-end",
 ];
 
 /**
