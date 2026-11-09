@@ -4,32 +4,13 @@
 // up, the public sizes of every hand and of the talon, and the card he passed to his partner at this
 // deal's exchange (PlayerView.givenToPartner): while the partner has not played it, it is known to be
 // in the partner's hand, and it is not part of the unknown pool.
-// Card ids are unique (52 cards), so the pool is the full deck minus every card the seat has seen.
-// Pure, no I/O, erasable syntax only.
+// The pool itself is the engine's (unknownCards and partnerHolds of @toc/engine, quick task
+// 261109-6an), re-exported here: the sheet « Les cartes du paquet » counts the same pool rank by rank,
+// so a human and a computer player see the same thing. Pure, no I/O, erasable syntax only.
 
-import { type CardId, COLORS, type Color, FULL_DECK, PARTNER, type PlayerView } from "@toc/engine";
+import { COLORS, type Color, PARTNER, type PlayerView, partnerHolds } from "@toc/engine";
 
-/**
- * The card the seat passed to its partner when the partner still holds it: givenToPartner once the
- * gives have crossed, unless it was played or laid down since. null otherwise (and during the exchange,
- * where the chosen card is still in the seat's own hand).
- */
-export function partnerHolds(view: PlayerView): CardId | null {
-  const card = view.givenToPartner;
-  if (card === null || view.hand.includes(card) || view.discard.includes(card)) return null;
-  for (const color of COLORS) if (view.posed[color].includes(card)) return null;
-  return card;
-}
-
-/** The cards hidden from the seat of `view`: in the other hands or in the talon, in deck order. */
-export function unknownCards(view: PlayerView): CardId[] {
-  const seen = new Set<CardId>(view.hand);
-  for (const card of view.discard) seen.add(card);
-  for (const color of COLORS) for (const card of view.posed[color]) seen.add(card);
-  const passed = partnerHolds(view);
-  if (passed !== null) seen.add(passed);
-  return FULL_DECK.filter((card) => !seen.has(card));
-}
+export { partnerHolds, unknownCards } from "@toc/engine";
 
 /**
  * How many unknown cards each seat holds (0 for the viewer, one less for the partner while it holds the
