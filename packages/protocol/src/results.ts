@@ -1,0 +1,243 @@
+// « Mes résultats » (plan 05-01, HIST-02, D-01 to D-04, D-12; 05-RESEARCH Pattern 4): the answer of
+// GET /api/me/results, shared by the Worker (what it builds) and the page (what it accepts, untrusted).
+// A seat is the caller's (me), another account's (by its pseudo), a guest's (by the first name typed
+// at the table) or a computer's (by its level): never an account id, a `who`, a token or a card.
+// Plan 05-05: the answers of GET /api/me/stats (« Mes chiffres ») and GET /api/me/ranking (the friends
+// ranking), and the body of POST /api/me/results/solo (a solo game the browser reports, client-claimed).
+// Pure, no I/O.
+
+import { COLORS } from "@toc/engine";
+import * as z from "zod/mini";
+
+/** The games of one page of the history (the next page starts after the last one). */
+export const HISTORY_PAGE_SIZE = 20;
+
+/**
+ * The cursor of the next page: the last game's end time and its id, « <ended_at>:<game_id> ». A game
+ * id is a table hash and a game number (online), or « solo:<user_id>:<uuid> » (solo, plan 05-05).
+ */
+export const HISTORY_CURSOR_RE = /^(\d{1,16}):([A-Za-z0-9_-]{1,64}(?::[A-Za-z0-9_-]{1,64}){1,2})$/;
+
+const level = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
+const team = z.enum(["bleu-rouge", "jaune-vert"]);
+const count = z.number().check(z.int(), z.gte(0), z.lte(64));
+const time = z.number().check(z.int(), z.gte(0));
+
+const historySeat = z.strictObject({
+  colour: z.enum(COLORS),
+  /** me: the caller's seat; account: another account (its pseudo); guest: no account; bot: a computer. */
+  kind: z.enum(["me", "account", "guest", "bot"]),
+  /** The pseudo, the guest's first name or the horse name (the page shows a computer by its level). */
+  name: z.string().check(z.maxLength(40)),
+  /** A computer's level, or the level a person's seat was handed over at; else null. */
+  level: z.nullable(level),
+  /** The computer finished this person's seat. */
+  handedOver: z.boolean(),
+  captured: count,
+  lost: count,
+  home: z.number().check(z.int(), z.gte(0), z.lte(4)),
+});
+
+export type HistorySeat = z.infer<typeof historySeat>;
+
+const historyGame = z.strictObject({
+  id: z.string().check(z.maxLength(200)),
+  kind: z.enum(["online", "solo"]),
+  startedAt: time,
+  endedAt: time,
+  winner: team,
+  /** The caller's colour in that game. */
+  mine: z.enum(COLORS),
+  /** The four seats, in the order bleu, jaune, rouge, vert. */
+  seats: z.tuple([historySeat, historySeat, historySeat, historySeat]),
+  deals: z.number().check(z.int(), z.gte(0)),
+  /** Online: the table creator's shown name. */
+  creator: z.nullable(z.string().check(z.maxLength(40))),
+  /** The game counts in the friends ranking (online, two accounts or more, D-02, D-13). */
+  ranked: z.boolean(),
+});
+
+export type HistoryGame = z.infer<typeof historyGame>;
+
+const historyPage = z.strictObject({
+  games: z.array(historyGame).check(z.maxLength(HISTORY_PAGE_SIZE)),
+  /** The cursor of the next page (the `before` query), or null when there is no older game. */
+  next: z.nullable(z.string().check(z.regex(HISTORY_CURSOR_RE))),
+});
+
+/** GET /api/me/results: one page of the signed-in player's finished games, newest first. */
+export type HistoryPage = z.infer<typeof historyPage>;
+
+/** The page's untrusted answer as a HistoryPage, or null when it is out of shape. */
+export function parseHistoryPage(data: unknown): HistoryPage | null {
+  const parsed = historyPage.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The schema itself, for the Worker's own checks in the tests. */
+export const HistoryPage = historyPage;
+
+// --- « Mes chiffres » (plan 05-05, HIST-03; 05-UI-SPEC Panel 2) ---
+
+const total = z.number().check(z.int(), z.gte(0));
+
+/**
+ * One partner of the player's games: another account (by its pseudo), all the guests together
+ * (« Joueurs sans compte », name null), or the computers of one level (name null). Never an id.
+ */
+const statsPartner = z
+  .strictObject({
+    kind: z.enum(["account", "guests", "bot"]),
+    name: z.nullable(z.string().check(z.maxLength(40))),
+    level: z.nullable(level),
+    games: total,
+    wins: total,
+  })
+  .check(z.refine((partner) => partner.wins <= partner.games));
+
+/** The games against two computers, under the stronger one's level. */
+const statsLevel = z
+  .strictObject({ level, games: total, wins: total })
+  .check(z.refine((entry) => entry.wins <= entry.games));
+
+const statsBlock = z
+  .strictObject({
+    games: total,
+    wins: total,
+    /** Knights the player's seat ate. */
+    captured: total,
+    /** The player's knights eaten. */
+    lost: total,
+    /** The player's knights brought home. */
+    home: total,
+    /** Most games first, then accounts by pseudo, the guests, the computers by level. */
+    partners: z.array(statsPartner),
+    /** In level order. */
+    levels: z.array(statsLevel).check(z.maxLength(5)),
+  })
+  .check(z.refine((block) => block.wins <= block.games));
+
+export type StatsBlock = z.infer<typeof statsBlock>;
+
+const statsAnswer = z.strictObject({
+  /** « Toutes »: every counted game. */
+  all: statsBlock,
+  /** « En ligne ». */
+  online: statsBlock,
+  /** « Contre l’ordinateur »: the solo games the browser reported (D-01). */
+  solo: statsBlock,
+});
+
+/** GET /api/me/stats: the signed-in player's figures for the three filters at once. */
+export type StatsAnswer = z.infer<typeof statsAnswer>;
+
+/** The schema itself, for the Worker's own checks in the tests. */
+export const StatsAnswer = statsAnswer;
+
+/** The page's untrusted answer as a StatsAnswer, or null when it is out of shape. */
+export function parseStatsAnswer(data: unknown): StatsAnswer | null {
+  const parsed = statsAnswer.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+// --- The friends ranking (plan 05-05, HIST-04, D-02, D-13; 05-UI-SPEC Panel 3) ---
+
+/** Ranked games a player needs to enter the ranking (D-13). */
+export const RANKING_THRESHOLD = 5;
+
+const pseudoText = z.string().check(z.maxLength(40));
+
+const rankedRow = z
+  .strictObject({
+    /** Competition rank: tied players share it, the next skips (« 1, 2, 2, 4 »). */
+    rank: z.number().check(z.int(), z.gte(1)),
+    pseudo: pseudoText,
+    games: total,
+    wins: total,
+    /** The signed-in player's own row. */
+    me: z.boolean(),
+  })
+  .check(z.refine((row) => row.games >= RANKING_THRESHOLD && row.wins <= row.games));
+
+const unrankedRow = z
+  .strictObject({ pseudo: pseudoText, games: total, me: z.boolean() })
+  .check(z.refine((row) => row.games < RANKING_THRESHOLD));
+
+const rankingAnswer = z.strictObject({
+  /** The signed-in player's friends (the circle is them and the player). */
+  friends: total,
+  /** Win rate, then wins, then games, then pseudo. */
+  ranked: z.array(rankedRow),
+  /** Fewer than RANKING_THRESHOLD ranked games: by games, then pseudo (« n sur 5 »). */
+  unranked: z.array(unrankedRow),
+});
+
+/** GET /api/me/ranking: the signed-in player and their friends, by their ranked games. */
+export type RankingAnswer = z.infer<typeof rankingAnswer>;
+
+/** The schema itself, for the Worker's own checks in the tests. */
+export const RankingAnswer = rankingAnswer;
+
+/** The page's untrusted answer as a RankingAnswer, or null when it is out of shape. */
+export function parseRankingAnswer(data: unknown): RankingAnswer | null {
+  const parsed = rankingAnswer.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+// --- The solo report (plan 05-05, D-01; 05-RESEARCH Pattern 2) ---
+
+/** The report's own id, made by the browser at the start of the game (crypto.randomUUID()). */
+export const SOLO_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Loose bounds only: the Worker's plausibility check (results.ts) has the game's own limits.
+const reported = z.number().check(z.int(), z.gte(0), z.lte(100_000));
+const instant = z.number().check(z.int(), z.gte(0), z.lte(Number.MAX_SAFE_INTEGER));
+
+const soloSeat = z.strictObject({
+  /** Knights this seat ate. */
+  captured: reported,
+  /** This seat's knights eaten. */
+  lost: reported,
+  /** This seat's knights home at the end. */
+  home: z.number().check(z.int(), z.gte(0), z.lte(4)),
+});
+
+const soloReport = z
+  .strictObject({
+    id: z.string().check(z.regex(SOLO_ID_RE)),
+    startedAt: instant,
+    endedAt: instant,
+    /** The player's colour; the three others are computers. */
+    human: z.enum(COLORS),
+    winner: team,
+    deals: reported,
+    /** The level of each computer: exactly the three colours other than the player's. */
+    levels: z.strictObject({
+      bleu: z.optional(level),
+      jaune: z.optional(level),
+      rouge: z.optional(level),
+      vert: z.optional(level),
+    }),
+    seats: z.strictObject({ bleu: soloSeat, jaune: soloSeat, rouge: soloSeat, vert: soloSeat }),
+  })
+  .check(
+    z.refine((body) =>
+      COLORS.every((colour) => (colour === body.human) === (body.levels[colour] === undefined)),
+    ),
+  );
+
+/**
+ * POST /api/me/results/solo: a solo game that ended while signed in, as the browser reports it
+ * (client-claimed: the server stores it for the player's own figures only, never the ranking). No
+ * name: the player is the session's account, the computers are their levels.
+ */
+export type SoloReport = z.infer<typeof soloReport>;
+
+/** The schema itself: the Worker's readJson checks the body against it. */
+export const SoloReport = soloReport;
+
+/** An untrusted body as a SoloReport, or null when it is out of shape. */
+export function parseSoloReport(data: unknown): SoloReport | null {
+  const parsed = soloReport.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}

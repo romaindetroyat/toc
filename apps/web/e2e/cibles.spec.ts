@@ -125,13 +125,44 @@ for (const viewport of VIEWPORTS) {
       expect(await expectTargets("tray chip", page.locator("[data-tray-option]"))).toBe(2);
       await page.locator('[data-tray-option="bleu1"]').click();
       expect(await expectTargets("step chip", page.locator("[data-step]"))).toBe(7);
-      for (const label of ["Retirer le dernier pas", "Tout annuler", "Jouer"]) {
+      for (const label of ["Retirer le dernier pas", "Tout effacer", "Jouer"]) {
         await expectTargets(label, page.getByRole("button", { name: label, exact: true }));
       }
       await page.getByRole("button", { name: "3 pas" }).click();
       expect(await expectTargets("step chip", page.locator("[data-step]"))).toBe(4);
       await expectAllButtons(page);
       await page.getByRole("button", { name: "Retirer le dernier pas" }).isEnabled();
+    });
+
+    // Plan 05-10: the phase's new game controls, the book « Règles du jeu », the guide's « Suivant »
+    // and the lesson pill.
+    test("le livre des règles, « Suivant » du guide et la pastille de la leçon", async ({
+      page,
+    }) => {
+      await openPosition(page, {
+        turn: "bleu",
+        pawns: { bleu: [{ p: 5 }, "S", "S", "S"] },
+        hands: { bleu: ["3S"] },
+      });
+      expect(await expectTargets("book", page.getByRole("button", { name: "Règles du jeu" }))).toBe(
+        1,
+      );
+      await page.goto("/");
+      await page.goto("/#/apprendre/1?vitesse=test");
+      await expect(page.locator("[data-board]")).toHaveClass(/loaded/);
+      expect(await expectTargets("Suivant", page.getByRole("button", { name: /^Suivant/ }))).toBe(
+        1,
+      );
+      expect(
+        await expectTargets(
+          "lesson pill",
+          page.getByRole("button", { name: /^Leçon \d sur 8 : / }),
+        ),
+      ).toBe(1);
+      expect(await expectTargets("book", page.getByRole("button", { name: "Règles du jeu" }))).toBe(
+        1,
+      );
+      await expectAllButtons(page);
     });
 
     test("la main morte : « Poser mes cartes »", async ({ page }) => {

@@ -8,6 +8,7 @@
 // pictures); the game renders the same data as Svelte markup.
 
 import { COLORS, type Color, EXIT, type PawnIndex } from "@toc/engine";
+import { type MarkShape, markPath, SEAT_MARKS } from "./marks.ts";
 import {
   boardOutline,
   bottomOf,
@@ -18,6 +19,8 @@ import {
   riderBox,
   ringPolyline,
   SCENE,
+  type ScreenSide,
+  sceneSideOf,
   sceneXY,
 } from "./scene.ts";
 
@@ -38,7 +41,8 @@ export type ArtRole =
   | "cell"
   | "exit"
   | "entry"
-  | "label";
+  | "label"
+  | "stable-mark";
 
 /** translate, then rotate (degrees), then scale: the SVG order. */
 export type ArtTransform = { translate?: Point; rotate?: number; scale?: number };
@@ -72,6 +76,8 @@ type Common = {
   cell?: number;
   /** The colour a shape belongs to, where it applies. */
   color?: Color;
+  /** The seat's shape a stable mark shows (plan 05-02). */
+  mark?: MarkShape;
   /** A secondary stroke or a shadow of the same object: not counted as an object. */
   detail?: true;
   fill?: string;
@@ -172,6 +178,47 @@ function crescent(x: number, y: number, r: number, dy: number): string {
     `M${n(x - half)} ${n(ym)} A${n(r)} ${n(r)} 0 0 0 ${n(x + half)} ${n(ym)} ` +
     `A${n(r)} ${n(r)} 0 0 1 ${n(x - half)} ${n(ym)} Z`
   );
+}
+
+/**
+ * The stable marks (plan 05-02, APP-05, D-14): a cream disc of 0.9 step ringed in ink, the seat's
+ * shape of 0.6 step in the seat's colour, beside each stable. The line is in scene units.
+ */
+export const STABLE_MARK = { disc: 0.9, glyph: 0.6, line: 1.5 } as const;
+
+/**
+ * Where each side's stable mark stands, in its seat frame (ta along the direction of travel, na
+ * toward the centre, in steps, as the stable dots at ta 2.4 / 3.5 and na 2.0 / 3.1). The drawing never
+ * turns, so the place depends on the side only. Found by moving the disc along the wood until it
+ * cleared everything by at least 0.1 step at every turn of the board (stableMarks.test.ts), the
+ * nearest margins being:
+ * - bottom and top: past the stable's far end, level with its middle (ta 4.9, na 2.55), between the
+ *   stable and the rider: 0.45 step;
+ * - left: below the stable on its outer side, toward the board's middle line (ta 0.8, na 1.6): 0.53;
+ * - right: above the stable on its outer side (ta 0.15, na 1.6), a little farther than on the left
+ *   because the stable's knights stand upright and their heads reach toward it: 0.54.
+ * Each one is farther from the felt than its stable (« on the side away from the felt »).
+ */
+const STABLE_MARK_FRAME: Record<ScreenSide, readonly [number, number]> = {
+  bottom: [4.9, 2.55],
+  top: [4.9, 2.55],
+  left: [0.8, 1.6],
+  right: [0.15, 1.6],
+};
+
+/** The centre of the stable mark of `color` for the board turned for seat k (scene units). */
+export function stableMarkAt(color: Color, k: number): Point {
+  // The seat frame, from the stable dots: slot 0 at (2.4, 2.0), slot 1 at (3.5, 2.0), slot 2 at (2.4, 3.1).
+  const d0 = sceneXY({ z: "stable", color, slot: 0 }, k);
+  const d1 = sceneXY({ z: "stable", color, slot: 1 }, k);
+  const d2 = sceneXY({ z: "stable", color, slot: 2 }, k);
+  const t: Point = [(d1[0] - d0[0]) / 1.1, (d1[1] - d0[1]) / 1.1];
+  const n: Point = [(d2[0] - d0[0]) / 1.1, (d2[1] - d0[1]) / 1.1];
+  const [ta, na] = STABLE_MARK_FRAME[sceneSideOf(color, k)];
+  return [
+    d0[0] + t[0] * (ta - 2.4) + n[0] * (na - 2.0),
+    d0[1] + t[1] * (ta - 2.4) + n[1] * (na - 2.0),
+  ];
 }
 
 /** The galet drawing for seat k, in the mock-up's painting order. */
@@ -375,6 +422,36 @@ export function boardArt(k: number): Art {
     }
   }
 
+  // The stable marks (plan 05-02): the board's key, always drawn, on bare wood beside each stable.
+  for (const c of seats) {
+    const [x, y] = stableMarkAt(c, k);
+    const line = STABLE_MARK.line;
+    shapes.push({
+      kind: "circle",
+      role: "stable-mark",
+      color: c,
+      mark: SEAT_MARKS[c],
+      cx: x,
+      cy: y,
+      r: (STABLE_MARK.disc * s) / 2 - line / 2,
+      fill: PALETTE.cream,
+      stroke: PALETTE.ink,
+      strokeWidth: line,
+    });
+    shapes.push({
+      kind: "path",
+      role: "stable-mark",
+      color: c,
+      mark: SEAT_MARKS[c],
+      detail: true,
+      d: markPath(SEAT_MARKS[c], x, y, (STABLE_MARK.glyph * s) / 2),
+      fill: PALETTE.hex[c],
+      stroke: PALETTE.ink,
+      strokeWidth: line,
+      linejoin: "round",
+    });
+  }
+
   // The 72 cells and their handwritten numbers, each cell over its drop shadow.
   for (let cell = 0; cell < 72; cell++) {
     const [x, y] = sceneXY({ z: "ring", cell }, k);
@@ -542,7 +619,31 @@ function transformAttr(t: ArtTransform): string {
   return parts.join(" ");
 }
 
-const DEF_ID = /^toc-[a-z0-9-]+$/;
+/** A def id: « toc- » after an optional prefix of prefixArt. */
+const DEF_ID = /^([a-z][a-z0-9-]*)?toc-[a-z0-9-]+$/;
+const PREFIX = /^([a-z][a-z0-9-]*)?$/;
+
+/**
+ * The same drawing with every def id and every reference to it prefixed, so several boards can share
+ * a page without duplicate ids (05-RESEARCH Pitfall 10: the rule figures of 05-04). An empty prefix
+ * returns the drawing as it is: the game board's ids stay « toc- ».
+ */
+export function prefixArt(art: Art, prefix: string): Art {
+  if (!PREFIX.test(prefix)) throw new Error(`prefixArt: bad prefix ${JSON.stringify(prefix)}`);
+  if (prefix === "") return art;
+  const id = (ref: string | undefined) => (ref === undefined ? undefined : `${prefix}${ref}`);
+  return {
+    ...art,
+    defs: art.defs.map((def) => ({ ...def, id: `${prefix}${def.id}` })),
+    shapes: art.shapes.map((shape) => {
+      const out: ArtShape = { ...shape };
+      if (shape.fillDef !== undefined) out.fillDef = id(shape.fillDef);
+      if (shape.filter !== undefined) out.filter = id(shape.filter);
+      if (shape.clip !== undefined) out.clip = id(shape.clip);
+      return out;
+    }),
+  };
+}
 
 export type ArtSvgOptions = {
   width: number;

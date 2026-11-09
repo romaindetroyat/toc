@@ -40,13 +40,29 @@ export type KeyContext = {
   blocked: boolean;
   /** An online game: « M » opens « Messages rapides » (plan 02-08); absent or false in the local game. */
   messages?: boolean;
+  /**
+   * « Règles du TOC » is the sheet open (plan 05-04): « R » closes it, every other key is left to the
+   * sheet. The game screen still reports `blocked` then, as for any sheet.
+   */
+  rules?: boolean;
+  /**
+   * « Les cartes jouées » is the sheet open (quick tasks 261109-6an, 261109-80e): « T » closes it, every other key
+   * is left to the sheet. The game screen still reports `blocked` then, as for any sheet.
+   */
+  deck?: boolean;
 };
 
-/** Reducer events to send, the help sheet (« ? ») or the quick messages (« M », online) to open, or nothing. */
+/**
+ * Reducer events to send, the help sheet (« ? »), the quick messages (« M », online), the rules
+ * (« R », plan 05-04) or the cards of the pack (« T », quick task 261109-6an) to open (or, for the
+ * last two, closed from inside their sheet), or nothing.
+ */
 export type KeyIntent =
   | { kind: "turn"; events: TurnUiEvent[] }
   | { kind: "help" }
   | { kind: "messages" }
+  | { kind: "rules" }
+  | { kind: "deck" }
   | null;
 
 /**
@@ -194,10 +210,20 @@ function knightIntent(letter: string, ctx: KeyContext): KeyIntent {
 
 /** What a key press means on the game screen, or null when it means nothing there. */
 export function keyIntent(input: KeyInput, ctx: KeyContext): KeyIntent {
-  if (ctx.blocked || ctx.focus.kind === "field") return null;
+  if (ctx.focus.kind === "field") return null;
   if (input.ctrlKey || input.metaKey || input.altKey || input.repeat || input.isComposing) {
     return null;
   }
+  // « R » (the typed letter, wherever the layout puts it) opens « Règles du TOC », whatever the turn;
+  // inside that sheet it closes it. « T » does the same for « Les cartes jouées ». Under
+  // any other sheet they do nothing.
+  const rulesKey = input.key === "r" || input.key === "R";
+  const deckKey = input.key === "t" || input.key === "T";
+  if (ctx.rules === true) return rulesKey ? { kind: "rules" } : null;
+  if (ctx.deck === true) return deckKey ? { kind: "deck" } : null;
+  if (ctx.blocked) return null;
+  if (rulesKey) return { kind: "rules" };
+  if (deckKey) return { kind: "deck" };
   // « ? » (typed with Shift on most layouts) opens the help sheet, whatever the turn.
   if (input.key === "?") return { kind: "help" };
   // « M » (the typed letter, wherever the layout puts it) opens the quick messages online, whatever the turn.

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import type { TableSummary } from "@toc/protocol";
-  import { onMount } from "svelte";
+  import type { AccountTable, TableSummary } from "@toc/protocol";
+  import { untrack } from "svelte";
+  import { forgetMyTable, myTables } from "../account/api.ts";
+  import { account } from "../account/store.svelte.ts";
   import { accueil } from "../i18n/fr/accueil.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { table as copy } from "../i18n/fr/table.ts";
@@ -9,11 +11,13 @@
   import {
     forgetTable,
     loadTables,
+    mergeTables,
     restoreTable,
     rowStatus,
     rowText,
     type TableEntry,
     timeAgo,
+    visibleTables,
   } from "../net/tables.ts";
   import Icon from "./Icon.svelte";
   import SeatChip from "./SeatChip.svelte";
@@ -25,6 +29,10 @@
   // server no longer knows (404) leaves the list, with one « effacée » toast for all of them. A paused
   // table waiting for this device's seat reads « En pause : on t’attend » (plan 02-07); a saved one
   // « Sauvegardée », and its row opens the saved plate.
+  // Plan 04-09 (ACCT-02, D-12; 04-UI-SPEC « Mes parties en cours »): signed in, the device's list is
+  // merged with the account's tables from other devices (GET /api/me/tables, at start and after each
+  // sign-in); signed out, the rows tagged with an account hide (they stay on the device and come back
+  // at the next sign-in). A table gone (404) also leaves the account's list (DELETE /api/me/tables).
   type Props = { storage: StorageLike | null };
 
   let { storage }: Props = $props();
@@ -32,17 +40,30 @@
   type Check = "checking" | "unknown" | TableSummary;
 
   // svelte-ignore state_referenced_locally
-  let entries = $state.raw<TableEntry[]>(loadTables(storage));
+  let device = $state.raw<TableEntry[]>(loadTables(storage));
+  let remote = $state.raw<AccountTable[]>([]);
   let checks = $state.raw<Record<string, Check>>({});
   let now = $state(Date.now());
 
-  async function refresh() {
-    const list = loadTables(storage);
-    entries = list;
+  const accountId = $derived(account.current?.id ?? null);
+  const entries = $derived(
+    accountId === null ? visibleTables(device, null) : mergeTables(device, remote, accountId),
+  );
+
+  async function refresh(signedIn: string | null) {
+    device = loadTables(storage);
+    remote = [];
     if (!browserApi.online()) {
-      checks = Object.fromEntries(list.map((entry) => [entry.id, "unknown" as const]));
+      checks = Object.fromEntries(entries.map((entry) => [entry.id, "unknown" as const]));
       return;
     }
+    if (signedIn !== null) {
+      const listed = await myTables();
+      // The account changed meanwhile (signed out, another account): this answer is not its own.
+      if (accountId !== signedIn) return;
+      remote = listed ?? [];
+    }
+    const list = entries;
     checks = Object.fromEntries(list.map((entry) => [entry.id, "checking" as const]));
     let gone = 0;
     await Promise.all(
@@ -51,7 +72,9 @@
         if (result === "gone") {
           gone++;
           forgetTable(storage, entry.id);
-          entries = entries.filter((each) => each.id !== entry.id);
+          if (entry.account !== undefined) void forgetMyTable(entry.id);
+          device = device.filter((each) => each.id !== entry.id);
+          remote = remote.filter((row) => row.tableId !== entry.id);
           return;
         }
         now = Date.now();
@@ -61,8 +84,11 @@
     if (gone > 0) showToast(copy.list.expired(gone));
   }
 
-  onMount(() => {
-    void refresh();
+  // At start, and again whenever the account changes (a sign-in brings its tables, a sign-out hides
+  // them).
+  $effect(() => {
+    const id = accountId;
+    untrack(() => void refresh(id));
   });
 
   /** Last activity first; a row not checked yet keeps its join date. */
@@ -90,12 +116,18 @@
 
   function remove(entry: TableEntry) {
     const removed = forgetTable(storage, entry.id);
-    entries = loadTables(storage);
-    if (removed === null) return;
+    const index = removed?.index ?? 0;
+    device = loadTables(storage);
+    // A row of the account leaves the account's list too (every device forgets it); « Remettre »
+    // puts it back on this device, tagged with the account.
+    if (entry.account !== undefined) {
+      remote = remote.filter((row) => row.tableId !== entry.id);
+      void forgetMyTable(entry.id);
+    }
     showToast(copy.list.removed, {
       label: copy.list.restore,
       run: () => {
-        entries = restoreTable(storage, removed.entry, removed.index);
+        device = restoreTable(storage, removed?.entry ?? entry, index);
       },
     });
   }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
 
   type Props = {
     /** The number of steps written on the chip. */
@@ -7,9 +8,11 @@
     /** False when the 7 could no longer be finished after these steps: a tap explains why. */
     enabled: boolean;
     onpick: (steps: number) => void;
+    /** In a lesson (plan 05-06): the chip the guide asks to touch, ringed in cream. */
+    guide?: boolean;
   };
 
-  let { steps, enabled, onpick }: Props = $props();
+  let { steps, enabled, onpick, guide = false }: Props = $props();
 </script>
 
 <!-- A step chip of the 7 splitter (UI-SPEC): 44 x 44. It stays tappable when it is off (aria-disabled, not
@@ -17,8 +20,10 @@
 <button
   type="button"
   class="chip tabular"
+  class:guide-halo={guide}
   data-step={steps}
-  aria-label={game.seven.chipAria(steps)}
+  data-guide-halo={guide ? "chip" : undefined}
+  aria-label={guide ? lecons.target(game.seven.chipAria(steps)) : game.seven.chipAria(steps)}
   aria-disabled={!enabled}
   onclick={() => onpick(steps)}
 >

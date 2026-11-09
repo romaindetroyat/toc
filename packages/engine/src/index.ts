@@ -10,6 +10,8 @@ export * from "./rules.ts";
 export * from "./scenario.ts";
 export * from "./seven.ts";
 export * from "./state.ts";
+export * from "./tally.ts";
 export * from "./topology.ts";
 export * from "./types.ts";
+export * from "./unseen.ts";
 export * from "./view.ts";

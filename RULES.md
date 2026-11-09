@@ -1,12 +1,12 @@
 # Règles du TOC — version maison
 
-**Statut :** Validé par Romain le 2026-10-13 ; règles changées par Romain le 2026-10-14 pendant la recette, puis précisées le 2026-10-15 (G16) et changées le même jour (G17) ; voir « Décisions de Romain » à la fin
-**Date :** 2026-10-15
+**Statut :** Validé par Romain le 2026-10-13 ; règles changées par Romain le 2026-10-14 pendant la recette, puis précisées le 2026-10-15 (G16) et changées le même jour (G17), puis le 2026-10-19 (G18) ; voir « Décisions de Romain » à la fin
+**Date :** 2026-10-19
 **Contenu de cette version :** les seize règles R-01 à R-16 (équipes, plateau, donnes, échange, tour, As et Roi, cartes à avancer, le 4, le Valet, le 7, prise, sortie protégée, maison, main injouable, joueur qui a fini, fin de partie), suivies de « Décisions de Romain » (les points qu’il a validés, avec la valeur retenue) et de « Décidé » (ce qui l’est déjà, avec sa source). Chaque scénario est dessiné sur le plateau galet en largeur : en haut avant le coup, en bas après.
 
 Chaque règle est numérotée. Chaque règle cite des scénarios (`R-NN.k`) : ce sont de petits cas écrits comme des données, que le moteur de jeu devra reproduire à l’identique. Rien n’est décidé en silence dans le code : ce qui est écrit ici est ce que le jeu fera.
 
-Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Le 2026-10-14, pendant la recette de la phase 1, Romain a changé des règles (G14 et suivantes, dans « Décisions de Romain »). Le 2026-10-15, après une nouvelle recette, il a précisé l’entrée dans la maison (G16) ; la façon dont le 7 l’applique est une lecture à confirmer par Romain. Le même jour, il a décidé qu’un cheval saute les chevaux déjà rentrés dans sa maison (G17, qui remplace G2). Ce que dit ce document est ce que le moteur fait.
+Tous les points sont maintenant tranchés : Romain a relu et validé le document le 2026-10-13, avec la valeur par défaut pour chacun des points de « Décisions de Romain ». Le 2026-10-14, pendant la recette de la phase 1, Romain a changé des règles (G14 et suivantes, dans « Décisions de Romain »). Le 2026-10-15, après une nouvelle recette, il a précisé l’entrée dans la maison (G16) ; la façon dont le 7 l’applique est une lecture à confirmer par Romain. Le même jour, il a décidé qu’un cheval saute les chevaux déjà rentrés dans sa maison (G17, qui remplace G2). Le 2026-10-19, il a décidé que seul le cheval qui vient de sortir de son écurie est protégé sur son losange (G18, qui remplace G3). Ce que dit ce document est ce que le moteur fait.
 
 ## Vocabulaire
 
@@ -124,8 +124,9 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 **Cas limites**
 - S’il n’y a plus de cheval à l’écurie, l’As et le Roi ne servent qu’à avancer.
 - Quand plusieurs chevaux sont à l’écurie, ils sont interchangeables : c’est le premier (le plus petit numéro) qui sort.
-- Un cheval adverse ou du partenaire garé sur mon losange est mangé par ma sortie, puisqu’il n’y est pas protégé : seul le cheval de la couleur du losange y est protégé (Q13 acté par RULE-14, Q14 acté par RULE-13).
-- Mon propre cheval sur mon losange bloque ma deuxième sortie : il faut d’abord le faire avancer (Q15, acté par RULE-14).
+- Un cheval adverse ou du partenaire garé sur mon losange est mangé par ma sortie, puisqu’il n’y est pas protégé : seul le cheval de la couleur du losange peut y être protégé (Q13 acté par RULE-14, Q14 acté par RULE-13 ; et seulement s’il vient d’en sortir, G18).
+- Mon propre cheval sur mon losange bloque ma deuxième sortie : il faut d’abord le faire avancer (Q15, acté par RULE-14). C’est vrai qu’il y soit protégé ou ordinaire (G18, R-12.13).
+- Le cheval qui sort est protégé sur son losange tant qu’il ne bouge pas (R-12, G18).
 
 **Scénarios**
 - R-06.1 — L’As sort un pion ou avance de 1 : les deux sont permis
@@ -289,13 +290,15 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
 
 ### R-12 Case de sortie protégée
 
-**Règle** — Un cheval arrêté sur le losange de sa propre couleur est protégé : aucun cheval ne peut le dépasser, en avant, en arrière avec le 4 ou au milieu d’un 7, ni le manger, ni l’échanger avec le Valet. Cela vaut aussi pour les autres chevaux de sa propre couleur. Un cheval d’une autre couleur sur ce losange est un cheval ordinaire. Sortir un cheval sur son losange occupé par un cheval d’une autre couleur mange ce cheval ; c’est impossible si son propre cheval y est déjà.
+**Règle** — Un cheval qui sort de son écurie (avec l’As ou le Roi) arrive sur le losange de sa propre couleur, sa case de sortie (son 18) : il y est protégé tant qu’il ne bouge pas, même pendant plusieurs tours. Aucun cheval ne peut le dépasser, en avant, en arrière avec le 4 ou au milieu d’un 7, ni le manger, ni l’échanger avec le Valet. Cela vaut aussi pour les autres chevaux de sa propre couleur. Dès qu’il bouge, il n’est plus protégé. Seul le cheval qui vient de sortir est protégé (G18, 2026-10-19) : un cheval qui revient sur son losange autrement (après un tour de plus ou une entrée manquée, par un échange au Valet, en reculant de 4) y est un cheval ordinaire, qu’on dépasse, qu’on mange et qu’on échange. Un cheval d’une autre couleur sur ce losange est un cheval ordinaire. Sortir un cheval sur son losange occupé par un cheval d’une autre couleur mange ce cheval ; c’est impossible si son propre cheval y est déjà, protégé ou ordinaire.
 
 **Cas limites**
 - La protection ne vaut que pour la couleur du losange : c’est acté (D-04, RULE-13).
-- Mon cheval sur ma sortie bloque ma deuxième sortie : il faut le faire avancer d’abord (Q15, acté par RULE-14).
-- Un cheval protégé reste libre de bouger : dès qu’il quitte son losange, il n’est plus protégé.
-- Un cheval qui s’arrête sur sa sortie après un tour de plus y est protégé comme au premier passage (G3, validé).
+- Mon cheval sur ma sortie bloque ma deuxième sortie : il faut le faire avancer d’abord (Q15, acté par RULE-14). Cela vaut aussi quand ce cheval y est ordinaire, revenu après un tour de plus, un échange ou un recul (Romain, 2026-10-19 : « Garde le blocage » ; R-12.13).
+- Un cheval protégé reste libre de bouger : dès qu’il quitte son losange, il n’est plus protégé. S’il y revient plus tard, il y est ordinaire (G18).
+- Le cheval qui vient de sortir reste protégé tant qu’il ne bouge pas, quel que soit le nombre de tours (G18 : « Oui, tant qu’il ne bouge pas »).
+- Un cheval qui s’arrête sur sa sortie après un tour de plus, ou parce que la case visée de sa maison était occupée, y est un cheval ordinaire (G18, R-12.9). Jusqu’au 2026-10-19, il y était protégé comme au premier passage (G3, remplacé par G18).
+- Un cheval que le Valet place sur sa propre sortie y est ordinaire (G18, R-12.11) ; de même un cheval qui y revient en reculant de 4 (G18, R-12.12).
 - Le cheval protégé bloque aussi les autres chevaux de sa propre couleur, pour le 4, le 7 et les cartes à avancer (G4, validé).
 - Le cheval qui entre dans sa maison passe par le carré 16, avant le losange : l’entrée ne croise jamais son losange.
 
@@ -316,10 +319,16 @@ Tous les points sont maintenant tranchés : Romain a relu et validé le document
   ![R-12.7](docs/regles/R-12.7.webp)
 - R-12.8 — Sur la sortie d’une autre couleur, un pion est un pion ordinaire : on le mange
   ![R-12.8](docs/regles/R-12.8.webp)
-- R-12.9 — Un pion revenu sur sa sortie après un tour de plus est protégé aussi
+- R-12.9 — Un pion revenu sur sa sortie après un tour de plus est un pion ordinaire : on le dépasse, on le mange, on l’échange
   ![R-12.9](docs/regles/R-12.9.webp)
 - R-12.10 — Mon pion protégé bloque aussi le passage de mes autres pions
   ![R-12.10](docs/regles/R-12.10.webp)
+- R-12.11 — Un pion placé sur sa sortie par le Valet est un pion ordinaire : on le mange
+  ![R-12.11](docs/regles/R-12.11.webp)
+- R-12.12 — Un pion revenu sur sa sortie en reculant de 4 est un pion ordinaire : on le dépasse
+  ![R-12.12](docs/regles/R-12.12.webp)
+- R-12.13 — Mon pion ordinaire revenu sur ma sortie m’empêche aussi d’en sortir un second
+  ![R-12.13](docs/regles/R-12.13.webp)
 
 ### R-13 Entrée dans la maison
 
@@ -491,7 +500,7 @@ Quand une carte peut amener un cheval pile sur une case vide de sa maison, cette
 
 Romain a relu ce document, les points ci-dessous et les images R-09.8, R-09.9, R-13.7 et R-10.13, puis l’a validé tel quel le 2026-10-13 : chaque point prend la valeur retenue indiquée. Aucune correction. (L’image R-13.7 a été redessinée le 2026-10-15 pour G17, qui remplace G2.) Les scénarios R-09.9 et R-15.9 dessinent l’autre choix de G1 et de G12 : ils sont conservés comme repères et ne sont pas implémentés. Chaque valeur est une constante nommée dans `packages/engine/src/rules.ts`.
 
-Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci-dessous (G14 et suivantes). Ses mots sont cités tels quels.
+Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci-dessous (G14 et suivantes ; G18 le 2026-10-19). Ses mots sont cités tels quels.
 
 - **G14 — Entrée dans la maison sans tour complet (décision du 2026-10-14).** Retenu : un cheval qui atteint ou franchit son carré 16 en avançant entre dans sa maison au compte exact sur une case vide, même s’il n’a pas fait le tour complet ; l’entrée reste obligatoire quand le compte tombe juste ; on n’entre jamais en reculant. Les mots de Romain : « si le cheval n’a pas fait le tour complet et qu’il arrive en situation de pouvoir rentrer (par 4 ou par valet) doit pouvoir rentrer ». Remplace « tour complet obligatoire » (D-04, Q3). Constante ENTRY_WITHOUT_FULL_LAP. Touche R-02, R-08, R-09, R-13 ; scénarios R-02.3, R-08.7, R-13.12, R-13.16 à R-13.21.
 - **G15 — Le 7 et le cheval du partenaire (décision du 2026-10-14).** Retenu : le 7 mange les chevaux adverses qu’il dépasse, mais dépasse ceux du partenaire sans les manger ; il mange le cheval du partenaire seulement s’il s’arrête sur lui, et c’est obligatoire. Aucun cheval de l’équipe n’est mangé au passage, y compris quand un joueur qui a fini joue les chevaux de son partenaire. Les mots de Romain : « Le 7 ne doit pas manger les partenaires quand il les double, mais seulement s’il arrive sur eux (pas le choix). » Remplace Q23 pour le passage du 7. Constante SEVEN_EATS_PASSED_PARTNER. Touche R-07, R-10, R-11, R-15 ; scénarios R-10.6, R-10.7, R-10.14, R-15.10.
@@ -508,12 +517,20 @@ Le 2026-10-14, pendant la recette de la phase 1, Romain a changé les règles ci
   - À la question « Un cheval déjà rentré dans son arrivée peut encore y avancer pour se ranger au fond, au compte exact. Peut-il lui aussi sauter les chevaux devant lui ? », son choix : « Oui, aussi (Recommandé) ». Le texte de l’option était : « Même règle partout dans l'arrivée : on peut sauter les chevaux déjà rentrés, tant qu'on tombe au compte exact sur une case vide. »
   - Retenu : dans la maison, en entrant depuis le carré 16 comme en y avançant, un cheval saute les chevaux déjà rentrés. Il lui faut toujours le compte exact jusqu’à une case vide (D-01) : si le compte dépasse le fond ou si la case où il tombe est occupée, il n’entre pas et repart pour un tour (dans la maison, ce coup est impossible). Quand le compte tombe juste sur une case vide, l’entrée reste obligatoire (D-02), en sautant s’il le faut. Le 4 ne fait jamais entrer (D-04). Avec le 7, G16 compte ces entrées.
   - Remplace G2 (validé le 2026-10-13) et la fin de D-03 (« sans sauter un autre cheval »). Constante HOME_JUMP_ALLOWED ; l’ancienne règle G2 reste réglable (HOME_JUMP_BLOCKED). Touche R-13 ; scénarios R-13.7, R-13.10, R-13.19 (réécrits) et R-13.28 à R-13.31.
+- **G18 — Seul le cheval qui vient de sortir est protégé sur son 18 (décision du 2026-10-19).** Romain a joué dans l’application installée.
+  - Les mots de Romain : « Quand un joueur se place sur son propre 18 après avoir loupé l'entrée dans son écurie, il n'est pas bloquant et il reste échangeable. Cette règle ne s'applique qu'aux chevaux qui sortent juste de leur camp, ok ? » (Son « 18 » est la case de sortie de sa couleur, le losange ; son « écurie » est ici la maison d’arrivée, son « camp » l’écurie de départ.)
+  - À la question « Et un cheval qui arrive sur son 18 autrement, par un échange au Valet ou en reculant de 4 ? », son choix : « Ordinaire aussi (Recommandé) ».
+  - À la question « Et un cheval qui vient de sortir et reste sur son 18 : il reste protégé tant qu'il n'a pas bougé ? », son choix : « Oui, tant qu'il ne bouge pas (Recommandé) ».
+  - À la question « ton propre cheval posé sur ton 18 t'empêche d'en sortir un second : je garde ce blocage même quand ce cheval est ordinaire », son choix : « Garde le blocage ».
+  - Retenu : seul le cheval qui sort de son écurie sur son losange y est protégé, et il le reste tant qu’il ne bouge pas. Toute autre arrivée sur son losange donne un cheval ordinaire : après un tour de plus ou une entrée manquée, après un échange au Valet, après un recul de 4. On le dépasse, on le mange et on l’échange au Valet comme n’importe quel cheval. Le reste de R-12 ne change pas : le cheval protégé bloque aussi sa propre couleur (G4), et son propre cheval sur le losange, protégé ou ordinaire, empêche une deuxième sortie (Q15).
+  - Les parties sauvegardées avant le 2026-10-19 reprennent avec G18 : un cheval qui s’y trouvait sur son losange au départ (progression 0) y reste protégé tant qu’il ne bouge pas ; un cheval revenu sur son losange après un tour de plus y devient ordinaire.
+  - Remplace G3 (validé le 2026-10-13). Constante EXIT_ONLY_PROTECTION ; l’ancienne règle G3 reste réglable (PROTECTED_AFTER_EXTRA_LAP). Touche R-06, R-12 ; scénario R-12.9 (réécrit) et R-12.11 à R-12.13.
 
 Les points validés le 2026-10-13 :
 
 - **G1 — Progression d’un cheval après un échange au Valet.** Retenu : le cheval qui change de case prend la progression de sa nouvelle case (de 0 à 71 ; un cheval qui avait fait un tour de plus perd ce tour). Touche R-02, R-09, R-13 ; scénarios R-09.1, R-09.2, R-09.8, R-15.4. Le scénario R-09.9 (garder ses tours) n’est pas retenu.
 - **G2 — Entrée bloquée par un cheval déjà rentré.** Retenu le 2026-10-13 : le cheval ne le saute pas et repart pour un tour, comme si la case était occupée. **Remplacé par G17 le 2026-10-15** : le cheval saute les chevaux déjà rentrés (voir G17 plus haut). Touche R-13 ; scénario R-13.7, réécrit pour G17.
-- **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Retenu : il est protégé comme au premier passage, la protection tient à la case et à la couleur, pas au tour. Touche R-12 ; scénario R-12.9.
+- **G3 — Cheval qui s’arrête sur sa sortie après un tour de plus.** Retenu le 2026-10-13 : il est protégé comme au premier passage, la protection tient à la case et à la couleur, pas au tour. **Remplacé par G18 le 2026-10-19** : seul le cheval qui vient de sortir est protégé, celui qui revient après un tour de plus est ordinaire (voir G18 plus haut). Touche R-12 ; scénario R-12.9, réécrit pour G18.
 - **G4 — Un cheval protégé bloque-t-il aussi ses propres chevaux ?** Retenu : oui, personne ne le dépasse, y compris son propre camp. Touche R-08, R-12 ; scénarios R-08.4, R-08.5, R-12.10.
 - **G5 — Le même cheval deux fois dans un 7.** Retenu : un plan peut reprendre un cheval déjà déplacé plus tôt dans le même 7 ; deux pas de suite du même cheval n’en font qu’un. Touche R-10 ; scénario R-10.13.
 - **G6 — Le Valet avec mon propre cheval protégé sur ma sortie.** Retenu : impossible, un cheval protégé ne s’échange pas, ni comme cible ni comme cheval joué. Touche R-09 ; scénario R-09.6.
@@ -549,7 +566,7 @@ Ces points ne sont plus à discuter : ils sont écrits plus haut sans réserve.
 - Q11, un cheval à l’écurie ou dans la maison ne s’échange pas au Valet (RULE-09).
 - Q12, un cheval protégé ne s’échange pas : sans autre cible, le Valet est injouable (RULE-09, RULE-13).
 - Q13, sortir sur un cheval d’une autre couleur garé sur sa sortie le mange (RULE-14).
-- Q14, seul le cheval de la couleur du losange y est protégé (RULE-13).
+- Q14, seul le cheval de la couleur du losange y est protégé (RULE-13) ; depuis le 2026-10-19, seulement s’il vient d’en sortir (G18).
 - Q15, mon cheval sur ma sortie bloque ma deuxième sortie (RULE-14).
 - Q16, le 5 fait avancer les chevaux du partenaire quand on a fini (RULE-17).
 - Q17, les chevaux du partenaire comptent comme les siens pour toutes les cartes (RULE-17).

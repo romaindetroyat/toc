@@ -12,6 +12,7 @@
   import { COURT_FIGURES, cardFace } from "../cards/faces.ts";
   import { cardName } from "../i18n/fr/cards.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
 
   type Props = {
     card: CardId;
@@ -26,6 +27,8 @@
     onclick?: () => void;
     tabindex?: number;
     el?: HTMLElement;
+    /** In a lesson (plan 05-06): the card the guide asks to touch; its name ends « , à toucher ». */
+    guide?: boolean;
   };
 
   let {
@@ -36,6 +39,7 @@
     onclick,
     tabindex = 0,
     el = $bindable(),
+    guide = false,
   }: Props = $props();
 
   const face = $derived(cardFace(card));
@@ -49,32 +53,36 @@
         ? game.hand.unplayable(name)
         : game.hand.neutral(name),
   );
-  const label = $derived(received ? game.exchange.received(named, received.name) : named);
+  const said = $derived(received ? game.exchange.received(named, received.name) : named);
+  const label = $derived(guide ? lecons.target(said) : said);
   const border = $derived(received ? PALETTE.hex[received.color] : undefined);
 </script>
 
+<!-- The printed face (plan 05-10, APP-05 audit, WCAG 2.5.3 « Label in Name »): the indices and pips
+     are painted by CSS from their attributes, as the court figures are pictures, so the card's only
+     text is its name (« Dame de cœur, jouable »), never « D D » read off its corners. -->
 {#snippet content()}
   {#if received}
     <!-- Under the corners and the middle: the glyphs stay whole over the border. -->
     <span class="border" aria-hidden="true"></span>
   {/if}
   <span class="corner top" style:color={face.colour} aria-hidden="true">
-    <span class="rank">{face.rankLabel}</span>
-    <span class="pip">{face.suitGlyph}</span>
+    <span class="rank glyph" data-glyph={face.rankLabel}></span>
+    <span class="pip glyph" data-glyph={face.suitGlyph}></span>
   </span>
   <span class="middle" style:color={face.colour} aria-hidden="true">
     {#if face.court && figure}
       <img src={figure} alt="" draggable="false" />
     {:else if face.court}
-      <span class="letter">{face.rankLabel}</span>
-      <span class="pips">{face.suitGlyph}</span>
+      <span class="letter glyph" data-glyph={face.rankLabel}></span>
+      <span class="pips glyph" data-glyph={face.suitGlyph}></span>
     {:else}
-      <span class="big">{face.suitGlyph}</span>
+      <span class="big glyph" data-glyph={face.suitGlyph}></span>
     {/if}
   </span>
   <span class="corner bottom" style:color={face.colour} aria-hidden="true">
-    <span class="rank">{face.rankLabel}</span>
-    <span class="pip">{face.suitGlyph}</span>
+    <span class="rank glyph" data-glyph={face.rankLabel}></span>
+    <span class="pip glyph" data-glyph={face.suitGlyph}></span>
   </span>
 {/snippet}
 
@@ -167,6 +175,10 @@
   .received .corner.bottom {
     right: 9px;
     bottom: 8px;
+  }
+
+  .glyph::before {
+    content: attr(data-glyph);
   }
 
   .rank {

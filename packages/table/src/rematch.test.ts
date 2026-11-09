@@ -348,14 +348,30 @@ describe("the record of a finished game (plan 02-09 Task 2, HIST-01, D-14)", () 
         endedAt: 3000,
         winner: "bleu-rouge",
         seats: [
-          { colour: "bleu", kind: "human", name: "Ana", level: null, handedOver: false },
-          { colour: "jaune", kind: "human", name: "Ben", level: null, handedOver: false },
+          // Plan 05-01: the account (none: guests), the tally and the knights home of each seat.
+          {
+            colour: "bleu",
+            kind: "human",
+            name: "Ana",
+            level: null,
+            handedOver: false,
+            ...{ account: null, captured: 0, lost: 0, home: 4 },
+          },
+          {
+            colour: "jaune",
+            kind: "human",
+            name: "Ben",
+            level: null,
+            handedOver: false,
+            ...{ account: null, captured: 0, lost: 0, home: 0 },
+          },
           {
             colour: "rouge",
             kind: "bot",
             name: (result.table.seats.rouge as { name: string }).name,
             level: 3,
             handedOver: false,
+            ...{ account: null, captured: 0, lost: 0, home: 4 },
           },
           {
             colour: "vert",
@@ -363,10 +379,12 @@ describe("the record of a finished game (plan 02-09 Task 2, HIST-01, D-14)", () 
             name: (result.table.seats.vert as { name: string }).name,
             level: 4,
             handedOver: false,
+            ...{ account: null, captured: 0, lost: 0, home: 0 },
           },
         ],
         deals: 0,
         captures: { "bleu-rouge": 0, "jaune-vert": 0 },
+        creatorName: "Ana",
       },
     ]);
     expect(result.table.records).toEqual(result.records);
@@ -469,12 +487,17 @@ describe("the record of a finished game (plan 02-09 Task 2, HIST-01, D-14)", () 
       endedAt: 9000,
       game: { ...table.game, phase: "won", winner: "jaune-vert" },
     });
+    // Plan 05-01: the seat handed over still belongs to its person's account (here a guest).
     expect(record.seats[1]).toEqual({
       colour: "jaune",
       kind: "human",
       name: "Ben",
       level: 3,
       handedOver: true,
+      account: null,
+      captured: 0,
+      lost: 0,
+      home: 0,
     });
     expect(record.winner).toBe("jaune-vert");
   });

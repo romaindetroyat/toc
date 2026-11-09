@@ -2,13 +2,16 @@
   import { COLORS, type Color, type RenderState } from "@toc/engine";
   import { cardName } from "../i18n/fr/cards.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { paquet } from "../i18n/fr/paquet.ts";
   import Card from "./Card.svelte";
   import SeatChip from "./SeatChip.svelte";
   import Sheet from "./Sheet.svelte";
 
-  // « Sur le tapis » (D-08, UI-SPEC « Tapis sheet »): the felt read at a size a phone can show. One row
-  // per seat with its last card in large form, then the counts of the talon and the défausse. Only
-  // public information (T-01-30): the last cards were played face up, the piles are counted, not shown.
+  // « Sur le tapis » (D-08, UI-SPEC « Tapis sheet »): the felt read at a size a phone can show. First
+  // the button « Cartes jouées » (quick task 261109-80e: at the very top, above the fold on a phone;
+  // 261109-6an had it under the counts), then one row per seat with its last card in large form, then
+  // the counts of the talon and the défausse. Only public information (T-01-30): the last cards were
+  // played face up, the piles are counted, not shown.
   type Props = {
     render: RenderState;
     /** « toi » for the human, a horse name for each bot. */
@@ -16,9 +19,11 @@
     onclose: () => void;
     /** Element that gets the focus back on close. */
     opener?: HTMLElement | null;
+    /** Closes this sheet and opens « Les cartes jouées »; no button without it. */
+    ondeck?: () => void;
   };
 
-  let { render, names, onclose, opener = null }: Props = $props();
+  let { render, names, onclose, opener = null, ondeck }: Props = $props();
 
   const upper = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1);
 
@@ -32,6 +37,11 @@
 
 <Sheet title={game.tapis.title} {onclose} {opener}>
   <div class="tapis" data-tapis>
+    {#if ondeck !== undefined}
+      <button type="button" class="btn btn-secondary deck" data-tapis-deck onclick={ondeck}>
+        {paquet.button}
+      </button>
+    {/if}
     <ul class="seats">
       {#each rows as row (row.color)}
         <li class="seat" data-tapis-seat={row.color}>
@@ -117,5 +127,9 @@
 
   .count {
     margin: 0;
+  }
+
+  .deck {
+    align-self: flex-start;
   }
 </style>

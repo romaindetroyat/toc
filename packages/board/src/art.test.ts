@@ -1,7 +1,27 @@
 import { COLORS, type Color, ENTRY, EXIT } from "@toc/engine";
 import { describe, expect, it } from "vitest";
-import { type Art, type ArtRole, type ArtShape, artSvg, boardArt, feltPath } from "./art.ts";
-import { MOCKUP, PALETTE, type Point, riderBox, SCENE, sceneXY } from "./scene.ts";
+import {
+  type Art,
+  type ArtRole,
+  type ArtShape,
+  artSvg,
+  boardArt,
+  feltPath,
+  prefixArt,
+  STABLE_MARK,
+  stableMarkAt,
+} from "./art.ts";
+import { markPath, SEAT_MARKS } from "./marks.ts";
+import {
+  MOCKUP,
+  PALETTE,
+  type Point,
+  riderBox,
+  SCENE,
+  sceneSideOf,
+  sceneXY,
+  stableCentre,
+} from "./scene.ts";
 
 const KS = [0, 1, 2, 3];
 const ROLES: ArtRole[] = [
@@ -20,6 +40,7 @@ const ROLES: ArtRole[] = [
   "exit",
   "entry",
   "label",
+  "stable-mark",
 ];
 
 /** Centre of a shape in scene units (rects are centred on their translate when transformed). */
@@ -250,9 +271,129 @@ describe("boardArt", () => {
     expect(first(art, "rider")).toBeGreaterThan(last(art, "stitch"));
     expect(first(art, "lane")).toBeGreaterThan(last(art, "rider"));
     expect(first(art, "hole")).toBeGreaterThan(last(art, "rider"));
+    expect(first(art, "stable-mark")).toBeGreaterThan(
+      Math.max(last(art, "lane"), last(art, "hole")),
+    );
     const cells = Math.min(first(art, "cell"), first(art, "exit"), first(art, "entry"));
     expect(cells).toBeGreaterThan(Math.max(last(art, "lane"), last(art, "hole")));
+    expect(cells).toBeGreaterThan(last(art, "stable-mark"));
     expect(art.shapes[art.shapes.length - 1]?.role).toBe("label");
+  });
+});
+
+describe("the stable marks (plan 05-02, APP-05, D-14)", () => {
+  it("draws one per colour beside its stable: a cream disc of 0.9 step ringed in ink, the seat's shape of 0.6 step", () => {
+    for (const k of KS) {
+      const art = boardArt(k);
+      const discs = objects(art, "stable-mark");
+      expect(discs).toHaveLength(4);
+      for (const c of COLORS) {
+        const disc = discs.find((x) => x.color === c);
+        if (disc?.kind !== "circle") throw new Error(`no stable mark disc for ${c}`);
+        expect(disc.mark).toBe(SEAT_MARKS[c]);
+        expect(disc.fill).toBe(PALETTE.cream);
+        expect(disc.stroke).toBe(PALETTE.ink);
+        expect(disc.strokeWidth).toBe(STABLE_MARK.line);
+        // The disc's outer edge, its ink line included, is 0.9 step across.
+        expect(2 * (disc.r + STABLE_MARK.line / 2)).toBeCloseTo(0.9 * SCENE.step, 9);
+        const at = stableMarkAt(c, k);
+        expect(disc.cx).toBeCloseTo(at[0], 9);
+        expect(disc.cy).toBeCloseTo(at[1], 9);
+
+        const glyphs = art.shapes.filter(
+          (x) => x.role === "stable-mark" && x.detail && x.color === c,
+        );
+        expect(glyphs).toHaveLength(1);
+        const glyph = glyphs[0];
+        if (glyph?.kind !== "path") throw new Error(`no stable mark shape for ${c}`);
+        expect(glyph.mark).toBe(SEAT_MARKS[c]);
+        expect(glyph.d).toBe(markPath(SEAT_MARKS[c], at[0], at[1], 0.3 * SCENE.step));
+        expect(glyph.fill).toBe(PALETTE.hex[c]);
+        expect(glyph.stroke).toBe(PALETTE.ink);
+        // Painted over its disc.
+        expect(art.shapes.indexOf(glyph)).toBeGreaterThan(art.shapes.indexOf(disc));
+      }
+    }
+  });
+
+  it("stands beside its own stable, farther from the felt than the stable", () => {
+    for (const k of KS) {
+      for (const c of COLORS) {
+        const at = stableMarkAt(c, k);
+        const stable = stableCentre(c, k);
+        const [cx, cy] = SCENE.centre;
+        expect(Math.hypot(at[0] - stable[0], at[1] - stable[1])).toBeLessThan(3.2 * SCENE.step);
+        expect(Math.hypot(at[0] - cx, at[1] - cy)).toBeGreaterThan(
+          Math.hypot(stable[0] - cx, stable[1] - cy),
+        );
+        // Nearer its own stable than any other.
+        for (const other of COLORS.filter((x) => x !== c)) {
+          const o = stableCentre(other, k);
+          expect(Math.hypot(at[0] - o[0], at[1] - o[1])).toBeGreaterThan(
+            Math.hypot(at[0] - stable[0], at[1] - stable[1]),
+          );
+        }
+      }
+    }
+  });
+
+  it("depends only on the side of the board: the drawing never turns, the colours take their side", () => {
+    for (const c of COLORS) {
+      for (const k of KS) {
+        const side = sceneSideOf(c, k);
+        for (const other of COLORS) {
+          for (const k2 of KS) {
+            if (sceneSideOf(other, k2) !== side) continue;
+            const a = stableMarkAt(c, k);
+            const b = stableMarkAt(other, k2);
+            expect(a[0]).toBeCloseTo(b[0], 9);
+            expect(a[1]).toBeCloseTo(b[1], 9);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("prefixArt (several boards on one page, 05-RESEARCH Pitfall 10)", () => {
+  const ids = (art: Art) => art.defs.map((d) => d.id);
+  const refs = (art: Art) =>
+    art.shapes.flatMap((x) => [x.fillDef, x.filter, x.clip]).filter((r) => r !== undefined);
+
+  it("keeps today's ids without a prefix", () => {
+    const art = boardArt(0);
+    expect(prefixArt(art, "")).toEqual(art);
+    expect(ids(prefixArt(art, ""))).toContain("toc-grain");
+  });
+
+  it("names every def with the prefix and points every reference at it", () => {
+    const art = prefixArt(boardArt(1), "fig-a-");
+    const declared = new Set(ids(art));
+    for (const id of declared) expect(id).toMatch(/^fig-a-toc-[a-z0-9-]+$/);
+    expect(refs(art).length).toBeGreaterThan(0);
+    for (const ref of refs(art)) expect(declared.has(ref as string)).toBe(true);
+    // The shapes are otherwise the same.
+    const plain = boardArt(1);
+    expect(art.shapes).toHaveLength(plain.shapes.length);
+    expect(art.shapes.map((x) => x.role)).toEqual(plain.shapes.map((x) => x.role));
+    // artSvg accepts a prefixed drawing.
+    expect(artSvg(art, { width: 10, height: 10, fontFamily: "x" })).toContain(
+      'filter="url(#fig-a-toc-grain)"',
+    );
+  });
+
+  it("gives two boards with different prefixes no id in common", () => {
+    const a = new Set(ids(prefixArt(boardArt(0), "fig-a-")));
+    const b = ids(prefixArt(boardArt(0), "fig-b-"));
+    expect(b.filter((id) => a.has(id))).toEqual([]);
+    const plain = new Set(ids(boardArt(0)));
+    expect([...a].filter((id) => plain.has(id))).toEqual([]);
+  });
+
+  it("refuses a prefix that is not plain lowercase letters, digits and dashes", () => {
+    for (const bad of ['a"b', "A-", "x y", "-x", "é-"]) {
+      expect(() => prefixArt(boardArt(0), bad)).toThrow();
+    }
   });
 });
 

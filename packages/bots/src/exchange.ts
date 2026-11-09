@@ -1,30 +1,67 @@
-// The exchange card (D-09, 03-RESEARCH Pattern 7): the bot gives what helps its partner most, judged on
-// public information only (D-10). For each card in hand (one per rank: two cards of a rank are worth
-// the same), the score is
+// The exchange card, judged on public information only (D-10). Two ways, chosen by level (levels.ts
+// GIVE_METHOD):
+//
+// The board give (D-09, 03-RESEARCH Pattern 7; levels 2 and 3). For each card in hand (one per rank:
+// two cards of a rank are worth the same), the score is
 //   partnerGain − GIVE_OWN_LOSS × ownLoss
 // where partnerGain is the best evaluation gain among the partner's moves of that card on the current
 // board (movesForCard for PARTNER[seat], sevenOutcomes for a 7) and ownLoss the same for the bot itself.
 // A card with no move gains nothing. movesForCard follows controlledPawns, so a partner who has finished
 // is credited with moving the bot's own knights (R-15).
-// The partner's hand is never read: the score uses the view's board and the bot's own hand only.
+//
+// The deal give (plan 04-15, Pur-sang and Champion; a refinement of D-09). Romain, 2026-11-06: « en mode intelligent, le
+// partenaire ordinateur ne donne pas forcément systématiquement un as ou un roi s'il n'en a qu'un et
+// qu'il faut qu'il sorte ses pions... Il doit pouvoir moduler ça en fonction de la stratégie. » The board
+// give sees one move: it cannot tell that a lone As unlocks the bot's whole deal, that the partner may
+// already hold one, or what a card does for the rest of the hand. The deal give scores a card by what
+// the two hands can do over the deal:
+// - the partner's hand is imagined DEAL_HANDS times from the cards the bot cannot see (knowledge.ts
+//   unknownCards, shuffled with the bot's own rng), in strata: by how many exit cards (As, Roi) it holds,
+//   0, 1 or 2 and more, and whether the card it passes back is one of them, each stratum weighted by its
+//   exact chance (hypergeometric, then k / size) and given its share of the hands; the bot knows
+//   nothing of the partner's choice, so the passed card is any card of the imagined hand;
+// - for each card c and each imagined hand, the bot's hand after the exchange (its cards less c, plus
+//   the passed card) and the partner's (its imagined cards less the passed one, plus c) are each played
+//   out alone on the current board (playOut): one card per turn, the best evaluate + handBonus of the
+//   cards kept, the engine's movesForCard and, for the 7, one knight walking the whole 7 (engine walk);
+//   a hand with no legal move is laid down (R-14), the rest of it lost;
+// - the score of c is the weighted mean, over the imagined hands, of the two play-outs' team gains;
+// - dealGives keeps the deal's answer to one question, does an As or a Roi go or stay, and lets the board
+//   give pick the card within that family (the ladder runs below dealGives).
+// A lone As or Roi with four knights in the stable is the bot's whole deal: given away, its other cards
+// are laid down. The same card gives the partner much only when its imagined hands lack one.
+// The play-outs ignore the other seats' moves: they value hands, they never decide a move. Every
+// legality decision is the engine's. The partner's real hand is never read.
 // Pure, no I/O, erasable syntax only.
 
 import {
   type Board,
   type CardId,
+  COLORS,
   type Color,
+  controlledPawns,
   movesForCard,
+  ownPawns,
   PARTNER,
+  type Pawn,
+  type PawnId,
   type PlayerView,
+  type Rng,
+  type RuleSet,
   rankOf,
+  resolveCandidate,
   resolveMove,
   sevenOutcomes,
+  shuffle,
   type Team,
   teamOf,
+  walk,
 } from "@toc/engine";
-import { evaluate } from "./evaluate.ts";
+import { pawnsKey } from "./candidates.ts";
+import { evaluate, handBonus } from "./evaluate.ts";
+import { hiddenCounts, unknownCards } from "./knowledge.ts";
 
-/** How much the bot's own use of a card weighs against the partner's (λ). */
+/** How much the bot's own use of a card weighs against the partner's (λ, the board give). */
 export const GIVE_OWN_LOSS = 0.6;
 
 export type GiveScore = { card: CardId; score: number };
@@ -48,22 +85,327 @@ function bestGain(board: Board, mover: Color, card: CardId, team: Team): number 
   return best ?? 0;
 }
 
+/** The first card of each rank, in hand order, with its index. */
+function firstOfEachRank(hand: readonly CardId[]): { card: CardId; index: number }[] {
+  const ranks = new Set<number>();
+  const out: { card: CardId; index: number }[] = [];
+  hand.forEach((card, index) => {
+    const rank = rankOf(card);
+    if (ranks.has(rank)) return;
+    ranks.add(rank);
+    out.push({ card, index });
+  });
+  return out;
+}
+
 /**
- * The score of each card `seat` may give, in hand order, the first card of each rank only. Reads the
- * view's board and hand, nothing else.
+ * The board give (levels 2 and 3): the score of each card `seat` may give, in hand order, the first card
+ * of each rank only. Reads the view's board and hand, nothing else.
  */
 export function giveScores(view: PlayerView, seat: Color): GiveScore[] {
   const team = teamOf(seat);
   const board: Board = { pawns: view.pawns, rules: view.rules };
-  const ranks = new Set<number>();
-  const out: GiveScore[] = [];
-  for (const card of view.hand) {
-    const rank = rankOf(card);
-    if (ranks.has(rank)) continue;
-    ranks.add(rank);
+  return firstOfEachRank(view.hand).map(({ card }) => {
     const partnerGain = bestGain(board, PARTNER[seat], card, team);
     const ownLoss = bestGain(board, seat, card, team);
-    out.push({ card, score: partnerGain - GIVE_OWN_LOSS * ownLoss });
+    return { card, score: partnerGain - GIVE_OWN_LOSS * ownLoss };
+  });
+}
+
+/**
+ * Imagined partner hands of one deal give, shared out among the strata by weight (at least one each).
+ * The strata answer the question Romain raised (does the partner already hold an exit card? does it
+ * pass one back?) by exact weights, not by the luck of a few draws; the hands only average out the
+ * other cards. Calibrated on 2026-11-06 (plan 04-15, 04-15-SUMMARY), this machine, one thread:
+ * - the hands, on every deal score (`node tools/bench-bots.mjs --exchange --level 5`, the 40 bench
+ *   exchanges, before the memo and the walked 7): 8 hands p95 7.3 ms, 16 hands 9.4 ms, 24 hands 12.4
+ *   to 15.0 ms, 32 hands 15.5 to 17.9 ms; the lone exit card at the start of the game
+ *   (exchange.test.ts), 200 seeds, level 5: the As and the Roi each kept 193 times at 16 hands (margin
+ *   11.5, spread 6.3); every case with a wider margin kept or given 50 times out of 50;
+ * - the final give (dealGives, 16 hands): the bench exchanges p50 1.9 ms, p95 7.0 ms, max 21.9 ms
+ *   (the board give: p95 2.8 ms, max 25.5 ms); 772 exchanges of level-4 games, warmed up: p50 2.3 ms,
+ *   p95 10.5 ms, max 40.2 ms (the board give on the same positions: p95 3.2 ms, max 36.6 ms); 2543
+ *   gives met in play: p95 10.3 ms, p99 17.3 ms, max 49.0 ms. The level-4 play decision, for scale:
+ *   p95 10.8 ms, max 14.6 ms on its bench.
+ * 16 keeps the give near the cost of a level-4 play decision, decided in one alarm tick online.
+ */
+export const DEAL_HANDS = 16;
+
+export type DealGives = {
+  /**
+   * dealGiveScores: one deal score per rank, first card of each rank in hand order, like giveScores;
+   * dealGives: the board scores of the family that may go, in the same order.
+   */
+  scores: GiveScore[];
+  /** The rng after the imagined hands were drawn. */
+  rng: Rng;
+  /** Boards expanded by the play-outs (a rank's moves from a board, computed once): the work. */
+  units: number;
+};
+
+/** The ranks of a hand as a key: two hands with the same ranks play out the same. */
+function ranksKey(hand: readonly CardId[]): string {
+  return hand
+    .map(rankOf)
+    .sort((a, b) => a - b)
+    .join(",");
+}
+
+/** The steps of a 7 walked by one knight. */
+const SEVEN_STEPS = 7;
+
+const isExitCard = (card: CardId): boolean => rankOf(card) === 1 || rankOf(card) === 13;
+
+/**
+ * A board met in the play-outs of one decision: its evaluation for the bot's team, the boards each
+ * mover's rank leads to from it (computed once), and the end of each play-out already run from it (the
+ * greedy play-out depends only on the board, the mover and the ranks left, so every play-out that
+ * reaches this board with the same cards left ends the same way).
+ */
+type Node = {
+  pawns: Record<PawnId, Pawn>;
+  value: number;
+  next: Map<number, Node[]>;
+  ends: Map<string, Node>;
+};
+
+/** The boards of a card other than the 7, one per candidate in the engine's order. */
+function movesAfter(board: Board, mover: Color, card: CardId): Record<PawnId, Pawn>[] {
+  return movesForCard(board, mover, card).map(
+    (candidate) => resolveCandidate(board, candidate).pawns,
+  );
+}
+
+/**
+ * The 7 of a play-out: one controlled ring knight walks the whole 7, as one micro-move of seven.ts (the
+ * engine's walk, eating the opponents it passes, G15; the mover's own knights neither landed on nor
+ * eaten). A play-out only values a hand: the splits of the 7 and G16's duty to enter are the play
+ * decision's (sevenOutcomes, candidates.ts). Checking them on every board met would cost a hard 7 per
+ * turn (applyPlan runs G16's search on each new board: up to 150 ms for one give).
+ */
+function sevenAlone(board: Board, mover: Color): Record<PawnId, Pawn>[] {
+  const out: Record<PawnId, Pawn>[] = [];
+  const own = ownPawns(board, mover);
+  for (const pawn of controlledPawns(board, mover)) {
+    if (board.pawns[pawn].zone !== "ring") continue;
+    const walked = walk(board, pawn, SEVEN_STEPS, 1, { capturePassed: true, ownIds: own });
+    if (!walked.ok) continue;
+    const pawns = { ...board.pawns, [pawn]: walked.end };
+    for (const { victim } of walked.captures) pawns[victim] = { zone: "stable" };
+    out.push(pawns);
   }
   return out;
+}
+
+/** The boards of one decision's play-outs, each evaluated once (pawnsKey). */
+type Boards = {
+  node(pawns: Record<PawnId, Pawn>): Node;
+  after(from: Node, mover: Color, card: CardId): Node[];
+  /** Board expansions so far: the work of the decision. */
+  expanded(): number;
+};
+
+function newBoards(rules: RuleSet, team: Team): Boards {
+  const nodes = new Map<string, Node>();
+  let expansions = 0;
+  const node = (pawns: Record<PawnId, Pawn>): Node => {
+    const key = pawnsKey(pawns);
+    let found = nodes.get(key);
+    if (found === undefined) {
+      found = { pawns, value: evaluate(pawns, rules, team), next: new Map(), ends: new Map() };
+      nodes.set(key, found);
+    }
+    return found;
+  };
+  const after = (from: Node, mover: Color, card: CardId): Node[] => {
+    const rank = rankOf(card);
+    const key = COLORS.indexOf(mover) * 16 + rank;
+    let found = from.next.get(key);
+    if (found === undefined) {
+      expansions++;
+      const board: Board = { pawns: from.pawns, rules };
+      const boards = rank === 7 ? sevenAlone(board, mover) : movesAfter(board, mover, card);
+      found = boards.map(node);
+      from.next.set(key, found);
+    }
+    return found;
+  };
+  return { node, after, expanded: () => expansions };
+}
+
+/**
+ * `mover` plays `cards` (sorted by rank) alone from `at`, one card per turn, each turn the move with
+ * the best evaluate + handBonus of the cards kept (ties to the lower rank, then the engine's order),
+ * until the hand is played or has no legal move (laid down, R-14). Returns the last board.
+ */
+function playOut(boards: Boards, at: Node, mover: Color, cards: readonly CardId[]): Node {
+  if (cards.length === 0) return at;
+  const key = `${mover}|${ranksKey(cards)}`;
+  const known = at.ends.get(key);
+  if (known !== undefined) return known;
+  let best: { score: number; node: Node; index: number } | null = null;
+  for (const { card, index } of firstOfEachRank(cards)) {
+    const kept = [...cards.slice(0, index), ...cards.slice(index + 1)];
+    for (const node of boards.after(at, mover, card)) {
+      const score = node.value + handBonus(kept, node.pawns, mover);
+      if (best === null || score > best.score) best = { score, node, index };
+    }
+  }
+  const end =
+    best === null
+      ? at
+      : playOut(boards, best.node, mover, [
+          ...cards.slice(0, best.index),
+          ...cards.slice(best.index + 1),
+        ]);
+  at.ends.set(key, end);
+  return end;
+}
+
+/** The number of ways to choose `k` among `n` (as a float; 0 outside 0 ≤ k ≤ n). */
+function choose(n: number, k: number): number {
+  if (k < 0 || k > n) return 0;
+  let out = 1;
+  for (let i = 1; i <= k; i++) out = (out * (n - k + i)) / i;
+  return out;
+}
+
+/** One stratum of the partner's imagined hand: its exit cards, whether it passes one, its weight. */
+type Stratum = { exits: number; passesExit: boolean; weight: number };
+
+/**
+ * The strata of the partner's imagined hand of `size` cards drawn from `exits` exit cards and `plain`
+ * other cards: by the exit cards it holds (0, 1, and 2 standing for 2 or more), each weighted by its
+ * hypergeometric chance, then by whether the card it passes back is one of them (k / size, the passed
+ * card being any of its cards). Impossible strata are left out; the weights sum to 1.
+ */
+function strata(size: number, exits: number, plain: number): Stratum[] {
+  const total = choose(exits + plain, size);
+  if (size === 0 || total === 0) return [{ exits: 0, passesExit: false, weight: 1 }];
+  const p0 = choose(plain, size) / total;
+  const p1 = (exits * choose(plain, size - 1)) / total;
+  const byCount: [number, number][] = [
+    [0, p0],
+    [1, p1],
+  ];
+  if (exits >= 2 && size >= 2 && plain >= size - 2) byCount.push([2, Math.max(0, 1 - p0 - p1)]);
+  const out: Stratum[] = [];
+  for (const [k, p] of byCount) {
+    if (p <= 0 || k > exits || size - k > plain) continue;
+    if (k > 0) out.push({ exits: k, passesExit: true, weight: (p * k) / size });
+    if (k < size) out.push({ exits: k, passesExit: false, weight: (p * (size - k)) / size });
+  }
+  const sum = out.reduce((acc, stratum) => acc + stratum.weight, 0);
+  return out.map((stratum) => ({ ...stratum, weight: stratum.weight / sum }));
+}
+
+/**
+ * The deal give (levels 4 and 5): the score of each card `seat` may give, in hand order, the first card
+ * of each rank only, with the rng after the imagined partner hands and the play-outs computed. Reads the
+ * view only; the same view and rng give the same result. Neither is modified.
+ */
+export function dealGiveScores(
+  view: PlayerView,
+  seat: Color,
+  rng: Rng,
+  hands: number = DEAL_HANDS,
+): DealGives {
+  const team = teamOf(seat);
+  const partner = PARTNER[seat];
+  const budget = Math.max(1, Math.floor(hands));
+  const pool = unknownCards(view);
+  const exits = pool.filter(isExitCard);
+  const plain = pool.filter((card) => !isExitCard(card));
+  const size = Math.min(hiddenCounts(view).hands[partner], pool.length);
+  const gives = firstOfEachRank(view.hand);
+  const sums = gives.map(() => 0);
+  const boards = newBoards(view.rules, team);
+  const start = boards.node(view.pawns);
+  const value = (mover: Color, hand: readonly CardId[]): number => {
+    const sorted = [...hand].sort((x, y) => rankOf(x) - rankOf(y));
+    return playOut(boards, start, mover, sorted).value - start.value;
+  };
+
+  let r: Rng = [rng[0], rng[1], rng[2], rng[3]];
+  // Cards are dealt from one shuffled pile per kind and stratum, in consecutive runs, the pile shuffled
+  // again when it runs out: over a stratum's hands every rank comes up about as often as it lies among
+  // the unseen cards (a 4, which makes an As worth a home entry, is neither missed nor doubled by luck).
+  const pile = (cards: readonly CardId[]): ((n: number) => CardId[]) => {
+    let left: CardId[] = [];
+    return (n) => {
+      if (left.length < n) {
+        let fresh: CardId[];
+        [fresh, r] = shuffle(cards, r);
+        left = [...left, ...fresh];
+      }
+      const out = left.slice(0, n);
+      left = left.slice(n);
+      return out;
+    };
+  };
+  for (const { exits: count, passesExit, weight } of strata(size, exits.length, plain.length)) {
+    // The hands are shared out by weight, at least one per stratum.
+    const draws = Math.max(1, Math.round(budget * weight));
+    const takeExits = pile(exits);
+    const takePlain = pile(plain);
+    for (let d = 0; d < draws; d++) {
+      const held = takeExits(count);
+      const others = takePlain(size - count);
+      // The passed card: the first held exit card or the first other card, by the stratum (each run is
+      // in random order, so it is any of them).
+      const passed = passesExit ? held[0] : others[0];
+      const partnerKeeps = passesExit
+        ? [...held.slice(1), ...others]
+        : [...held, ...others.slice(1)];
+      gives.forEach(({ card, index }, g) => {
+        const own = [...view.hand.slice(0, index), ...view.hand.slice(index + 1)];
+        if (passed !== undefined) own.push(passed);
+        const both = value(seat, own) + value(partner, [...partnerKeeps, card]);
+        sums[g] = (sums[g] as number) + (weight * both) / draws;
+      });
+    }
+  }
+  return {
+    scores: gives.map(({ card }, g) => ({ card, score: sums[g] as number })),
+    rng: r,
+    units: boards.expanded(),
+  };
+}
+
+/**
+ * The deal give of levels 4 and 5 (plan 04-15). The deal decides the one question the board cannot see,
+ * whether an exit card (As or Roi) goes or stays: the best deal score of the exit cards against the best
+ * of the others. The board give (giveScores) then orders the cards of that family, as it did for every
+ * card before: the play-outs value whole hands well, but walk the 7 with one knight and ignore the
+ * opponents, so among ordinary cards they are no better a guide than one move on the board. Measured
+ * on 2026-11-06 with tools/ladder.mjs (04-15-SUMMARY), against the board give at the same level
+ * (`--give-a deal --give-b board --min 0 --lower 0`), this code:
+ * - Pur-sang, seed 1: 2091 / 4000, p̂ 52.3 %, Wilson 95 % [50.7 %, 53.8 %]; seed 2: 2095 / 4000,
+ *   52.4 %, [50.8 %, 53.9 %];
+ * - Champion, seed 1: 531 / 1000, p̂ 53.1 %, Wilson 95 % [50.0 %, 56.2 %] (pairs 2–0 128, 0–2 97).
+ * Every card by its deal score instead (the first version, seed 1): Pur-sang 52.3 %, Champion
+ * 484 / 1000, 48.4 %, [45.3 %, 51.5 %], so only the exit question is left to the deal.
+ * A hand with no exit card, or nothing else, has no such question: the board give alone, no play-out.
+ * Returns the family's board scores in hand order (first card of each rank), the rng after the
+ * imagined hands (unchanged without them) and the work: board expansions plus one unit per card scored.
+ */
+export function dealGives(view: PlayerView, seat: Color, rng: Rng): DealGives {
+  const board = giveScores(view, seat);
+  const exitsInHand = board.filter((give) => isExitCard(give.card));
+  if (exitsInHand.length === 0 || exitsInHand.length === board.length) {
+    return { scores: board, rng: [rng[0], rng[1], rng[2], rng[3]], units: board.length };
+  }
+  const dealt = dealGiveScores(view, seat, rng);
+  let exitBest = Number.NEGATIVE_INFINITY;
+  let otherBest = Number.NEGATIVE_INFINITY;
+  for (const give of dealt.scores) {
+    if (isExitCard(give.card)) exitBest = Math.max(exitBest, give.score);
+    else otherBest = Math.max(otherBest, give.score);
+  }
+  const giveExit = exitBest > otherBest;
+  return {
+    scores: board.filter((give) => isExitCard(give.card) === giveExit),
+    rng: dealt.rng,
+    units: dealt.units + board.length,
+  };
 }

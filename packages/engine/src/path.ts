@@ -1,8 +1,9 @@
 // The single movement path (RESEARCH Pattern 1): walk() is used by legality, previews, captures,
 // the 7 (plan 01-13, seven.ts) and animation. No second movement code path exists for the 4, the Valet or the 7.
-// Rules read: RULES.md R-02, R-08, R-10, R-12, R-13 and the choices G2, G3, G4, G14, G15, G17 through
-// `board.rules` (G15: a capture in passing eats only opponents, the mover's team is passed; G17: the
-// knights already home are jumped, G2 is read only when G17 is off).
+// Rules read: RULES.md R-02, R-08, R-10, R-12, R-13 and the choices G2, G3, G4, G14, G15, G17, G18
+// through `board.rules` (G15: a capture in passing eats only opponents, the mover's team is passed; G17:
+// the knights already home are jumped, G2 is read only when G17 is off; G18: only the knight just out of
+// its stable is protected, G3 is read only when G18 is off).
 // Pure, no I/O, erasable syntax only.
 
 import type { RuleSet } from "./rules.ts";
@@ -97,13 +98,25 @@ function homePlace(color: Color, slot: number): Place {
 }
 
 /**
- * A pawn on the diamond of its own colour is protected (R-12): the ring cell is its colour's EXIT, at
- * progress 0 or, after an extra lap, only when PROTECTED_AFTER_EXTRA_LAP (G3).
+ * The flag of a ring pawn saved before G18 (no `justOut`): it was most often protected when it stood on
+ * its own losange at progress 0, the knight just out; every other position reads as ordinary.
+ */
+export function defaultJustOut(progress: number): boolean {
+  return progress === 0;
+}
+
+/**
+ * Protection on the diamond of its own colour (R-12). Under G18 (EXIT_ONLY_PROTECTION) only the knight
+ * that came out of its stable there and has not moved since (Pawn.justOut; defaultJustOut for a pawn
+ * saved without the flag). Otherwise, the rule of 2026-10-13: at progress 0 or, after an extra lap, only
+ * when PROTECTED_AFTER_EXTRA_LAP (G3). Every rule that uses protection (passing, the 4, the 7, landing,
+ * the Valet, G4, the exit) reads this.
  */
 export function isProtected(id: PawnId, pawn: Pawn, rules: RuleSet): boolean {
   if (pawn.zone !== "ring") return false;
   const color = pawnColor(id);
   if (ringIndex(color, pawn.progress) !== EXIT[color]) return false;
+  if (rules.EXIT_ONLY_PROTECTION) return pawn.justOut ?? defaultJustOut(pawn.progress);
   return pawn.progress === 0 || rules.PROTECTED_AFTER_EXTRA_LAP;
 }
 
@@ -285,15 +298,17 @@ export function walk(
   return {
     ok: true,
     path: stretch.path,
-    end: { zone: "ring", progress: from + dir * steps },
+    // G18: a knight that moves is no longer the knight just out of its stable.
+    end: { zone: "ring", progress: from + dir * steps, justOut: false },
     captures: stretch.captures,
   };
 }
 
 /**
- * A stable pawn leaves onto its colour's exit square (As, Roi). Illegal when one of the mover's pawns
- * stands there (R-06, R-12 and Q15); a pawn of another colour there is eaten, because only the pawn of
- * the colour of the diamond is protected there.
+ * A stable pawn leaves onto its colour's exit square (As, Roi), protected there until it moves (G18:
+ * justOut). Illegal when one of the mover's pawns or a pawn of its colour stands there, protected or
+ * ordinary (R-06, R-12, Q15, and « Garde le blocage », 2026-10-19); a pawn of another colour there is
+ * eaten, because only the pawn of the colour of the diamond can be protected there.
  */
 export function exitWalk(board: Board, pawnId: PawnId, opts: WalkOpts): WalkResult {
   if (board.pawns[pawnId].zone !== "stable") return { ok: false, reason: "no-entry" };
@@ -309,5 +324,10 @@ export function exitWalk(board: Board, pawnId: PawnId, opts: WalkOpts): WalkResu
     }
     captures.push({ victim: other, atStep: 0 });
   }
-  return { ok: true, path: [ringPlace(cell)], end: { zone: "ring", progress: 0 }, captures };
+  return {
+    ok: true,
+    path: [ringPlace(cell)],
+    end: { zone: "ring", progress: 0, justOut: true },
+    captures,
+  };
 }

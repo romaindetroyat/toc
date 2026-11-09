@@ -51,6 +51,11 @@
     compact?: boolean;
     /** In the compact mode: the board, to measure the galet's bare corner against. */
     board?: HTMLElement | null;
+    /**
+     * In a lesson (plan 05-06): the card the guide asks to touch. It wears the cream guide halo
+     * outside its amber outline, and its name ends with « , à toucher ».
+     */
+    guide?: CardId | null;
   };
 
   let {
@@ -65,6 +70,7 @@
     onpick,
     compact = false,
     board = null,
+    guide = null,
   }: Props = $props();
 
   let viewportWidth = $state(0);
@@ -277,6 +283,7 @@
           received={card === received ? partner : null}
           {interactive}
           tabindex={i === roving ? 0 : -1}
+          guide={card === guide}
           bind:el={buttons[card]}
           onclick={() => {
             active = i;
@@ -286,6 +293,18 @@
       </div>
     {/if}
   {/each}
+  {#if guide !== null && !concealed}
+    <!-- The guide halo (plan 05-06) rides on a layer of its own over the cards, following its card's
+         slot, so a card stacked over it never hides the ring. -->
+    {#each cards as card, i (card)}
+      {@const slot = slots[i]}
+      {#if slot && card === guide}
+        <div class="slot guide-slot" style:transform={transformOf(card, slot)} aria-hidden="true">
+          <span class="guide-ring" data-guide-halo="card" data-guide-card={card}></span>
+        </div>
+      {/if}
+    {/each}
+  {/if}
   {#if hinted}
     <!-- The digits ride on a layer of their own over the whole fan, each slot following its card, so
          a raised or selected card never hides the digit of its neighbour. -->
@@ -374,6 +393,29 @@
     width: 0;
     transform-origin: calc(var(--card-w) / 2) 160%;
     pointer-events: none;
+  }
+
+  /* The guide's ring (plan 05-06, 05-UI-SPEC « The guide halo »): a 3 px cream outline 3 px outside
+     the card's 3 px amber outline, a 2 px walnut line outside it; its opacity pulses 1 -> 0.45 over
+     1.2 s (never amber, never a filter), still under reduced motion. Under the digits (20). */
+  .guide-slot,
+  .compact .slot.guide-slot {
+    z-index: 19;
+    pointer-events: none;
+  }
+
+  .guide-ring {
+    position: absolute;
+    pointer-events: none;
+    inset: -9px;
+    border: 3px solid var(--creme);
+    border-radius: calc(var(--radius-card) + 9px);
+    box-shadow: 0 0 0 2px var(--noyer);
+    animation: guide-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .still .guide-ring {
+    animation: none;
   }
 
   /* The digit right of the larger rank. */
@@ -470,6 +512,10 @@
   @media (prefers-reduced-motion: reduce) {
     .slot {
       transition: none;
+    }
+
+    .guide-ring {
+      animation: none;
     }
   }
 </style>

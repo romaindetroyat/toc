@@ -1,0 +1,159 @@
+# Plan 04-15, 2026-11-06: tools/ladder.mjs outputs (this machine, 4 workers; times under load)
+
+## Final code (a6a4a82 + c253d54): the deal decides whether an As or a Roi goes, the board picks
+
+### v3-l4-seed1
+ladder: A=4 (Pur-sang) vs B=4 (Pur-sang), 4000 games (2000 pairs), seed 1
+gives: A deal, B board
+games: 4000 (4000 finished, 0 failed)
+A wins: 2091 / 4000, p̂ = 52.3 %
+Wilson 95 %: [50.7 %, 53.8 %]
+pairs: 2–0 512, 1–1 1067, 0–2 421
+A decisions: 591479, mean 0.87 ms, p95 5.40 ms, max 75.1 ms, units 20237641
+B decisions: 588340, mean 0.31 ms, p95 1.23 ms, max 47.8 ms, units 2210586
+A gives: 126324, mean 3.33 ms, p95 11.22 ms, max 75.1 ms
+B gives: 126324, mean 0.69 ms, p95 3.31 ms, max 47.8 ms
+wall time: 189.6 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### v3-l4-seed2
+ladder: A=4 (Pur-sang) vs B=4 (Pur-sang), 4000 games (2000 pairs), seed 2
+gives: A deal, B board
+games: 4000 (4000 finished, 0 failed)
+A wins: 2095 / 4000, p̂ = 52.4 %
+Wilson 95 %: [50.8 %, 53.9 %]
+pairs: 2–0 477, 1–1 1141, 0–2 382
+A decisions: 585922, mean 0.84 ms, p95 5.16 ms, max 80.0 ms, units 19992714
+B decisions: 583371, mean 0.31 ms, p95 1.21 ms, max 71.0 ms, units 2208668
+A gives: 125256, mean 3.20 ms, p95 10.71 ms, max 80.0 ms
+B gives: 125256, mean 0.69 ms, p95 3.28 ms, max 64.9 ms
+wall time: 177.7 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### v3-l5-seed1
+ladder: A=5 (Champion) vs B=5 (Champion), 1000 games (500 pairs), seed 1
+gives: A deal, B board
+games: 1000 (1000 finished, 0 failed)
+A wins: 531 / 1000, p̂ = 53.1 %
+Wilson 95 %: [50.0 %, 56.2 %]
+pairs: 2–0 128, 1–1 275, 0–2 97
+A decisions: 130376, mean 30.98 ms, p95 121.22 ms, max 1907.7 ms, units 26938734
+B decisions: 130718, mean 30.60 ms, p95 121.47 ms, max 1623.9 ms, units 22882668
+A gives: 28098, mean 3.12 ms, p95 10.38 ms, max 64.3 ms
+B gives: 28098, mean 0.62 ms, p95 2.90 ms, max 33.6 ms
+wall time: 2061.2 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### v3-ladder-5-4
+ladder: A=5 (Champion) vs B=4 (Pur-sang), 400 games (200 pairs), seed 1
+gives: A deal, B deal
+games: 400 (400 finished, 0 failed)
+A wins: 300 / 400, p̂ = 75.0 %
+Wilson 95 %: [70.5 %, 79.0 %]
+pairs: 2–0 108, 1–1 84, 0–2 8
+A decisions: 52837, mean 31.86 ms, p95 122.35 ms, max 1160.9 ms, units 11120075
+B decisions: 51136, mean 0.81 ms, p95 4.94 ms, max 64.7 ms, units 1750039
+A gives: 11246, mean 3.21 ms, p95 10.49 ms, max 67.7 ms
+B gives: 11246, mean 3.02 ms, p95 9.91 ms, max 64.7 ms
+wall time: 443.5 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 60 % and Wilson lower bound > 55 %)
+
+### v3-ladder-5-4-old
+ladder: A=5 (Champion) vs B=4 (Pur-sang), 400 games (200 pairs), seed 1
+gives: A board, B board
+games: 400 (400 finished, 0 failed)
+A wins: 333 / 400, p̂ = 83.3 %
+Wilson 95 %: [79.3 %, 86.6 %]
+pairs: 2–0 140, 1–1 53, 0–2 7
+A decisions: 55237, mean 30.66 ms, p95 118.91 ms, max 1700.0 ms, units 9902257
+B decisions: 52742, mean 0.27 ms, p95 1.08 ms, max 39.6 ms, units 192477
+A gives: 11694, mean 0.66 ms, p95 3.07 ms, max 38.2 ms
+B gives: 11694, mean 0.57 ms, p95 2.51 ms, max 39.6 ms
+wall time: 441.9 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### v3-ladder-4-3
+ladder: A=4 (Pur-sang) vs B=3 (Galopeur), 400 games (200 pairs), seed 1
+gives: A deal, B board
+games: 400 (400 finished, 0 failed)
+A wins: 269 / 400, p̂ = 67.3 %
+Wilson 95 %: [62.5 %, 71.7 %]
+pairs: 2–0 86, 1–1 97, 0–2 17
+A decisions: 61104, mean 0.92 ms, p95 5.53 ms, max 92.9 ms, units 2082424
+B decisions: 59693, mean 0.32 ms, p95 1.22 ms, max 39.8 ms, units 223745
+A gives: 12988, mean 3.51 ms, p95 11.88 ms, max 92.9 ms
+B gives: 12988, mean 0.73 ms, p95 3.59 ms, max 39.8 ms
+wall time: 21.0 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 60 % and Wilson lower bound > 55 %)
+
+### final-ladder-3-2
+ladder: A=3 (Galopeur) vs B=2 (Trotteur), 400 games (200 pairs), seed 1
+gives: A board, B board
+games: 400 (400 finished, 0 failed)
+A wins: 393 / 400, p̂ = 98.3 %
+Wilson 95 %: [96.4 %, 99.1 %]
+pairs: 2–0 193, 1–1 7, 0–2 0
+A decisions: 67025, mean 0.30 ms, p95 1.12 ms, max 44.8 ms, units 245619
+B decisions: 63865, mean 0.26 ms, p95 1.01 ms, max 63.4 ms, units 238263
+A gives: 14140, mean 0.68 ms, p95 3.26 ms, max 40.9 ms
+B gives: 14140, mean 0.59 ms, p95 2.55 ms, max 63.4 ms
+wall time: 10.7 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 60 % and Wilson lower bound > 55 %)
+
+### final-ladder-2-1
+ladder: A=2 (Trotteur) vs B=1 (Poulain), 400 games (200 pairs), seed 1
+gives: A board, B board (randomLegal)
+games: 400 (400 finished, 0 failed)
+A wins: 371 / 400, p̂ = 92.8 %
+Wilson 95 %: [89.8 %, 94.9 %]
+pairs: 2–0 172, 1–1 27, 0–2 1
+A decisions: 120713, mean 0.29 ms, p95 1.11 ms, max 55.3 ms, units 457642
+B decisions: 118129, mean 0.22 ms, p95 0.87 ms, max 33.0 ms, units 508378
+A gives: 24788, mean 0.69 ms, p95 3.16 ms, max 55.3 ms
+B gives: 24788, mean 0.00 ms, p95 0.00 ms, max 5.1 ms
+wall time: 17.6 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 60 % and Wilson lower bound > 55 %)
+
+## Earlier versions
+
+### l4-deal-board
+ladder: A=4 (Pur-sang) vs B=4 (Pur-sang), 4000 games (2000 pairs), seed 1
+gives: A deal, B board
+games: 4000 (4000 finished, 0 failed)
+A wins: 2091 / 4000, p̂ = 52.3 %
+Wilson 95 %: [50.7 %, 53.8 %]
+pairs: 2–0 494, 1–1 1103, 0–2 403
+A decisions: 587736, mean 1.37 ms, p95 7.51 ms, max 152.1 ms, units 33248302
+B decisions: 585429, mean 0.33 ms, p95 1.29 ms, max 56.0 ms, units 2204068
+A gives: 125664, mean 5.64 ms, p95 13.85 ms, max 152.1 ms
+B gives: 125664, mean 0.74 ms, p95 3.54 ms, max 56.0 ms
+wall time: 260.7 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### l5-deal-board
+ladder: A=5 (Champion) vs B=5 (Champion), 1000 games (500 pairs), seed 1
+gives: A deal, B board
+games: 1000 (1000 finished, 0 failed)
+A wins: 484 / 1000, p̂ = 48.4 %
+Wilson 95 %: [45.3 %, 51.5 %]
+pairs: 2–0 97, 1–1 290, 0–2 113
+A decisions: 127604, mean 32.84 ms, p95 127.57 ms, max 1964.1 ms, units 29090844
+B decisions: 128230, mean 32.26 ms, p95 128.02 ms, max 1792.4 ms, units 22434849
+A gives: 27584, mean 5.31 ms, p95 13.06 ms, max 100.1 ms
+B gives: 27584, mean 0.66 ms, p95 3.11 ms, max 46.5 ms
+wall time: 2218.1 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)
+
+### l5-split-board
+ladder: A=5 (Champion) vs B=5 (Champion), 1000 games (500 pairs), seed 1
+gives: A split, B board
+games: 1000 (1000 finished, 0 failed)
+A wins: 527 / 1000, p̂ = 52.7 %
+Wilson 95 %: [49.6 %, 55.8 %]
+pairs: 2–0 129, 1–1 269, 0–2 102
+A decisions: 130465, mean 32.74 ms, p95 127.30 ms, max 1647.4 ms, units 26958738
+B decisions: 130797, mean 32.18 ms, p95 127.76 ms, max 1822.1 ms, units 22897741
+A gives: 28112, mean 3.78 ms, p95 13.06 ms, max 134.7 ms
+B gives: 28112, mean 0.65 ms, p95 3.03 ms, max 45.0 ms
+wall time: 2160.0 s (4 workers)
+verdict: PASS (bar: p̂ ≥ 0 % and Wilson lower bound > 0 %)

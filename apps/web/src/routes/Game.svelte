@@ -11,6 +11,7 @@
     type Playability,
     pawnColor,
     playability,
+    rankOf,
     sortHand,
     teamOf,
   } from "@toc/engine";
@@ -43,10 +44,14 @@
   import Pawn from "../board/Pawn.svelte";
   import { mixFromSettings } from "../game/audioSettings.ts";
   import type { DebugParams } from "../game/debugParams.ts";
+  import { markDone } from "../game/lessonProgress.ts";
+  import { LESSONS } from "../game/lessons.ts";
   import { game as copy } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { seats as seatNames } from "../i18n/fr/seats.ts";
   import type { TableConnection } from "../net/connection.svelte.ts";
+  import { pageStorage } from "../net/device.ts";
   import { gameNotices } from "../net/notices.ts";
   import {
     type ControllerFactory,
@@ -60,14 +65,22 @@
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ActionZone from "../ui/ActionZone.svelte";
   import DealBanner from "../ui/DealBanner.svelte";
+  import DeckSheet from "../ui/DeckSheet.svelte";
   import EndScreen from "../ui/EndScreen.svelte";
+  import GuideBand from "../ui/GuideBand.svelte";
   import HandFan, { type HandMode } from "../ui/HandFan.svelte";
   import Icon from "../ui/Icon.svelte";
   import InfoBar from "../ui/InfoBar.svelte";
+  import LessonPlank from "../ui/LessonPlank.svelte";
+  import LessonsSheet from "../ui/LessonsSheet.svelte";
   import MessagesButton from "../ui/MessagesButton.svelte";
   import MessagesSheet from "../ui/MessagesSheet.svelte";
   import PawnTray from "../ui/PawnTray.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
+  import RulesButton from "../ui/RulesButton.svelte";
+  import RulesSheet from "../ui/RulesSheet.svelte";
+  import { rulesOpen } from "../ui/rulesOpen.svelte.ts";
+  import type { RulesTabId } from "../i18n/fr/regles.ts";
   import SettingsButton from "../ui/SettingsButton.svelte";
   import type { TableSpeed } from "../ui/tableSpeed.ts";
   import SevenPanel from "../ui/SevenPanel.svelte";
@@ -99,9 +112,21 @@
       onleave: () => void;
       onquit: () => void;
     };
+    /**
+     * A lesson (#/apprendre/<1-8>, plan 05-06; 05-UI-SPEC « The lesson screen »): the game screen fed
+     * with the lesson's position, with the guide's band and halo, and « Bravo ! » at the end. Bleu at
+     * the bottom; no computer moves (lesson 8's three others pass their scripted cards); the deal
+     * banner, « D », « 1er », the team pills and « Avance rapide » are hidden. Never online.
+     */
+    lesson?: number;
   };
 
-  let { online }: Props = $props();
+  let { online, lesson }: Props = $props();
+
+  /** The lesson on screen, from its number (the route checked it is 1 to 8). */
+  const lessonData = untrack(() =>
+    online === undefined && lesson !== undefined ? LESSONS[lesson - 1] : undefined,
+  );
 
   // Debug views allowed in the hash query (#/partie?debug=geometry); anything else is ignored.
   const DEBUG_VIEWS = ["geometry"] as const;
@@ -239,11 +264,30 @@
     untrack(announceVisibility);
   });
 
+  // --- « Règles du TOC » (plan 05-04, PLAY-06): the book button, « R », the sheet ---
+  /** The sheet is open (set in the same task as the tap or the key, before the sheet mounts). */
+  let rulesShown = $state(false);
+  let rulesOpener = $state.raw<HTMLElement | null>(null);
+  /** The last tab opened in this game (memory only); « Les cartes » at first. */
+  let rulesTab = $state<RulesTabId>("cartes");
+
+  // --- « Les cartes jouées » (quick tasks 261109-6an, 261109-80e): the défausse pile on the felt, « T »,
+  // the row button, « Sur le tapis » ---
+  /** The sheet is open (set in the same task as the tap or the key, before the sheet mounts). */
+  let deckShown = $state(false);
+  let deckOpener = $state.raw<HTMLElement | null>(null);
+
   /**
    * The computer players wait while the invitation shows (« Conséquence de mise en œuvre, à confirmer
-   * par Romain »): the session's idle awaits this hold, which resolves once the screen is back in
-   * landscape. Every pending hold is released then, and on destroy, so a disposed game's loop ends.
+   * par Romain »), and in a solo game or a lesson while a rules sheet is open (plan 05-04: this
+   * screen's own, or one opened from « Réglages ») or « Les cartes jouées » is (quick task
+   * 261109-6an); online the game goes on: the session's idle awaits this hold, which resolves once
+   * the screen is back in landscape and those sheets are closed. Every pending hold is released
+   * then, and on destroy, so a disposed game's loop ends.
    */
+  const held = $derived(
+    prompting || (online === undefined && (rulesShown || deckShown || rulesOpen.count > 0)),
+  );
   let holds: (() => void)[] = [];
   function releaseHolds() {
     const waiting = holds;
@@ -251,11 +295,11 @@
     for (const resolve of waiting) resolve();
   }
   function hold(): Promise<void> {
-    if (!prompting || !alive) return Promise.resolve();
+    if (!held || !alive) return Promise.resolve();
     return new Promise<void>((resolve) => holds.push(resolve));
   }
   $effect(() => {
-    if (!prompting) untrack(releaseHolds);
+    if (!held) untrack(releaseHolds);
   });
 
   // What the screen provides to every session: it owns the SVG nodes, so it moves and animates pawns.
@@ -356,6 +400,7 @@
     flights = [];
     tapped = null;
     missed = false;
+    rulesTab = "cartes";
     await tick();
     if (!alive || mine !== epoch) return;
     const created = createSession(
@@ -364,6 +409,7 @@
       colour,
       online?.makeController,
       () => online?.connection.table?.fast === true,
+      lessonData,
     );
     session = created;
     // Online, the game number this screen plays (a higher one is the rematch, plan 02-09).
@@ -379,8 +425,9 @@
     guarded(
       (async () => {
         opened = await loadDebugParams(location.hash);
-        // Online the server holds the game: only the test speed of the debug parameters applies.
-        if (online !== undefined) opened = { vitesse: opened.vitesse };
+        // Online the server holds the game, and a lesson sets its own position: only the test speed
+        // of the debug parameters applies.
+        if (online !== undefined || lessonData !== undefined) opened = { vitesse: opened.vitesse };
         if (alive) await begin(opened, online?.seat);
       })(),
     );
@@ -398,6 +445,58 @@
       return;
     }
     guarded(begin({ vitesse: opened.vitesse }, session?.human));
+  }
+
+  /** « Revoir la leçon », « Recommencer cette leçon »: the position and the first line again. */
+  function restartLesson() {
+    lessonsOpen = false;
+    guarded(begin({ vitesse: opened.vitesse }));
+  }
+
+  /** « Les leçons », opened from the lesson pill; the pill gets the focus back on close. */
+  let lessonsOpen = $state(false);
+  let lessonsOpener = $state.raw<HTMLElement | null>(null);
+
+  /** The lesson pill of the info (plan 05-06). */
+  const lessonPill = $derived(
+    lessonData === undefined
+      ? undefined
+      : {
+          n: lessonData.n,
+          count: LESSONS.length,
+          title: lessonData.title,
+          onopen: (opener: HTMLElement) => {
+            lessonsOpener = opener;
+            lessonsOpen = true;
+          },
+        },
+  );
+
+  /** A row of « Les leçons »: that lesson, once the sheet has slid away (pickedLesson, sheetGone). */
+  let pickedLesson: number | null = null;
+  function pickLesson(n: number) {
+    pickedLesson = n;
+    lessonsOpen = false;
+  }
+  function sheetGone() {
+    const n = pickedLesson;
+    pickedLesson = null;
+    if (n !== null && alive) location.hash = `#/apprendre/${n}`;
+  }
+
+  /** « Quitter les leçons » (Réglages, no confirmation): the lessons page; finished lessons stay. */
+  function quitLessons() {
+    epoch++;
+    session?.dispose();
+    session = undefined;
+    location.hash = "#/apprendre";
+  }
+
+  /** The « Bravo ! » plank's primary: the next lesson, or the solo setup after the last one. */
+  function afterLesson() {
+    if (lessonData === undefined) return;
+    location.hash =
+      lessonData.n >= LESSONS.length ? "#/ordinateur" : `#/apprendre/${lessonData.n + 1}`;
   }
 
   /** « Changer de couleur »: back to the solo setup (#/ordinateur, 02-04). */
@@ -540,6 +639,18 @@
     messagesOpener = opener;
     messagesOpen = true;
   }
+
+  /** Opens « Règles du TOC » on the last tab of this game; `opener` gets the focus back. */
+  function openRules(opener: HTMLElement | null) {
+    rulesOpener = opener;
+    rulesShown = true;
+  }
+
+  /** Opens « Les cartes jouées »; `opener` gets the focus back. */
+  function openDeck(opener: HTMLElement | null) {
+    deckOpener = opener;
+    deckShown = true;
+  }
   let previousTable: TablePublic | null = null;
   $effect(() => {
     const next = onlineTable;
@@ -633,6 +744,48 @@
   );
   const ui = $derived(session?.ui ?? { kind: "waiting" as const });
   const view = $derived(session?.view);
+
+  // --- The lesson (plan 05-06): the guide's line, its halo, the plank ---
+  const lessonState = $derived(session?.lesson ?? null);
+  const lessonAt = $derived(lessonState?.at ?? null);
+  /** The lesson is over and the board has stopped: the « Bravo ! » plank shows. */
+  const lessonOver = $derived(lessonState?.done === true);
+  /** A narration line the player may pass with « Suivant » (a « cross » line once the cards crossed). */
+  const narration = $derived(
+    lessonAt !== null &&
+      lessonAt.ready &&
+      (lessonAt.step.expect.t === "next" || lessonAt.step.expect.t === "cross"),
+  );
+  /** What the guide says: a wrong choice's line, the game's own refusal, else the step's line. */
+  const guideLine = $derived.by((): string => {
+    if (lessonState === null) return "";
+    if (lessonState.wrong !== null) return lessonState.wrong;
+    const hint = session?.hint ?? null;
+    if (hint === "illegal") return copy.illegal;
+    if (hint !== null) return copy.reasons[hint];
+    return lessonAt?.step.line ?? lecons.bravo;
+  });
+  const guideHalo = $derived(lessonState?.halo ?? []);
+  const guideCard = $derived(guideHalo.find((halo) => halo.t === "card")?.card ?? null);
+  const guidePawns = $derived(
+    guideHalo.flatMap((halo) => (halo.t === "pawn" ? [halo.pawn] : [])),
+  );
+  const guideChip = $derived(guideHalo.find((halo) => halo.t === "chip")?.steps ?? null);
+  const guideButton = $derived.by((): "confirm" | "give" | null => {
+    for (const halo of guideHalo) {
+      if (halo.t === "button" && (halo.button === "confirm" || halo.button === "give")) {
+        return halo.button;
+      }
+    }
+    return null;
+  });
+  // A lesson is done when its plank shows (05-UI-SPEC « Progress »).
+  $effect(() => {
+    if (lessonOver && lessonData !== undefined) {
+      const n = lessonData.n;
+      untrack(() => markDone(pageStorage(), n));
+    }
+  });
 
   // Lower on screen = in front; the pawn on the move is on top of all the others (UI-SPEC).
   const drawn = $derived(
@@ -750,7 +903,7 @@
     view?.received != null && view.hand.includes(view.received) ? view.received : null,
   );
 
-  function send(event: TurnUiEvent) {
+  function send(event: TurnUiEvent | { t: "next" }) {
     missed = false;
     session?.send(event);
   }
@@ -807,6 +960,25 @@
       event.stopImmediatePropagation();
       return;
     }
+    // A lesson's narration line: Entrée presses « Suivant » (05-UI-SPEC « Keyboard (additions) »).
+    if (
+      narration &&
+      event.key === "Enter" &&
+      !event.repeat &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      // Plan 05-10 (keyboard audit): a focused control keeps its own Entrée (the lesson pill opens
+      // « Les leçons », the gear « Réglages »); « Suivant » itself is such a control and presses itself.
+      focusTarget().kind !== "field" &&
+      focusTarget().kind !== "control" &&
+      document.querySelector("[data-sheet-layer]") === null
+    ) {
+      event.preventDefault();
+      send({ t: "next" });
+      return;
+    }
     const intent = keyIntent(event, {
       ui,
       hand: view === undefined ? [] : sortHand(view.hand),
@@ -814,15 +986,26 @@
       concealed,
       focus: focusTarget(),
       messages: online !== undefined,
+      rules: rulesShown,
+      deck: deckShown,
       blocked:
         session === undefined ||
         view === undefined ||
         ended ||
+        lessonOver ||
         document.querySelector("[data-sheet-layer]") !== null,
     });
     if (intent === null) return;
-    // Under a plate only « ? » and « M » reach the game.
-    if (plateUp && intent.kind !== "help" && intent.kind !== "messages") return;
+    // Under a plate only « ? », « M », « R » and « T » reach the game.
+    if (
+      plateUp &&
+      intent.kind !== "help" &&
+      intent.kind !== "messages" &&
+      intent.kind !== "rules" &&
+      intent.kind !== "deck"
+    ) {
+      return;
+    }
     // The key is handled: no native action (a focused card or button is not also activated). It is
     // not stopped, though: the audio's first-gesture unlock and its resume retry listen further down
     // the path (the document), and a key is a gesture like a tap. The knights' own handler skips
@@ -837,6 +1020,26 @@
     if (intent.kind === "messages") {
       const active = document.activeElement;
       openMessages(active instanceof HTMLElement && active !== document.body ? active : null);
+      return;
+    }
+    if (intent.kind === "rules") {
+      // « R » opens the rules, and closes them from inside the sheet.
+      if (rulesShown) {
+        rulesShown = false;
+        return;
+      }
+      const active = document.activeElement;
+      openRules(active instanceof HTMLElement && active !== document.body ? active : null);
+      return;
+    }
+    if (intent.kind === "deck") {
+      // « T » opens the cards of the pack, and closes them from inside the sheet.
+      if (deckShown) {
+        deckShown = false;
+        return;
+      }
+      const active = document.activeElement;
+      openDeck(active instanceof HTMLElement && active !== document.body ? active : null);
       return;
     }
     for (const each of intent.events) {
@@ -962,7 +1165,10 @@
       {bar}
       {compact}
       {part}
-      fastToggle={online === undefined}
+      fastToggle={online === undefined && lessonData === undefined}
+      quiet={lessonData !== undefined}
+      onnext={narration ? () => send({ t: "next" }) : undefined}
+      guide={flow.kind === "sevenBuilding" ? null : guideButton}
       {view}
       human={session.human}
       names={session.names}
@@ -992,6 +1198,8 @@
       {part}
       tray={ui.kind === "tray" ? ui : null}
       {missed}
+      guide={guideChip !== null ? { steps: guideChip } : guideButton === "confirm" ? "confirm" : null}
+      counter={lessonData !== undefined && part === "chips"}
       onpickSteps={(steps) => send({ t: "pickSteps", steps })}
       onundo={() => send({ t: "undoLast" })}
       oncancelAll={() => send({ t: "cancelAll" })}
@@ -1028,6 +1236,7 @@
       pace={session.pace}
       {compact}
       board={stageEl}
+      guide={guideCard}
       onpick={pickCard}
     />
   {/if}
@@ -1035,7 +1244,10 @@
 
 <main
   class="game"
+  class:lesson={lessonData !== undefined}
   data-chrome={screen.chrome}
+  data-lesson={lessonData?.n}
+  data-lesson-step={lessonData === undefined ? undefined : (lessonAt?.index ?? "done")}
   style:--head-room={SCENE.headRoom}
   style:--board-ratio={SCENE.height / SCENE.width}
   style:--galet-bare={GALET_BARE}
@@ -1047,13 +1259,22 @@
   {/if}
   {#if prompting}
     <RotatePrompt bind:heading={rotateHeading} />
+  {:else}
+    <!-- The page's one h1 (plan 05-10, APP-05 audit), for screen readers: the rotate prompt has its own. -->
+    <h1 class="sr-only" data-game-heading>
+      {lessonData !== undefined
+        ? lecons.heading(lessonData.n, lessonData.title)
+        : online !== undefined
+          ? copy.heading.online
+          : copy.heading.solo}
+    </h1>
   {/if}
   <!-- Behind the invitation to turn the screen the whole game is kept, mounted, but not displayed and
        inert: no focus, no tap, nothing for a screen reader. -->
   <div class="play" class:away={prompting} data-game-play inert={prompting} bind:this={playEl}>
     {#if session !== undefined && render !== null && view !== undefined}
       <!-- Behind the end screen the game is out of reach: no focus, no tap, nothing for a screen reader. -->
-      <div class="layout" data-layout inert={ended}>
+      <div class="layout" data-layout inert={ended || lessonOver}>
         <div class="info">
           <InfoBar
             {render}
@@ -1061,7 +1282,8 @@
             names={session.names}
             thinking={session.thinking}
             form={bar ? "column" : compact ? "pill" : "row"}
-            onabandon={online === undefined ? abandon : undefined}
+            onabandon={online === undefined && lessonData === undefined ? abandon : undefined}
+            onquitlessons={lessonData === undefined ? undefined : quitLessons}
             onleave={online?.onleave}
             onstop={canStop ? stopGame : undefined}
             {tableSpeed}
@@ -1069,17 +1291,29 @@
               ? { table: onlineTable, me: online.seat }
               : undefined}
             onmessages={online !== undefined ? openMessages : undefined}
+            onrules={openRules}
+            ondeck={openDeck}
+            lesson={lessonPill}
           />
         </div>
 
+        {#if lessonData !== undefined}
+          <!-- The guide (plan 05-06): in the compact prompt row's place, or above the board on a
+               computer; always mounted, so each new line is read once. -->
+          <div class="band-row">
+            <GuideBand line={guideLine} />
+          </div>
+        {/if}
+
         {#if compact}
-          <!-- The top of the right strip: « Réglages », then « Avance rapide » while the computer plays;
-               online « Messages » takes that slot (the server paces the computers, plan 02-08) and
-               stays usable under a plate. -->
+          <!-- The top of the right strip: « Réglages », « Règles du jeu » (plan 05-04), then « Avance
+               rapide » while the computer plays; online « Messages » takes that slot (the server
+               paces the computers, plan 02-08) and stays usable under a plate. -->
           <div class="tools">
             <div class="gear" data-settings-slot>
               <SettingsButton
-                onabandon={online === undefined ? abandon : undefined}
+                onabandon={online === undefined && lessonData === undefined ? abandon : undefined}
+                onquitlessons={lessonData === undefined ? undefined : quitLessons}
                 online={online !== undefined}
                 inGame={online !== undefined}
                 onleave={online?.onleave}
@@ -1087,9 +1321,11 @@
                 {tableSpeed}
               />
             </div>
+            <!-- « Règles du jeu », under the gear (plan 05-04). -->
+            <RulesButton onopen={openRules} />
             {#if online !== undefined}
               <MessagesButton onopen={openMessages} keys />
-            {:else}
+            {:else if lessonData === undefined}
               <div class="fast" inert={plateUp}>
                 {@render zone("fast")}
               </div>
@@ -1105,7 +1341,9 @@
             {burst}
             {flights}
             thinking={session.thinking}
+            markers={lessonData === undefined}
             ontapis={() => (tapisOpen = true)}
+            ondefausse={openDeck}
           >
             {#snippet badges()}
               {#if onlineTable !== null}
@@ -1122,6 +1360,7 @@
                 {candidates}
                 selected={selectedPawn}
                 target={targetPawn}
+                guided={guidePawns}
               />
             {/snippet}
             {#each drawn as pawn (pawn.id)}
@@ -1133,6 +1372,10 @@
                 place={render.pawns[pawn.id] as Place}
                 facing={facings[pawn.id]}
                 lift={pawn.id === selectedPawn ? 12 : 0}
+                guide={guidePawns.includes(pawn.id)}
+                human={session.human}
+                names={session.names}
+                lit={candidates.includes(pawn.id)}
                 bind:el={() => els[pawn.id], (node) => (els[pawn.id] = node)}
               />
             {/each}
@@ -1164,6 +1407,9 @@
                   ui.kind === "sevenBuilding" ||
                   ui.kind === "preview"
                 }
+                guided={guidePawns}
+                human={session?.human}
+                names={session?.names}
                 onpick={pickPawn}
                 onnear={pickNear}
                 onmiss={() => {
@@ -1172,7 +1418,9 @@
               />
             {/snippet}
           </Board>
-          <DealBanner {render} names={session.names} human={session.human} />
+          {#if lessonData === undefined}
+            <DealBanner {render} names={session.names} human={session.human} />
+          {/if}
         </div>
 
         {#if flow.kind === "sevenBuilding" && compact}
@@ -1185,9 +1433,11 @@
             data-selected={flow.selected ?? ""}
             aria-label={copy.seven.title}
           >
-            <div class="prompt-row">
-              {@render seven("line")}
-            </div>
+            {#if lessonData === undefined}
+              <div class="prompt-row">
+                {@render seven("line")}
+              </div>
+            {/if}
             <div class="chips">
               {@render seven("chips")}
             </div>
@@ -1203,13 +1453,15 @@
         {:else if compact}
           <!-- The prompt row over the board, then the state's buttons at the bottom of the right strip
                and the hand (or the « Lequel ? » chips) at the bottom of the left one. -->
-          <div class="prompt-row">
-            {#if plateUp}
-              {@render pausedLine()}
-            {:else}
-              {@render zone("prompt")}
-            {/if}
-          </div>
+          {#if lessonData === undefined}
+            <div class="prompt-row">
+              {#if plateUp}
+                {@render pausedLine()}
+              {:else}
+                {@render zone("prompt")}
+              {/if}
+            </div>
+          {/if}
           {#if ui.kind === "tray"}
             <div class="chips" inert={plateUp}>
               <PawnTray
@@ -1267,7 +1519,17 @@
       {/if}
 
       {#if tapisOpen}
-        <TapisSheet {render} names={session.names} onclose={() => (tapisOpen = false)} />
+        <TapisSheet
+          {render}
+          names={session.names}
+          onclose={() => (tapisOpen = false)}
+          ondeck={() => {
+            // In the same task: « Sur le tapis » closes, the new sheet takes the focus, and the felt
+            // gets it back when « Les cartes jouées » closes.
+            tapisOpen = false;
+            openDeck(stageEl?.querySelector<HTMLElement>("[data-felt-button]") ?? null);
+          }}
+        />
       {/if}
 
       {#if shortcutsOpen}
@@ -1278,6 +1540,22 @@
         />
       {/if}
 
+      {#if rulesShown}
+        <RulesSheet
+          tab={rulesTab}
+          selectedRank={selectedCard === null ? null : rankOf(selectedCard)}
+          inGame
+          yourTurn={online !== undefined && (handMode === "turn" || handMode === "dead")}
+          opener={rulesOpener}
+          ontab={(next) => (rulesTab = next)}
+          onclose={() => (rulesShown = false)}
+        />
+      {/if}
+
+      {#if deckShown}
+        <DeckSheet {view} opener={deckOpener} onclose={() => (deckShown = false)} />
+      {/if}
+
       {#if messagesOpen && online !== undefined && onlineTable !== null && !ended}
         <MessagesSheet
           chat={online.connection.chat}
@@ -1286,6 +1564,29 @@
           opener={messagesOpener}
           onsend={(msg) => online.connection.send({ t: "chat", msg })}
           onclose={() => (messagesOpen = false)}
+        />
+      {/if}
+
+      {#if lessonsOpen && lessonData !== undefined}
+        <LessonsSheet
+          current={lessonData.n}
+          opener={lessonsOpener}
+          onrestart={restartLesson}
+          onpick={pickLesson}
+          onclose={() => (lessonsOpen = false)}
+          ongone={sheetGone}
+        />
+      {/if}
+
+      {#if lessonOver && lessonData !== undefined}
+        <LessonPlank
+          recap={lessonData.recap}
+          last={lessonData.n >= LESSONS.length}
+          board={boardEl}
+          onprimary={afterLesson}
+          onsecondary={lessonData.n >= LESSONS.length
+            ? () => (location.hash = "#/apprendre")
+            : restartLesson}
         />
       {/if}
 
@@ -1535,13 +1836,14 @@
       --head-room: 0;
     }
 
-    /* The bottom of the right strip, under the gear and « Avance rapide » (two 44 px targets). */
+    /* The bottom of the right strip, under the gear, the book and « Avance rapide » (three 44 px
+       targets, plan 05-04). */
     .actions {
       grid-area: right;
       align-self: end;
       justify-self: center;
       min-height: 0;
-      max-height: calc(100% - 2 * var(--touch) - 3 * var(--space-xs));
+      max-height: calc(100% - 3 * var(--touch) - 4 * var(--space-xs));
     }
 
     /* The hand over the whole left strip, in front of the board: its cards stand from the strip's
@@ -1577,6 +1879,34 @@
     /* The 7's region has no box: its three parts are placed like the others. */
     .seven {
       display: contents;
+    }
+
+    /*
+     * A lesson (plan 05-06; 05-UI-SPEC « Board width in a lesson »): the guide's band takes the prompt
+     * row's place, 56 px high (two lines of Body), and the board formula reads its height.
+     */
+    .game.lesson {
+      --prompt-row: 56px;
+      --band: 56px;
+    }
+
+    .band-row {
+      grid-area: prompt;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    /* Room under the lowest button for the guide's ring (8 px outside it). */
+    .game.lesson .actions {
+      padding-bottom: var(--space-sm);
+    }
+  }
+
+  /* Under 640 px wide the band has three lines (80 px): there the board is limited by the width. */
+  @media (orientation: landscape) and (max-width: 639.98px) {
+    .game.lesson {
+      --prompt-row: 80px;
+      --band: 80px;
     }
   }
 
@@ -1647,6 +1977,42 @@
       grid-column: hand / action;
       min-width: 0;
       min-height: 0;
+    }
+
+    /*
+     * A lesson (plan 05-06): the guide's band (56 px) above the board, as wide as the board and
+     * centred on it; the board formula takes its height off.
+     */
+    .game.lesson {
+      --band: 56px;
+      --board-size: max(
+        0px,
+        min(
+          100vw - 32px - var(--inset-x),
+          (100dvh - var(--bar) - var(--band) - var(--inset-y)) /
+            (var(--board-ratio) + var(--head-room)),
+          1600px
+        )
+      );
+    }
+
+    .game.lesson .layout {
+      grid-template-areas:
+        "band band band"
+        "stage stage stage"
+        "info hand action";
+      grid-template-rows: var(--band) minmax(0, 1fr) var(--bar);
+    }
+
+    .game.lesson .stage {
+      align-self: start;
+    }
+
+    .band-row {
+      grid-area: band;
+      justify-self: center;
+      width: var(--board-size);
+      min-width: 0;
     }
   }
 </style>

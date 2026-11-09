@@ -8,6 +8,8 @@
     "types": "wrangler types -c ../../wrangler.jsonc ./worker-configuration.d.ts"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
+    "@simplewebauthn/server": "14.0.3",
     "@toc/engine": "workspace:*",
     "@toc/protocol": "workspace:*",
     "@toc/table": "workspace:*"

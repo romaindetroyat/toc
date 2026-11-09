@@ -88,11 +88,11 @@ export const table = {
     checking: "Vérification…",
     offline: "État inconnu (hors ligne)",
     line2: (status: string, time: string) => `${status} · ${time}`,
-    /** The row's accessible name. */
+    /** The row’s accessible name: its visible words in order, then the action (plan 05-10). */
     rowLabel: (first: string, second: string, colour: string | null) =>
       colour === null
-        ? `Reprendre la partie : ${first}, ${second}.`
-        : `Reprendre la partie : ${first}, ${second}. Ta couleur : ${colour}.`,
+        ? `${first}, ${second}, reprendre la partie`
+        : `${colour}, ${first}, ${second}, reprendre la partie`,
     remove: "Retirer cette partie de la liste",
     removed: "Partie retirée de la liste.",
     restore: "Remettre",
@@ -125,12 +125,20 @@ export const table = {
     otherSeat: (colour: string, name: string, status: string) => `${colour} : ${name}, ${status}`,
     /** Accessible name of the own seat when this device is the chef de table. */
     ownSeatHost: (colour: string) => `${colour} : toi, chef de table`,
-    /** The creator's button on another person's seat. */
-    moveSeat: (name: string, colour: string) => `Déplacer ${name} (${colour})`,
+    /** The creator’s button on another person’s seat: its sentence, then the action (plan 05-10). */
+    moveSeat: (sentence: string) => `${sentence}, déplacer`,
     /** « Libérer ma place » under the grid. */
     stand: "Libérer ma place",
+    /**
+     * Plan 05-08: a seated device without a finished lesson, at the end of the right column; the
+     * rules only, never the lessons (leaving would free the seat).
+     */
+    newcomer: "Première fois ? Lis les règles en attendant.",
+    newcomerRules: "Règles du jeu",
     invite: "Inviter",
     partner: "Partenaire",
+    /** The partner’s tag in a seat’s sentence. */
+    partnerWord: "partenaire",
     noComputer: "Quatre joueurs à la table : pas d’ordinateur.",
     /** « 1 joueur et 3 ordinateurs », « 4 joueurs et aucun ordinateur ». */
     count: (people: number, computers: number) =>

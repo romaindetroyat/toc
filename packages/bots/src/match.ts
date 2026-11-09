@@ -17,8 +17,8 @@ import {
   teamOf,
   viewFor,
 } from "@toc/engine";
-import type { BotLevel } from "./levels.ts";
-import { type Budget, chooseAction } from "./thinker.ts";
+import type { BotLevel, GiveMethod } from "./levels.ts";
+import { type Budget, chooseAction, chooseGive } from "./thinker.ts";
 
 /** A game that has not ended after this many actions is a failure (tools/selfplay.mjs's cap). */
 export const ACTION_CAP = 5000;
@@ -30,6 +30,8 @@ export type TeamStats = {
   units: number;
   /** The duration of each decision, in the unit of the injected clock; [] without one. */
   ms: number[];
+  /** The same for the exchange decisions only (plan 04-15), also counted in `ms`. */
+  giveMs: number[];
 };
 
 export type GameResult = { winner: Team; actions: number; perTeam: Record<Team, TeamStats> };
@@ -42,6 +44,12 @@ export type PlayGameOptions = {
   budgets?: Partial<Readonly<Record<Team, Budget>>>;
   /** A clock injected by the host (performance.now in the ladder); none here. */
   time?: () => number;
+  /**
+   * Per-team exchange method (plan 04-15): forces the board or the deal give whatever the level's own
+   * (levels.ts GIVE_METHOD), so the ladder can play the new give against the old one at one level.
+   * Level 1 always gives like randomLegal.
+   */
+  gives?: Partial<Readonly<Record<Team, GiveMethod>>>;
 };
 
 /** A mixing step for 32-bit integers (the seeds of the streams). */
@@ -106,12 +114,12 @@ export function ladderSeeds(seed: number, pairs: number): { dealSeed: Rng; botSe
  * too) and the bot seed. Throws after ACTION_CAP actions or on an action apply refuses.
  */
 export function playGame(options: PlayGameOptions): GameResult {
-  const { levels, dealSeed, botSeed, budgets, time } = options;
+  const { levels, dealSeed, botSeed, budgets, time, gives } = options;
   let state = newGame({ firstDealer: COLORS[(dealSeed[0] >>> 0) % 4] as Color }, dealSeed);
   const streams = seatStreams(botSeed);
   const perTeam: Record<Team, TeamStats> = {
-    "bleu-rouge": { decisions: 0, units: 0, ms: [] },
-    "jaune-vert": { decisions: 0, units: 0, ms: [] },
+    "bleu-rouge": { decisions: 0, units: 0, ms: [], giveMs: [] },
+    "jaune-vert": { decisions: 0, units: 0, ms: [], giveMs: [] },
   };
   let actions = 0;
   while (state.phase !== "won") {
@@ -126,8 +134,17 @@ export function playGame(options: PlayGameOptions): GameResult {
     const team = teamOf(seat);
     const view = viewFor(state, seat);
     const started = time?.();
-    const thought = chooseAction(view, seat, levels[team], streams[seat], budgets?.[team]);
-    if (time !== undefined && started !== undefined) perTeam[team].ms.push(time() - started);
+    const level = levels[team];
+    const method = gives?.[team];
+    const thought =
+      phase === "exchange" && level !== 1 && method !== undefined
+        ? chooseGive(view, seat, level, streams[seat], method)
+        : chooseAction(view, seat, level, streams[seat], budgets?.[team]);
+    if (time !== undefined && started !== undefined) {
+      const spent = time() - started;
+      perTeam[team].ms.push(spent);
+      if (phase === "exchange") perTeam[team].giveMs.push(spent);
+    }
     streams[seat] = thought.rng;
     perTeam[team].decisions++;
     perTeam[team].units += thought.units;

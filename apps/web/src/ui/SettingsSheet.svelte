@@ -1,19 +1,25 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { setMix } from "../audio/engine.ts";
   import { mixFromSettings } from "../game/audioSettings.ts";
   import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
   import { reglages } from "../i18n/fr/reglages.ts";
+  import { canInstall, install, promptInstall } from "../pwa/install.svelte.ts";
+  import { inGameUpdateLine } from "../pwa/rules.ts";
+  import { currentPlace, pwaUpdate } from "../pwa/update.svelte.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreditsSheet from "./CreditsSheet.svelte";
+  import InstallSheet from "./InstallSheet.svelte";
+  import RulesSheet from "./RulesSheet.svelte";
   import Sheet from "./Sheet.svelte";
   import ShortcutsSheet from "./ShortcutsSheet.svelte";
   import Switch from "./Switch.svelte";
   import type { TableSpeed } from "./tableSpeed.ts";
 
-  // « Réglages » (UI-SPEC): sound, effects, reduced animations, and the links
+  // « Réglages » (UI-SPEC): sound, effects, reduced animations, the shapes on the knights, and the links
   // to the sound test and the credits. Every change is applied at once and kept (no Save button): the
   // store writes it to localStorage, and the mix below reaches the audio buses.
   type Props = {
@@ -26,6 +32,11 @@
      * by default).
      */
     onabandon?: (to?: string) => void;
+    /**
+     * In a lesson (plan 05-06): « Quitter les leçons » in place of « Abandonner la partie », without
+     * a confirmation (finished lessons stay marked).
+     */
+    onquitlessons?: () => void;
     /**
      * At an online table (plan 02-05): « Tester les sons » is hidden (leaving the page would drop the
      * table's connection), and « Quitter la table » is offered when `onleave` is given, confirmed first.
@@ -54,6 +65,7 @@
     onclose,
     opener = null,
     onabandon,
+    onquitlessons,
     online = false,
     onleave,
     inGame = false,
@@ -78,6 +90,20 @@
   // engine keeps them until it is unlocked).
   $effect(() => {
     setMix(mixFromSettings(settings));
+  });
+
+  // « Règles du jeu » (plan 05-08, 05-UI-SPEC « Where it opens »): the first link, the rules over this
+  // sheet like « Crédits et licences ». In a game or a lesson on « Les cartes » (the solo computers
+  // wait: the rules sheet counts in rulesOpen); elsewhere on « Le but ». « Apprendre en jouant » only
+  // outside a game and away from an online table (leaving the waiting room would free the seat): it
+  // closes both sheets, then opens #/apprendre once this one has gone.
+  const playing = $derived(onabandon !== undefined || onquitlessons !== undefined || inGame);
+  const canLearn = $derived(!playing && !online);
+  let rulesOpen = $state(false);
+  let rulesButton = $state<HTMLButtonElement | null>(null);
+  let learning = false;
+  onDestroy(() => {
+    if (learning) location.hash = "#/apprendre";
   });
 
   let creditsOpen = $state(false);
@@ -107,6 +133,19 @@
 
   // « Son » off dims « Bruitages ».
   const muted = $derived(!settings.sound);
+
+  // Plan 04-08: « Installer l’application » while installing is possible (the browser's prompt, or
+  // « Installer TOC » on iPhone and iPad); in a game or at a table, the line that says a new version
+  // waits for the home (APP-02).
+  const installable = $derived(canInstall());
+  const updateLine = $derived(pwaUpdate.needRefresh && inGameUpdateLine(currentPlace()));
+  let installOpen = $state(false);
+  let installButton = $state<HTMLButtonElement | null>(null);
+
+  function startInstall() {
+    if (install.prompt !== null) void promptInstall();
+    else installOpen = true;
+  }
 </script>
 
 <Sheet title={reglages.title} {onclose} {opener} closeLabel={reglages.close}>
@@ -142,8 +181,27 @@
       checked={settings.reduceMotion}
       onchange={(reduceMotion) => updateSettings({ reduceMotion })}
     />
+    <Switch
+      label={reglages.knightMarks}
+      helper={reglages.knightMarksHelper}
+      checked={settings.knightMarks}
+      onchange={(knightMarks) => updateSettings({ knightMarks })}
+    />
+    {#if updateLine}
+      <p class="update-line" data-update-line>{reglages.updateReady}</p>
+    {/if}
 
     <nav class="links">
+      <button
+        type="button"
+        class="btn btn-text"
+        aria-haspopup="dialog"
+        data-settings-rules
+        bind:this={rulesButton}
+        onclick={() => (rulesOpen = true)}
+      >
+        {reglages.rules}
+      </button>
       {#if !online}
         <a class="btn btn-text" href="#/sons" bind:this={soundsLink} onclick={onSoundsClick}>
           {reglages.testSounds}
@@ -157,7 +215,19 @@
       >
         {reglages.credits}
       </button>
-      {#if onabandon || inGame}
+      {#if installable}
+        <button
+          type="button"
+          class="btn btn-text"
+          data-install-app
+          aria-haspopup={install.prompt === null ? "dialog" : undefined}
+          bind:this={installButton}
+          onclick={startInstall}
+        >
+          {reglages.install}
+        </button>
+      {/if}
+      {#if onabandon || onquitlessons || inGame}
         <!-- In a game, on a computer only: the same help as the « ? » key (plan 01-28). -->
         <button
           type="button"
@@ -170,6 +240,20 @@
         </button>
       {/if}
     </nav>
+
+    {#if onquitlessons}
+      <button
+        type="button"
+        class="btn btn-text abandon"
+        data-quit-lessons
+        onclick={() => {
+          onclose();
+          onquitlessons();
+        }}
+      >
+        {reglages.quitLessons}
+      </button>
+    {/if}
 
     {#if onabandon}
       <button
@@ -233,8 +317,27 @@
   />
 {/if}
 
+{#if rulesOpen}
+  <RulesSheet
+    tab={playing ? "cartes" : "but"}
+    inGame={playing}
+    opener={rulesButton}
+    onclose={() => (rulesOpen = false)}
+    onlearn={canLearn
+      ? () => {
+          learning = true;
+          onclose();
+        }
+      : undefined}
+  />
+{/if}
+
 {#if creditsOpen}
   <CreditsSheet onclose={() => (creditsOpen = false)} opener={creditsButton} />
+{/if}
+
+{#if installOpen}
+  <InstallSheet onclose={() => (installOpen = false)} opener={installButton} />
 {/if}
 
 {#if shortcutsOpen}
@@ -261,6 +364,14 @@
   .abandon,
   .leave {
     align-self: flex-start;
+  }
+
+  /* The update line: Label, muted, under the switches (04-UI-SPEC « Update »). */
+  .update-line {
+    margin: 0;
+    color: var(--creme-attenuee);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
   }
 
   .links {

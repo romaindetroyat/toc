@@ -2,12 +2,15 @@
   import { COLORS, type Color, type Team, teamOf } from "@toc/engine";
   import { PALETTE } from "@toc/board";
   import type { RematchVote } from "@toc/protocol";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import { account } from "../account/store.svelte.ts";
   import type { GameStats } from "../game/GameController.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { resultats } from "../i18n/fr/resultats.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { table as tableCopy } from "../i18n/fr/table.ts";
   import { discLabel, voteLine } from "../net/votes.ts";
+  import { reportSolo, reportStatusOf } from "../results/report.svelte.ts";
   import { settings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
 
@@ -76,6 +79,27 @@
   }
 
   const result = $derived(stats());
+
+  // Plan 05-07 (D-01; 05-UI-SPEC « What counts »): a real solo game won while signed in goes to
+  // « Mes résultats », once (reportSolo keeps it in toc.pending.v1 until the server has it). The line
+  // under the figures says it, or that it waits for the network; a failure and a guest show nothing.
+  const solo = $derived(online === undefined ? result.solo : null);
+  const accountId = $derived(account.current?.id ?? null);
+  $effect(() => {
+    const game = solo;
+    const id = accountId;
+    if (game === null || id === null) return;
+    untrack(() => void reportSolo(game, id));
+  });
+  const reportLine = $derived.by(() => {
+    if (accountId === null) return "";
+    const status = reportStatusOf(solo);
+    return status === "added"
+      ? resultats.report.added
+      : status === "offline"
+        ? resultats.report.offline
+        : "";
+  });
   // The winning team's two colours, the human's own knight first (« Toi », then the partner).
   const winners = $derived(
     COLORS.filter((color) => teamOf(color) === winner).sort(
@@ -193,11 +217,20 @@
         </span>
       </div>
 
-      <p class="stats">
-        <span data-stat="deals">{game.end.deals(result.dealsPlayed)}</span>
-        <span class="dot" aria-hidden="true">·</span>
-        <span data-stat="captures">{game.end.captures(result.captured.nous, result.captured.eux)}</span>
-      </p>
+      <div class="figures">
+        <p class="stats">
+          <span data-stat="deals">{game.end.deals(result.dealsPlayed)}</span>
+          <span class="dot" aria-hidden="true">·</span>
+          <span data-stat="captures">{game.end.captures(result.captured.nous, result.captured.eux)}</span>
+        </p>
+
+        <!-- Plan 05-07: the solo report's line, a live region that stays mounted (empty until it speaks). -->
+        <p class="report" aria-live="polite">
+          {#if reportLine !== ""}
+            <span data-solo-report={reportStatusOf(solo)}>{reportLine}</span>
+          {/if}
+        </p>
+      </div>
 
       {#if online !== undefined}
         <div class="vote">
@@ -504,6 +537,25 @@
 
   .dot {
     margin: 0 var(--space-xs);
+  }
+
+  /* The figures and, under them (plan 05-07), the solo report's line: an empty line has no height. */
+  .figures {
+    display: grid;
+    justify-items: center;
+  }
+
+  .report span {
+    display: block;
+    margin-top: var(--space-xs);
+  }
+
+  .report {
+    max-width: 36ch;
+    text-wrap: balance;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    color: var(--track);
   }
 
   .buttons {

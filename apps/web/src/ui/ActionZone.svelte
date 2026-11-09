@@ -15,6 +15,7 @@
   import { cardName, cardWithArticle } from "../i18n/fr/cards.ts";
   import { clavier } from "../i18n/fr/clavier.ts";
   import { botLine, game } from "../i18n/fr/game.ts";
+  import { lecons } from "../i18n/fr/lecons.ts";
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import Icon from "./Icon.svelte";
   import KeyHint from "./KeyHint.svelte";
@@ -64,6 +65,18 @@
      * for everyone (plan 02-08, 02-UI-SPEC « Chrome changes »).
      */
     fastToggle?: boolean;
+    /**
+     * In a lesson (plan 05-06): the guide's band says what to do, so the zone says nothing (its
+     * prompt text is empty and it is no live region); its buttons stay.
+     */
+    quiet?: boolean;
+    /**
+     * In a lesson, on a narration line: « Suivant » (the primary, Entrée) takes the place of the
+     * state's buttons and takes the focus when it appears.
+     */
+    onnext?: () => void;
+    /** In a lesson: the button the guide asks to touch, ringed in cream and named « …, à toucher ». */
+    guide?: "confirm" | "give" | null;
   };
 
   let {
@@ -72,6 +85,9 @@
     compact = false,
     part = "all",
     fastToggle = true,
+    quiet = false,
+    onnext,
+    guide = null,
     view,
     human,
     names,
@@ -124,6 +140,7 @@
 
   /** The sentence(s) of the zone: a list of lines, the first one is the prompt. */
   const lines = $derived.by((): string[] => {
+    if (quiet) return [];
     if (hint === "illegal") return [game.illegal];
     if (hint !== null) return [game.reasons[hint]];
     const done = doneLine === null ? [] : [doneLine];
@@ -214,6 +231,16 @@
   // One key per displayed state, so the zone cross-fades (150 ms, none under reduced motion).
   const key = $derived(`${ui.kind}|${hint ?? ""}|${missed}|${thinking ?? ""}|${lines.join("/")}`);
   const fadeMs = $derived(settings.reduceMotion ? 0 : 150);
+
+  /** A button's accessible name, with « , à toucher » when the guide rings it. */
+  function named(label: string, ringed: boolean): string {
+    return ringed ? lecons.target(label) : label;
+  }
+
+  /** « Suivant » takes the focus when it appears (05-UI-SPEC « The guide band »). */
+  function focusNow(node: HTMLElement) {
+    node.focus({ preventScroll: true });
+  }
   const showFast = $derived(
     fastToggle &&
       (ui.kind === "waiting" || ui.kind === "empty" || ui.kind === "posed") &&
@@ -222,7 +249,22 @@
 </script>
 
 {#snippet stateButtons()}
-  {#if ui.kind === "modeChoice"}
+  {#if onnext !== undefined}
+    <!-- A narration line of a lesson: « Suivant » alone (plan 05-06). -->
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn btn-primary play hinted"
+        data-lesson-next
+        aria-keyshortcuts="Enter"
+        use:focusNow
+        onclick={onnext}
+      >
+        {lecons.suivant}
+        <KeyHint label={clavier.keys.enter} />
+      </button>
+    </div>
+  {:else if ui.kind === "modeChoice"}
     <div class="buttons modes">
       <button
         type="button"
@@ -285,7 +327,12 @@
       <button
         type="button"
         class="btn btn-primary play hinted"
-        aria-label={ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play}
+        class:guide-halo={guide === "confirm"}
+        data-guide-halo={guide === "confirm" ? "button" : undefined}
+        aria-label={named(
+          ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play,
+          guide === "confirm",
+        )}
         aria-keyshortcuts="Enter"
         title={compact ? (ui.partnerCapture ? game.buttons.playAnyway : game.buttons.play) : undefined}
         onclick={onconfirm}
@@ -303,8 +350,10 @@
       <button
         type="button"
         class="btn btn-primary play hinted"
+        class:guide-halo={guide === "give"}
+        data-guide-halo={guide === "give" ? "button" : undefined}
         disabled={ui.selected === undefined}
-        aria-label={game.exchange.pass}
+        aria-label={named(game.exchange.pass, guide === "give")}
         aria-keyshortcuts="Enter P"
         title={compact ? game.exchange.pass : undefined}
         onclick={ongive}
@@ -401,7 +450,7 @@
     class:still={settings.reduceMotion}
     class:bar
     class:row={part === "prompt"}
-    aria-live="polite"
+    aria-live={quiet ? undefined : "polite"}
     data-action-zone
     data-state={ui.kind}
   >

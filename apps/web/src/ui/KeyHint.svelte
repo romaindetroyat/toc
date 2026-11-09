@@ -4,6 +4,10 @@
   // that can hover); on phones it is not drawn at all. It is aria-hidden and lets every tap through:
   // the host keeps its size, its accessible name and its Tab stop (the host names itself with
   // aria-label and aria-keyshortcuts).
+  // Plan 05-10 (APP-05 audit, WCAG 2.5.3 « Label in Name »): the key is painted by CSS from its
+  // attribute, not written as text in the host, so the host's visible label stays its own words
+  // (« Jouer », not « Jouer Entrée »): the badge is a keyboard cue drawn on the button, not part of
+  // its label, and it was already left out of the accessible name.
   type Props = {
     /** The key, as printed on the badge: a digit, a letter, « Entrée », « Échap », « ⌫ ». */
     label: string;
@@ -17,7 +21,7 @@
   let { label, at = "corner" }: Props = $props();
 </script>
 
-<kbd class="key-hint {at}" aria-hidden="true" data-key-hint={label}>{label}</kbd>
+<kbd class="key-hint {at}" aria-hidden="true" data-key-hint={label}></kbd>
 
 <style>
   .key-hint {
@@ -42,6 +46,10 @@
     line-height: 1;
     white-space: nowrap;
     pointer-events: none;
+  }
+
+  .key-hint::before {
+    content: attr(data-key-hint);
   }
 
   .corner {

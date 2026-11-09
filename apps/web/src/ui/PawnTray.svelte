@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { SEAT_MARKS } from "@toc/board";
   import { type PawnId, pawnColor } from "@toc/engine";
   import { trayLetters } from "../game/turnUi.ts";
   import { clavier } from "../i18n/fr/clavier.ts";
   import { game } from "../i18n/fr/game.ts";
+  import { settings } from "../settings/store.svelte.ts";
   import KeyHint from "./KeyHint.svelte";
 
   type Props = {
@@ -42,6 +44,13 @@
           >
             <svg viewBox="0 0 110 190" width="22" height="38" focusable="false" aria-hidden="true">
               <use href={`#knight-${pawnColor(pawn)}`} />
+              {#if settings.knightMarks}
+                <!-- The seat's shape, as on the board's knights (plan 05-02). -->
+                <use
+                  href={`#knight-mark-${pawnColor(pawn)}`}
+                  data-knight-mark={SEAT_MARKS[pawnColor(pawn)]}
+                />
+              {/if}
             </svg>
             <span class="letter" aria-hidden="true">{letters[i]}</span>
           </button>

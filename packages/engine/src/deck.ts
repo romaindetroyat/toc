@@ -6,7 +6,8 @@ import { rankOf, suitOf } from "./types.ts";
 /** Hand order of the suits for equal ranks: pique, coeur, carreau, trefle (UI-SPEC). */
 const SUIT_ORDER: Record<Suit, number> = { S: 0, H: 1, D: 2, C: 3 };
 
-const RANKS: readonly Rank[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+/** The 13 ranks in order, As = 1 ... Roi = 13. */
+export const RANKS: readonly Rank[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const SUITS: readonly Suit[] = ["S", "H", "D", "C"];
 
 /** The 52 cards, 13 ranks times S H D C, no joker. */

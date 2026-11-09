@@ -253,3 +253,37 @@ describe("the reclaim of one's own seat (D-12, A7)", () => {
     for (const client of [ana, bruno, old]) client.ws.close(1000, "bye");
   }, 120_000);
 });
+
+describe("a snapshot stored before G18 (plan 04-14)", () => {
+  it("is read with the switch filled and the default flag: the knight on its 18 at progress 0 stays protected", async () => {
+    const { id, ana, ben } = await startTwo();
+    ben.ws.close(1000, "bye");
+    // The stored JSON as an older version wrote it: no EXIT_ONLY_PROTECTION, no flag on the knights.
+    await evictDurableObject(stubOf(id));
+    await runInDurableObject(stubOf(id), (_room, state) => {
+      const table = load(state.storage.sql) as Table;
+      const game = table.game as NonNullable<Table["game"]>;
+      const old = JSON.parse(JSON.stringify(table));
+      old.game.pawns.bleu0 = { zone: "ring", progress: 0 };
+      old.game.pawns.bleu1 = { zone: "ring", progress: 72 };
+      delete old.game.rules.EXIT_ONLY_PROTECTION;
+      expect(game.rules.EXIT_ONLY_PROTECTION).toBe(true);
+      state.storage.sql.exec(
+        "UPDATE snapshot SET table_json = ? WHERE id = 1",
+        JSON.stringify(old),
+      );
+    });
+    await evictDurableObject(stubOf(id));
+    const stored = await readTable(id);
+    expect(stored.game?.rules.EXIT_ONLY_PROTECTION).toBe(true);
+    expect(stored.game?.pawns.bleu0).toEqual({ zone: "ring", progress: 0, justOut: true });
+    expect(stored.game?.pawns.bleu1).toEqual({ zone: "ring", progress: 72, justOut: false });
+
+    const again = await hello(id, "a", "Ana");
+    const welcome = await again.next("welcome");
+    expect(welcome.view?.rules.EXIT_ONLY_PROTECTION).toBe(true);
+    expect(welcome.view?.pawns.bleu0).toEqual({ zone: "ring", progress: 0, justOut: true });
+    expect(welcome.view?.pawns.bleu1).toEqual({ zone: "ring", progress: 72, justOut: false });
+    expect(await ana.closed).toEqual({ code: CLOSE_ELSEWHERE });
+  });
+});

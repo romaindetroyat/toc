@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type ArtShape, type ArtTransform, boardArt, bottomOf } from "@toc/board";
+  import { type ArtShape, type ArtTransform, boardArt, bottomOf, prefixArt } from "@toc/board";
   import type { Color } from "@toc/engine";
   import riderBleu from "../assets/plateau/cav-bleu.png";
   import riderJaune from "../assets/plateau/cav-jaune.png";
@@ -15,7 +15,10 @@
   // the animations never touch it (T-01-51). The riders are Romain's ink horseman of his original
   // board, recoloured for each colour (apps/web/src/assets/plateau, copied as they are from the
   // galet mock-up): decoration only, never a target.
-  let { k = 0 }: { k?: number } = $props();
+  // `ids` prefixes every def id of this drawing and every url(#…) to it, so several boards can share
+  // a page (05-RESEARCH Pitfall 10: the rule figures of plan 05-04); the game board passes nothing and
+  // keeps its « toc- » ids. The stable marks (plan 05-02) are the board's key, always drawn.
+  let { k = 0, ids = "" }: { k?: number; ids?: string } = $props();
 
   /** Romain's rider picture of each colour (bundled files, one href per colour). */
   const RIDERS: Record<Color, string> = {
@@ -25,7 +28,7 @@
     vert: riderVert,
   };
 
-  const art = $derived(boardArt(k));
+  const art = $derived(prefixArt(boardArt(k), ids));
   const bottom = $derived(bottomOf(k));
 
   /** translate, then rotate, then scale: the SVG order of ArtTransform. */
@@ -50,7 +53,12 @@
   const colorIf = (shape: ArtShape, role: "exit" | "entry") =>
     shape.role === role && !shape.detail ? shape.color : undefined;
 
-  /** url(#id) of a def of this drawing (the ids are fixed, « toc- »). */
+  /** A stable mark's disc (not its shape): its seat's shape, for the tests. */
+  const stableMarkOf = (shape: ArtShape) =>
+    shape.role === "stable-mark" && !shape.detail ? shape.mark : undefined;
+  const decorative = (shape: ArtShape) => (shape.role === "stable-mark" ? "true" : undefined);
+
+  /** url(#id) of a def of this drawing (« toc- », after the `ids` prefix if any). */
   const url = (id: string | undefined) => (id === undefined ? undefined : `url(#${id})`);
   const fillOf = (shape: ArtShape) => url(shape.fillDef) ?? shape.fill;
   const pointsOf = (points: readonly (readonly [number, number])[]) =>
@@ -121,6 +129,9 @@
         opacity={shape.opacity}
         transform={transformOf(shape.transform)}
         data-cell={cellOf(shape)}
+        data-stable-mark={stableMarkOf(shape)}
+        data-mark-color={stableMarkOf(shape) ? shape.color : undefined}
+        aria-hidden={decorative(shape)}
       />
     {:else if shape.kind === "polyline"}
       <polyline
@@ -165,6 +176,7 @@
         stroke-linejoin={shape.linejoin}
         opacity={shape.opacity}
         transform={transformOf(shape.transform)}
+        aria-hidden={decorative(shape)}
       />
     {:else if shape.kind === "image"}
       <!-- The box already has the picture's 157:209 ratio, hence preserveAspectRatio none. The

@@ -30,7 +30,15 @@ import type { Table } from "@toc/table";
 import { frameProblems, leakedCards, sameJson } from "@toc/table/oracle";
 import { describe, expect, it } from "vitest";
 import { load } from "../src/storage.ts";
-import { type Client, connect, createTable, token } from "./helpers.ts";
+import {
+  type Client,
+  connect,
+  connectAs,
+  createTable,
+  newJar,
+  signUpPerson,
+  token,
+} from "./helpers.ts";
 
 const stubOf = (id: string) => env.GAME_ROOM.getByName(id);
 const ALARM_CAP = 600;
@@ -94,11 +102,14 @@ describe("leak oracle on the real frames of a whole game", () => {
     const stub = stubOf(id);
     const readers: Reader[] = [];
 
-    const ana = await connect(id);
-    ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+    // Plan 04-04: Ana is signed in, so bleu is an account seat; her account id never leaves the server.
+    const anaJar = newJar();
+    const account = await signUpPerson(`Ana${Math.floor(Math.random() * 1e6)}`, anaJar);
+    const ana = await connectAs(id, { jar: anaJar });
+    ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
     await ana.next("welcome");
     let ben = await connect(id);
-    ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+    ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
     await ben.next("welcome");
     readers.push({ name: "ana", client: ana, seat: "bleu", seatedFrom: ana.raw.length });
     ana.send({ t: "sit", seat: "bleu" });
@@ -109,7 +120,13 @@ describe("leak oracle on the real frames of a whole game", () => {
 
     // The person ids live on the server only; no frame may carry one, nor a device token.
     const lobby = await readTable(id);
-    const forbidden = [...lobby.people.map((person) => person.who), token("a"), token("b")];
+    const forbidden = [
+      ...lobby.people.map((person) => person.who),
+      token("a"),
+      token("b"),
+      account.id,
+    ];
+    expect(lobby.people.find((person) => person.seat === "bleu")?.account).toBe(account.id);
     const creator = lobby.creator;
 
     // The start, delivered inside the object, and the stored game read in the same turn: no alarm can
@@ -190,7 +207,7 @@ describe("leak oracle on the real frames of a whole game", () => {
         // Ben comes back: a new socket, hello with the same device token.
         ben = await connect(id);
         readers.push({ name: `ben#${reconnects + 2}`, client: ben, seat: "jaune", seatedFrom: 0 });
-        ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+        ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
         const welcome = await ben.next("welcome");
         expect(welcome.you).toEqual({ seat: "jaune", host: false });
         const at = (await readTable(id)).seq;

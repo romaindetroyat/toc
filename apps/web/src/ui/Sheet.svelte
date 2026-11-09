@@ -28,9 +28,10 @@
 </script>
 
 <script lang="ts">
-  import { onDestroy, type Snippet } from "svelte";
+  import { onDestroy, type Snippet, untrack } from "svelte";
   import { fade, fly } from "svelte/transition";
   import { settings } from "../settings/store.svelte.ts";
+  import Icon from "./Icon.svelte";
 
   // Bottom sheet on compact screens, centred 480 px dialog on larger ones (UI-SPEC « Sheet »).
   // The parent mounts it with `{#if open}`; it closes through `onclose` (Échap, backdrop, « Fermer »).
@@ -49,6 +50,13 @@
     focusClose?: boolean;
     /** Element that gets the focus back on close; defaults to the element focused on opening. */
     opener?: HTMLElement | null;
+    /**
+     * « large » (plan 05-04, 05-UI-SPEC « The large sheet »): « Règles du TOC », up to 880 x 720 from
+     * 600 px wide, the full height from the bottom under it; a header with the title and a 44 x 44
+     * close button named by `closeLabel`, no bottom button, and a body that its content lays out
+     * (it scrolls in its own parts). « normal », the default, is unchanged.
+     */
+    size?: "normal" | "large";
     children: Snippet;
   };
 
@@ -60,8 +68,11 @@
     closeIsPrimary = false,
     focusClose = false,
     opener = null,
+    size = "normal",
     children,
   }: Props = $props();
+
+  const large = untrack(() => size === "large");
 
   const uid = $props.id();
   const titleId = `${uid}-title`;
@@ -116,10 +127,22 @@
   // The page behind does not scroll while the sheet is open.
   $effect(() => lockScroll());
 
+  // The dialog element, kept for onDestroy (the binding may already be cleared when it runs).
+  let mounted: HTMLElement | undefined;
+  $effect(() => {
+    if (dialog) mounted = dialog;
+  });
+
+  // On close the focus goes back to the opener, but only if nothing else holds it (plan 04-16): the
+  // sheet is torn down at the end of its slide-out, and a sheet or a confirmation opened meanwhile
+  // has its focus where it belongs (its safe answer). While the sheet slides out it is inert, so the
+  // focus it held has fallen back to the body.
   onDestroy(() => {
     open.splice(open.indexOf(me), 1);
     const target = opener ?? openedFrom;
-    if (target?.isConnected) target.focus({ preventScroll: true });
+    const active = document.activeElement;
+    const free = active === null || active === document.body || (mounted?.contains(active) ?? false);
+    if (free && target?.isConnected) target.focus({ preventScroll: true });
   });
 
   function onWindowKeydown(event: KeyboardEvent) {
@@ -172,6 +195,7 @@
 >
   <div
     class="sheet"
+    class:large
     role="dialog"
     aria-modal="true"
     aria-labelledby={titleId}
@@ -180,21 +204,43 @@
     onkeydown={trap}
     transition:fly|global={{ y: isCompact ? "100%" : 24, opacity: isCompact ? 1 : 0, duration }}
   >
-    <h2 id={titleId} class="t-heading">{title}</h2>
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div class="body" role="region" aria-labelledby={titleId} tabindex="0" data-sheet-body>
-      {@render children()}
-    </div>
-    <button
-      type="button"
-      class="btn close"
-      class:btn-primary={closeIsPrimary}
-      class:btn-secondary={!closeIsPrimary}
-      bind:this={closeButton}
-      onclick={onclose}
-    >
-      {closeLabel}
-    </button>
+    {#if large}
+      <!-- The large sheet: the title and the close button on one 44 px row, then a body whose
+           content scrolls in its own parts (the rules' nav and panel). -->
+      <div class="header">
+        <h2 id={titleId} class="t-heading">{title}</h2>
+        <button
+          type="button"
+          class="icon-close"
+          aria-label={closeLabel}
+          title={closeLabel}
+          bind:this={closeButton}
+          onclick={onclose}
+          data-sheet-close
+        >
+          <Icon name="x" />
+        </button>
+      </div>
+      <div class="body large-body" data-sheet-body>
+        {@render children()}
+      </div>
+    {:else}
+      <h2 id={titleId} class="t-heading">{title}</h2>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="body" role="region" aria-labelledby={titleId} tabindex="0" data-sheet-body>
+        {@render children()}
+      </div>
+      <button
+        type="button"
+        class="btn close"
+        class:btn-primary={closeIsPrimary}
+        class:btn-secondary={!closeIsPrimary}
+        bind:this={closeButton}
+        onclick={onclose}
+      >
+        {closeLabel}
+      </button>
+    {/if}
   </div>
 </div>
 
@@ -244,6 +290,54 @@
     flex: none;
   }
 
+  /* The large sheet (plan 05-04): the full width and 100dvh − 8 from the bottom, padding 16, the
+     body 8 under the header. */
+  .sheet.large {
+    gap: var(--space-sm);
+    height: calc(100dvh - 8px);
+    max-height: none;
+    padding: var(--space-md) calc(var(--space-md) + env(safe-area-inset-right, 0px))
+      calc(var(--space-md) + env(safe-area-inset-bottom, 0px))
+      calc(var(--space-md) + env(safe-area-inset-left, 0px));
+  }
+
+  .header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    min-height: var(--touch);
+  }
+
+  .header h2 {
+    min-width: 0;
+  }
+
+  .icon-close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch);
+    height: var(--touch);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-button);
+    background: transparent;
+    color: var(--creme);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The content lays itself out in the body and scrolls in its own parts. */
+  .large-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   @media (min-width: 600px) {
     .layer {
       align-items: center;
@@ -255,6 +349,14 @@
       padding-bottom: var(--space-lg);
       border-radius: var(--radius-sheet);
       box-shadow: 0 4px 24px rgb(0 0 0 / 50%);
+    }
+
+    /* Centred, up to 880 x 720: the page stays visible around it on a computer. */
+    .sheet.large {
+      width: min(880px, 100vw - 32px);
+      max-width: none;
+      height: min(720px, 100dvh - 16px);
+      padding: var(--space-md);
     }
   }
 </style>

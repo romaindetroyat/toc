@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { mintInvitation, passkeyContext, signUp, uniquePseudo } from "./comptes.ts";
 import { deviceOptions, join, seatTile } from "./online.ts";
 
 // « Accueil » and « Mes parties en cours » against the real Worker and GameRoom (plan 02-04, D-01,
@@ -39,14 +40,15 @@ test("créer une table depuis l’accueil, la retrouver dans « Mes parties en c
   await seatTile(ana, "bleu").click();
   await expect(seatTile(ana, "bleu")).toHaveAttribute("data-seat-state", "you");
 
-  // Back home: the row, alone at the table, in the waiting room; the name line shows « Ana ».
+  // Back home: the row, alone at the table, in the waiting room; the name tile shows « Ana » (plan
+  // 04-09: the 02 name line became the small tile « Ton prénom »).
   await ana.goto("/");
-  await expect(ana.locator("[data-name-line]")).toContainText("Ana");
+  await expect(ana.locator('[data-small-tile="prenom"]')).toContainText("Ana");
   await expect(row(ana, id)).toContainText("Personne d’autre pour l’instant");
   await expect(row(ana, id)).toContainText("Salle d’attente");
   await expect(row(ana, id).getByRole("link")).toHaveAttribute("href", `#/table/${id}`);
   await expect(row(ana, id).getByRole("link")).toHaveAccessibleName(
-    /^Reprendre la partie\s: Personne d’autre pour l’instant, Salle d’attente · .+\. Ta couleur\s: Bleu\.$/,
+    /^Bleu, Personne d’autre pour l’instant, Salle d’attente · .+, reprendre la partie$/,
   );
 
   // Ben opens the link: the prompt says who invites him; he sits on Jaune.
@@ -112,4 +114,55 @@ test("hors ligne, « Créer une table en ligne » ne fait que le dire", async ({
   await expect(page).toHaveURL(/#?\/?$/);
   await expect(page.locator("[data-name-prompt]")).toHaveCount(0);
   await context.setOffline(false);
+});
+
+// Plan 05-08 (05-UI-SPEC « The links row »): signed in, the third tile « Mes résultats ».
+test("avec un compte, la rangée de liens a « Mes résultats », qui ouvre #/resultats", async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  const context = await passkeyContext(browser, testInfo);
+  const page = await context.newPage();
+  await signUp(page, await mintInvitation(request), uniquePseudo("Liens"));
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  const links = page.locator("[data-home-links]");
+  await expect(links.locator("[data-small-tile]")).toHaveCount(3);
+  const kinds = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-small-tile")));
+  expect(kinds).toEqual(["regles", "apprendre", "resultats"]);
+  const results = links.locator('[data-small-tile="resultats"]');
+  await expect(results).toContainText("Mes résultats");
+  await expect(results).toContainText("Parties et classement");
+  await expect(results).toHaveAccessibleName("Mes résultats : parties et classement");
+  // Three tiles of 152 in one row; the list keeps three 64 px rows in sight.
+  const boxes = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  for (const box of boxes) {
+    expect(box.width).toBeCloseTo(152, 0);
+    expect(box.y).toBeCloseTo(boxes[0]?.y ?? 0, 0);
+  }
+  // Without a strip (the phone project's iPhone has the two-row install strip under the row).
+  const list = await page.locator("[data-home] .list").evaluate((el) => el.clientHeight);
+  const strip = await page.locator("[data-home-strip]").count();
+  expect(list).toBeGreaterThanOrEqual(strip === 0 ? 192 : 96);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(
+    0,
+  );
+  // At 640 × 360 two per row: the third on a second row, left-aligned.
+  await page.setViewportSize({ width: 640, height: 360 });
+  const narrow = await links
+    .locator("[data-small-tile]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  const column = (await links.boundingBox())?.width ?? 0;
+  expect(narrow[0]?.width).toBeCloseTo(Math.min(152, (column - 8) / 2), 0);
+  expect(narrow[1]?.y).toBeCloseTo(narrow[0]?.y ?? 0, 0);
+  expect(narrow[2]?.y).toBeCloseTo((narrow[0]?.y ?? 0) + 56, 0);
+  expect(narrow[2]?.x).toBeCloseTo(narrow[0]?.x ?? 0, 0);
+  await results.click();
+  await expect(page).toHaveURL(/#\/resultats$/);
+  await context.close();
 });

@@ -67,8 +67,16 @@ test.describe("depuis l’écran de lancement", () => {
       await expect(sw(page, name)).toHaveAttribute("aria-checked", "true");
     }
     await expect(sw(page, "Réduire les animations")).toHaveAttribute("aria-checked", "false");
+    // Plan 05-02: the shapes on the knights, on by default, right after « Réduire les animations ».
+    await expect(sw(page, "Formes sur les chevaux")).toHaveAttribute("aria-checked", "true");
     // The ambience is gone: no « Ambiance » switch, no « Volume de l’ambiance » slider.
-    await expect(sheet.getByRole("switch")).toHaveCount(3);
+    await expect(sheet.getByRole("switch")).toHaveCount(4);
+    const names = await sheet
+      .getByRole("switch")
+      .evaluateAll((nodes) => nodes.map((node) => node.querySelector(".label")?.textContent));
+    expect(names.indexOf("Formes sur les chevaux")).toBe(
+      names.indexOf("Réduire les animations") + 1,
+    );
     await expect(sheet.getByRole("slider")).toHaveCount(0);
     await expect(sheet.getByText(/ambiance/i)).toHaveCount(0);
     await expect(
@@ -88,6 +96,7 @@ test.describe("depuis l’écran de lancement", () => {
       sw(page, "Son"),
       sw(page, "Bruitages"),
       sw(page, "Réduire les animations"),
+      sw(page, "Formes sur les chevaux"),
     ]) {
       const box = await target.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(43.99);
@@ -382,6 +391,36 @@ test.describe("abandonner la partie", () => {
     await expect(confirm(page)).toHaveCount(0);
     await expect(page).toHaveURL(/#\/partie/);
     await expect(page.locator("[data-board]")).toBeVisible();
+  });
+
+  test("abandon: une confirmation ouverte pendant que les crédits se ferment garde le focus sur « Continuer à jouer »", async ({
+    page,
+  }) => {
+    await openGame(page);
+    await openFromGame(page);
+    await dialog(page, "Réglages").getByRole("button", { name: "Crédits et licences" }).click();
+    await expect(dialog(page, "Crédits et licences")).toBeVisible();
+
+    // Échap closes the credits, and the confirmation opens at once, while the credits slide out.
+    const layersDuringSlide = await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.querySelector<HTMLButtonElement>("[data-abandon]")?.click();
+      return new Promise<number>((resolve) =>
+        requestAnimationFrame(() =>
+          resolve(document.querySelectorAll("[data-sheet-layer]").length),
+        ),
+      );
+    });
+    // Réglages, the credits sliding out, the confirmation.
+    expect(layersDuringSlide).toBe(3);
+    const keep = confirm(page).getByRole("button", { name: "Continuer à jouer" });
+    await expect(keep).toBeFocused();
+
+    // Once the credits are gone, the safe answer still has the focus.
+    await expect(page.locator("[data-sheet-layer]")).toHaveCount(2);
+    await page.waitForTimeout(150);
+    await expect(keep).toBeFocused();
+    await expect(dialog(page, "Crédits et licences")).toHaveCount(0);
   });
 
   test("abandon: confirmer ramène à l’écran de lancement", async ({ page }) => {

@@ -257,7 +257,7 @@ describe("createRemoteGame", () => {
     game.start();
     connection.emit({ t: "table", table: { ...TABLE, thinking: "vert" } });
     expect(game.thinking()).toBe("vert");
-    expect(game.stats()).toEqual({ dealsPlayed: 0, captured: { nous: 0, eux: 0 } });
+    expect(game.stats()).toEqual({ dealsPlayed: 0, captured: { nous: 0, eux: 0 }, solo: null });
   });
 
   it("a table frame moves the thinking sign: onChange runs, so the session follows it", () => {

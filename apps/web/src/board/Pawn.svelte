@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { KNIGHT, knightScale } from "@toc/board";
+  import { KNIGHT, knightScale, SEAT_MARKS } from "@toc/board";
   import type { Color, PawnId, Place } from "@toc/engine";
-  import { board as t } from "../i18n/fr/board.ts";
   import { settings } from "../settings/store.svelte.ts";
   import { type Facing, placeKey } from "./geometry.ts";
+  import { knightName } from "./knightName.ts";
 
   type Props = {
     pawn: PawnId;
@@ -20,6 +20,15 @@
     onselect?: () => void;
     /** Board units the knight is lifted off its shadow (12 for the selected one). */
     lift?: number;
+    /** In a lesson (plan 05-06): the guide asks to touch this knight; its name ends « , à toucher ». */
+    guide?: boolean;
+    /**
+     * Plan 05-10 (05-UI-SPEC « Knight names »): the player's seat and the seats' names, so the knight
+     * is named « à toi », « à ton partenaire {Nom} » or « adversaire »; `lit` adds « , jouable ».
+     */
+    human?: Color;
+    names?: Readonly<Partial<Record<Color, string>>>;
+    lit?: boolean;
   };
 
   let {
@@ -32,7 +41,13 @@
     el = $bindable(),
     onselect,
     lift = 0,
+    guide = false,
+    human = "bleu",
+    names = {},
+    lit = false,
   }: Props = $props();
+
+  const label = $derived(knightName(pawn, place, human, names, { lit, target: guide }));
 
   const ring = $derived(place.z === "ring" ? place.cell : -1);
   // The mock-up's sizes (« à confirmer par Romain »): 0.92 step wide on the ring, 0.8 in a home and
@@ -74,6 +89,18 @@
                 <g data-role="rear">
                   <!-- Feet at the local origin; the footprint is 110 wide and 190 high. -->
                   <use href={`#knight-${color}`} x="-55" y="-186" width="110" height="190" />
+                  {#if settings.knightMarks}
+                    <!-- The seat's shape on the base (plan 05-02): inside rear, so it hops, squashes
+                         and rears with the knight; symmetric, so the facing mirror keeps it. -->
+                    <use
+                      href={`#knight-mark-${color}`}
+                      x="-55"
+                      y="-186"
+                      width="110"
+                      height="190"
+                      data-knight-mark={SEAT_MARKS[color]}
+                    />
+                  {/if}
                 </g>
               </g>
             </g>
@@ -101,7 +128,7 @@
     data-facing={facing}
     role="button"
     tabindex="0"
-    aria-label={t.pawn[color]}
+    aria-label={label}
     onclick={() => onselect()}
     {onkeydown}
   >
@@ -116,7 +143,7 @@
     data-ring={ring}
     data-facing={facing}
     role="img"
-    aria-label={t.pawn[color]}
+    aria-label={label}
     pointer-events="none"
   >
     {@render body()}

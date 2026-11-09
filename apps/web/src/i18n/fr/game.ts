@@ -35,8 +35,9 @@ export const game = {
     /** The compact mode's info pill (plan 01-47): the knights home of « nous » and « eux ». */
     score: (us: number, them: number) => `${us}–${them}`,
     /** The pill's accessible name, from the turn line (« À toi de jouer », « Tour de Marengo »). */
+    // Plan 05-10 (WCAG 2.5.3 « Label in Name »): the name holds the score as the pill shows it.
     pillAria: (turn: string, us: number, them: number) =>
-      `Infos de la partie : ${turn}, nous ${us} sur 8, eux ${them} sur 8`,
+      `Infos de la partie : ${turn}, ${us}–${them}, nous ${us} sur 8, eux ${them} sur 8`,
     /** The title of the sheet the pill opens. */
     sheetTitle: "Infos de la partie",
   },
@@ -89,7 +90,7 @@ export const game = {
     play: "Jouer",
     playAnyway: "Jouer quand même",
     cancel: "Annuler ce coup",
-    changeCard: "Changer de carte",
+    changeCard: "Choisir une autre carte",
     otherHorse: "Choisir un autre cheval",
   },
 
@@ -112,6 +113,12 @@ export const game = {
 
   fast: "Avance rapide",
 
+  /** Plan 05-10 (APP-05 audit, one h1 per page): the game screen’s heading, for screen readers. */
+  heading: {
+    solo: "Partie contre l’ordinateur",
+    online: "Partie en ligne",
+  },
+
   /**
    * The short labels of the compact mode's buttons (plan 01-47, « à confirmer par Romain »): the
    * buttons are 52 px wide there. Their accessible names and their titles keep the full labels.
@@ -124,7 +131,7 @@ export const game = {
     pose: "Poser",
     exit: "Sortir",
     advance: (n: number) => `+${n}`,
-    undo: "Retour",
+    undo: "Retirer",
     reset: "Effacer",
   },
   illegal: "Ce coup n’est pas permis. Choisis-en un autre.",
@@ -151,7 +158,7 @@ export const game = {
     chipAria: (n: number) => `${n} pas`,
     chipDisabled: "Ce nombre de pas t’empêcherait de finir le 7.",
     undo: "Retirer le dernier pas",
-    reset: "Tout annuler",
+    reset: "Tout effacer",
     play: "Jouer",
     remainingHint: (n: number) => `Il reste ${n} pas à jouer.`,
   },
@@ -219,18 +226,7 @@ export const game = {
     playable: (card: string) => `${card}, jouable`,
     unplayable: (card: string) => `${card}, pas jouable`,
     neutral: (card: string) => card,
-    /**
-     * A lit knight, for the keyboard and screen readers: its colour, its letter (A to D, as on the 7
-     * panel) and where it stands, so two knights of one colour never read the same.
-     */
-    pawn: (color: Color, letter: string, where: string) =>
-      `Cheval ${colourWord(color)} ${letter}, ${where}, jouable`,
-    place: {
-      stable: "à l’écurie",
-      home: "à la maison",
-      exit: "sur sa case de sortie",
-      ring: (n: number) => `à ${cases(n)} de sa sortie`,
-    },
+    // The knights' names (lit or not) are board.knight's, built by board/knightName.ts (plan 05-10).
   },
   /**
    * The invitation shown instead of the game on a screen taller than wide (UI-SPEC addendum « Plateau

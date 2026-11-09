@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 4
-current_phase_name: Comptes, amis et application installable
-status: ready_to_discuss
-stopped_at: Phases 2 and 3 closed, UAT pending (02-UAT.md, 03-UAT.md)
-last_updated: "2026-10-17T19:00:00.000Z"
-last_activity: 2026-10-17
-last_activity_desc: Phases 2 and 3 closed at Romain's request, remaining tests noted
-state_head: c32ffdc90952ec7a0259a0761869605f997efe22
+current_phase: 5
+current_phase_name: Suivi, apprentissage et finition
+status: milestone_complete
+stopped_at: All five phases closed, UAT pending (01- to 05-UAT.md)
+last_updated: "2026-11-09T06:42:14.587Z"
+last_activity: 2026-11-09
+last_activity_desc: Phase 5 closed at Romain's request, remaining tests noted
+state_head: 82379c84c4a5b9db69fa2bf27346f4a3678812b2
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 5
   total_plans: 80
   completed_plans: 78
-  percent: 60
+  percent: 100
 ---
 
 # Project State
@@ -23,16 +23,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Une vraie partie de TOC, fidèle aux règles maison, jouable à distance entre proches sur n'importe quel appareil, avec l'ambiance du plateau original (chevaux animés, bruitages).
-**Current focus:** Phase 4 — Comptes, amis et application installable (discuss, puis plan)
+**Current focus:** Les cinq phases sont closes ; essais sur appareil restants dans 01- à 05-UAT.md
 
 ## Current Position
 
-Phase: 4 (Comptes, amis et application installable) — NOT STARTED
-Plan: TBD
-Status: Phases 1, 2 and 3 complete (closed with their remaining tests noted in 01-UAT.md, 02-UAT.md and 03-UAT.md); next: discuss and plan phase 4
-Last activity: 2026-10-17 — Phases 2 and 3 closed at Romain's request (« Clôturer, essais notés »)
+Phase: 5 (Suivi, apprentissage et finition) — CLOSED 2026-11-07
+Status: Phases 1 à 5 closes (« Clôturer, essais notés »), essais restants dans les fichiers UAT ; prochaine étape : les essais de Romain, puis la clôture de la version
+Last activity: 2026-11-09 - Completed quick task 261109-8v7: classement lu sur des totaux par compte
 
-Progress: [██████░░░░] 60%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -91,3 +90,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 Last session: 2026-10-17T19:00:00.000Z
 Stopped at: Phases 2 and 3 closed, UAT pending
 Resume file: None (next: /gsd-discuss-phase 4)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261109-6an | Compteur « Les cartes du paquet » (même information que l'ordinateur) et test permanent d'équité du tirage | 2026-11-09 | 65320a0 | [261109-6an-compteur-des-cartes-du-paquet-et-test-d-](./quick/261109-6an-compteur-des-cartes-du-paquet-et-test-d-/) |
+| 261109-80e | « Les cartes jouées » par valeur, en une touche sur la défausse | 2026-11-09 | d52d921 | [261109-80e-cartes-deja-jouees-en-une-touche](./quick/261109-80e-cartes-deja-jouees-en-une-touche/) |
+| 261109-8v7 | Classement lu sur des totaux par compte (rester sur l'offre gratuite) | 2026-11-09 | 82379c8 | [261109-8v7-classement-lu-sur-des-totaux-par-compte](./quick/261109-8v7-classement-lu-sur-des-totaux-par-compte/) |

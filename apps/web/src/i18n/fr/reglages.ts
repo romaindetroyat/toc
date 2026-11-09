@@ -14,11 +14,19 @@ export const reglages = {
   sfx: "Bruitages",
   reduceMotion: "Réduire les animations",
   reduceMotionHelper: "Les déplacements sont instantanés, sans bonds, ruades ni effets.",
+  /** Plan 05-02 (D-11, D-14): the seat's shape on each knight, on by default. */
+  knightMarks: "Formes sur les chevaux",
+  knightMarksHelper:
+    "Un rond, un triangle, un carré ou une étoile sur chaque cheval, pour reconnaître les couleurs autrement.",
 
+  /** Plan 05-08: the first link, the « Règles » sheet (« Le but » outside a game, « Les cartes » in one). */
+  rules: "Règles du jeu",
   testSounds: "Tester les sons",
   credits: "Crédits et licences",
   /** At an online table (plan 02-05): leave it, after a confirmation. */
   leaveTable: "Quitter la table",
+  /** Plan 05-06: in a lesson, in place of « Abandonner la partie » (no confirmation). */
+  quitLessons: "Quitter les leçons",
   /** The chef de table's « Arrêter la partie » in an online game (plan 02-07). */
   stopGame: "Arrêter la partie",
   /**
@@ -29,6 +37,11 @@ export const reglages = {
   tableFastHelper:
     "Pour toute la table : les ordinateurs jouent presque aussitôt et les coups vont plus vite.",
   tableFastOthers: (host: string) => `Seul le chef de table, ${host}, peut la changer.`,
+  /** Plan 04-08: while installing TOC is possible (the browser's prompt, or « Installer TOC »). */
+  install: "Installer l’application",
+  /** Plan 04-08: in a game or at a table, when a new version waits (APP-02). */
+  updateReady:
+    "Une nouvelle version est prête : elle s’installera quand tu reviendras à l’accueil.",
   /** The gear's accessible name while the table is fast. */
   openLabelFast: "Réglages (avance rapide pour toute la table)",
 } as const;

@@ -15,9 +15,11 @@
     k: number;
     /** Board units per screen pixel. */
     px: number;
+    /** The « D » disc and the « 1er » token; a lesson has neither (plan 05-06). */
+    markers?: boolean;
   };
 
-  let { render, discardTop, k, px }: Props = $props();
+  let { render, discardTop, k, px, markers = true }: Props = $props();
 
   const WALNUT = "#2B1D12";
   const CREAM = "#FFF8E1";
@@ -79,7 +81,7 @@
      (T-01-30, T-01-57). -->
 <g role="group" aria-label={game.tapis.title} data-felt pointer-events="none">
   <!-- Talon: a face-down stack, left of the felt's centre. -->
-  <g data-talon={render.talonSize} aria-label={game.tapis.talon(render.talonSize)}>
+  <g data-talon={render.talonSize} role="img" aria-label={game.tapis.talon(render.talonSize)}>
     {#if layers === 0}
       <rect
         x={talon[0] - PW / 2}
@@ -112,7 +114,7 @@
   </g>
 
   <!-- Défausse: its top card face up, or an empty outline, right of the felt's centre. -->
-  <g data-discard={render.discardSize} aria-label={game.tapis.discard(render.discardSize)}>
+  <g data-discard={render.discardSize} role="img" aria-label={game.tapis.discard(render.discardSize)}>
     {#if discardTop === null}
       <rect
         x={discard[0] - PW / 2}
@@ -173,56 +175,58 @@
   <!-- The « 1er » token of the first player (plan 03-11): a walnut pill with a cream outline, unlike the
        cream « D » disc, on the wood just outside the felt on that player's side, for the whole deal.
        The deal banner says it aloud (« … commence. »), so the token itself stays silent. -->
-  <g data-starter={starter} aria-hidden="true">
-    <rect
-      x={token.at[0] - token.w / 2}
-      y={token.at[1] - token.h / 2}
-      width={token.w}
-      height={token.h}
-      rx={token.h / 2}
-      fill={WALNUT}
-      stroke={CREAM}
-      stroke-width={2 * px}
-    />
-    <!-- « 1 » and a raised « er » as two texts meeting at the pill's middle (« 1 » ends there, « er »
-         starts there): no tspan with baseline-shift, which WebKit drew over the « 1 » (plan 02-06b). -->
-    <text
-      class="disc"
-      x={token.at[0] - 0.5 * px}
-      y={token.at[1] + 1 * px}
-      font-size={15 * px}
-      text-anchor="end"
-      dominant-baseline="central"
-      fill={CREAM}
-      data-starter-part="1">1</text
-    >
-    <text
-      class="disc"
-      x={token.at[0] + 0.5 * px}
-      y={token.at[1] - 3.5 * px}
-      font-size={10 * px}
-      text-anchor="start"
-      dominant-baseline="central"
-      fill={CREAM}
-      data-starter-part="er">er</text
-    >
-  </g>
+  {#if markers}
+    <g data-starter={starter} aria-hidden="true">
+      <rect
+        x={token.at[0] - token.w / 2}
+        y={token.at[1] - token.h / 2}
+        width={token.w}
+        height={token.h}
+        rx={token.h / 2}
+        fill={WALNUT}
+        stroke={CREAM}
+        stroke-width={2 * px}
+      />
+      <!-- « 1 » and a raised « er » as two texts meeting at the pill's middle (« 1 » ends there, « er »
+           starts there): no tspan with baseline-shift, which WebKit drew over the « 1 » (plan 02-06b). -->
+      <text
+        class="disc"
+        x={token.at[0] - 0.5 * px}
+        y={token.at[1] + 1 * px}
+        font-size={15 * px}
+        text-anchor="end"
+        dominant-baseline="central"
+        fill={CREAM}
+        data-starter-part="1">1</text
+      >
+      <text
+        class="disc"
+        x={token.at[0] + 0.5 * px}
+        y={token.at[1] - 3.5 * px}
+        font-size={10 * px}
+        text-anchor="start"
+        dominant-baseline="central"
+        fill={CREAM}
+        data-starter-part="er">er</text
+      >
+    </g>
 
-  <!-- The dealer disc « D », at the top-right corner (on the screen) of the dealer's card place. -->
-  <g data-dealer={render.dealer}>
-    <circle cx={dealerAt[0]} cy={dealerAt[1]} r={12 * px} fill={CREAM} />
-    <text
-      class="disc"
-      x={dealerAt[0]}
-      y={dealerAt[1]}
-      font-size={15 * px}
-      text-anchor="middle"
-      dominant-baseline="central"
-      fill={WALNUT}
-    >
-      D
-    </text>
-  </g>
+    <!-- The dealer disc « D », at the top-right corner (on the screen) of the dealer's card place. -->
+    <g data-dealer={render.dealer}>
+      <circle cx={dealerAt[0]} cy={dealerAt[1]} r={12 * px} fill={CREAM} />
+      <text
+        class="disc"
+        x={dealerAt[0]}
+        y={dealerAt[1]}
+        font-size={15 * px}
+        text-anchor="middle"
+        dominant-baseline="central"
+        fill={WALNUT}
+      >
+        D
+      </text>
+    </g>
+  {/if}
 </g>
 
 <style>

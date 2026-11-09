@@ -4,6 +4,7 @@ import {
   COLORS,
   type Color,
   DEFAULT_RULES,
+  defaultJustOut,
   type GameState,
   type Pawn,
   type PawnId,
@@ -28,7 +29,7 @@ export function board(
         spec === "S"
           ? { zone: "stable" }
           : "p" in spec
-            ? { zone: "ring", progress: spec.p }
+            ? { zone: "ring", progress: spec.p, justOut: defaultJustOut(spec.p) }
             : { zone: "home", slot: spec.h };
     }
   }

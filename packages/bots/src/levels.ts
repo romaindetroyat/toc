@@ -93,3 +93,33 @@ export const CHAMPION_WORLDS = 10;
 export const CHAMPION_BUDGET: Readonly<Budget> = {
   plies: CHAMPION_KEEP * CHAMPION_WORLDS * (1 + CHAMPION_PLIES),
 };
+
+/**
+ * How a level chooses its exchange card (plan 04-15, a refinement of phase 3 D-09):
+ * - "board": exchange.ts giveScores, the best one-move gain of each card on the current board for the
+ *   partner less GIVE_OWN_LOSS times the bot's own (D-09, levels 2 and 3, which make more mistakes, D-05);
+ * - "deal": exchange.ts dealGives (Pur-sang and Champion): whether an exit card (As or Roi) goes or
+ *   stays is decided over the deal (dealGiveScores, what the two hands can do with and without each card,
+ *   the partner's hand imagined from the unseen cards), and the board give picks the card within that
+ *   family. Romain, 2026-11-06:
+ *   « en mode intelligent, le partenaire ordinateur ne donne pas forcément systématiquement un as ou un
+ *   roi s'il n'en a qu'un et qu'il faut qu'il sorte ses pions... Il doit pouvoir moduler ça en fonction
+ *   de la stratégie. »
+ */
+export type GiveMethod = "board" | "deal";
+
+/**
+ * Level 1 gives like randomLegal and never reads this. Ladder re-run on 2026-11-06 with this table
+ * (plan 04-15, seed 1, 400 games, `node tools/ladder.mjs --a N --b N-1`), every step above the bar:
+ * - 5 → 4: 300 / 400, p̂ 75.0 %, Wilson 95 % [70.5 %, 79.0 %] (both on the board give, same seeds:
+ *   333 / 400, 83.3 %, [79.3 %, 86.6 %]: the new give helps Pur-sang too, so the top step narrows);
+ * - 4 → 3: 269 / 400, p̂ 67.3 %, [62.5 %, 71.7 %];
+ * - 3 → 2: 393 / 400, p̂ 98.3 %, [96.4 %, 99.1 %]; 2 → 1: 371 / 400, p̂ 92.8 %, [89.8 %, 94.9 %].
+ */
+export const GIVE_METHOD: Readonly<Record<BotLevel, GiveMethod>> = {
+  1: "board",
+  2: "board",
+  3: "board",
+  4: "deal",
+  5: "deal",
+};

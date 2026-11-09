@@ -11,12 +11,23 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import type { Table } from "@toc/table";
-import { describe, expect, it } from "vitest";
+import type { GameRecord, RecordSeat, Table } from "@toc/table";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { GameRoom } from "../src/GameRoom.ts";
 import { tableHash, writeGame } from "../src/record.ts";
 import { commit, load } from "../src/storage.ts";
-import { type Client, connect, createTable, NEAR_END, token } from "./helpers.ts";
+import {
+  rows as accountRows,
+  type Client,
+  connect,
+  connectAs,
+  createTable,
+  NEAR_END,
+  newJar,
+  resetAccounts,
+  signUpPerson,
+  token,
+} from "./helpers.ts";
 
 const stubOf = (id: string) => env.GAME_ROOM.getByName(id);
 const db = () => {
@@ -55,12 +66,12 @@ async function bindDatabase(id: string, database: unknown): Promise<void> {
 async function nearEnd(): Promise<{ id: string; ana: Client; ben: Client }> {
   const id = await createTable({ pace: "zero", before: NEAR_END });
   const ana = await connect(id);
-  ana.send({ t: "hello", v: 5, token: token("a"), name: "Ana" });
+  ana.send({ t: "hello", v: 6, token: token("a"), name: "Ana" });
   await ana.next("welcome");
   ana.send({ t: "sit", seat: "bleu" });
   await ana.next("welcome", (frame) => frame.you.seat === "bleu");
   const ben = await connect(id);
-  ben.send({ t: "hello", v: 5, token: token("b"), name: "Ben" });
+  ben.send({ t: "hello", v: 6, token: token("b"), name: "Ben" });
   await ben.next("welcome");
   ben.send({ t: "sit", seat: "jaune" });
   await ben.next("welcome", (frame) => frame.you.seat === "jaune");
@@ -155,7 +166,8 @@ describe("the record of a finished game in D1", () => {
     expect(await writeGame(db(), id, replayed)).toBe("written");
     await runInDurableObject(stubOf(id), (_room, state) => {
       const again = load(state.storage.sql) as Table;
-      again.records = [replayed];
+      // The shape of a record pending from before plan 05-01 (no account, tally or creator).
+      again.records = [replayed as unknown as Table["records"][number]];
       commit(state.storage.sql, again, [], Date.now());
     });
     await retryNow(id);
@@ -206,4 +218,212 @@ describe("the record of a finished game in D1", () => {
     ana.ws.close(1000, "bye");
     ben.ws.close(1000, "bye");
   }, 60_000);
+});
+
+// --- Plan 05-01: who sat where (played, game_seats), written once and only once ---
+
+/** A phase-5 record of game `gameNo`: A bleu and B jaune by default, a guest rouge, a computer vert. */
+function phase5Record(
+  accounts: { bleu?: string | null; jaune?: string | null; rouge?: string | null } = {},
+  gameNo = 1,
+): GameRecord {
+  const human = (colour: "bleu" | "jaune" | "rouge", name: string, home: number): RecordSeat => ({
+    colour,
+    kind: "human",
+    name,
+    level: null,
+    handedOver: false,
+    account: accounts[colour] ?? null,
+    captured: colour === "bleu" ? 2 : 0,
+    lost: colour === "jaune" ? 2 : 0,
+    home,
+  });
+  return {
+    gameNo,
+    startedAt: 1_000,
+    endedAt: 50_000 + gameNo,
+    winner: "bleu-rouge",
+    seats: [
+      human("bleu", "Anaïs", 4),
+      human("jaune", "Bruno", 1),
+      human("rouge", "Mamie", 4),
+      {
+        colour: "vert",
+        kind: "bot",
+        name: "Ourasi",
+        level: 4,
+        handedOver: false,
+        account: null,
+        captured: 0,
+        lost: 0,
+        home: 0,
+      },
+    ],
+    deals: 2,
+    captures: { "bleu-rouge": 2, "jaune-vert": 0 },
+    creatorName: "Anaïs",
+  };
+}
+
+/** A D1 binding that adds up the rows each batch wrote (D1Result meta). */
+function metered(): { db: D1Database; written: () => number } {
+  let written = 0;
+  const real = db();
+  const wrapped = {
+    prepare: (sql: string) => real.prepare(sql),
+    batch: async (statements: D1PreparedStatement[]) => {
+      const results = await real.batch(statements);
+      for (const result of results) written += result.meta?.rows_written ?? 0;
+      return results;
+    },
+  } as unknown as D1Database;
+  return { db: wrapped, written: () => written };
+}
+
+const tableId = () => `t${Math.floor(Math.random() * 1e9)}`.padEnd(22, "x");
+
+describe("the results of a finished game in D1 (plan 05-01)", () => {
+  beforeEach(resetAccounts);
+
+  it("written twice, or retried after a failed batch, still one played row and one row per account", async () => {
+    const a = await signUpPerson(`Anaïs${Math.floor(Math.random() * 1e6)}`);
+    const b = await signUpPerson(`Bruno${Math.floor(Math.random() * 1e6)}`);
+    const id = tableId();
+    const record = phase5Record({ bleu: a.id, jaune: b.id });
+    const first = metered();
+    expect(await writeGame(first.db, id, record)).toBe("written");
+    // The rows one finished two-account game writes: legacy 3, played 2, one per account seat, and
+    // since 0004 one ranked_totals row per account of a ranked game (the trigger, quick task 261109-8v7).
+    console.log(`D1 rows written by one finished two-account game: ${first.written()}`);
+    expect(first.written()).toBeLessThanOrEqual(9);
+    const again = metered();
+    expect(await writeGame(again.db, id, record)).toBe("written");
+    expect(again.written()).toBe(0);
+    // A batch that throws writes nothing; the retry writes nothing new either.
+    const broken = {
+      prepare: (sql: string) => db().prepare(sql),
+      batch: async () => {
+        throw new Error("D1 is down");
+      },
+    } as unknown as D1Database;
+    expect(await writeGame(broken, id, record)).toBe("failed");
+    expect(await writeGame(db(), id, record)).toBe("written");
+    const gameId = `${await tableHash(id)}:1`;
+    expect(await accountRows("SELECT id FROM played WHERE id = ?", gameId)).toHaveLength(1);
+    const seats = await accountRows(
+      "SELECT user_id, colour, won, ranked, captured, lost, home FROM game_seats WHERE game_id = ? ORDER BY colour",
+      gameId,
+    );
+    expect(seats).toEqual([
+      { user_id: a.id, colour: "bleu", won: 1, ranked: 1, captured: 2, lost: 0, home: 4 },
+      { user_id: b.id, colour: "jaune", won: 0, ranked: 1, captured: 0, lost: 2, home: 1 },
+    ]);
+  });
+
+  it("an alarm retry after a thrown batch writes the rows once", async () => {
+    const jar = newJar();
+    const a = await signUpPerson(`Anaïs${Math.floor(Math.random() * 1e6)}`, jar);
+    const id = await createTable({ pace: "zero", before: NEAR_END });
+    const ana = await connectAs(id, { jar });
+    ana.send({ t: "hello", v: 6, token: token("a"), name: "Anaïs" });
+    await ana.next("welcome");
+    ana.send({ t: "sit", seat: "bleu" });
+    await ana.next("welcome", (frame) => frame.you.seat === "bleu");
+    ana.send({ t: "start" });
+    await ana.next("events");
+    await bindDatabase(id, {
+      prepare: (sql: string) => db().prepare(sql),
+      batch: async () => {
+        throw new Error("D1 is down");
+      },
+    });
+    await win(ana);
+    await until(async () => (await readTable(id)).status === "finished", "the end");
+    const [pending] = (await readTable(id)).records;
+    expect(pending?.seats[0]?.account).toBe(a.id);
+    expect(await accountRows("SELECT * FROM game_seats WHERE user_id = ?", a.id)).toHaveLength(0);
+    await retryNow(id);
+    await until(async () => (await readTable(id)).records.length === 0, "the recorded step");
+    // The answer was lost: the same record pending again and retried, nothing more is written.
+    await runInDurableObject(stubOf(id), (_room, state) => {
+      const table = load(state.storage.sql) as Table;
+      if (pending !== undefined) table.records = [pending];
+      commit(state.storage.sql, table, [], Date.now());
+    });
+    await retryNow(id);
+    await until(async () => (await readTable(id)).records.length === 0, "the second retry");
+    const gameId = `${await tableHash(id)}:1`;
+    expect(await accountRows("SELECT id, accounts FROM played WHERE id = ?", gameId)).toEqual([
+      { id: gameId, accounts: 1 },
+    ]);
+    const seats = await accountRows(
+      "SELECT colour, ranked FROM game_seats WHERE user_id = ?",
+      a.id,
+    );
+    expect(seats).toEqual([{ colour: "bleu", ranked: 0 }]);
+    ana.ws.close(1000, "bye");
+  }, 60_000);
+
+  it("a seat whose account no longer exists is skipped, and the write is still written", async () => {
+    const a = await signUpPerson(`Anaïs${Math.floor(Math.random() * 1e6)}`);
+    const b = await signUpPerson(`Bruno${Math.floor(Math.random() * 1e6)}`);
+    await db().prepare("DELETE FROM users WHERE id = ?").bind(b.id).run();
+    const id = tableId();
+    expect(await writeGame(db(), id, phase5Record({ bleu: a.id, jaune: b.id }))).toBe("written");
+    const gameId = `${await tableHash(id)}:1`;
+    expect(await accountRows("SELECT accounts FROM played WHERE id = ?", gameId)).toEqual([
+      { accounts: 2 },
+    ]);
+    const seats = await accountRows("SELECT user_id FROM game_seats WHERE game_id = ?", gameId);
+    expect(seats).toEqual([{ user_id: a.id }]);
+  });
+
+  it("a record from before plan 05-01 writes the games row only", async () => {
+    const a = await signUpPerson(`Anaïs${Math.floor(Math.random() * 1e6)}`);
+    const id = tableId();
+    const record = phase5Record({ bleu: a.id });
+    // The 02-09 shape: no account, tally or creator.
+    const old = {
+      ...record,
+      creatorName: undefined,
+      seats: record.seats.map(({ colour, kind, name, level, handedOver }) => ({
+        colour,
+        kind,
+        name,
+        level,
+        handedOver,
+      })),
+    };
+    expect(await writeGame(db(), id, old)).toBe("written");
+    const gameId = `${await tableHash(id)}:1`;
+    expect(await accountRows("SELECT game_id FROM games WHERE game_id = ?", gameId)).toHaveLength(
+      1,
+    );
+    expect(await accountRows("SELECT id FROM played WHERE id = ?", gameId)).toHaveLength(0);
+  });
+
+  it("ranked: two accounts as opponents 1, one account with two guests 0, one account twice 0", async () => {
+    const a = await signUpPerson(`Anaïs${Math.floor(Math.random() * 1e6)}`);
+    const b = await signUpPerson(`Bruno${Math.floor(Math.random() * 1e6)}`);
+    const cases: [Parameters<typeof phase5Record>[0], number, number][] = [
+      [{ bleu: a.id, jaune: b.id }, 1, 2],
+      [{ bleu: a.id }, 0, 1],
+      [{ bleu: a.id, rouge: a.id }, 0, 1],
+    ];
+    for (const [accounts, ranked, count] of cases) {
+      const id = tableId();
+      expect(await writeGame(db(), id, phase5Record(accounts))).toBe("written");
+      const gameId = `${await tableHash(id)}:1`;
+      expect(await accountRows("SELECT accounts FROM played WHERE id = ?", gameId)).toEqual([
+        { accounts: count },
+      ]);
+      const seats = await accountRows(
+        "SELECT user_id, colour, ranked FROM game_seats WHERE game_id = ? ORDER BY colour",
+        gameId,
+      );
+      expect(seats.every((seat) => seat.ranked === ranked)).toBe(true);
+      // An account seated twice keeps one row (the key is the account, the end time, the game).
+      expect(seats.filter((seat) => seat.user_id === a.id)).toHaveLength(1);
+    }
+  });
 });

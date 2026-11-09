@@ -4,8 +4,9 @@
 // agree, deals end, every home entry goes forward through the colour's carré 16 (G14), no knight of the
 // mover's team is eaten in passing (G15), G16 never changes whether a 7 is playable and every applied 7
 // brings home each knight it moved that it could bring home, a knight whose count lands on an empty home
-// slot enters, jumping the knights already home (D-02, G17), and the same seed and actions give the
-// same JSON.
+// slot enters, jumping the knights already home (D-02, G17), only the knight just out of its stable is
+// protected on its own losange and it stays so until it moves (G18), and the same seed and actions give
+// the same JSON.
 
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -32,6 +33,7 @@ import {
   PARTNER,
   type PawnId,
   type Place,
+  pawnColor,
   RING,
   type Rng,
   rankOf,
@@ -82,6 +84,12 @@ const seen = {
   homeJumps: 0,
   /** D-02 with G17: forward ring moves that crossed or left their carré 16 (none may skip an open slot). */
   entryChances: 0,
+  /** G18: knights that came out of their stable, protected. */
+  exitsProtected: 0,
+  /** G18: actions after which a knight just out stayed protected without moving. */
+  protectionKept: 0,
+  /** G18: knights standing on their own losange as ordinary knights (back after a lap, a swap or a 4). */
+  ordinaryOnOwnExit: 0,
 };
 
 function check(condition: boolean, message: string): void {
@@ -166,6 +174,40 @@ function checkEntries(before: GameState, events: readonly GameEvent[]): void {
 }
 
 const colorOf = (id: PawnId): Color => id.slice(0, -1) as Color;
+
+/**
+ * G18: every ring knight carries an explicit flag; a knight is protected (justOut) only on its own
+ * losange at progress 0, and only when it came out of its stable with this action or was already
+ * protected and did not move; a knight that came out is protected; a knight that moved is not.
+ */
+function checkProtection(before: GameState, after: GameState, events: readonly GameEvent[]): void {
+  const exited = new Set(events.flatMap((e) => (e.t === "pawnExited" ? [e.pawn] : [])));
+  for (const id of ALL_PAWNS) {
+    const was = before.pawns[id];
+    const now = after.pawns[id];
+    if (now.zone !== "ring") continue;
+    check(typeof now.justOut === "boolean", `${id} on the ring without the G18 flag`);
+    const unmoved = was.zone === "ring" && was.progress === now.progress && !exited.has(id);
+    if (exited.has(id)) {
+      check(now.justOut === true && now.progress === 0, `${id} came out unprotected`);
+      seen.exitsProtected++;
+    } else if (now.justOut === true) {
+      check(
+        unmoved && was.zone === "ring" && was.justOut === true && now.progress === 0,
+        `${id} protected without coming out of its stable`,
+      );
+      seen.protectionKept++;
+    } else if (unmoved && was.zone === "ring") {
+      check(was.justOut !== true, `${id} lost its protection without moving`);
+    }
+    if (
+      now.justOut === false &&
+      ringIndex(pawnColor(id), now.progress) === ringIndex(pawnColor(id), 0)
+    ) {
+      seen.ordinaryOnOwnExit++;
+    }
+  }
+}
 
 /**
  * D-02 with G17, event by event, the home slots followed through the action: a forward move of a ring
@@ -500,6 +542,7 @@ function playChecked(
     checkPawns(state);
     checkEntries(before, result.events);
     checkHomeJumps(before, result.events);
+    checkProtection(before, state, result.events);
     checkTeamCaptures(before, state, action, result.events);
     checkDutyKept(duty, action, state);
 
@@ -562,6 +605,11 @@ describe("engine invariants over 200 random games driven by the level-1 bot", ()
     expect(seen.entryChances).toBeGreaterThan(GAMES);
     expect(seen.entryJumps).toBeGreaterThan(0);
     expect(seen.homeJumps).toBeGreaterThan(0);
+    // G18: knights came out protected, stayed protected while other knights played, and knights stood
+    // on their own losange as ordinary knights (back after a lap, a Valet swap or a 4).
+    expect(seen.exitsProtected).toBeGreaterThan(GAMES * 4);
+    expect(seen.protectionKept).toBeGreaterThan(GAMES);
+    expect(seen.ordinaryOnOwnExit).toBeGreaterThan(0);
   });
 });
 

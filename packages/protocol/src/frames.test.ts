@@ -469,9 +469,9 @@ describe("ids", () => {
   it("keeps distinct close codes for the three endings, and 4000 for a silent socket", () => {
     expect([CLOSE_ELSEWHERE, CLOSE_VERSION, CLOSE_GONE]).toEqual([4001, 4002, 4004]);
     expect(CLOSE_SILENT).toBe(4000);
-    // Version 5 (plan 02-10b): the table's « Avance rapide »; an older page would animate at the
-    // normal speed while the table plays at the fast pace, so it is closed with 4002.
-    expect(PROTOCOL_VERSION).toBe(5);
+    // Version 6 (plan 04-14, G18): a view's knights carry the « just out » flag; a page of version 5
+    // would read every knight on its 18 as protected, so it is closed with 4002.
+    expect(PROTOCOL_VERSION).toBe(6);
   });
 });
 
@@ -657,6 +657,13 @@ describe("the test options of a creation body", () => {
       pace: "zero",
       pauseMs: 2000,
     });
+    // Plan 04-07: « C’est ton tour » sooner than 30 s, 100 ms to 2 minutes.
+    for (const notifyMs of [100, 2000, 120_000]) {
+      expect(parseCreateTestOptions({ test: { pace: "zero", notifyMs } })).toEqual({
+        pace: "zero",
+        notifyMs,
+      });
+    }
     for (const test of [
       undefined,
       null,
@@ -668,6 +675,10 @@ describe("the test options of a creation body", () => {
       { pace: "zero", pauseMs: 100 },
       { pace: "zero", pauseMs: 61_000 },
       { pace: "zero", pauseMs: "2000" },
+      { pace: "zero", notifyMs: 99 },
+      { pace: "zero", notifyMs: 120_001 },
+      { pace: "zero", notifyMs: 1500.5 },
+      { pace: "zero", notifyMs: "2000" },
     ]) {
       expect(parseCreateTestOptions({ test }), JSON.stringify(test)).toBeNull();
     }

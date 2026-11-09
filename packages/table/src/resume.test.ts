@@ -5,10 +5,11 @@
 // purged by its own deadline; and someone who began on another device gets their own seat back, only
 // with the chef de table's yes.
 
-import { type Color, type Rng, viewFor } from "@toc/engine";
+import { type Color, type Rng, scenarioState, viewFor } from "@toc/engine";
 import type { ServerFrame, TableFrame, TablePublic, WelcomeFrame } from "@toc/protocol";
 import { describe, expect, it } from "vitest";
 import {
+  copyTable,
   createTable,
   EXPIRY_MS,
   hostOf,
@@ -516,5 +517,82 @@ describe("the summary names the missing colours (« En pause : on t’attend »)
     expect(summary(paused).missing).toEqual(["jaune", "rouge"] satisfies Color[]);
     const saved = reduce(paused, client(ANA, { t: "stop" }), ctx(6000)).table;
     expect(summary(saved).missing).toEqual([]);
+  });
+});
+
+describe("a snapshot saved before G18 (plan 04-14)", () => {
+  it("copyTable fills the protection switch and writes the default flag on the ring knights", () => {
+    const game = scenarioState(
+      {
+        pawns: { bleu: [{ p: 0 }, { p: 72 }, "S", "S"], rouge: [{ p: 0 }, "S", "S", "S"] },
+        hands: { bleu: ["2S"] },
+        turn: "bleu",
+      },
+      [1, 2, 3, 4],
+    );
+    // As stored before G18: no flag, no switch.
+    const stored = JSON.parse(JSON.stringify(game));
+    for (const pawn of Object.values(stored.pawns) as { zone: string; justOut?: boolean }[]) {
+      delete pawn.justOut;
+    }
+    delete stored.rules.EXIT_ONLY_PROTECTION;
+    const table: Table = {
+      ...createTable({ tableId: ID, now: 1000, seed: [1, 2, 3, 4] }),
+      status: "playing",
+      game: stored,
+    };
+    const copy = copyTable(JSON.parse(JSON.stringify(table)));
+    expect(copy.game?.rules.EXIT_ONLY_PROTECTION).toBe(true);
+    expect(copy.game?.pawns.bleu0).toEqual({ zone: "ring", progress: 0, justOut: true });
+    expect(copy.game?.pawns.bleu1).toEqual({ zone: "ring", progress: 72, justOut: false });
+    expect(copy.game?.pawns.rouge0).toEqual({ zone: "ring", progress: 0, justOut: true });
+    // And the view sent to a seat carries the flag.
+    const view = viewFor(copy.game as NonNullable<Table["game"]>, "bleu");
+    expect(view.pawns.bleu1).toEqual({ zone: "ring", progress: 72, justOut: false });
+  });
+});
+
+describe("a computer's decision stored before G18 (plan 04-14)", () => {
+  it("is dropped by copyTable, so the computer decides again under the new rule", () => {
+    const game = scenarioState(
+      { pawns: { bleu: [{ p: 72 }, "S", "S", "S"] }, hands: { jaune: ["2H"] }, turn: "jaune" },
+      [1, 2, 3, 4],
+    );
+    const stored = JSON.parse(JSON.stringify(game));
+    delete stored.rules.EXIT_ONLY_PROTECTION;
+    const thinking: NonNullable<Table["thinking"]> = {
+      seat: "jaune",
+      base: 3,
+      level: 3,
+      dueAt: 900,
+      waitMs: 0,
+      checkpoint: null,
+      slices: 1,
+      thought: {
+        action: { t: "discard" },
+        rng: [5, 6, 7, 8],
+        candidates: 1,
+        worlds: 0,
+        close: false,
+        broad: false,
+      } as unknown as NonNullable<NonNullable<Table["thinking"]>["thought"]>,
+      playAt: 1200,
+      fallback: false,
+    } as NonNullable<Table["thinking"]>;
+    const table: Table = {
+      ...createTable({ tableId: ID, now: 1000, seed: [1, 2, 3, 4] }),
+      status: "playing",
+      game: stored,
+      thinking,
+    };
+    const copy = copyTable(JSON.parse(JSON.stringify(table)));
+    expect(copy.thinking?.thought).toBeNull();
+    expect(copy.thinking?.checkpoint).toBeNull();
+    expect(copy.thinking?.playAt).toBeNull();
+    expect(copy.thinking?.seat).toBe("jaune");
+    // An up-to-date table keeps its decision.
+    const again = copyTable(copy);
+    const decided = { ...again, thinking: { ...thinking } };
+    expect(copyTable(decided).thinking?.thought).not.toBeNull();
   });
 });

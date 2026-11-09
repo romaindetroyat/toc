@@ -22,9 +22,21 @@
     selected: PawnId | null;
     /** Valet: the knight to swap with, once chosen. */
     target?: PawnId | null;
+    /** In a lesson (plan 05-06): the knights the guide asks to touch, ringed in cream. */
+    guided?: readonly PawnId[];
   };
 
-  let { layer, px, k, render, ui, candidates, selected, target = null }: Props = $props();
+  let {
+    layer,
+    px,
+    k,
+    render,
+    ui,
+    candidates,
+    selected,
+    target = null,
+    guided = [],
+  }: Props = $props();
 
   const AMBER = "#FFB02E";
   const WALNUT = "#2B1D12";
@@ -35,6 +47,11 @@
   // pixels (badges, letters, capture marks: x px) and the path's strokes are not scaled.
   /** Halo radius of a knight. */
   const HALO_R = KNIGHT.w / 2 + 14;
+  /**
+   * The guide's ring (05-UI-SPEC « The guide halo »): outside the amber halo, footprint / 2 + 26
+   * units, drawn 4 units walnut, 10 cream, 4 walnut from the inside out.
+   */
+  const GUIDE_R = KNIGHT.w / 2 + 26;
   /** A ghost's ring at its feet (half axes), and its badge beside its head. */
   const GHOST_RX = 70;
   const GHOST_RY = 26;
@@ -276,6 +293,20 @@
           </g>
         </g>
       {/if}
+    {/each}
+
+    {#each guided as pawn (pawn)}
+      {@const [x, y] = bodyAt(pawn)}
+      {@const r = GUIDE_R * sizeOf(pawn)}
+      <!-- The guide halo (plan 05-06): its pulse is a CSS animation on its own group, never on the
+           knight; static under reduced motion. Cream and walnut, never amber. -->
+      <g data-guide-halo="pawn" data-guide-pawn={pawn} transform={`translate(${x} ${y})`}>
+        <g class="guide-pulse" class:still>
+          <circle r={r - 7} fill="none" stroke={WALNUT} stroke-width="4" />
+          <circle r={r} fill="none" stroke={CREAM} stroke-width="10" />
+          <circle r={r + 7} fill="none" stroke={WALNUT} stroke-width="4" />
+        </g>
+      </g>
     {/each}
 
     {#each [selected, target] as chosen, i (i)}
@@ -523,6 +554,13 @@
     animation: pulse 1.2s ease-in-out infinite alternate;
   }
 
+  /* The guide's ring: 1 -> 1.12 over 1.2 s, endless; static under reduced motion. */
+  .guide-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: guide-ring 1.2s ease-in-out infinite alternate;
+  }
+
   .pop {
     transform-box: fill-box;
     transform-origin: center;
@@ -535,6 +573,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .pulse,
+    .guide-pulse,
     .pop {
       animation: none;
     }
@@ -546,6 +585,15 @@
     }
     to {
       transform: scale(1.08);
+    }
+  }
+
+  @keyframes guide-ring {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.12);
     }
   }
 

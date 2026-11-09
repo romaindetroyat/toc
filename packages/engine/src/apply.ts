@@ -5,7 +5,7 @@
 
 import type { GameEvent } from "./events.ts";
 import { legalActions } from "./legal.ts";
-import { homeCount, movesForCard, sameAction, winningTeam } from "./moves.ts";
+import { type Candidate, homeCount, movesForCard, sameAction, winningTeam } from "./moves.ts";
 import { type Board, placeOf, stablePlace } from "./path.ts";
 import { applyPlan } from "./seven.ts";
 import { endDeal, giveCard, isDealOver } from "./state.ts";
@@ -61,7 +61,16 @@ export function resolveMove(board: Board, seat: Color, action: Action): MoveReso
   if (candidate === undefined) {
     throw new IllegalActionError("illegal-action", `${seat} cannot play ${JSON.stringify(action)}`);
   }
+  return resolveCandidate(board, candidate);
+}
 
+/**
+ * The movement of `candidate`, one of movesForCard(board, seat, card) on this very board, without
+ * looking it up again (resolveMove's second half; the bots' play-outs of plan 04-15 resolve every
+ * candidate of a card).
+ */
+export function resolveCandidate(board: Board, candidate: Candidate): MoveResolution {
+  const action = candidate.action;
   const pawns = copyPawns(board.pawns);
   const events: GameEvent[] = [];
   const captured: PawnId[] = [];

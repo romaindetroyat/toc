@@ -7,8 +7,10 @@
 //   cards kept (evaluate.ts scoreOf), then picked through the noise of the level (levels.ts): an epsilon
 //   chance of a uniform pick, otherwise a softmax of temperature T over the scores (T 0: the best
 //   score, ties to the first);
-// - exchange phase: level 1 gives like randomLegal; levels 2 to 5 score each card for the partner
-//   (exchange.ts giveScores, D-09) and pick through the same noise, level 5 taking the best.
+// - exchange phase: level 1 gives like randomLegal; levels 2 and 3 score each card on the board for the
+//   partner (exchange.ts giveScores, D-09); levels 4 and 5 first decide over the deal whether an As or a
+//   Roi goes (exchange.ts dealGives, plan 04-15), then score that family on the board the same way; all
+//   pick through the same noise, level 5 taking the best.
 // - level 5 in the play phase: the search over imagined deals (search.ts, D-04), anytime: each step
 //   runs more of its budget (levels.ts CHAMPION_BUDGET by default) and result() is valid at any moment.
 // Work is counted in units (Budget), never in time, so the same inputs give the same move on every
@@ -19,8 +21,15 @@
 import { type Action, type Color, next, type PlayerView, type Rng } from "@toc/engine";
 import { candidatesFor } from "./candidates.ts";
 import { scoreOf } from "./evaluate.ts";
-import { giveScores } from "./exchange.ts";
-import { type BotLevel, type Budget, CHAMPION_BUDGET, LEVEL_PARAMS } from "./levels.ts";
+import { dealGives, type GiveScore, giveScores } from "./exchange.ts";
+import {
+  type BotLevel,
+  type Budget,
+  CHAMPION_BUDGET,
+  GIVE_METHOD,
+  type GiveMethod,
+  LEVEL_PARAMS,
+} from "./levels.ts";
 import { randomLegal } from "./randomLegal.ts";
 import { createSearch, type SearchCheckpoint } from "./search.ts";
 
@@ -104,23 +113,45 @@ function gapOf(scores: readonly number[]): number {
   return sorted.length > 1 ? (sorted[0] as number) - (sorted[1] as number) : 0;
 }
 
-/** The exchange card of levels 2 to 5: giveScores through the noise of the level. */
-function decideGive(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thought {
-  const gives = giveScores(view, seat);
+/**
+ * The exchange card of a level from 2 to 5 by `method` (levels.ts GIVE_METHOD by default): the board
+ * give (giveScores, one unit per card) or the deal give (dealGives: the family decided over the deal, its
+ * board expansions as units, its rng drawn first), then the noise of the level among the cards left.
+ * Exported for the ladder's give-against-give runs (match.ts).
+ */
+export function chooseGive(
+  view: PlayerView,
+  seat: Color,
+  level: BotLevel,
+  rng: Rng,
+  method: GiveMethod = GIVE_METHOD[level],
+): Thought {
+  let gives: GiveScore[];
+  let units: number;
+  let r: Rng;
+  if (method === "deal") {
+    const dealt = dealGives(view, seat, rng);
+    gives = dealt.scores;
+    units = dealt.units;
+    r = dealt.rng;
+  } else {
+    gives = giveScores(view, seat);
+    units = gives.length;
+    r = [...rng];
+  }
   const only = gives[0];
   if (only === undefined) throw new Error(`chooseAction: ${seat} has no card to give`);
-  const units = gives.length;
   if (gives.length === 1) {
     return {
       action: { t: "give", card: only.card },
-      rng: [...rng],
+      rng: r,
       difficulty: 0,
       candidates: 1,
       units,
     };
   }
   const scores = gives.map((give) => give.score);
-  const [index, after] = pickIndex(scores, level, rng);
+  const [index, after] = pickIndex(scores, level, r);
   const chosen = gives[index] ?? only;
   return {
     action: { t: "give", card: chosen.card },
@@ -133,7 +164,7 @@ function decideGive(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): T
 
 /** The decision of a level from 1 to 5, computed in one go. */
 function decide(view: PlayerView, seat: Color, level: BotLevel, rng: Rng): Thought {
-  if (view.phase === "exchange" && level !== 1) return decideGive(view, seat, level, rng);
+  if (view.phase === "exchange" && level !== 1) return chooseGive(view, seat, level, rng);
   if (view.phase !== "play") {
     // Level 1's exchange (and a won game, where randomLegal reports there is nothing to play).
     const [action, after] = randomLegal(view, seat, rng);

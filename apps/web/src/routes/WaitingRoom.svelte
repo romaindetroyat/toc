@@ -1,11 +1,14 @@
 <script lang="ts">
   import { COLORS, type Color, PARTNER } from "@toc/engine";
   import type { TablePublic, You } from "@toc/protocol";
+  import { account } from "../account/store.svelte.ts";
   import { unlock } from "../audio/engine.ts";
   import { bots } from "../i18n/fr/bots.ts";
   import { seats } from "../i18n/fr/seats.ts";
   import { table as copy } from "../i18n/fr/table.ts";
   import type { TableConnection } from "../net/connection.svelte.ts";
+  import { readProgress } from "../game/lessonProgress.ts";
+  import { pageStorage } from "../net/device.ts";
   import { tableNotices } from "../net/notices.ts";
   import ConfirmDialog from "../ui/ConfirmDialog.svelte";
   import { placeAbove, type Rect, type Size } from "../board/bubbles.ts";
@@ -15,6 +18,7 @@
   import MessagesSheet from "../ui/MessagesSheet.svelte";
   import MoveSheet from "../ui/MoveSheet.svelte";
   import RotatePrompt from "../ui/RotatePrompt.svelte";
+  import RulesSheet from "../ui/RulesSheet.svelte";
   import SeatTile from "../ui/SeatTile.svelte";
   import Icon from "../ui/Icon.svelte";
   import SettingsButton from "../ui/SettingsButton.svelte";
@@ -196,6 +200,22 @@
     inviteOpen = true;
   }
 
+  // Plan 04-11 (D-07): a signed-in person invites friends from the sheet's « Mes amis » tab; the
+  // names at the table tell which friend is already there. Guests get the 02 sheet unchanged.
+  const friendsAt = $derived(
+    account.current === null
+      ? null
+      : {
+          table: id,
+          names: [
+            ...COLORS.map((color) =>
+              table.seats[color].kind === "human" ? table.seats[color].name : null,
+            ),
+            ...table.unseated,
+          ],
+        },
+  );
+
   // Right after the creation the sheet opens by itself, once, for the creator (D-02); the table takes
   // the creator's last « Avance rapide » on this device (plan 02-10b).
   $effect(() => {
@@ -244,6 +264,12 @@
   });
 
   const startNames = $derived(copy.names(unseatedOthers));
+
+  // Plan 05-08 (05-UI-SPEC « Waiting room hint for newcomers »): a seated device that has finished no
+  // lesson is pointed to the rules while it waits, never to the lessons (leaving would free the seat).
+  const newcomer = readProgress(pageStorage()).done.length === 0;
+  let rulesOpen = $state(false);
+  let rulesButton = $state<HTMLButtonElement | null>(null);
 </script>
 
 <svelte:window bind:innerWidth={width} />
@@ -341,6 +367,21 @@
         <p class="t-body muted" data-fast-line>{copy.lobby.fastLine}</p>
       {/if}
 
+      {#if newcomer && mySeat !== null}
+        <div class="hint" data-newcomer-hint>
+          <p class="t-label muted">{copy.lobby.newcomer}</p>
+          <button
+            type="button"
+            class="btn btn-text"
+            aria-haspopup="dialog"
+            bind:this={rulesButton}
+            onclick={() => (rulesOpen = true)}
+          >
+            {copy.lobby.newcomerRules}
+          </button>
+        </div>
+      {/if}
+
       <!-- DOM order = visual order: [Réglages] [Messages] [Inviter] [Lancer la partie]; « Messages »
            once seated (plan 02-08). -->
       <div class="actions" data-room-actions>
@@ -415,7 +456,17 @@
 {/if}
 
 {#if inviteOpen}
-  <InviteSheet url={link} name={myName} onclose={() => (inviteOpen = false)} opener={inviteButton} />
+  <InviteSheet
+    url={link}
+    name={myName}
+    onclose={() => (inviteOpen = false)}
+    opener={inviteButton}
+    {friendsAt}
+  />
+{/if}
+
+{#if rulesOpen}
+  <RulesSheet tab="but" onclose={() => (rulesOpen = false)} opener={rulesButton} />
 {/if}
 
 {#if confirmStart}
@@ -509,6 +560,18 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+
+  /* The newcomer hint: the line (Label muted), then the text button, on one 44 px row when it fits. */
+  .hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--space-xs);
+  }
+
+  .hint p {
+    margin: 0;
   }
 
   .actions {

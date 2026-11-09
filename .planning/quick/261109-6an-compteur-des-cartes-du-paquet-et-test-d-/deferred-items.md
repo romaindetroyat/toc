@@ -1,0 +1,3 @@
+# Deferred items (quick task 261109-6an)
+
+- **Pre-existing, out of scope:** `e2e/accessibilite.spec.ts` « l’accueil … », « Première fois ? » and « Installer TOC » fail at every size with axe `label-content-name-mismatch` on `button[data-small-tile="regles"]`: commit d336cec shortened the visible line to « Cartes, 7, maison » (`apps/web/src/i18n/fr/accueil.ts` `rules.sub`) but kept the accessible name « Règles : les cartes, le 7, la maison » (`rules.name`). The name has to start with the visible words again (for example « Règles : cartes, 7, maison »). Not touched here: the home page is outside this task.

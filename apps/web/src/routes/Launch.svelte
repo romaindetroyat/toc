@@ -9,6 +9,7 @@
   import { settings, updateSettings } from "../settings/store.svelte.ts";
   import type { BotLevels } from "../settings/settings.ts";
   import ColorTile from "../ui/ColorTile.svelte";
+  import HomeStrip from "../ui/HomeStrip.svelte";
   import SettingsSheet from "../ui/SettingsSheet.svelte";
   import { screen } from "../ui/screen.svelte.ts";
   import StrengthPicker from "../ui/StrengthPicker.svelte";
@@ -97,6 +98,12 @@
     <h1 class="t-display">{launch.title}</h1>
     <p class="tagline">{launch.tagline}</p>
   </header>
+  <!-- Plan 04-08 (APP-02): « Nouvelle version disponible » may show after the header in one column
+       and in portrait (at the bottom of the right column otherwise); the offline and install strips
+       stay on the home. -->
+  {#if layout === "one" || layout === "portrait"}
+    <HomeStrip kinds={["update"]} margin={layout === "one" ? "0 0 var(--space-sm)" : undefined} />
+  {/if}
 {/snippet}
 
 <main class="launch" data-layout={layout}>
@@ -153,6 +160,12 @@
         </button>
         <button type="button" class="btn btn-primary play" onclick={play}>{launch.play}</button>
       </div>
+      {#if layout === "computer" || layout === "two"}
+        <HomeStrip
+          kinds={["update"]}
+          margin={layout === "computer" ? "var(--space-md) 0 0" : "var(--space-sm) 0 0"}
+        />
+      {/if}
     </div>
   </div>
 </main>

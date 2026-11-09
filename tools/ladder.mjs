@@ -2,6 +2,7 @@
 // with the real @toc/bots and their real per-level parameters.
 //
 //   node tools/ladder.mjs --a N --b M [--games 400] [--seed 1] [--workers 4] [--min 0.60] [--lower 0.55]
+//                         [--give-a board|deal] [--give-b board|deal]
 //
 // Pair i takes a deal seed and a bot seed from one seeded sfc32 stream (ladderSeeds) and is played
 // twice: level A as bleu-rouge, then level A as jaune-vert, so the luck of the deal and of the seats
@@ -9,9 +10,12 @@
 // the decisions with performance.now through playGame's `time` hook.
 //
 // Prints the win rate of A, its Wilson 95 % interval, the pair outcomes 2–0 / 1–1 / 0–2, the decision
-// time of each side (mean, p95, max) and its work units, the wall time and a verdict. The bar
+// time of each side (mean, p95, max) and its work units, the time of its exchange decisions alone, the wall time and a verdict. The bar
 // (« nettement »): p̂ ≥ --min and the Wilson lower bound > --lower (--min 0 --lower 0: a probe that
 // reports without judging; a failed game still fails it).
+// --give-a / --give-b (plan 04-15) force how side A / side B chooses its exchange card (board: the give
+// of D-09, deal: the give over the deal), whatever its level's own (levels.ts GIVE_METHOD), so the new
+// give can be played against the old one at the same level: --a 5 --b 5 --give-a deal --give-b board.
 // Exit codes: 0 PASS, 1 FAIL or a failed game (printed with its seeds), 2 bad arguments.
 // The engine and the bots are TypeScript files imported directly by Node (type stripping).
 
@@ -39,7 +43,7 @@ function wilson(wins, n) {
 function usage(message) {
   console.error(`ladder: ${message}`);
   console.error(
-    "usage: node tools/ladder.mjs --a N --b M [--games 400] [--seed 1] [--workers 4] [--min 0.60] [--lower 0.55]",
+    "usage: node tools/ladder.mjs --a N --b M [--games 400] [--seed 1] [--workers 4] [--min 0.60] [--lower 0.55] [--give-a board|deal] [--give-b board|deal]",
   );
   process.exit(2);
 }
@@ -75,8 +79,16 @@ function fraction(name, fallback) {
   return n;
 }
 
+/** --give-a / --give-b: "board" or "deal", or null (the level's own method). */
+function method(name) {
+  const value = raw(name);
+  if (value === undefined) return null;
+  if (value !== "board" && value !== "deal") usage(`--${name} expects board or deal`);
+  return value;
+}
+
 function parseArgs() {
-  const known = new Set(["a", "b", "games", "seed", "workers", "min", "lower"]);
+  const known = new Set(["a", "b", "games", "seed", "workers", "min", "lower", "give-a", "give-b"]);
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith("--") && !known.has(arg.slice(2))) usage(`unknown option ${arg}`);
   }
@@ -88,20 +100,31 @@ function parseArgs() {
   const workers = integer("workers", Math.max(1, Math.min(4, availableParallelism())), 1, 64);
   const min = fraction("min", 0.6);
   const lower = fraction("lower", 0.55);
-  return { a, b, games, seed, workers, min, lower };
+  const giveA = method("give-a");
+  const giveB = method("give-b");
+  return { a, b, games, seed, workers, min, lower, giveA, giveB };
 }
 
 /** Worker: plays the pairs it is given and posts one record per game. */
 async function work() {
   const { playGame } = await load("packages/bots/src/index.ts");
-  const { a, b, pairs } = workerData;
+  const { a, b, pairs, giveA, giveB } = workerData;
   const time = () => performance.now();
   const results = [];
   for (const { index, dealSeed, botSeed } of pairs) {
     for (const aTeam of TEAMS) {
       const bTeam = aTeam === TEAMS[0] ? TEAMS[1] : TEAMS[0];
       try {
-        const game = playGame({ levels: { [aTeam]: a, [bTeam]: b }, dealSeed, botSeed, time });
+        const gives = {};
+        if (giveA !== null) gives[aTeam] = giveA;
+        if (giveB !== null) gives[bTeam] = giveB;
+        const game = playGame({
+          levels: { [aTeam]: a, [bTeam]: b },
+          dealSeed,
+          botSeed,
+          time,
+          gives,
+        });
         results.push({
           index,
           aTeam,
@@ -134,13 +157,16 @@ function timing(ms) {
 
 async function main() {
   const options = parseArgs();
-  const { a, b, games, seed, workers, min, lower } = options;
-  const { ladderSeeds } = await load("packages/bots/src/index.ts");
+  const { a, b, games, seed, workers, min, lower, giveA, giveB } = options;
+  const { GIVE_METHOD, ladderSeeds } = await load("packages/bots/src/index.ts");
   const pairCount = games / 2;
   const pairs = ladderSeeds(seed, pairCount).map((p, index) => ({ index, ...p }));
   const started = performance.now();
   console.log(
     `ladder: A=${a} (${NAMES[a]}) vs B=${b} (${NAMES[b]}), ${games} games (${pairCount} pairs), seed ${seed}`,
+  );
+  console.log(
+    `gives: A ${giveA ?? GIVE_METHOD[a]}${a === 1 ? " (randomLegal)" : ""}, B ${giveB ?? GIVE_METHOD[b]}${b === 1 ? " (randomLegal)" : ""}`,
   );
 
   const slices = Array.from({ length: Math.min(workers, pairCount) }, () => []);
@@ -152,7 +178,7 @@ async function main() {
       (slice) =>
         new Promise((done, fail) => {
           const worker = new Worker(fileURLToPath(import.meta.url), {
-            workerData: { a, b, pairs: slice },
+            workerData: { a, b, pairs: slice, giveA, giveB },
           });
           worker.once("message", done);
           worker.once("error", fail);
@@ -191,14 +217,16 @@ async function main() {
 
   const side = (key) => {
     const ms = [];
+    const giveMs = [];
     let units = 0;
     let decisions = 0;
     for (const r of played) {
       for (const x of r[key].ms) ms.push(x);
+      for (const x of r[key].giveMs) giveMs.push(x);
       units += r[key].units;
       decisions += r[key].decisions;
     }
-    return { ms, units, decisions };
+    return { ms, giveMs, units, decisions };
   };
   const sideA = side("a");
   const sideB = side("b");
@@ -210,6 +238,8 @@ async function main() {
   console.log(`pairs: 2–0 ${twoZero}, 1–1 ${oneOne}, 0–2 ${zeroTwo}`);
   console.log(`A decisions: ${sideA.decisions}, ${timing(sideA.ms)}, units ${sideA.units}`);
   console.log(`B decisions: ${sideB.decisions}, ${timing(sideB.ms)}, units ${sideB.units}`);
+  console.log(`A gives: ${sideA.giveMs.length}, ${timing(sideA.giveMs)}`);
+  console.log(`B gives: ${sideB.giveMs.length}, ${timing(sideB.giveMs)}`);
   console.log(`wall time: ${seconds.toFixed(1)} s (${slices.length} workers)`);
   const pass = failed.length === 0 && p >= min && lo > lower;
   console.log(

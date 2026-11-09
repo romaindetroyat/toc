@@ -14,6 +14,7 @@
   import type { CardId, Color, RenderState } from "@toc/engine";
   import type { Snippet } from "svelte";
   import { game } from "../i18n/fr/game.ts";
+  import { paquet } from "../i18n/fr/paquet.ts";
   import { settings } from "../settings/store.svelte.ts";
   import BoardArt from "./BoardArt.svelte";
   import CardFlights, { type Flight } from "./CardFlights.svelte";
@@ -41,11 +42,13 @@
     flights = [],
     thinking = null,
     ontapis,
+    ondefausse,
     children,
     under,
     over,
     hits,
     badges,
+    markers = true,
   }: {
     k?: number;
     render?: RenderState | null;
@@ -58,11 +61,18 @@
     thinking?: Color | null;
     /** A tap (or Entrée) on the felt: the game opens « Sur le tapis ». */
     ontapis?: () => void;
+    /**
+     * A tap (or Entrée) on the défausse pile (quick task 261109-80e): the game opens « Les cartes
+     * jouées »; the target is its opener and gets the focus back.
+     */
+    ondefausse?: (opener: HTMLElement) => void;
     children?: Snippet;
     under?: Snippet<[number]>;
     over?: Snippet<[number]>;
     hits?: Snippet<[number]>;
     badges?: Snippet;
+    /** The « D » disc and the « 1er » token on the felt; a lesson has neither (plan 05-06). */
+    markers?: boolean;
   } = $props();
 
   const scene = SCENE;
@@ -79,6 +89,21 @@
     height: pct(scene.felt.h, scene.height),
     radius: "50%",
   };
+
+  /**
+   * The défausse target (quick task 261109-80e): the pile's box (a card at SCENE.pile, right of the
+   * felt's centre), at least 44 x 44. It grows from the pile's left edge to the right, away from the
+   * felt's centre, so the middle of the felt stays the « Sur le tapis » target on the smallest board.
+   */
+  const pileW = scene.card.w * scene.pile;
+  const pileH = scene.card.h * scene.pile;
+  const defausse = {
+    left: pct(scene.defausse[0] - pileW / 2, scene.width),
+    top: pct(scene.defausse[1], scene.height),
+    width: `max(${pct(pileW, scene.width)}, 44px)`,
+    height: `max(${pct(pileH, scene.height)}, 44px)`,
+  };
+  let defausseEl = $state<HTMLButtonElement | null>(null);
 
   /**
    * The thinking glow (plan 03-09, Romain's « Pas assez visible » of 2026-10-17): a soft disc of the
@@ -140,7 +165,7 @@
   {@render badges?.()}
   <svg viewBox={`0 0 ${scene.width} ${scene.height}`} xmlns="http://www.w3.org/2000/svg">
     {#if render}
-      <FeltTable {render} {discardTop} {k} {px} />
+      <FeltTable {render} {discardTop} {k} {px} {markers} />
     {/if}
     {@render under?.(px)}
     {@render children?.()}
@@ -174,6 +199,26 @@
       style:height={felt.height}
       style:border-radius={felt.radius}
       onclick={ontapis}
+    ></button>
+  {/if}
+  {#if render && ondefausse}
+    <!-- The défausse pile, a target of its own over the felt's (quick task 261109-80e): one tap opens
+         « Les cartes jouées », on the phone as on the computer. -->
+    <button
+      type="button"
+      class="defausse"
+      aria-label={paquet.button}
+      title={paquet.button}
+      aria-haspopup="dialog"
+      data-defausse-button
+      bind:this={defausseEl}
+      style:left={defausse.left}
+      style:top={defausse.top}
+      style:width={defausse.width}
+      style:height={defausse.height}
+      onclick={() => {
+        if (defausseEl !== null) ondefausse(defausseEl);
+      }}
     ></button>
   {/if}
 </div>
@@ -226,6 +271,19 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Invisible button over the défausse pile, above the felt's button; centred on the pile's height. */
+  .defausse {
+    position: absolute;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    transform: translateY(-50%);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* Below 314 px of board the felt (448 of the landscape galet's 3200 units) is less than 44 px tall,
      so its button outgrows it and covers the knights around it. No supported screen gets there any
      more (the smallest, 480 x 320, has a 360 px board since plan 01-47), but a window can be
@@ -233,7 +291,8 @@
      picks a knight or reports a miss. The felt stays a 44 px target the rest of the time and to the
      keyboard. */
   @container (max-width: 314px) {
-    .board:has(:global([data-hit-layer])) .tapis {
+    .board:has(:global([data-hit-layer])) .tapis,
+    .board:has(:global([data-hit-layer])) .defausse {
       pointer-events: none;
     }
   }
